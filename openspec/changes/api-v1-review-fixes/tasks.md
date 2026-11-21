@@ -28,7 +28,7 @@ Merge order: PR #18 (`chore/infra-compose-v2`) first, then PR #21. This branch m
 
 ## 5. Closing
 
-- [ ] 5.1 Full suite on a throwaway Postgres 17 and Redis, docs-check, `openspec validate --all --strict`, test-diff-check, `pip-audit`
-- [ ] 5.2 End-to-end through the gateway on the stacked compose (#18 + this branch) with a fresh `scripts/init-env.sh`: `docker compose up` passes interpolation, `api` is healthy, and the end-to-end steps pass
-- [ ] 5.3 Apply the `iw-docs-update` skill (docs, Damian's STATUS row) and add the `iw-ai-log` row
+- [x] 5.1 Full suite on a throwaway Postgres 17 and Redis, docs-check, `openspec validate --all --strict`, test-diff-check, `pip-audit`
+- [x] 5.2 End-to-end through the gateway on the stacked compose (#18 + this branch) with a fresh `scripts/init-env.sh`: `docker compose up` passes interpolation, `api` is healthy, and the end-to-end steps pass
+- [x] 5.3 Apply the `iw-docs-update` skill (docs, Damian's STATUS row) and add the `iw-ai-log` row
 - [ ] 5.4 Run the `iw-pr-review` skill with one reviewer pass and fix real findings
