@@ -31,7 +31,10 @@ async def test_valid_document_is_inserted_with_payload(pool, seeded_source):
     assert str(row["source_id"]) == seeded_source.id
     assert row["content_hash"] == "35864f838dfec0cd765ac334f77c5250f3283ccedbb2e7df3eaccf16e32ccf23"
     assert row["stream_published_at"] is None
-    assert json.loads(row["payload"])["text"] == "Zysk do 20%"
+    assert row["text"] == "Zysk do 20%"
+    assert row["title"] == "Konto"
+    # only the nested contract fields go into the payload (api/README.md)
+    assert json.loads(row["payload"]) == {"scrape_meta": {"scraper": "httpx", "duration_ms": 10, "proxy": None}}
 
 
 async def test_rerun_of_unchanged_page_is_a_duplicate(pool, seeded_source):

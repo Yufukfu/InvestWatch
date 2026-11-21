@@ -6,7 +6,7 @@ Persist a parsed document safely and announce it to analytics, so downstream con
 ## ADDED Requirements
 
 ### Requirement: Validate before insert
-The scraper SHALL validate every document against the `ScrapedDocument` v1 schema in `contracts/` (path from `CONTRACTS_DIR`, present in the service image) before inserting it, and SHALL NOT insert an invalid one. It SHALL always set `source_id` (collected documents come from a `sources` row), because a NULL would make the dedup index treat rows as distinct.
+The scraper SHALL validate every document against the `ScrapedDocument` v1 schema in `contracts/` (path from `CONTRACTS_DIR`, present in the service image) before inserting it, and SHALL NOT insert an invalid one. It SHALL always set `source_id`, because collected documents come from a `sources` row.
 
 #### Scenario: Valid document is inserted
 - **WHEN** a document with all of `id, platform, url, fetched_at, text, source_kind` is ingested
@@ -15,6 +15,10 @@ The scraper SHALL validate every document against the `ScrapedDocument` v1 schem
 #### Scenario: Invalid document is rejected
 - **WHEN** a document is missing `text` or has a malformed `fetched_at`
 - **THEN** no row is inserted and a job error with reason `schema_invalid` is recorded
+
+#### Scenario: Blank text
+- **WHEN** the text of a document is empty or only whitespace after normalisation
+- **THEN** no row is inserted and a job error with reason `empty_text` is recorded
 
 ### Requirement: Deduplicate by content hash
 The scraper SHALL compute `content_hash` as the sha256 of the normalised text (Unicode NFC, every run of whitespace collapsed to one space, leading and trailing whitespace removed; case is preserved) and SHALL NOT insert a second document with the same `content_hash` for the same `source_id`.
@@ -44,7 +48,7 @@ The scraper SHALL compute `content_hash` as the sha256 of the normalised text (U
 - **THEN** the uploaded object is removed and no document row exists
 
 ### Requirement: Store raw HTML in object storage
-The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_id}.html` and set `html_object_key` accordingly. The scraper SHALL create the bucket at startup if it is missing. If the upload fails the document SHALL NOT be inserted.
+The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_id}.html` and set `html_object_key` accordingly. At startup the scraper SHALL check that the bucket exists and fail with a clear error if it does not; it SHALL NOT create it (the stack's `minio-init` does, and the app user may lack that permission). If the upload fails the document SHALL NOT be inserted.
 
 #### Scenario: HTML stored
 - **WHEN** a document is ingested
@@ -53,6 +57,10 @@ The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_i
 #### Scenario: Object storage unavailable
 - **WHEN** the upload to MinIO fails
 - **THEN** no `documents` row is inserted and a job error with reason `storage_error` is recorded
+
+#### Scenario: Bucket missing
+- **WHEN** the scraper starts and `iw-raw` does not exist
+- **THEN** startup fails with an error naming the bucket, and the bucket is not created
 
 ### Requirement: Publish only after the database commit
 The scraper SHALL publish `{"document_id": "<uuid>", "schema": "v1"}` to the Redis Stream `iw:documents` after, and only after, the `documents` row is committed.

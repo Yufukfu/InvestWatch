@@ -21,7 +21,11 @@ SCHEMA_SQL = (Path(__file__).parent / "schema.sql").read_text()
 def _require(name: str) -> str:
     value = os.environ.get(name)
     if not value:
-        pytest.skip(f"{name} not set (needs the test containers)")
+        message = f"{name} not set (needs the test containers)"
+        if os.environ.get("CI"):
+            # in CI a skipped service test would hide the core spec scenarios behind a green run
+            pytest.fail(message)
+        pytest.skip(message)
     return value
 
 
@@ -41,6 +45,46 @@ async def pool():
         await created.close()
         await admin.execute(f'DROP SCHEMA "{schema}" CASCADE')
         await admin.close()
+
+
+@pytest_asyncio.fixture
+async def redis_client():
+    """A Redis client; tests use their own stream name, so nothing is shared between tests."""
+    from redis import asyncio as aioredis
+
+    client = aioredis.from_url(_require("IW_TEST_REDIS_URL"), decode_responses=True)
+    try:
+        yield client
+    finally:
+        await client.aclose()
+
+
+@pytest.fixture
+def stream_name() -> str:
+    return f"iw:documents:test:{uuid.uuid4().hex[:8]}"
+
+
+@pytest_asyncio.fixture
+async def storage():
+    """A Storage on a unique bucket. The bucket is made here, as module C's `minio-init` does in the stack:
+    the service itself never creates it."""
+    import asyncio
+
+    from iw_scraper.ingest.storage import Storage
+
+    store = Storage(
+        _require("IW_TEST_MINIO_ENDPOINT"),
+        os.environ["IW_TEST_MINIO_ACCESS_KEY"],
+        os.environ["IW_TEST_MINIO_SECRET_KEY"],
+        bucket=f"iw-raw-test-{uuid.uuid4().hex[:10]}",
+    )
+    await asyncio.to_thread(store._client.make_bucket, store.bucket)
+    try:
+        yield store
+    finally:
+        for key in await store.list_keys():
+            await store.remove(key)
+        await asyncio.to_thread(store._client.remove_bucket, store.bucket)
 
 
 @pytest.fixture

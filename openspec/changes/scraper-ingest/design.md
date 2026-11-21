@@ -13,19 +13,19 @@ Stateless Python async code that turns a parsed page into a stored, announced do
 ## Decisions
 
 - **Ingest order: validate, cheap dedup check, upload HTML, insert row, commit, then `XADD`.** A failure before commit publishes nothing; a failure after commit records `publish_failed`, leaves the row unpublished and the sweep republishes it (at-least-once; analytics deduplicates by `document_id`).
-- **Dedup in two steps.** A lookup on `(source_id, content_hash)` before the upload, and a unique index with `INSERT ... ON CONFLICT DO NOTHING` for the race. Any failure after the upload (conflict or other error) removes the object. `source_id` is always set, because NULLs would defeat the index. The scraper creates `iw-raw` at startup if absent.
+- **Dedup in two steps.** A lookup on `(source_id, content_hash)` before the upload, and the partial unique index `uq_documents_source_hash` with a named target, `INSERT ... ON CONFLICT (source_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING`, for the race (a bare `ON CONFLICT DO NOTHING` would also hide a reused `id`). Any failure after the upload (conflict or other error) removes the object. `source_id` is always set because collected documents come from a `sources` row (the index is `NULLS NOT DISTINCT`, so ad-hoc rows dedup too). The scraper only checks at startup that `iw-raw` exists and fails clearly if not: `minio-init` (module C) creates it, and the app user is limited to that bucket.
 - **Hash normalisation keeps case.** NFC, whitespace collapsed and trimmed, no case folding: capitalisation can carry meaning in risk wording. Volatile page text still produces new rows; stripping it is per-site parser work.
-- **Republish sweep** claims rows that are unpublished and older than a grace period with `FOR UPDATE SKIP LOCKED`. The row lock separates concurrent sweeps; only the grace period protects a run that is still publishing. A crash between `XADD` and the marker update can publish twice, which analytics tolerates.
-- **Schema changes are not created by this service.** The migration items in `proposal.md` are Alembic migrations under `api` (integration plan §7). `api/` does not exist yet, so task 1.4 agrees with C who writes them; groups needing the database wait for it.
-- **Job errors** go to a `job_errors` table (source_id nullable, no foreign key, reason, detail, at) plus a JSON log line. Detail never holds credentials.
+- **Republish sweep** claims rows that are unpublished and older than a grace period (`documents.created_at`, ordered by `created_at, id`) with `FOR UPDATE SKIP LOCKED`. The row lock separates concurrent sweeps; only the grace period protects a run that is still publishing. A crash between `XADD` and the marker update can publish twice, which analytics tolerates.
+- **Schema changes are not created by this service.** Module C writes the Alembic revision `0001_initial` (branch `api/api-v1`; its `api/README.md` holds the SQL the scraper uses). Tests run on a throwaway schema in `scraper/tests/schema.sql` that mirrors it; ids have no server default, so the scraper generates UUID v4 for `documents` and `job_errors`.
+- **Job errors** go to a `job_errors` table (`id` generated here, `source_id` nullable with no foreign key, `url`, `reason`, `detail`, `occurred_at`) plus a JSON log line; a blank `text` is recorded as `empty_text` instead of a junk row. Detail never holds credentials.
 - **Contracts in the image**: `CONTRACTS_DIR` points at `contracts/` (the image build context includes it, see `scraper-v1`).
 
 ## Risks / Trade-offs
 
 - [Volatile page text creates new rows] -> stripping it is per-site parser work in `scraper-v1`, not hash work.
 - [Redis publish lost after commit] -> republish sweep.
-- [Migration late] -> tests run on a throwaway schema; the real migration is checked in `scraper-orchestration`'s end-to-end test.
+- [Schema drift] -> the throwaway test schema mirrors module C's `0001_initial`; the real migration is exercised in `scraper-orchestration`'s end-to-end test. A new column needs a new revision from C, never an edit of an applied one.
 
 ## Open Questions
 
-- None blocking. The published marker is `documents.stream_published_at` with `committed_at` (`migration-request.md`); C may rename them without changing the specs.
+- None blocking. The published marker is `documents.stream_published_at` and the sweep age is `documents.created_at`, as agreed with C (no `committed_at` column).
