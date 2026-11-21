@@ -15,7 +15,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from ..registry import _normalize_domain, core_name
+from ..registry import SOCIAL_HOSTS, _normalize_domain, core_name
 from . import KnfError
 from .fetch import LISTS, SUMMARY_URL, FetchedList
 from .parse import COUNTRIES, RawRecord, country_code
@@ -26,11 +26,6 @@ TYPE_ORDER = {s.type: i for i, s in enumerate(LISTS)}
 DOMESTIC_TYPES = {"brokerage_house", "brokerage_bank"}
 NAME_SEPARATOR = " – "
 
-#: Platform hosts never belong to a firm (same list as analytics-m1-m3's advertiser module).
-SOCIAL_HOSTS = (
-    "instagram.com", "facebook.com", "fb.com", "tiktok.com", "youtube.com", "youtu.be", "x.com",
-    "twitter.com", "t.me", "telegram.me", "linkedin.com", "threads.net",
-)
 
 #: Shorter aliases are noise. Short single words (`XTB`, `mBank`) are kept: the registry matches them only
 #: as a capitalized word and never fuzzily (design decision 9).

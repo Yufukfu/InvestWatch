@@ -202,3 +202,36 @@ def test_brand_casing_with_an_inner_capital_matches():
     reg = _reg(("Etoro (Europe) Ltd", "foreign_no_branch", ("Etoro",)))
     assert reg.match("Platforma eToro dla początkujących", URL).evidence == "eToro"
     assert reg.match("platforma etoro", URL) is None
+
+
+@pytest.mark.parametrize("shape", [
+    "1," * 50_000,                      # 100 KB of digit-comma runs
+    "1," * 500_000,                     # 1 MB of the same
+    "​" * 1_000_000,               # 1 MB of zero-width spaces
+    "XTB​" * 250_000,              # a short brand glued by zero-width spaces
+    "Konto inwestycje akcje Markets Capital " * 26_000,  # 1 MB of finance words
+    "ﬁ" * 1_000_000,               # 1 MB of a ligature NFKC expands
+], ids=["comma-100k", "comma-1m", "zw-1m", "zw-brand-1m", "words-1m", "ligature-1m"])
+def test_real_registry_on_hostile_shapes_within_budget(shape):
+    from investwatch_analytics.config import KNF_REGISTRY
+    from investwatch_analytics.registry import fold
+
+    registry = _real_registry()
+    timings = []
+    for _ in range(3):  # best of three, so a busy CI runner does not fail the budget
+        fold.cache_clear()
+        started = time.perf_counter()
+        registry.match(shape, URL)
+        timings.append(time.perf_counter() - started)
+    assert min(timings) < 2.0, (KNF_REGISTRY, timings)
+
+
+_REAL: list[Registry] = []
+
+
+def _real_registry() -> Registry:
+    from investwatch_analytics.config import KNF_REGISTRY
+
+    if not _REAL:
+        _REAL.append(Registry.from_csv(KNF_REGISTRY))
+    return _REAL[0]

@@ -119,3 +119,39 @@ def test_bank_brokerage_unit_line_is_official():
 def test_domain_only_still_fails():
     r = _r1(CERES, "Otwórz rachunek już dziś.", url="https://www.ceresdi.pl/oferta")
     assert r.result == "fail" and r.evidence is None
+
+
+# ---- review fixes (group 6) -------------------------------------------------------------------------
+
+
+def test_alias_containing_the_official_core_is_still_only_an_alias():
+    # "Alfa Inwestycje DM" (alias) contains the official core "Alfa Inwestycje": that is no official mention.
+    r = _r1(ALFA, "Alfa Inwestycje DM zaprasza.")
+    assert r.result == "uncertain" and r.evidence == "Alfa Inwestycje DM"
+
+
+def test_official_core_elsewhere_in_the_text_still_passes():
+    r = _r1(ALFA, "Alfa Inwestycje DM zaprasza. Organizator: Alfa Inwestycje.")
+    assert r.result == "pass" and r.evidence == "Alfa Inwestycje"
+
+
+def test_real_registry_trade_name_containing_the_core_is_uncertain():
+    registry = Registry.from_csv(KNF_REGISTRY)
+    firm = next(f for f in registry.firms if "Kepler Cheuvreux" in f.aliases)
+    assert registry.find_official_name(firm, "Kepler Cheuvreux zaprasza.") is None
+    assert registry.find_name(firm, "Kepler Cheuvreux zaprasza.") == "Kepler Cheuvreux"
+
+
+def test_handle_resolves_to_the_firm_that_owns_the_form():
+    from investwatch_analytics.modules.advertiser import _firm_by_handle
+
+    reg = Registry([
+        Firm(id="00000000-0000-4000-8000-000000000011", name="XTB Ltd", type="foreign_no_branch", country="CY",
+             aliases=(), domains=(), source_url=None),
+        Firm(id="00000000-0000-4000-8000-000000000012", name="XTB S.A.", type="brokerage_house", country="PL",
+             aliases=("XTB",), domains=(), source_url=None),
+        Firm(id="00000000-0000-4000-8000-000000000013", name="mBANK S.A. – Biuro Maklerskie mBank",
+             type="brokerage_bank", country="PL", aliases=(), domains=(), source_url=None),
+    ])
+    assert _firm_by_handle("@xtb", reg).name == "XTB S.A."
+    assert _firm_by_handle("@mbank", reg).name.startswith("mBANK")  # a name line's core, no alias needed

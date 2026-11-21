@@ -40,9 +40,11 @@ Python 3.12+.
 ```bash
 cd analytics
 python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt -e .   # Linux/macOS: .venv/bin/python
-.venv/Scripts/python -m investwatch_analytics.cli ../contracts/mocks/documents.json > findings.json
+REGISTRY_CSV=registry/seed.csv .venv/Scripts/python -m investwatch_analytics.cli ../contracts/mocks/documents.json > findings.json
 .venv/Scripts/python ../contracts/validate.py finding findings.json
 ```
+
+The mocks name the fictional seed firms, so this run sets `REGISTRY_CSV` to the seed; with the default (the real KNF register) their firms are unmatched and R1 fails.
 
 The CLI reads one `ScrapedDocument` or a list of them and writes `Finding`s as a JSON list to stdout. JSON logs go to stderr. An invalid document, or one whose analysis fails, is logged and skipped. Exit codes: 0 ok; 1 at least one document failed analysis (the others' findings are still written); 2 bad input, bad configuration, or no valid document (nothing on stdout).
 

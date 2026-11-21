@@ -1,6 +1,6 @@
 # Proposal
 
-**Stage 3 (etap 3).** This change depends on PR #26 `analytics-worker` (with its review fixes, `analytics-worker-review-fixes`). While PR #26 is open, the branch `analytics/analytics-knf-registry` is built on `origin/analytics/analytics-worker` and rebased onto each newer tip; it is merged only after PR #26. It interacts with the stage-2 change `analytics-m1-m3` (Dependencies below), which may land before or after it.
+**Stage 3 (etap 3).** This change depends on PR #26 `analytics-worker` (merged) and is stacked on PR #35 `analytics-m1-m3`: the branch `analytics/analytics-knf-registry` is rebased onto `analytics/analytics-m1-m3`, keeps that change's `registry.py` behaviour (page host through `http_host`, NFKC and zero-width folding, the 200 KB scan cap, social hosts, `match_links`, `Registry.demo`) and puts the real-scale matching, the alias rules and the handle seam (its follow-up 20) on top. It merges after #35. It interacts with the stage-2 change `analytics-m1-m3` (Dependencies below), which may land before or after it.
 
 ## Why
 

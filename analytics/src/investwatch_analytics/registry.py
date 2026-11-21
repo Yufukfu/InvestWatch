@@ -267,9 +267,19 @@ class Registry:
         """Exact quote of an official form of the firm (its `name`, a name line, or their cores without legal
         forms) in `text`, or None. Aliases (former and trade names, abbreviations) are not official (ZASÓB R1)."""
         official = {_form_key(x) for x in (firm.name, firm.core, *firm.name_lines, *firm.cores)}
-        forms = [f for f in self._all_forms[firm.id] if _form_key(f.text) in official]
-        span = self._find(text, forms)
-        return text[span[0]:span[1]] if span else None
+        folded, where = fold(text[:SCAN_MAX])
+        forms = self._all_forms[firm.id]
+        # An official form inside a longer alias mention is no official mention: "Kepler Cheuvreux" (an alias)
+        # contains the core "Cheuvreux", "Alfa Inwestycje DM" contains "Alfa Inwestycje".
+        alias_spans = [s for f in forms if _form_key(f.text) not in official
+                       for s in self._spans(f, text, folded, where)]
+        for f in forms:
+            if _form_key(f.text) not in official:
+                continue
+            for s in self._spans(f, text, folded, where):
+                if not any(a[0] <= s[0] and s[1] <= a[1] and a != s for a in alias_spans):
+                    return text[s[0]:s[1]]
+        return None
 
     def find_name(self, firm: Firm, text: str) -> str | None:
         """Exact quote (from the original text) of the firm's name or an alias in `text`, or None. Searches every
@@ -286,12 +296,16 @@ class Registry:
         return None
 
     @staticmethod
-    def _search(form: _Form, text: str, folded: str, where: tuple[int, ...]) -> tuple[int, int] | None:
+    def _spans(form: _Form, text: str, folded: str, where: tuple[int, ...]):
+        """Every span in the ORIGINAL text where `form` occurs and passes the short-word case guard."""
         for m in form.pattern.finditer(folded):
             span = where[m.start()], where[m.end() - 1] + 1
             if _case_ok(form.text, text[span[0]:span[1]]):
-                return span
-        return None
+                yield span
+
+    @classmethod
+    def _search(cls, form: _Form, text: str, folded: str, where: tuple[int, ...]) -> tuple[int, int] | None:
+        return next(cls._spans(form, text, folded, where), None)
 
     def firm_on_host(self, host: str) -> Firm | None:
         """The firm whose `website_domains` hold `host` (equal or a subdomain), or None."""
