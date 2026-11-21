@@ -412,6 +412,10 @@ class _SupervisorMention(Rule):
 class R17SupervisoryApproval(_SupervisorMention):
     rule_id = "R17"
 
+    def ask_llm(self, ctx: Context, result: RuleResult) -> bool:
+        # `when: always`, except a deterministic approval-word fail, which the LLM never sees (ADR 0309).
+        return super().ask_llm(ctx, result) and result.result == "pass"
+
     @cached_property
     def _approval(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
         p = self.spec.params

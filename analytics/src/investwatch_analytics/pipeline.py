@@ -6,6 +6,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from .models import Finding, ScrapedDocument
 from .modules import m2
@@ -13,6 +14,9 @@ from .modules.router import route
 from .preprocessing import preprocess
 from .registry import Registry
 from .rules.engine import Catalogue, Context
+
+if TYPE_CHECKING:
+    from .llm.judge import LlmJudge
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +28,9 @@ def analyze(
     catalogue: Catalogue,
     now: datetime | None = None,
     new_id: Callable[[], str] = lambda: str(uuid.uuid4()),
+    judge: "LlmJudge | None" = None,
 ) -> list[Finding]:
+    """`judge` is the only I/O and is injected: None (the default) is rules-only."""
     now = now or datetime.now(timezone.utc)
     pre = preprocess(doc.text)
     if pre.is_empty:
@@ -38,7 +44,8 @@ def analyze(
         )
         return []
     ctx = Context(doc=doc, pre=pre, firm_match=registry.match(doc.text, doc.url), registry=registry)
-    findings = [m2.build_finding(ctx, catalogue, now=now, new_id=new_id) for module in modules if module == "M2"]
+    findings = [m2.build_finding(ctx, catalogue, now=now, new_id=new_id, judge=judge)
+                for module in modules if module == "M2"]
     for f in findings:
         log.info("finding built", extra={"document_id": doc.id, "finding_module": f.module, "score": f.score})
     return findings

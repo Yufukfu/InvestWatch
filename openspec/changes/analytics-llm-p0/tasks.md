@@ -46,9 +46,9 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 8. Engine seam, merge and finding assembly (~1.5 h)
 
-- [ ] 8.1 Failing tests: `run_rules(..., judge=None)` equals rules-only; `when: always` / `uncertain` collection; `Rule.ask_llm` override; merge sets `method` `hybrid` / `llm`; M3 test catalogue with an unmodified `S3.3` rule class refined by YAML only; S-ids accepted for non-M2 catalogues; bad `llm:` block rejected; nothing deferred → no request (`m2-bank-ok`); injection cannot flip the deterministic R18 fail; LLM down / timeout / malformed / 500 keep rules-only with the log reasons; `model.llm` and summary scenarios (used, configured but not used); the evidence check over all mocks rules-only and with a stub judge
-- [ ] 8.2 `rules/engine.py` (`llm` spec field, `ask_llm`, collect, one judge call per module, merge), `pipeline.analyze(..., judge=None)`, `modules/m2.py` (`model.llm`, Polish mode sentence); R17 `ask_llm` (always when applicable and not a rules fail), R18 `ask_llm` (neighbouring-sentence case only); tests green
-- [ ] 8.3 Mutation check; `mutations: N tried, N caught`
+- [x] 8.1 Failing tests: `run_rules(..., judge=None)` equals rules-only; `when: always` / `uncertain` collection; `Rule.ask_llm` override; merge sets `method` `hybrid` / `llm`; M3 test catalogue with an unmodified `S3.3` rule class refined by YAML only; S-ids accepted for non-M2 catalogues; bad `llm:` block rejected; nothing deferred → no request (`m2-bank-ok`); injection cannot flip the deterministic R18 fail; LLM down / timeout / malformed / 500 keep rules-only with the log reasons; `model.llm` and summary scenarios (used, configured but not used); the evidence check over all mocks rules-only and with a stub judge
+- [x] 8.2 `rules/engine.py` (`llm` spec field, `ask_llm`, collect, one judge call per module, merge), `pipeline.analyze(..., judge=None)`, `modules/m2.py` (`model.llm`, Polish mode sentence); R17 `ask_llm` (always when applicable and not a rules fail), R18 `ask_llm` (neighbouring-sentence case only); tests green
+- [x] 8.3 Mutation check; `mutations: 14 tried, 14 caught` (one survivor closed: a `when: always` rule returning `not_applicable` from `evaluate` is never sent; one equivalent mutant dropped)
 - [ ] 8.4 Tell the `analytics-m1-m3` session (or Damian) that the interface in `llm/judge.py` is frozen, with the commit sha
 
 ## 9. R3 borderline proximity refinement (~45 min)

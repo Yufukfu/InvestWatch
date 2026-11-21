@@ -43,6 +43,9 @@ class JudgeOutcome:
 
 
 class LlmJudge(Protocol):
+    #: The model reported as `model.llm` on a finding when one of its verdicts was used.
+    model_name: str
+
     def judge(
         self,
         *,
@@ -148,6 +151,7 @@ class HttpJudge:
 
     def __init__(self, settings: LlmSettings, *, client: ChatClient | None = None):
         self.settings = settings
+        self.model_name = settings.model
         self._client = client or ChatClient(settings)
 
     def judge(

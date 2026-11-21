@@ -9,13 +9,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import yaml
 
 from ..models import RULE_ID_PATTERN, EvidenceLocator, Result, RuleResult, ScrapedDocument
 from ..preprocessing import Preprocessed
 from ..registry import FirmMatch, Registry
+
+if TYPE_CHECKING:
+    from ..llm.judge import LlmJudge
 
 DEFAULT_CATALOGUE = Path(__file__).with_name("m2_rules.yaml")
 SEVERITIES = {"high", "medium", "low"}
@@ -67,6 +70,17 @@ class Rule:
 
     def applies(self, ctx: Context) -> bool:
         return True
+
+    def ask_llm(self, ctx: Context, result: RuleResult) -> bool:
+        """Whether to defer this rules-only result to the LLM (only entries with an `llm:` block are asked).
+
+        `when: always` defers whenever the rule applies, `when: uncertain` (default) only an `uncertain` result.
+        A rule overrides this when its borderline is narrower (R3, R17).
+        """
+        llm = self.spec.llm
+        if llm is None or result.result == "not_applicable":
+            return False
+        return llm["when"] == "always" or result.result == "uncertain"
 
     def evaluate(self, ctx: Context) -> RuleResult:  # pragma: no cover - abstract
         raise NotImplementedError
@@ -207,8 +221,20 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
     return dict(params)
 
 
-def run_rules(catalogue: Catalogue, ctx: Context) -> list[RuleResult]:
+UNVERIFIED = "Nie udało się potwierdzić cytatu w treści dokumentu; wymaga weryfikacji."
+
+
+def run_rules(
+    catalogue: Catalogue,
+    ctx: Context,
+    judge: "LlmJudge | None" = None,
+    *,
+    module: str = "M2",
+    module_context: str = "",
+) -> list[RuleResult]:
+    """Rules first; with a judge, the deferred checks of this module go to the LLM in one call (ADR 0309)."""
     out = []
+    deferred: list[tuple[int, RuleSpec]] = []
     for spec in catalogue.implemented:
         rule = _RULES[spec.id](spec)
         if not rule.applies(ctx):
@@ -217,10 +243,39 @@ def run_rules(catalogue: Catalogue, ctx: Context) -> list[RuleResult]:
         res = rule.evaluate(ctx)
         if res.evidence is not None and res.evidence not in ctx.doc.text:
             # Safety net (analytics/CLAUDE.md): an unverifiable quote never supports a verdict.
-            res = res.model_copy(update={
-                "result": "uncertain",
-                "evidence": None,
-                "explanation": "Nie udało się potwierdzić cytatu w treści dokumentu; wymaga weryfikacji.",
-            })
+            res = res.model_copy(update={"result": "uncertain", "evidence": None, "explanation": UNVERIFIED})
+        if judge is not None and rule.ask_llm(ctx, res):
+            deferred.append((len(out), spec))
         out.append(res)
+    if deferred:
+        out = _refine(out, deferred, judge, ctx, module=module, module_context=module_context)
+    return out
+
+
+def _refine(
+    out: list[RuleResult],
+    deferred: list[tuple[int, RuleSpec]],
+    judge: "LlmJudge",
+    ctx: Context,
+    *,
+    module: str,
+    module_context: str,
+) -> list[RuleResult]:
+    from ..llm.judge import SemanticCheck
+
+    checks = [SemanticCheck(spec.id, spec.llm["question"]) for _, spec in deferred]  # type: ignore[index]
+    outcome = judge.judge(module=module, module_context=module_context, text=ctx.doc.text,
+                          content_hash=ctx.pre.content_hash, sentences=ctx.pre.sentences, checks=checks)
+    out = list(out)
+    for index, spec in deferred:
+        verdict = outcome.verdicts.get(spec.id)
+        if verdict is None:
+            continue  # no valid verdict: the rules-only result stands
+        before = out[index]
+        update = {"result": verdict.result, "evidence": verdict.evidence, "explanation": verdict.explanation,
+                  "method": "hybrid" if before.evidence is not None else "llm"}
+        if verdict.evidence is not None and verdict.evidence not in ctx.doc.text:
+            # Defence in depth: the judge already verified the quote; never trust it blindly.
+            update.update({"result": "uncertain", "evidence": None, "explanation": UNVERIFIED})
+        out[index] = before.model_copy(update=update)
     return out

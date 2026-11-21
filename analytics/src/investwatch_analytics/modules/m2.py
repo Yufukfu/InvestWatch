@@ -5,10 +5,20 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from ..config import PIPELINE_VERSION
 from ..models import Finding, FirmRef, ModelInfo, RuleResult
 from ..rules.engine import Catalogue, Context, run_rules
+
+if TYPE_CHECKING:
+    from ..llm.judge import LlmJudge
+
+#: The module's legal frame for the LLM system prompt (design §2: each module owns its context).
+M2_CONTEXT = (
+    "Module M2: marketing material published by an investment firm itself, checked against art. 44 of "
+    "Delegated Regulation (EU) 2017/565 and the UKNF criteria for risk information."
+)
 
 WEIGHTS = {"high": 3, "medium": 2, "low": 1}
 FAIL_VALUE = {"fail": 1.0, "uncertain": 0.5, "pass": 0.0}
@@ -30,8 +40,11 @@ def build_finding(
     *,
     now: datetime,
     new_id: Callable[[], str] = lambda: str(uuid.uuid4()),
+    judge: "LlmJudge | None" = None,
 ) -> Finding:
-    rules = run_rules(catalogue, ctx)
+    rules = run_rules(catalogue, ctx, judge, module="M2", module_context=M2_CONTEXT)
+    llm_rules = [r.rule_id for r in rules if r.method in ("llm", "hybrid")]
+    llm_model = judge.model_name if judge is not None and llm_rules else None
     match = ctx.firm_match
     firm = None
     if match is not None:
@@ -42,7 +55,7 @@ def build_finding(
             authorized=True,  # every registry entry is an authorized firm
             match_confidence=match.confidence,
         )
-    title, summary = _texts(rules, firm)
+    title, summary = _texts(rules, firm, llm_model)
     excerpt = ctx.pre.normalized[:EXCERPT_MAX] or None
     return Finding(
         id=new_id(),
@@ -59,11 +72,11 @@ def build_finding(
         platform=ctx.doc.platform,
         detected_at=now,
         updated_at=now,
-        model=ModelInfo(pipeline_version=PIPELINE_VERSION, llm=None, embedder=None),
+        model=ModelInfo(pipeline_version=PIPELINE_VERSION, llm=llm_model, embedder=None),
     )
 
 
-def _texts(rules: list[RuleResult], firm: FirmRef | None) -> tuple[str, str]:
+def _texts(rules: list[RuleResult], firm: FirmRef | None, llm_model: str | None = None) -> tuple[str, str]:
     who = firm.name if firm else "Nieznana firma"
     failed = [r for r in rules if r.result == "fail"]
     unsure = [r for r in rules if r.result == "uncertain"]
@@ -76,7 +89,11 @@ def _texts(rules: list[RuleResult], firm: FirmRef | None) -> tuple[str, str]:
     else:
         # name the rules: only R1-R3 run today, so a clean card must not read as a full UKNF check
         title = f"{who}: brak naruszeń w regułach {checked}" if checked else f"{who}: żadna reguła nie miała zastosowania"
-    if checked:
+    llm_rules = [r.rule_id for r in rules if r.method in ("llm", "hybrid")]
+    if checked and llm_model and llm_rules:
+        parts = [f"Sprawdzono reguły {checked}; reguły {', '.join(llm_rules)} rozstrzygnięto z pomocą modelu "
+                 f"językowego ({llm_model})."]
+    elif checked:
         parts = [f"Sprawdzono reguły {checked} w trybie regułowym (bez modelu językowego)."]
     else:
         parts = ["Żadna z reguł nie miała zastosowania (tryb regułowy, bez modelu językowego)."]
