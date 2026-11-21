@@ -42,9 +42,8 @@ trap cleanup EXIT
 new_env() {
   local p=$1 f="$TMP/$1.env"
   "$ROOT/scripts/init-env.sh" "$f" >/dev/null
-  {
-    printf 'COMPOSE_PROJECT_NAME=%s\nIW_HTTPS_PORT=%s\nIW_HTTP_PORT=%s\n' "$p" "$2" "$3"
-  } >>"$f"
+  sed -i -e "s|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=$p|" -e "s|^IW_HTTPS_PORT=.*|IW_HTTPS_PORT=$2|" \
+    -e "s|^IW_HTTP_PORT=.*|IW_HTTP_PORT=$3|" "$f"
   echo "$f"
 }
 
@@ -91,9 +90,51 @@ group_parallel() {
   check "postgres resolves only to its own stack" resolves_to_own "$a" postgres data
 }
 
+SECRETS=(POSTGRES_ADMIN_PASSWORD POSTGRES_APP_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD MINIO_SECRET_KEY)
+
+example_lists_secrets() {
+  local v; for v in "${SECRETS[@]}"; do
+    grep -qx "$v=" "$ROOT/.env.example" || { echo "$v missing or not empty in .env.example"; return 1; }
+  done
+}
+generated_env_complete() {
+  local f="$TMP/gen.env" v val
+  "$ROOT/scripts/init-env.sh" "$f" || return 1
+  for v in $(grep -E '^[A-Z0-9_]+(_PASSWORD|_SECRET_KEY)=' "$ROOT/.env.example" | cut -d= -f1); do
+    val=$(grep -E "^$v=" "$f" | cut -d= -f2-)
+    [ ${#val} -ge 32 ] || { echo "$v has ${#val} chars"; return 1; }
+  done
+  docker compose --env-file "$f" -f "$ROOT/compose.yaml" config -q
+}
+init_env_no_overwrite() {
+  local f="$TMP/keep.env"; echo KEEP=1 >"$f"
+  ! "$ROOT/scripts/init-env.sh" "$f" && grep -qx KEEP=1 "$f"
+}
+init_env_relative_to_caller() {
+  local d="$TMP/rel" name="smoke-rel-$RUN_ID.env"; mkdir -p "$d"
+  (cd "$d" && "$ROOT/scripts/init-env.sh" "$name") || return 1
+  [ -f "$d/$name" ] && [ ! -e "$ROOT/$name" ] || { rm -f "$ROOT/$name"; echo "written to the repo root"; return 1; }
+}
+# requires_secret <VAR> [compose file]: compose config fails, naming VAR, when VAR is empty.
+requires_secret() {
+  local v=$1 file=${2:-$ROOT/compose.yaml} f="$TMP/req-$1.env"
+  "$ROOT/scripts/init-env.sh" "$f" >/dev/null
+  sed -i "s|^$v=.*|$v=|" "$f"
+  if docker compose --env-file "$f" -f "$file" config -q 2>"$f.err"; then echo "config succeeded without $v"; return 1; fi
+  grep -q "$v" "$f.err" || { cat "$f.err"; return 1; }
+}
+
+group_env() {
+  check ".env.example lists every infrastructure secret, empty" example_lists_secrets
+  check "init-env fills every secret with 32+ chars and compose config accepts it" generated_env_complete
+  check "init-env never overwrites an existing file" init_env_no_overwrite
+  check "init-env resolves a relative path from the caller's directory" init_env_relative_to_caller
+  check "missing POSTGRES_APP_PASSWORD is named" requires_secret POSTGRES_APP_PASSWORD
+}
+
 # ---------------------------------------------------------------- main
 
-GROUPS_ALL=(parallel)
+GROUPS_ALL=(parallel env)
 [ $# -gt 0 ] && SELECTED=("$@") || SELECTED=("${GROUPS_ALL[@]}")
 docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1 || docker pull -q "$PROBE_IMAGE" >/dev/null
 for g in "${SELECTED[@]}"; do log "== $g"; "group_$g"; done
