@@ -113,17 +113,21 @@ def test_scan_emits_started_then_finished_and_updates_the_source(live):
     assert source["last_run_status"] == "ok" and source["last_run_at"] is not None
 
 
-def test_scan_in_flight_does_not_write_into_a_reset_store(live):
-    url, rec = live
-    sources = httpx.get(f"{url}/api/sources").json()["items"]
-    source = sources[0]
+def test_scan_in_flight_does_not_write_into_a_reset_store(contracts_dir):
+    # a long scan delay so the reset reliably lands while the scan is sleeping
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0, scan_delay_s=1.5, cors_origins=("*",))
+    with LiveServer(settings) as url:
+        rec = Recorder(url)
+        source = httpx.get(f"{url}/api/sources").json()["items"][0]
 
-    httpx.post(f"{url}/api/scans", json={"source_id": source["id"]})
-    rec.wait_for("scan.started")
-    httpx.post(f"{url}/__mock/reset")
-    rec.wait_for("scan.finished")
+        httpx.post(f"{url}/api/scans", json={"source_id": source["id"]})
+        rec.wait_for("scan.started")
+        httpx.post(f"{url}/__mock/reset")
+        assert rec.wait_for("scan.finished", timeout=5)
 
-    after = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source["id"])
+        after = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source["id"])
+        rec.close()
+
     assert after == source
 
 
@@ -192,6 +196,20 @@ def test_replay_pauses_while_no_client_is_connected(contracts_dir):
         time.sleep(1.0)  # ten intervals with nobody connected
 
         assert httpx.get(f"{url}/api/findings").json()["total"] == total
+
+
+def test_every_route_runs_on_the_event_loop(contracts_dir):
+    """Plain `def` routes run in FastAPI's thread pool and race with replay writes on the loop."""
+    import inspect
+
+    from iw_mock_server.app import create_app
+
+    api = create_app(Settings(contracts_dir=contracts_dir, replay_interval_s=0))
+    sync_routes = [r.path for r in api.routes
+                   if getattr(r, "endpoint", None) and r.path.startswith(("/api", "/__mock"))
+                   and not inspect.iscoroutinefunction(r.endpoint)]
+
+    assert sync_routes == []
 
 
 def test_reads_stay_consistent_while_replay_writes(contracts_dir):

@@ -75,6 +75,8 @@ Behaviour worth knowing:
 - `risk_level` is computed on every read from `score` and the current thresholds, so moving the calibration slider changes the list immediately.
 - `GET /api/stats/trend` without `risk_level` returns the mock background series plus findings added at runtime. With `risk_level` the series is recomputed from the findings themselves, so its scale is much smaller than the unfiltered one.
 - Timestamps in query strings must be URL-encoded (`+01:00` becomes `%2B01:00`), or use the `Z` form.
+- `finding.created` and `finding.high_risk` for the same finding are sent separately; do not rely on their order.
+- Replay runs only while at least one client is connected to `/events`.
 - Mock-only helpers, never called by the dashboard: `POST /__mock/reset` (restore data) and `POST /__mock/emit` (add one finding and emit its events now).
 - The server refuses to start, and names the file, if a mock does not match its schema.
 
