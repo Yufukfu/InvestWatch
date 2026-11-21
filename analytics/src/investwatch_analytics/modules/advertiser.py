@@ -95,11 +95,14 @@ def _url_or_none(value: str | None) -> str | None:
 def build_advertiser(doc: ScrapedDocument, registry: Registry) -> AdvertiserRef:
     author = doc.author if _has_author(doc) else None
     host = page_host(doc.url)
+    # A platform page without an author says nothing about who advertises: the platform is not the advertiser.
+    own_site = author is None and not is_social(http_host(doc.url) or host)
     return AdvertiserRef(
-        name=_cut(author.name if author else None) or _cut(author.handle if author else None) or _cut(host),
+        name=_cut(author.name if author else None) or _cut(author.handle if author else None)
+        or (_cut(host) if own_site else None),
         handle=_cut(author.handle) if author else None,
         profile_url=_url_or_none(author.profile_url) if author else None,
-        website=None if author else _url_or_none(f"{urlsplit(doc.url).scheme}://{host}/"),
+        website=_url_or_none(f"{urlsplit(doc.url).scheme}://{host}/") if own_site else None,
         in_registry=publisher_firm(doc, registry) is not None,
         on_warning_list=None,  # S3.7 (KNF public warnings list) is not implemented
     )

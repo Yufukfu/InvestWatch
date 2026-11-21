@@ -217,3 +217,13 @@ def test_social_domain_in_registry_is_not_a_publisher():
 def test_social_page_host_with_social_domain_in_registry():
     reg = Registry([_firm("Alfa Inwestycje", ("instagram.com",))])
     assert publisher_firm(doc(text="x"), reg) is None
+
+
+def test_social_host_without_author_gives_null_name_and_website(registry):
+    a = build_advertiser(doc(text="x"), registry)
+    assert a.name is None and a.website is None and a.in_registry is False
+
+
+def test_web_page_with_author_has_no_website(registry):
+    a = build_advertiser(doc(platform="web", url="https://blog.example.com/a", text="x", author={"name": "Ola"}), registry)
+    assert a.name == "Ola" and a.website is None

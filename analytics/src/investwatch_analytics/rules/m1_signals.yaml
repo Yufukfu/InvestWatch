@@ -48,7 +48,10 @@ rules:
         - materiał sponsorowany
         - sponsorowany
         - sponsorowane
-        - partner
+        # Not the bare word "partner": it is common in neutral text and pushed a plain mention over the
+        # M1 alert threshold (#35 review). Only marked forms count.
+        - "#partner"
+        - partner reklamowy
       rel_values: [sponsored]
       # Same-line negation as R2 ("to nie jest współpraca reklamowa"); a hashtag is never negated.
       negation_before: '(?:\bnie|\bnot|\bno)[ \t]+(?:(?!(?:tylko|jedynie|wyłącznie|only|just)\b)\w+[ \t]+){0,2}$'

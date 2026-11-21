@@ -10,9 +10,9 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 
 ## 2. S1.3 labels and the advertiser on social hosts (items 3, 4)
 
-- [ ] 2.1 Failing tests: Kacper's sentence `Nasz partner biznesowy omawia spotkanie z Alfa Inwestycje DM.` gives S1.3 `pass` and a score below 0.6; `#partner` and `partner reklamowy` count; an Instagram post without an author gives `advertiser.name`/`website` null and an M1 title starting `Nieznany autor`
-- [ ] 2.2 `rules/m1_signals.yaml`, `modules/advertiser.py`; tests green
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Failing tests: Kacper's sentence `Nasz partner biznesowy omawia spotkanie z Alfa Inwestycje DM.` gives S1.3 `pass` and a score below 0.6; `#partner` and `partner reklamowy` count; an Instagram post without an author gives `advertiser.name`/`website` null and an M1 title starting `Nieznany autor`
+- [x] 2.2 `rules/m1_signals.yaml`, `modules/advertiser.py`; tests green
+- [x] 2.3 Mutation check; `mutations: 5 tried, 5 caught` (one first survivor, `website` on a web page with an author, got its own test)
 
 ## 3. M3 vocabulary and the Polish-marker filter (items 5, 6)
 

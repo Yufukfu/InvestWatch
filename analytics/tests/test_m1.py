@@ -354,3 +354,24 @@ def test_s14_quotes_first_phrase(registry, cat):
 def test_long_post_excerpt_is_cut(registry, cat):
     f = finding(third_party(text="Alfa Inwestycje DM. " + "Słowo " * 400), registry, cat)
     assert len(f.content_excerpt) == 500
+
+
+# ---- review of #35, items 3 and 4 -------------------------------------------------------------------
+
+
+def test_bare_partner_is_not_a_label(registry, cat):
+    d = third_party(text="Nasz partner biznesowy omawia spotkanie z Alfa Inwestycje DM.")
+    f = finding(d, registry, cat)
+    assert {r.rule_id: r.result for r in f.rules}["S1.3"] == "pass" and f.score < 0.6
+
+
+@pytest.mark.parametrize("label", ["#partner", "partner reklamowy"])
+def test_partner_as_an_ad_label(registry, cat, label):
+    r = signals(third_party(text=f"Konto w Alfa Inwestycje DM ({label})."), registry, cat)["S1.3"]
+    assert (r.result, r.evidence) == ("fail", label)
+
+
+def test_social_post_without_author_has_no_advertiser_name(registry, cat):
+    f = finding(third_party(text="Polecam Alfa Inwestycje DM, konto otworzyłem w minutę.", author=None), registry, cat)
+    assert f.advertiser.name is None and f.advertiser.website is None
+    assert f.title.startswith("Nieznany autor")
