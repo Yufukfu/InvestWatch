@@ -1,7 +1,13 @@
 import asyncio
 import os
+from urllib.parse import urlsplit
 
 import pytest
+
+from iw_scraper.app import allowed_urls
+from iw_scraper.fetch import FetchFailure
+from iw_scraper.pgstore import PgSourceStore
+from iw_scraper.types import Reason
 
 from iw_scraper.seed import (
     _LOCK_KEY,
@@ -115,6 +121,18 @@ async def test_seed_all_writes_nothing_when_a_seed_file_is_invalid(pool, tmp_pat
         await seed_all(pool, directory=tmp_path)
 
     assert await pool.fetchval("SELECT count(*) FROM sources") == 0
+
+
+async def test_every_seeded_host_is_allowed_with_no_extra_hosts_and_a_foreign_hop_is_refused(pool):
+    await seed_sources(pool, ENTRIES)
+    guard = await allowed_urls(PgSourceStore(pool), [], (80, 443))()  # FETCH_EXTRA_HOSTS empty
+
+    for entry in ENTRIES:
+        guard.check(entry.url)
+        guard.check(urlsplit(entry.url)._replace(path="/elsewhere", query="").geturl())  # a redirect within the host
+    with pytest.raises(FetchFailure) as refused:
+        guard.check("https://not-seeded.example/landing")  # a redirect to a host no row names
+    assert refused.value.reason is Reason.BLOCKED_TARGET
 
 
 async def test_main_registers_the_seed_files_and_prints_the_report(pool, monkeypatch, capsys):

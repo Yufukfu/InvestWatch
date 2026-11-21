@@ -16,9 +16,9 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 2. Live check and host guard
 
-- [ ] 2.1 Failing test for "Seed hosts need no extra allow-list entries" (guard built from the seeded rows (as `Source` objects) allows each seeded host and refuses a hop to an unlisted host) with `FETCH_EXTRA_HOSTS` empty; passes once the loader's rows feed `UrlGuard.for_sources`
-- [ ] 2.2 Opt-in live check `scraper/tests/test_seed_live.py` (marker `scraper_live`, deselected by default, outside CI): one request per entry through the production fetch path, fails on redirect to another URL, status other than 200, empty text, block or robots refusal, naming the entry and URLs. Written and committed, **run only after a human go-ahead** (it makes real requests to 8 hosts); paste the output in the PR body
-- [ ] 2.3 Mutation check; line reads `mutations: N tried, N caught` (n/a for 2.2, which is a live check; guards of 2.1)
+- [x] 2.1 Failing test for "Seed hosts need no extra allow-list entries" (guard built from the seeded rows (as `Source` objects) allows each seeded host and refuses a hop to an unlisted host) with `FETCH_EXTRA_HOSTS` empty; passes once the loader's rows feed `UrlGuard.for_sources`
+- [ ] 2.2 Opt-in live check `scraper/tests/test_seed_live.py` (marker `scraper_live`, deselected by default, outside CI): one page request per entry (plus its `robots.txt`) through the production fetch path, fails on redirect to another URL, status other than 200, empty text, block or robots refusal, naming the entry and URLs. Written and committed, **run only after a human go-ahead** (it makes real requests to 8 hosts); paste the output in the PR body
+- [x] 2.3 Mutation check; mutations: 3 tried, 3 caught (guards of 2.1; n/a for 2.2, which is a live check: its helper was exercised once against fake stages for every refusal)
 
 ## 3. Closing
 

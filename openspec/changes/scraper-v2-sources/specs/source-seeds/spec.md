@@ -71,7 +71,7 @@ The seed file SHALL contain at least one active entry for each of `M1`, `M2` and
 - **THEN** its `source_kind` is `unknown` and the entry is accepted by validation
 
 ### Requirement: Seed URLs are final URLs
-An entry's URL SHALL be the URL the site serves directly, not one that redirects to another URL. The opt-in live check SHALL fetch every entry's URL once through the production fetch path and fail for an entry whose final URL differs from its URL, whose status is not 200, or whose text is empty. The live check SHALL be deselected by default and outside CI, and SHALL make at most one request per entry.
+An entry's URL SHALL be the URL the site serves directly, not one that redirects to another URL. The opt-in live check SHALL fetch every entry's URL once through the production fetch path and fail for an entry whose final URL differs from its URL, whose status is not 200, or whose text is empty. The live check SHALL be deselected by default and outside CI, and SHALL request each entry's page at most once (besides the host's `robots.txt` and the redirect hops that the production fetch follows).
 
 #### Scenario: Stable page
 - **WHEN** the live check fetches an entry that answers 200 with text and no redirect
