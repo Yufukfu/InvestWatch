@@ -178,6 +178,46 @@ R11, R12a and R15 get `llm: {when: uncertain, question: …}`. They use the defa
 
 On the base branch the loader already parses `llm:` blocks, so groups 1-6 work without the judge. Group 7 adds `FakeJudge` tests for the merge and needs `analytics-llm-p0` group 8. If that group never lands, the blocks are inert, the rules-only `uncertain` stands, and the catalogue scenario is still true.
 
+### 11. Dictionaries
+
+The spec requirements stay under the OpenSpec 2.1.1 limit of 500 characters, so the starting dictionaries live here. Implementation writes them into `m2_rules.yaml`, which is the source of truth from then on. `…` stands for `\w*`, and every gap is bounded (decision 8).
+
+- **R11 comparisons (`comparison_patterns`):**
+  - a comparative followed by `niż` within 3 words: `lepsz…`, `wyższ…`, `niższ…`, `tańsz…`, `korzystniejsz…`, `więcej`, `better/higher/lower/cheaper than`;
+  - `w porównaniu z/do`, `vs`, `versus`, `N razy więcej`, `bije … (lokaty|konkurencję|rynek)`, `outperform…`, `compared to/with`.
+- **R11 benchmarks (`benchmark_patterns`):** `WIG20`, `WIG`, `indeks…`, `benchmark…`, `średni… funduszy`, `pobił/pokonał <index>`.
+- **R11 excludes (`comparison_exclude_patterns`):** `niż rok temu`, `niż wcześniej`, `niż kiedykolwiek`, `niż inflacja`, `w porównaniu z inflacją`.
+- **R11 superlatives (`superlative_patterns`):** `najlepsz…`, `najtańsz…`, `najwyższ… oprocentowanie`, `nr 1`, `numer 1`, `best`, `cheapest`.
+- **Source (`&source_markers`, shared by R11 and R12a):** `źródło`, `według danych`, `wg danych`, `na podstawie danych`, `dane z/za`, `source`, `data from`.
+- **R11 assumptions (`assumption_patterns`):** `przy założeniu`, `zakładając`, `założeni…`, `dla kwoty`, `w okresie`, `na dzień`, `stan na`, `assuming`, `as of`.
+- **R12a sub-12-month periods (`short_period_patterns`):** `w ostatnim miesiącu`, `N miesięcy` with N not a multiple of 12 (checked in code), `od początku roku`, `YTD`, `w I…IV kwartale`, a month name, `tygodni…`, `dzienn…`.
+- **R12a 5-year coverage (`five_year_patterns`):** `ostatnich/minionych N lat` with N ≥ 5, `5-letn…`, `pięcioletn…`, `5-year`. In code: a year range of 5 or more calendar years, or 5 or more distinct past years.
+- **R12a since inception (`inception_patterns`):** `od początku działalności`, `od uruchomienia`, `od powstania`, `since inception`.
+- **R12a reference period:** a year (`_YEAR`), a year range, a date, `ostatnich N lat/miesięcy`, searched in the past-performance sentences only.
+- **R12a evidence:**
+  - `fail` quotes the sub-12-month sentence, or else the first past-performance sentence;
+  - `uncertain` quotes the since-inception sentence;
+  - `pass` quotes the first past-performance sentence.
+- **R12b fees (`fee_patterns`):** `po potrąceniu/odliczeniu/uwzględnieniu … opłat/prowizji/kosztów`, `nie uwzględnia… opłat/prowizji`, `wyniki netto/brutto`, `opłaty … obniżają/pomniejszają`, `net of fees`, `before/after/excluding fees`.
+- **R12b foreign currency (`foreign_currency_patterns`):** `EUR`, `USD`, `CHF`, `GBP`, `€`, `$`, `w euro`, `w dolarach`, `denominowan… w`, `w walucie obcej`.
+- **R12b currency warning (`currency_warning_patterns`):** `zmian/wahań kursów walut`, `ryzyko walutowe`, `currency fluctuations`, `exchange rate`.
+- **R12b `pass`** quotes the first past-performance sentence.
+- **R15 result vocabulary (`performance_patterns`):** `wynik…`, `zysk…`, `stopa zwrotu`, `zwrot…`, `rentown…`, `dochód`, `wzrost…`, a percentage that is not a fee or tax (`*return_figure_exclude`), `return`, `performance`, `growth`.
+- **R15 strong markers (`forecast_patterns`):** `prognoz…`, `spodziewa…`, `oczekuj…`, `przewidu…`, `szacuj…`, `w przyszłym/kolejnym/następnym roku`, `cel… zwrotu`, `expect…`, `forecast…`, `projected`, `target return`. In code: a year after `fetched_at`.
+- **R15 future-tense verbs (`forecast_verb_patterns`, strong together with a figure):** `zarobisz`, `zyskasz`, `zarobimy`, `przyniesie`, `wypracuje`, `osiągnie`.
+- **R15 weak markers (`forecast_weak_patterns`):** `będzie`, `będą`, `może przynieść/osiągnąć`, `will`.
+- **R15 imperatives (`forecast_exclude_patterns`):** `zarabiaj`, `zyskaj`, `pomnażaj`, `earn`.
+- **R15 warning (`&forecast_disclaimers`):**
+  - `prognoz… … nie jest/są/stanowi… … wiarygodn…/gwarancj…`;
+  - `przyszłe wyniki … mogą się różnić / nie są gwarantowane`;
+  - `nie ma gwarancji osiągnięcia … prognoz…/zakładanych wyników`;
+  - `forecasts/projections are not a reliable indicator`.
+- **R16 tax reference (`tax_patterns`):** `podat…`, `opodatkowan…`, `IKE`, `IKZE`, `Belk…`, `ulga podatkowa`, `zwolnieni… z podatku`, `odliczeni… od dochodu/podatku`, `PIT`, `tax…`.
+- **R16 tax excludes (`tax_exclude_patterns`):** `VAT`, `podatek od towarów i usług`.
+- **R16 individual part (`tax_individual_patterns`):** `zależy/uzależnion… od indywidualnej/osobistej sytuacji`, `individual circumstances`.
+- **R16 change part (`tax_change_patterns`):** `może/mogą ulec zmianie / się zmienić`, `subject to change`, `may change`.
+- **R16 tax context (`tax_context_patterns`):** tax words and `przepis…`.
+
 ## Risks / Trade-offs
 
 - **Lexical source and assumption detection is lenient.** `Źródło: opracowanie własne` passes the source check, and "w okresie" anywhere counts as assumptions. → The gold set calibrates this. Missing assumptions alone give `uncertain`, not `pass`.
