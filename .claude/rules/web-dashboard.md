@@ -9,7 +9,7 @@ Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../..
 
 ## Architecture (code quality)
 
-- Presentational components in `src/features/**` receive data and callbacks through props and import nothing from `api/`, the store or Socket.IO. A feature data hook sits between the API and the components; the layers are in ADR 0204 (PR #11). The existing `FindingsTable`, `SummaryCards` and `HealthBadge` predate that layering and are still to be moved in a refactor change.
+- Presentational components in `src/features/**` receive data and callbacks through props and import nothing from `api/`, the store or Socket.IO. Data comes from a parent (a page component or a hook) that reads the API. The existing `FindingsTable`, `SummaryCards` and `HealthBadge` call RTK Query hooks directly, so they act as containers for now; moving them is a separate refactor change, not part of unrelated work.
 - Server state lives in RTK Query (`src/api/baseApi.ts`, generated endpoints). No raw `fetch` in components. Local UI state (open panel, selected row) stays in the component that owns it.
 - Filter, `sort` and paging state (`page`, `page_size`) use the parameter names of `GET /findings` in `contracts/openapi.yaml`; do not copy the list here. Keep them in the URL search params, so a shared link reproduces the same view.
 - Do not compute `risk_level` in the browser. The API derives it from the threshold (§4, ADR 0305). Read it from the response and show it.
