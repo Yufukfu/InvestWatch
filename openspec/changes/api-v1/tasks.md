@@ -17,11 +17,11 @@ Starts after change `api-db-schema` groups 1-3 (package, tables, migrate service
 
 ## 3. Findings: list, detail, PATCH
 
-- [ ] 3.1 Failing tests for "Findings list filters, sort and pagination", "Filter uses the same rule" (list part) and "Threshold change applies at once"
-- [ ] 3.2 `GET /api/findings` query with all filters, literal `q`, sort tie-breakers and pagination; the 3.1 tests pass
-- [ ] 3.3 Failing tests, then `GET /api/findings/{id}` with `document` and `screenshot_urls`: "Document with two screenshots", "Document without screenshots", "Unknown finding" pass (finding and document parts validated separately, design open question 1)
-- [ ] 3.4 Failing tests, then `PATCH /api/findings/{id}` with the copied `FindingPatch`, `updated_at` bump and `finding.updated` published after commit: every "Status and note changes" scenario passes
-- [ ] 3.5 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 3.1 Failing tests for "Findings list filters, sort and pagination", "Filter uses the same rule" (list part) and "Threshold change applies at once"
+- [x] 3.2 `GET /api/findings` query with all filters, literal `q`, sort tie-breakers and pagination; the 3.1 tests pass
+- [x] 3.3 Failing tests, then `GET /api/findings/{id}` with `document` and `screenshot_urls`: "Document with two screenshots", "Document without screenshots", "Unknown finding" pass (finding and document parts validated separately, design open question 1)
+- [x] 3.4 Failing tests, then `PATCH /api/findings/{id}` with the copied `FindingPatch`, `updated_at` bump and `finding.updated` published after commit: every "Status and note changes" scenario passes
+- [x] 3.5 Mutation check; mutations: 13 tried, 13 caught (one survivor first: the `updated_at` test compared strings; now compares times)
 
 ## 4. Event relay
 
