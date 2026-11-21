@@ -30,9 +30,9 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 
 ## 5. Command line and exit codes (≈ 1 h)
 
-- [ ] 5.1 Failing tests (`tests/test_eval_cli.py`): exit 0 on a valid gold set without `--db` and no connection attempted (store patched to fail if called); exit 2 on an empty gold set with nothing on stdout; exit 2 on `--db` without `DATABASE_URL`; exit 2 on `--llm` with empty `LLM_BASE_URL`, and on `--llm` in a build without a judge; exit 1 when a module is `not_run` (rows of the other modules written); exit 3 when the store raises `StoreUnavailable` with the report still on stdout; stdout is only the JSON report and logs go to stderr as JSON; `python analytics/eval/run.py --help` and `python -m investwatch_analytics.evaluation --help` both work
-- [ ] 5.2 `evaluation/__main__.py` (argparse: `--gold`, `--registry`, `--db`, `--llm`, `--module`; defaults resolved from the package location so they work in the image), `analytics/eval/run.py` wrapper; LLM judge built from `LLM_*` when the build has one; tests green
-- [ ] 5.3 Mutation check (each exit-code branch, the no-db path); `mutations: N tried, N caught`
+- [x] 5.1 Failing tests (`tests/test_eval_cli.py`): exit 0 on a valid gold set without `--db` and no connection attempted (store patched to fail if called); exit 2 on an empty gold set with nothing on stdout; exit 2 on `--db` without `DATABASE_URL`; exit 2 on `--llm` with empty `LLM_BASE_URL`, and on `--llm` in a build without a judge; exit 1 when a module is `not_run` (rows of the other modules written); exit 3 when the store raises `StoreUnavailable` with the report still on stdout; stdout is only the JSON report and logs go to stderr as JSON; `python analytics/eval/run.py --help` and `python -m investwatch_analytics.evaluation --help` both work
+- [x] 5.2 `evaluation/__main__.py` (argparse: `--gold`, `--registry`, `--db`, `--llm`, `--module`; defaults resolved from the package location so they work in the image), `analytics/eval/run.py` wrapper; LLM judge built from `LLM_*` when the build has one; tests green
+- [x] 5.3 Mutation check (each exit-code branch, the no-db path); `mutations: 10 tried, 10 caught` (one first-pass mutant was malformed, `0 or _fail(...)` still returned 2, and was rerun as a real mutant)
 
 ## 6. Gold set: M2 (≈ 2.25 h)
 

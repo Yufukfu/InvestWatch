@@ -25,8 +25,8 @@ _INSERT = (f"INSERT INTO calibration_points ({', '.join(COLUMNS)}) VALUES ({', '
            "ON CONFLICT (run_id, module, threshold) DO NOTHING")
 
 
-def write_run(dsn: str, report: dict, *, connect_timeout: int = 5) -> dict[str, str]:
-    import psycopg
+def check_dsn(dsn: str) -> None:
+    """Raise StoreMisconfigured for a DSN libpq cannot parse; the message never quotes it."""
     from psycopg.conninfo import conninfo_to_dict
 
     try:
@@ -36,6 +36,12 @@ def write_run(dsn: str, report: dict, *, connect_timeout: int = 5) -> dict[str, 
         malformed = True
     if malformed:  # raised outside the except block, so the libpq error (it may quote the password) is not kept
         raise StoreMisconfigured("DATABASE_URL is malformed")
+
+
+def write_run(dsn: str, report: dict, *, connect_timeout: int = 5) -> dict[str, str]:
+    import psycopg
+
+    check_dsn(dsn)
 
     run_id = uuid.UUID(report["run"]["run_id"])
     computed_at = datetime.fromisoformat(report["run"]["computed_at"].replace("Z", "+00:00"))
