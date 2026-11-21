@@ -1,0 +1,109 @@
+# M1 signals: ads of registered investment firms published by third parties or private persons
+# (.docs/analytics-plan.md §4; challenge: "dane firmy inwestycyjnej, dane podmiotu reklamującego, treść reklamy, URL").
+# `fail` = the signal is present. score = σ(bias + Σ weight·x), x: fail 1, uncertain 0.5, else 0
+# ("how certain this is a third-party ad of registered firm X"). Weights are hand-tuned starting values
+# (change analytics-m1-m3, design decision 10), to be recalibrated on the gold set.
+# Patterns are Python regexes, matched case-insensitively against the ORIGINAL text.
+# `llm:` blocks follow the analytics-llm-p0 seam; the loader ignores them until that change lands.
+bias: -3.5
+rules:
+  - id: S1.1
+    name: Wzmianka o firmie z rejestru
+    severity: medium
+    legal_basis: null
+    weight: 0.5
+    implemented: false
+
+  - id: S1.2
+    name: Link afiliacyjny / kod polecający
+    severity: high
+    legal_basis: null
+    weight: 2.5
+    implemented: false
+    params:
+      referral_query_keys: [ref, aff, affiliate, partner, promo, coupon, referral]
+      tracking_query_prefixes: [utm_]
+      phrase_patterns:
+        - '(?<!\w)kod\w*\s+(?:polecając|promocyjn|rabatow)\w*'
+        - '(?<!\w)z\s+moim\s+link(?:iem|u)(?!\w)'
+        - '(?<!\w)z\s+kodem(?!\w)'
+        - '(?<!\w)z\s+moim\s+kodem(?!\w)'
+
+  - id: S1.3
+    name: Oznaczenie współpracy
+    severity: medium
+    legal_basis: null
+    weight: 2.0
+    implemented: false
+    params:
+      labels:
+        - "#reklama"
+        - "#ad"
+        - "#współpraca"
+        - "#wspolpraca"
+        - "#sponsored"
+        - "#sponsorowane"
+        - współpraca reklamowa
+        - płatna współpraca
+        - materiał sponsorowany
+        - sponsorowany
+        - sponsorowane
+        - partner
+      rel_values: [sponsored]
+      # Same-line negation as R2 ("to nie jest współpraca reklamowa"); a hashtag is never negated.
+      negation_before: '(?:\bnie|\bnot|\bno)[ \t]+(?:(?!(?:tylko|jedynie|wyłącznie|only|just)\b)\w+[ \t]+){0,2}$'
+
+  - id: S1.4
+    name: Wezwanie do działania
+    severity: medium
+    legal_basis: null
+    weight: 1.0
+    implemented: false
+    params:
+      phrase_patterns:
+        - '(?<!\w)(?:otwórz|załóż)\s+(?:konto|rachunek)(?!\w)'
+        - '(?<!\w)zarejestruj\s+się(?!\w)'
+        - '(?<!\w)odbierz\s+(?:bonus|prezent|nagrodę)(?!\w)'
+        - '(?<!\w)link\s+w\s+bio(?!\w)'
+        - '(?<!\w)kliknij(?!\w)'
+        - '(?<!\w)dołącz(?!\w)'
+        - '(?<!\w)skorzystaj\s+z\s+kodu(?!\w)'
+        - '(?<!\w)sprawdź\s+link(?!\w)'
+    llm:
+      when: always
+      question: >-
+        Czy materiał wzywa odbiorcę do działania wobec firmy inwestycyjnej (otwarcie konta, rejestracja,
+        skorzystanie z linku lub kodu)? fail = tak, pass = nie. Zacytuj zdanie z wezwaniem.
+
+  - id: S1.5
+    name: Treść promocyjna
+    severity: high
+    legal_basis: null
+    weight: 2.0
+    implemented: false
+    llm:
+      when: always
+      question: >-
+        Czy materiał promuje firmę inwestycyjną lub jej usługi (fail), jest neutralny (uncertain), czy
+        edukacyjny bez promocji (pass)? Zacytuj zdanie, które o tym przesądza.
+
+  - id: S1.6
+    name: Autor inny niż firma
+    severity: medium
+    legal_basis: null
+    weight: 1.0
+    implemented: false
+
+  - id: S1.7
+    name: Kierowanie do odbiorców w Polsce
+    severity: low
+    legal_basis: null
+    weight: 0.5
+    implemented: false
+    params: &poland
+      currency_patterns:
+        - '\d[\d\s.,]*\s?(?:zł|PLN)(?!\w)'
+        - '(?<!\w)PLN\s?\d'
+      phone_patterns:
+        - '\+48[\s-]?\d{2,3}[\s-]?\d{2,3}[\s-]?\d{2,3}'
+      pl_domain_suffixes: [.pl]

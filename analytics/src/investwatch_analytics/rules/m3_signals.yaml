@@ -1,0 +1,145 @@
+# M3 signals: offers that may indicate investment advice (art. 76 u.o.i.f.: a recommendation based on the
+# client's situation AND concerning financial instruments of art. 2-3) by entities outside the KNF registry.
+# Challenge output: "dane podmiotu, treść oferty oraz lokalizację (URL)".
+# `fail` = the signal is present. score = σ(bias + Σ weight·x), x: fail 1, uncertain 0.5, else 0, then
+# capped at 0.4 unless S3.4 is fail or uncertain (modules/m3.py; design decision 8).
+# Weights are hand-tuned starting values (design decision 10). Patterns are Python regexes, matched
+# case-insensitively against the ORIGINAL text. `llm:` blocks follow the analytics-llm-p0 seam.
+bias: -3.0
+rules:
+  - id: S3.1
+    name: Podmiot spoza rejestru
+    severity: high
+    legal_basis: art. 69 ust. 1 u.o.i.f.
+    weight: 0.5
+    implemented: false
+
+  - id: S3.2
+    name: Słownictwo usług doradczych
+    severity: medium
+    legal_basis: null
+    weight: 1.0
+    implemented: false
+    params:
+      phrase_patterns:
+        - '(?<!\w)family\s+office(?!\w)'
+        - '(?<!\w)wealth\s+management(?!\w)'
+        - '(?<!\w)doradztw\w*\s+inwestycyjn\w*'
+        - '(?<!\w)doradc\w*\s+inwestycyjn\w*'
+        - '(?<!\w)zarządzani\w*\s+portfel\w*'
+        - '(?<!\w)indywidualn\w*\s+strategi\w*'
+        - '(?<!\w)investment\s+advi[cs]\w*'
+
+  - id: S3.3
+    name: Personalizacja
+    severity: high
+    legal_basis: art. 76 u.o.i.f.
+    weight: 1.5
+    implemented: false
+    params:
+      phrase_patterns:
+        - '(?<!\w)dopasuj\w*\s+(?:\w+\s+){0,3}do\s+(?:Twojej|twojej|Pana|Pani|Państwa)\s+sytuacji(?!\w)'
+        - '(?<!\w)konsultacj\w*\s+1\s?:\s?1(?!\w)'
+        - '(?<!\w)profil\w*\s+inwestycyjn\w*'
+        - '(?<!\w)ankiet\w*'
+        - '(?<!\w)indywidualnie\s+dobier\w*'
+        - '(?<!\w)szyt\w*\s+na\s+miarę(?!\w)'
+    llm:
+      when: always
+      question: >-
+        Czy oferta dopasowuje rekomendacje do sytuacji konkretnego klienta (profil, ankieta, konsultacja
+        indywidualna) i czy jest to oferta autora materiału? fail = tak, pass = nie. Zacytuj zdanie.
+
+  - id: S3.4
+    name: Rekomendacja konkretnych instrumentów
+    severity: high
+    legal_basis: art. 76 u.o.i.f.
+    weight: 3.0
+    implemented: false
+    params:
+      verb_patterns: &verbs
+        - '(?<!\w)kup(?!\w)'
+        - '(?<!\w)kupuj\w*'
+        - '(?<!\w)kupn\w+'
+        - '(?<!\w)sprzedaj(?!\w)'
+        - '(?<!\w)sprzedawaj(?!\w)'
+        - '(?<!\w)sprzedaż\w*'
+        - '(?<!\w)trzymaj(?!\w)'
+        - '(?<!\w)rekomend(?:ujemy|uję|uje)(?!\w)'
+        - '(?<!\w)polec(?:am|amy)\s+(?:kupić|kupno|sprzedać|sprzedaż)\w*'
+        - '(?<!\w)co\s+(?:kupić|sprzedać)(?!\w)'
+      instrument_patterns: &instruments
+        - '(?<!\w)akcj\w*'
+        - '(?<!\w)obligacj\w*'
+        - '(?<!\w)ETF\w*'
+        - '(?<!\w)CFD(?!\w)'
+        - '(?<!\w)opcj\w*'
+        - '(?<!\w)kontrakt\w*\s+terminow\w*'
+        - '(?<!\w)futures(?!\w)'
+        - '(?<!\w)certyfikat\w*'
+        - '(?<!\w)jednost\w*\s+(?:uczestnictwa|funduszy?)\w*'
+      negation_patterns: &negations
+        - '(?<!\w)nie\s+(?:udzielamy|udzielam|dajemy|polecamy|polecam|rekomendujemy|rekomenduję)\b[^.!?]*'
+      window: 1
+    llm:
+      when: always
+      question: >-
+        Czy autor materiału rekomenduje nabycie, zbycie albo trzymanie konkretnych instrumentów finansowych
+        (akcje, obligacje, ETF, CFD, opcje, kontrakty terminowe, certyfikaty, jednostki funduszy)?
+        fail = tak, pass = nie. Zacytuj zdanie z rekomendacją.
+
+  - id: S3.5
+    name: Model odpłatny
+    severity: medium
+    legal_basis: null
+    weight: 1.0
+    implemented: false
+    params:
+      phrase_patterns:
+        - '(?<!\w)abonament\w*'
+        - '(?<!\w)subskrypcj\w*'
+        - '(?<!\w)sygnał\w*\s+premium(?!\w)'
+        - '(?<!\w)VIP(?!\w)'
+        - '(?<!\w)płatn\w*\s+grup\w*'
+        - '\d[\d\s.,]*\s?(?:zł|PLN)\s?/\s?mies\w*'
+        - '\d[\d\s.,]*\s?(?:zł|PLN)\s+miesięcznie(?!\w)'
+
+  - id: S3.6
+    name: Kierowanie do Polski
+    severity: low
+    legal_basis: null
+    weight: 0.5
+    implemented: false
+    params:
+      currency_patterns:
+        - '\d[\d\s.,]*\s?(?:zł|PLN)(?!\w)'
+        - '(?<!\w)PLN\s?\d'
+      phone_patterns:
+        - '\+48[\s-]?\d{2,3}[\s-]?\d{2,3}[\s-]?\d{2,3}'
+      pl_domain_suffixes: [.pl]
+
+  - id: S3.7
+    name: Lista ostrzeżeń publicznych KNF
+    severity: medium
+    legal_basis: null
+    weight: 1.0
+    implemented: false
+
+  - id: S3.8
+    name: Rekomendacje kryptoaktywów (poza art. 2)
+    severity: low
+    legal_basis: null
+    weight: 0.5
+    implemented: false
+    params:
+      verb_patterns: *verbs
+      instrument_patterns: *instruments
+      negation_patterns: *negations
+      crypto_patterns:
+        - '(?<!\w)bitcoin\w*'
+        - '(?<!\w)BTC(?!\w)'
+        - '(?<!\w)ethereum\w*'
+        - '(?<!\w)ETH(?!\w)'
+        - '(?<!\w)kryptowalut\w*'
+        - '(?<!\w)altcoin\w*'
+      window: 1

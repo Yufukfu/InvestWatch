@@ -18,12 +18,27 @@ from ..preprocessing import Preprocessed
 from ..registry import FirmMatch, Registry
 
 DEFAULT_CATALOGUE = Path(__file__).with_name("m2_rules.yaml")
+#: Shipped catalogue per module (M1/M3 signals: change analytics-m1-m3).
+MODULE_CATALOGUES = {
+    "M1": Path(__file__).with_name("m1_signals.yaml"),
+    "M2": DEFAULT_CATALOGUE,
+    "M3": Path(__file__).with_name("m3_signals.yaml"),
+}
+#: Rule id prefix each module's catalogue must use.
+_ID_PREFIX = {"M1": "S1.", "M2": "R", "M3": "S3."}
 SEVERITIES = {"high", "medium", "low"}
 # Every rule parameter a rule class reads (rules/m2.py); anything else in the YAML is a typo.
 KNOWN_PARAMS = {
     "labels", "prominent_sentences", "negation_before",
     "window", "claim_patterns", "claim_exclude_patterns", "risk_patterns",
     "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
+}
+# M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
+# the plain string lists below must hold non-empty strings.
+SIGNAL_STRING_LISTS = {"referral_query_keys", "tracking_query_prefixes", "rel_values", "pl_domain_suffixes"}
+KNOWN_PARAMS |= SIGNAL_STRING_LISTS | {
+    "phrase_patterns", "verb_patterns", "instrument_patterns", "negation_patterns", "crypto_patterns",
+    "currency_patterns", "phone_patterns",
 }
 _RULES: dict[str, type["Rule"]] = {}
 
@@ -40,6 +55,7 @@ class RuleSpec:
     legal_basis: str | None
     implemented: bool
     params: dict[str, Any] = field(default_factory=dict)
+    weight: float = 0.0  # M1/M3 only: the signal's weight in σ(bias + Σ w·x)
 
 
 @dataclass(frozen=True)
@@ -59,6 +75,10 @@ class Rule:
     def applies(self, ctx: Context) -> bool:
         return True
 
+    def evidence_fields(self, ctx: Context) -> list[str]:
+        """Document fields an evidence quote may come from; the text only, unless a signal quotes metadata."""
+        return [ctx.doc.text]
+
     def evaluate(self, ctx: Context) -> RuleResult:  # pragma: no cover - abstract
         raise NotImplementedError
 
@@ -75,6 +95,20 @@ class Rule:
         )
 
 
+def metadata_fields(doc: ScrapedDocument) -> list[str]:
+    """The text plus the metadata an M1/M3 signal may quote: author name and handle, link hrefs, the URL."""
+    fields = [doc.text]
+    if doc.author is not None:
+        fields += [v for v in (doc.author.name, doc.author.handle) if v]
+    fields += [link.href for link in doc.links]
+    fields.append(doc.url)
+    return fields
+
+
+def _number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def register(cls: type[Rule]) -> type[Rule]:
     _RULES[cls.rule_id] = cls
     return cls
@@ -85,9 +119,11 @@ def compile_patterns(patterns: list[str]) -> list[re.Pattern]:
 
 
 class Catalogue:
-    def __init__(self, specs: list[RuleSpec]):
+    def __init__(self, specs: list[RuleSpec], *, module: str = "M2", bias: float = 0.0):
         self.specs = tuple(specs)
         self._by_id = {s.id: s for s in specs}
+        self.module = module
+        self.bias = bias  # M1/M3 only
 
     @property
     def implemented(self) -> list[RuleSpec]:
@@ -97,23 +133,34 @@ class Catalogue:
         return self._by_id[rule_id]
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "Catalogue":
-        from . import m2  # noqa: F401  (registers the rule classes)
+    def load_module(cls, module: str) -> "Catalogue":
+        """The shipped catalogue of `module` (M1, M2 or M3)."""
+        return cls.load(MODULE_CATALOGUES[module], module=module)
+
+    @classmethod
+    def load(cls, path: Path | None = None, *, module: str = "M2") -> "Catalogue":
+        from . import m1, m2, m3  # noqa: F401  (registers the rule classes)
 
         path = path or DEFAULT_CATALOGUE
+        if module not in _ID_PREFIX:
+            raise CatalogueError(f"{path}: unknown module {module!r}")
+        signals = module != "M2"
         try:
             data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except (OSError, yaml.YAMLError) as exc:
             raise CatalogueError(f"{path}: cannot load rule catalogue ({exc})") from exc
         if not isinstance(data, dict):
             raise CatalogueError(f"{path}: the catalogue root must be a mapping with a `rules` list")
+        bias = data.get("bias")
+        if signals and not _number(bias):
+            raise CatalogueError(f"{path}: a {module} catalogue needs a numeric root `bias`")
         specs: list[RuleSpec] = []
         seen: set[str] = set()
         for entry in data.get("rules") or []:
             if not isinstance(entry, dict):
                 raise CatalogueError(f"{path}: entry {entry!r} is not a mapping")
             rule_id = str(entry.get("id", ""))
-            if not re.match(RULE_ID_PATTERN, rule_id) or not rule_id.startswith("R"):
+            if not re.match(RULE_ID_PATTERN, rule_id) or not rule_id.startswith(_ID_PREFIX[module]):
                 raise CatalogueError(f"{path}: invalid rule id {rule_id!r}")
             if rule_id in seen:
                 raise CatalogueError(f"{path}: duplicate rule id {rule_id}")
@@ -124,11 +171,14 @@ class Catalogue:
             implemented = bool(entry.get("implemented", False))
             if implemented and rule_id not in _RULES:
                 raise CatalogueError(f"{path}: {rule_id} is marked implemented but has no rule class")
+            weight = entry.get("weight")
+            if signals and not _number(weight):
+                raise CatalogueError(f"{path}: {rule_id} needs a numeric `weight`")
             params = _check_params(path, rule_id, entry.get("params") or {})
             seen.add(rule_id)
             specs.append(RuleSpec(rule_id, entry["name"], entry["severity"], entry.get("legal_basis"),
-                                  implemented, params))
-        return cls(specs)
+                                  implemented, params, float(weight) if signals else 0.0))
+        return cls(specs, module=module, bias=float(bias) if signals else 0.0)
 
 
 def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
@@ -144,6 +194,8 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
     if unknown:
         raise CatalogueError(f"{path}: {rule_id} has unknown param(s) {', '.join(map(str, unknown))}")
     for key, value in params.items():
+        if key in SIGNAL_STRING_LISTS and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key == "footnote_markers" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key == "negation_before":
@@ -177,7 +229,7 @@ def run_rules(catalogue: Catalogue, ctx: Context) -> list[RuleResult]:
             out.append(rule.result("not_applicable", None, "Reguła nie dotyczy tego materiału."))
             continue
         res = rule.evaluate(ctx)
-        if res.evidence is not None and res.evidence not in ctx.doc.text:
+        if res.evidence is not None and not any(res.evidence in f for f in rule.evidence_fields(ctx)):
             # Safety net (analytics/CLAUDE.md): an unverifiable quote never supports a verdict.
             res = res.model_copy(update={
                 "result": "uncertain",
