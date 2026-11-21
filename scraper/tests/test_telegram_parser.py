@@ -8,7 +8,8 @@ from jsonschema import Draft202012Validator, FormatChecker
 from iw_scraper.config import contracts_dir
 from iw_scraper.ingest.document import build_document
 from iw_scraper.parsing import ParseFailure
-from iw_scraper.social.telegram import Link, build_page, parse
+from iw_scraper.social.model import Link, build_page
+from iw_scraper.social.telegram import parse
 from iw_scraper.types import Reason, Source
 
 FIXTURES = Path(__file__).parent / "fixtures"

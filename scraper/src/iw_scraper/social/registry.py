@@ -5,9 +5,10 @@ from urllib.parse import urlsplit
 
 from iw_scraper.ratelimit import host_key
 from iw_scraper.social import telegram
+from iw_scraper.social.model import Channel
 
 # (body, final_url) -> Channel; a collector raises `ParseFailure` for a page it cannot read
-Collector = Callable[[bytes, str], telegram.Channel]
+Collector = Callable[[bytes, str], Channel]
 
 
 class CollectorRegistry:

@@ -1,51 +1,19 @@
 """Telegram public channel preview (`https://t.me/s/<handle>`): one page in, a `Channel` out."""
 
 import re
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin, urlsplit
 
 from lxml import etree, html
 
 from iw_scraper.parsing import ParseFailure
+from iw_scraper.social.model import Channel, Link, Post
 from iw_scraper.types import Reason
 
 _MULTIPLIERS = {"K": 1_000, "M": 1_000_000}
 _COUNT = re.compile(r"^(\d+(?:\.\d+)?)([KM])?$", re.IGNORECASE)
 _WEB_SCHEMES = {"http", "https"}
-
-
-@dataclass(frozen=True)
-class Link:
-    href: str
-    text: str
-
-
-@dataclass(frozen=True)
-class Post:
-    message_id: int
-    permalink: str
-    text: str
-    published_at: str | None
-    views: int | None
-    links: tuple[Link, ...]
-    html: str
-
-
-@dataclass(frozen=True)
-class Channel:
-    title: str | None
-    handle: str | None
-    followers: int | None
-    posts: tuple[Post, ...]  # only the posts that have text
-    skipped: int  # posts without text (image, video, sticker)
-    older_url: str | None
-
-    @property
-    def seen(self) -> int:
-        """Posts on the page, with or without text: what `SOCIAL_MAX_POSTS` counts."""
-        return len(self.posts) + self.skipped
+NETWORK = "telegram"
 
 
 def _has_class(name: str) -> str:
@@ -145,49 +113,12 @@ def parse(body: bytes, final_url: str) -> Channel:
 
     older = root.xpath(f"//a[{_has_class('tme_messages_more')} and @href and not(@data-after)]/@href")
     return Channel(
+        network=NETWORK,
         title=title,
         handle=handle,
+        profile_url=f"https://t.me/{handle.removeprefix('@')}" if handle else None,
         followers=_followers(root),
         posts=tuple(posts),
         skipped=skipped,
         older_url=urljoin(final_url, older[0]) if older else None,
     )
-
-
-def _utc(timestamp: str | None) -> str | None:
-    """`timestamp` in UTC ISO-8601, or None when it is missing or unreadable."""
-    if not timestamp:
-        return None
-    try:
-        moment = datetime.fromisoformat(timestamp)
-    except ValueError:
-        return None
-    # no offset: the zone is unknown, and `astimezone` would assume the host's own
-    return moment.astimezone(timezone.utc).isoformat() if moment.tzinfo is not None else None
-
-
-def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
-    """The page dict `Ingestor.ingest` takes for one post: the contract fields the page decides, plus `html`.
-
-    `platform`, `source_kind`, `source_id`, the fetch time and the fetch facts of `scrape_meta` are added from the
-    source row and the fetch by ingest, never taken from the page.
-    """
-    username = (channel.handle or "").removeprefix("@")
-    return {
-        "url": post.permalink,
-        "canonical_url": post.permalink,
-        "http_status": http_status,
-        "title": None,
-        "lang": None,
-        "text": post.text,
-        "published_at": _utc(post.published_at),
-        "author": {
-            "name": channel.title,
-            "handle": channel.handle,
-            "profile_url": f"https://t.me/{username}" if username else None,
-            "followers": channel.followers,
-        },
-        "links": [{"href": link.href, "text": link.text or None} for link in post.links],
-        "scrape_meta": {"message_id": post.message_id, "views": post.views, "network": "telegram"},
-        "html": post.html,
-    }

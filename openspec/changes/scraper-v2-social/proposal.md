@@ -32,6 +32,6 @@ The challenge asks for collectors for social media, and module M1 (finfluencers)
 
 ## Impact
 
-- New code under `scraper/src/iw_scraper/social/` (Telegram parser, collector registry) and a small branch in `collect.py` and `targets.py`/`types.py` selection; tests with saved real channel pages in `scraper/tests/fixtures/` (copied in the apply phase from the research samples in the session scratchpad).
+- New code under `scraper/src/iw_scraper/social/` (platform-neutral `model.py`, Telegram parser, collector registry) and a small branch in `collect.py` and `targets.py`/`types.py` selection; tests with saved real channel pages in `scraper/tests/fixtures/` (copied in the apply phase from the research samples in the session scratchpad).
 - No new dependency (`lxml` is already used).
 - Docs: `scraper/CLAUDE.md`, `iw-scraper-conventions`, `scraper/README.md` (`SOCIAL_MAX_POSTS`), `.docs/status/scraper.md`, ADR 0103 and its row in `.docs/decisions/README.md`.
