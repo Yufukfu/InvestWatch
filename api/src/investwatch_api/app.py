@@ -65,17 +65,27 @@ async def _check(probe: Callable[[], Awaitable[object]]) -> str:
 
 
 def create_app(services_factory: ServicesFactory = services_from_env) -> FastAPI:
+    from .events import Relay, create_sio, event_validator
+
+    origins = settings.cors_origins()
+    validator = event_validator(settings.contracts_dir())  # fails fast if contracts/ is missing
+    sio = create_sio(origins)
+
     @contextlib.asynccontextmanager
     async def lifespan(api: FastAPI):
-        api.state.services = services_factory()
+        services = services_factory()
+        api.state.services = services
+        relay = Relay(sio, services.redis, validator, services)
+        relay.start()
         try:
             yield
         finally:
-            await api.state.services.close()
+            await relay.stop()
+            await services.close()
 
     api = FastAPI(title="InvestWatch API", version="1.0.0", lifespan=lifespan)
+    api.state.sio = sio
     errors.install(api)
-    origins = settings.cors_origins()
     if origins:
         api.add_middleware(CORSMiddleware, allow_origins=list(origins), allow_methods=["*"], allow_headers=["*"])
 
@@ -96,3 +106,11 @@ def create_app(services_factory: ServicesFactory = services_from_env) -> FastAPI
 
     register(api)
     return api
+
+
+def create_asgi(services_factory: ServicesFactory = services_from_env):
+    """FastAPI under /api plus Socket.IO on /socket.io (namespace /events), one ASGI app on port 8000."""
+    import socketio
+
+    api = create_app(services_factory)
+    return socketio.ASGIApp(api.state.sio, other_asgi_app=api, socketio_path="socket.io")
