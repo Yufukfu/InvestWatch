@@ -6,11 +6,15 @@ The vetted set of web sources the scraper starts with for modules M1, M2 and M3,
 ## ADDED Requirements
 
 ### Requirement: Seed file is validated before any write
-The seed command SHALL read the entries of every `*.toml` file in the seed directory and validate all of them together before inserting any. An entry is valid only when `name` is non-empty, `platform` is one of the contract's platform values (`web` when the entry omits it; the entries of `sources.toml` are all `web`), `source_kind` is `firm_own`, `third_party` or `unknown` (the contract's closed set), `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host, `schedule_cron` is a valid cron expression of exactly five fields or null, and no other entry has the same URL. A single invalid entry SHALL abort the run with a message naming the entry, and no row SHALL be written.
+The seed command SHALL read the entries of every `*.toml` file in the seed directory and validate all of them together before inserting any. A single invalid entry SHALL abort the run with a message naming the file and entry, and no row SHALL be written.
 
 #### Scenario: Valid file
-- **WHEN** every entry satisfies the rules
+- **WHEN** every entry satisfies the rules of the scenario "Validity rules"
 - **THEN** the command proceeds to insert
+
+#### Scenario: Validity rules
+- **WHEN** an entry is checked
+- **THEN** it is valid only if `name` is non-empty, `platform` is one of the contract's platform values (`web` when omitted; every entry of `sources.toml` is `web`), `source_kind` is `firm_own`, `third_party` or `unknown`, `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host and without credentials or spaces, `schedule_cron` is a valid cron expression of exactly five fields or omitted, and no other entry has the same URL
 
 #### Scenario: Invalid entry aborts the whole run
 - **WHEN** one entry has `target_modules = []` and the others are valid
@@ -56,11 +60,15 @@ The seed command SHALL insert an entry only when no `sources` row has the same U
 - **THEN** the command exits non-zero with a message that does not contain the connection string or credentials
 
 ### Requirement: Every module has a real source
-The seed file SHALL contain at least one active entry for each of `M1`, `M2` and `M3`, and every entry SHALL carry the `source_kind` that matches what the scraper can know about who publishes the page: `firm_own` for a page published by a firm registered with the KNF, `third_party` for a page that promotes or compares registered firms (an affiliate, ranking or review page), and `unknown` for a page of an entity whose registry status the scraper does not determine (the M3 candidates). Analytics, not the seed, decides from the registry whether such an entity is authorised. Entries whose only purpose is a negative control SHALL say so in their name or a comment in the seed file.
+The seed file SHALL contain at least one active entry for each of `M1`, `M2` and `M3`, and every entry SHALL carry the `source_kind` that matches what the scraper can know about who publishes the page. Entries whose only purpose is a negative control SHALL say so in their name or a comment in the seed file.
 
 #### Scenario: Module coverage
 - **WHEN** the seed file is loaded
 - **THEN** each of `M1`, `M2` and `M3` appears in the `target_modules` of at least one entry
+
+#### Scenario: Source kind by publisher
+- **WHEN** an entry is classified
+- **THEN** `firm_own` is a page published by a firm registered with the KNF, `third_party` is a page that promotes or compares registered firms (an affiliate, ranking or review page), and `unknown` is a page of an entity whose registry status the scraper does not determine (the M3 candidates), because analytics, not the seed, decides from the registry whether such an entity is authorised
 
 #### Scenario: Registered firm's own page
 - **WHEN** an entry points at a page published by a KNF-registered firm

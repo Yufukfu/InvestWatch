@@ -27,4 +27,4 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## Workflow follow-up
 
-- Run `/openspec-archive-change` as the last commit of the branch, then stop and hand the PR body to the human. Never push or open the PR yourself.
+- Run `/openspec-archive-change` as the last commit of the branch, then, once the PR-ready criteria in `.claude/CODE_REVIEW.md` hold, push the branch and open the PR (ADR 0207; base `scraper/scraper-orchestration` while its PR is open, `main` after it merges). The human approves and merges; never merge or approve.
