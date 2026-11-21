@@ -1,11 +1,14 @@
 ## ADDED Requirements
 
 ### Requirement: Env-only embeddings configuration
-Analytics SHALL configure embeddings only from environment variables: `EMBED_BASE_URL`, `EMBED_MODEL` (default `bge-m3`), `EMBED_API_KEY`, `EMBED_DIM` (default 1024), `EMBED_TIMEOUT_S` (default 5), `EMBED_MAX_CHARS` (default 4000), `EMBED_CACHE_TTL_S` (default 604800), `EMBED_BREAKER_FAILURES` (default 3) and `EMBED_BREAKER_COOLDOWN_S` (default 60). With `EMBED_BASE_URL` empty or unset, embeddings SHALL be disabled and analysis SHALL continue without them. A set `EMBED_BASE_URL` with an empty `EMBED_MODEL`, or a non-numeric or non-positive limit, SHALL be a configuration error that names the variable, and the worker SHALL exit with code 2. The API key SHALL never appear in logs or error messages. The documented defaults in `analytics/.env.example` SHALL point to the local `ollama` service (`http://ollama:11434/v1`, `bge-m3`), never to a paid hosted API.
+Analytics SHALL configure embeddings only from environment variables: `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY`, `EMBED_DIM`, `EMBED_TIMEOUT_S`, `EMBED_MAX_CHARS`, `EMBED_CACHE_TTL_S`, `EMBED_BREAKER_FAILURES` and `EMBED_BREAKER_COOLDOWN_S` (defaults in design §2). With `EMBED_BASE_URL` empty or unset, embeddings SHALL be disabled.
 
 #### Scenario: Embeddings disabled by default
 - **WHEN** `EMBED_BASE_URL` is unset and a document is analyzed
 - **THEN** no embeddings request is made and every finding has `model.embedder = null`
+
+### Requirement: Invalid embeddings configuration
+A set `EMBED_BASE_URL` with an empty `EMBED_MODEL`, or a non-numeric or non-positive limit, SHALL be a configuration error that names the variable, and the worker SHALL exit with code 2.
 
 #### Scenario: Model missing
 - **WHEN** `EMBED_BASE_URL` is set and `EMBED_MODEL` is an empty string
@@ -14,6 +17,13 @@ Analytics SHALL configure embeddings only from environment variables: `EMBED_BAS
 #### Scenario: Bad number
 - **WHEN** `EMBED_DIM=abc` or `EMBED_TIMEOUT_S=0`
 - **THEN** startup fails with an error naming that variable
+
+### Requirement: Local embeddings by default
+The documented values in `analytics/.env.example` SHALL point to the local `ollama` service (`http://ollama:11434/v1`, `bge-m3`), never to a paid hosted API. The API key SHALL never appear in logs or error messages.
+
+#### Scenario: Example env is local
+- **WHEN** `analytics/.env.example` is read
+- **THEN** its `EMBED_BASE_URL` example is `http://ollama:11434/v1`, its `EMBED_MODEL` is `bge-m3`, and no other embeddings host appears
 
 #### Scenario: Key never logged
 - **WHEN** a request with `EMBED_API_KEY=sk-emb-123` fails with HTTP 401
@@ -88,7 +98,7 @@ After `EMBED_BREAKER_FAILURES` consecutive unavailable outcomes (connection erro
 - **THEN** later documents call the endpoint again
 
 ### Requirement: Embedding cache in Redis
-The client SHALL cache each accepted vector in Redis under `iw:emb:v1:{variant}:{content_hash}`, with TTL `EMBED_CACHE_TTL_S`. `variant` is derived from `EMBED_MODEL`, `EMBED_DIM` and `EMBED_MAX_CHARS`. `content_hash` SHALL be analytics' own preprocessing hash. The value SHALL be the float32 vector, encoded so that it can be read by a client with `decode_responses=True`. A cache hit SHALL make no HTTP request. A cached value of the wrong length SHALL be treated as a miss and overwritten. Rejected vectors and errors SHALL NOT be cached. A Redis error SHALL be treated as a miss or a skipped write, logged and never raised. Without a Redis client (CLI), no cache is used. This TTL-bound cache SHALL be the only place where a document vector is stored: vectors SHALL NOT be written to Postgres, to findings or to events.
+The client SHALL cache each accepted vector in Redis under `iw:emb:v1:{variant}:{content_hash}` with TTL `EMBED_CACHE_TTL_S`. `variant` is derived from `EMBED_MODEL`, `EMBED_DIM` and `EMBED_MAX_CHARS`, and `content_hash` is analytics' own preprocessing hash. The value SHALL be the float32 vector, encoded as text. A hit SHALL make no HTTP request. Rejected vectors and errors SHALL NOT be cached. This cache SHALL be the only store of document vectors: never Postgres, findings or events.
 
 #### Scenario: Re-scan is free
 - **WHEN** the same document is analyzed twice with the same embeddings settings
@@ -97,6 +107,13 @@ The client SHALL cache each accepted vector in Redis under `iw:emb:v1:{variant}:
 #### Scenario: Model swap misses the cache
 - **WHEN** a document is embedded with `EMBED_MODEL=bge-m3`, then with `EMBED_MODEL=multilingual-e5-large`
 - **THEN** the second run sends a new request
+
+#### Scenario: Readable through the worker client
+- **WHEN** a vector is cached and read back through a Redis client with `decode_responses=True`
+- **THEN** it decodes to the same 1024 float32 values
+
+### Requirement: Cache failures never fail a document
+A Redis error on a cache read SHALL be treated as a miss, and on a write as a skipped write. Both are logged and never raised. A cached value of the wrong length SHALL be treated as a miss and overwritten. Without a Redis client (CLI), no cache is used.
 
 #### Scenario: Cache down
 - **WHEN** the Redis client raises a connection error on both cache read and write

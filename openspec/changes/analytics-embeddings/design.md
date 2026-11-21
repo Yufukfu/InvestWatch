@@ -61,6 +61,7 @@ The embeddings env set is separate from the LLM one (`EMBED_*`, not `LLM_*`), be
 - **Input:** `pre.normalized[:EMBED_MAX_CHARS]`, 4000 by default, about 1.3k Polish tokens. The topic is decided by the headline and the lead. A short input keeps `bge-m3` fast on CPU, and it does not depend on the server's context length (#32). Empty text is never sent (the pipeline skips it earlier).
 - **No document budget.** There is one call per document, and the 5 s timeout plus the breaker bound it. The 5 s are added to the LLM's `LLM_DOC_BUDGET_S` worst case. Config validation requires `(LLM_DOC_BUDGET_S + EMBED_TIMEOUT_S) * 1000 < CLAIM_MIN_IDLE_MS`, the same XAUTOCLAIM reason as ADR 0310.
 - **Logs:** the host, the model, the status, the latency and the error class. Never the text, the vector or the key.
+- **Defaults:** `EMBED_MODEL=bge-m3`, `EMBED_DIM=1024`, `EMBED_TIMEOUT_S=5`, `EMBED_MAX_CHARS=4000`, `EMBED_CACHE_TTL_S=604800` (7 days), `EMBED_BREAKER_FAILURES=3`, `EMBED_BREAKER_COOLDOWN_S=60`. Near-dup: `NEARDUP_NUM_PERM=128`, `NEARDUP_BANDS=32`, `NEARDUP_THRESHOLD=0.8`, `NEARDUP_MAX_CHARS=50000`, `NEARDUP_TTL_S=2592000` (30 days). Gate: `GATE_ENABLED=true`, `GATE_SIM_THRESHOLD=0.45`.
 
 ### 3. Cache
 

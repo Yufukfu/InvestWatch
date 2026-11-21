@@ -1,16 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Which events per stored finding
-After the commit the worker SHALL publish, for each finding reported `created`, one `finding.created` event. When the finding's `score` is at or above the module threshold, it SHALL also publish one `finding.high_risk` event with the same `data`, after the `finding.created` one, unless the alert is suppressed for a near-duplicate.
-
-A finding reported `updated` (a redelivered or re-analysed document) SHALL publish nothing (coordinator decision, design §"Resolved questions").
-
-**Near-duplicate alerts.** When the finding's document belongs to a near-duplicate group (document-analysis "Near-duplicate detection and grouping"), the publisher SHALL claim the group's alert for that module with an atomic Redis `SET iw:neardup:v1:alerted:{group_id}:{module} NX`, with TTL `NEARDUP_TTL_S`, before sending `finding.high_risk`:
-- If the claim succeeds, it SHALL publish `finding.high_risk` as usual.
-- If the key already exists, it SHALL NOT publish `finding.high_risk`. It SHALL log `high_risk_suppressed` with reason `neardup`, the finding id and the group id. The `finding.created` event and the stored finding, with its own `url`, are unchanged.
-- If the claim raises a Redis error, the alert SHALL be published (fail open: no alert is lost).
-
-Suppression is per module, so an M1 alert does not suppress an M3 alert for the same group. A document with no group, or a worker with no near-dup index, behaves as before.
+After the commit the worker SHALL publish, for each finding reported `created`, one `finding.created` event. When the finding's `score` is at or above the module threshold, it SHALL also publish one `finding.high_risk` event with the same `data`, after the `finding.created` one, unless it is suppressed as a repeat alert for a near-duplicate group. A finding reported `updated` (a redelivered or re-analysed document) SHALL publish nothing (coordinator decision, design §"Resolved questions").
 
 #### Scenario: Low score
 - **WHEN** a new M2 finding has score 0.3 and the M2 threshold is 0.5
@@ -23,6 +14,11 @@ Suppression is per module, so an M1 alert does not suppress an M3 alert for the 
 #### Scenario: Re-scan update
 - **WHEN** a finding is reported `updated`
 - **THEN** no event is published for it
+
+## ADDED Requirements
+
+### Requirement: No repeat high-risk alert for a near-duplicate group
+When a finding's document belongs to a near-duplicate group, the publisher SHALL claim the group's alert for that module with an atomic Redis `SET iw:neardup:v1:alerted:{group_id}:{module} NX` (TTL `NEARDUP_TTL_S`) before sending `finding.high_risk`. It SHALL send the alert only if the claim succeeds or Redis raises (fail open), and otherwise log `high_risk_suppressed` with reason `neardup`. `finding.created` and the stored finding are unchanged.
 
 #### Scenario: Near-duplicate of an alerted document
 - **WHEN** a repost joins the group of an original whose M1 finding already fired `finding.high_risk`, and the repost's new M1 finding also scores above the M1 threshold
