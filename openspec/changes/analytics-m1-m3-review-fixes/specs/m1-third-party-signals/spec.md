@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: S1.3 partnership label
-S1.3 SHALL record whether a partnership label is present: `fail` when the text has a label from its dictionary (`#reklama`, `#ad`, `#współpraca`, `#sponsored`, `#partner`, `partner reklamowy`, `współpraca reklamowa`, `płatna współpraca`, `materiał sponsorowany`, `sponsorowany`); the bare word `partner` SHALL NOT count, because it is common in neutral text or a link's `rel` contains `sponsored`, quoting the label or the href; `pass` otherwise. A label negated on the same line SHALL NOT count, as for R2; a hashtag is never negated. A present label SHALL raise the M1 score; a missing label SHALL NOT lower it (it contributes nothing).
+S1.3 SHALL record whether a partnership label is present: `fail` when the text has a label from its dictionary (`#reklama`, `#ad`, `#współpraca`, `#sponsored`, `#partner`, `partner reklamowy`, `współpraca reklamowa`, `płatna współpraca`, `materiał sponsorowany`, `sponsorowany`); the bare word `partner` SHALL NOT count, because it is common in neutral text or a link's `rel` contains `sponsored`, quoting the label or the href; `pass` otherwise.
 
 #### Scenario: Hashtag label
 - **WHEN** the mock document `182e5a42…` is analyzed
@@ -31,8 +31,13 @@ S1.3 SHALL record whether a partnership label is present: `fail` when the text h
 - **WHEN** a post about Alfa Inwestycje DM says `#partner` or `partner reklamowy`
 - **THEN** S1.3 is `fail` quoting that label
 
+#### Scenario: S1.3 partnership label: further obligations
+- **WHEN** this requirement is applied
+- **THEN** A label negated on the same line SHALL NOT count, as for R2; a hashtag is never negated.
+- **AND** A present label SHALL raise the M1 score; a missing label SHALL NOT lower it (it contributes nothing).
+
 ### Requirement: S1.7 targeting readers in Poland
-S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone number (quoting it), else when the page host ends in `.pl` (quoting the host from `url`), else when the language guess is `pl` (null evidence, explanation says Polish language); otherwise `pass`. For a foreign firm without a Polish branch (`foreign_no_branch`), an M1 candidate with S1.7 `pass` SHALL produce no finding (routing requirement, reason `not_targeting_poland`), so its Polish-language ads are kept and foreign-language ones are not. For a firm registered in Poland (`brokerage_house`, `brokerage_bank`, `foreign_branch`: a branch is registered in Poland), S1.7 SHALL only be recorded as an attribute.
+S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone number (quoting it), else when the page host ends in `.pl` (quoting the host from `url`), else when the language guess is `pl` (null evidence, explanation says Polish language); otherwise `pass`.
 
 #### Scenario: Złoty amount
 - **WHEN** the mock document `3c41441c…` is analyzed
@@ -50,8 +55,19 @@ S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone num
 - **WHEN** an English third-party post names EuroTrade (`foreign_branch`) and has no Polish marker
 - **THEN** an M1 finding is returned with S1.7 `pass`
 
+#### Scenario: S1.7 targeting readers in Poland: further obligations
+- **WHEN** this requirement is applied
+- **THEN** For a foreign firm without a Polish branch (`foreign_no_branch`), an M1 candidate with S1.7 `pass` SHALL produce no finding (routing requirement, reason `not_targeting_poland`), so its Polish-language ads are kept and foreign-language ones are not.
+- **AND** For a firm registered in Poland (`brokerage_house`, `brokerage_bank`, `foreign_branch`: a branch is registered in Poland), S1.7 SHALL only be recorded as an attribute.
+
 ### Requirement: M1 finding assembly
-The M1 finding SHALL be an inventory entry: `module` M1, the matched `firm` (firm data, `authorized` true), the `advertiser` (advertiser data), the M1 signal results, `content_excerpt` (ad content: a window of at most 500 characters around the first evidence found in the text, or the start of the text without one), `url` and `platform` from the document (location), the raw `score`, a Polish title that names the advertiser and the firm and says "reklamuje" when an ad signal (S1.2, S1.3 or S1.4) is `fail` and "wspomina" otherwise, with "Nieznany autor" when the advertiser has no name, a Polish summary that says whether a partnership label is present and lists present, uncertain and unchecked signals, `status` new, and `model.llm` null in rules-only mode. A re-scan of the same document SHALL update this finding through the worker's upsert, not add another. It SHALL validate against `contracts/schemas/finding.schema.json` v1.
+The M1 finding SHALL be an inventory entry with `module` M1, the matched `firm` (firm data, `authorized` true), the `advertiser` (advertiser data), the M1 signal results, the raw `score`, `status` new, `url` and `platform` from the document (location), and `model.llm` null in rules-only mode. Its `content_excerpt` (ad content) SHALL be a window of at most 500 characters around the first evidence found in the text, or the start of the text without one.
+
+#### Scenario: M1 finding assembly: wording and updates
+- **WHEN** an M1 finding is built or its document is scanned again
+- **THEN** its Polish title names the advertiser and the firm and says "reklamuje" when an ad signal (S1.2, S1.3 or S1.4) is `fail` and "wspomina" otherwise, with "Nieznany autor" when the advertiser has no name
+- **AND** its Polish summary says whether a partnership label is present and lists present, uncertain and unchecked signals
+- **AND** a re-scan of the same document SHALL update this finding through the worker's upsert, not add another
 
 #### Scenario: Finfluencer finding
 - **WHEN** the mock document `3c41441c…` is analyzed
@@ -68,3 +84,18 @@ The M1 finding SHALL be an inventory entry: `module` M1, the matched `firm` (fir
 #### Scenario: Social post without an author
 - **WHEN** an Instagram post about Alfa Inwestycje DM has no author
 - **THEN** the title starts with `Nieznany autor`
+
+#### Scenario: M1 finding assembly: further obligations
+- **WHEN** this requirement is applied
+- **THEN** It SHALL validate against `contracts/schemas/finding.schema.json` v1.
+
+### Requirement: M1 signal semantics
+M1 SHALL inventory ads of registered investment firms published by third parties or private persons (design decisions 4-5). Each M1 signal result SHALL be `fail` when the signal is present, `pass` when it is absent, `uncertain` when a rule found a candidate only the LLM can confirm, and `not_applicable` when the document lacks the inputs to judge it.
+
+#### Scenario: Rules-only S1.5
+- **WHEN** the mock document `3c41441c…` is analyzed without a judge
+- **THEN** `rules` holds S1.1-S1.7, S1.5 is `uncertain` with null evidence, and the summary names S1.5 as not checked
+
+#### Scenario: M1 signal semantics: further obligations
+- **WHEN** this requirement is applied
+- **THEN** S1.5 (promotional vs neutral or educational content) has no rule part: without a merged judge verdict it SHALL be `uncertain` with null evidence and an explanation that it needs the language model, and the summary SHALL name it as not checked.
