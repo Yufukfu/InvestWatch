@@ -749,3 +749,29 @@ def test_visual_rules_without_blocks_on_every_mock(mock_documents, registry, cat
         ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=registry.match(doc.text, doc.url), registry=registry)
         res = {r.rule_id: r.result for r in run_rules(catalogue, ctx)}
         assert res["R4"] == "not_applicable" and res["R6"] == "not_applicable"
+
+
+# ---- adversarial input (ReDoS) -----------------------------------------------------------------
+
+import time  # noqa: E402
+
+
+@pytest.mark.parametrize("text", [
+    "1" * 20000,                       # digit run: \d+...% was quadratic
+    "1" * 20000 + "%",
+    "1," * 10000,
+    "Zysk " + "9" * 20000 + " zł w 2025 roku.",
+])
+def test_rules_are_linear_on_long_digit_runs(text, registry, catalogue):
+    start = time.perf_counter()
+    run(text, registry, catalogue)
+    assert time.perf_counter() - start < 2.0
+
+
+def test_locate_caps_whitespace_insensitive_search():
+    from investwatch_analytics.rules.m2 import locate
+
+    start = time.perf_counter()
+    assert locate("a " * 40000, "a " * 3000 + "b") is None
+    assert time.perf_counter() - start < 0.5
+    assert locate("x  y\nz", "x y z") == "x  y\nz"

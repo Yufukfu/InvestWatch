@@ -199,6 +199,9 @@ NO_RISK_BLOCK = "Brak informacji o ryzyku w danych renderowania – reguła nie 
 NO_RENDER_METADATA = "Brak metadanych renderowania (region, widoczność bez przewijania) – reguła nie dotyczy."
 
 
+LOCATE_FUZZY_MAX = 2000  # chars; longer block texts are matched exactly only
+
+
 def locate(text: str, needle: str) -> str | None:
     """`needle` as it appears in `text`: exact, else whitespace-insensitive; None when absent."""
     needle = needle.strip()
@@ -206,6 +209,8 @@ def locate(text: str, needle: str) -> str | None:
         return None
     if needle in text:
         return needle
+    if len(needle) > LOCATE_FUZZY_MAX:
+        return None  # the whitespace-insensitive search is O(len(text) * len(needle))
     m = re.search(r"\s+".join(map(re.escape, needle.split())), text)
     return m.group(0) if m else None
 

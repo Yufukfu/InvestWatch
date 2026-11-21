@@ -82,3 +82,13 @@
 | R31 → resolved | The investor-compensation-scheme fact next to KNF is lawful mandatory information, not R18. R18 is supervision "używane do sugerowania bezpieczeństwa inwestycji" | `fix-here`: `chronione przez system rekompensat` is excluded from R18's safety words. A safety claim in the same sentence still fails; borderline cases go to the LLM (`llm:` block) |
 | R9 → resolved | Past results in any unit are past performance | `fix-here`: R14 counts an amount (`5 000 zł`, `1200 PLN`) next to return vocabulary as a return figure. A bare amount (bonus, fee, subscription) does not count |
 | R18 → resolved | The scraper on `main` does not produce `blocks` yet (no Playwright rendering) | Verified: R4 and R6 are `not_applicable` without blocks on every mock. `fix-here`: R6 never passes on missing metadata. A block with `region: null` (and no footnote marker, not in view on load) is unknown. All unknown gives `not_applicable` "brak metadanych renderowania"; unknown next to hidden gives `uncertain`. R4 reads only fields the contract requires (`text`, `font_size_px`, `visible`, `viewport`), so it cannot see a null |
+
+## Adversarial-input timing (ReDoS check, coordinator request)
+
+Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14 adversarial inputs, each 20k and 40k characters long. The inputs were long whitespace, tab and newline, letter, digit, dot, Polish-letter and punctuation runs, plus repeated `nie `, `bez `, `wynik `, `nadzór przez `, `1,` and `12,5 `. `locate()` was timed too.
+
+| # | Finding | Disposition |
+|---|---|---|
+| R34 | `\d+(?:[.,]\d+)?\s?%` and the three excludes built on it were quadratic on a long digit run: about 25 s at 20k digits, about 4× slower when the input doubled. This includes R3's claim and exclude lists, which R14 aliases | `fix-here`: `(?<!\d)` prefix, so the pattern is tried once per number, not once per digit; regression tests on 20k-digit inputs (< 2 s). After the fix no pattern is super-linear |
+| R35 | `locate()`'s whitespace-insensitive search is O(text × needle) on a huge block | `fix-here`: only block texts up to `LOCATE_FUZZY_MAX` (2000 chars) go through the fuzzy path; longer ones match exactly or give null evidence |
+| R36 | `preprocessing._BOUNDARY` is quadratic on long whitespace runs (Kacper) | `docs`: fixed on `analytics/analytics-worker` by the worker session, arrives with the next sync; not touched here |

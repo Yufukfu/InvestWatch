@@ -2,6 +2,8 @@
 # One entry per rule; only `implemented: true` rules run. Names and legal bases of R1-R8, R10, R14, R15,
 # R17, R18 match contracts/mocks/generate_mocks.py. `legal_basis: null` = not yet checked against doc/.
 # Patterns are Python regexes, matched case-insensitively against the ORIGINAL document text.
+# A pattern that starts with `\d+` gets `(?<!\d)` so it is tried once per number, not once per digit
+# (quadratic on a long digit run otherwise; see tests/test_rules_m2_p0.py, adversarial input).
 # Dictionaries shared by several rules (YAML anchors); the loader reads only `rules`.
 # A pattern that starts with `\d+` gets `(?<!\d)` so it is tried once per number, not once per digit
 # (quadratic on a long digit run otherwise; see tests/test_rules_m2_p0.py, adversarial input).
@@ -155,7 +157,7 @@ rules:
       # A past-performance sentence: a return figure plus a past marker (or a year <= the fetch year
       # with no future marker in the sentence).
       figure_patterns:
-        - '\d+(?:[.,]\d+)?\s?%'
+        - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
       # Past results in any unit (coordinator answer, follow-up R9): an amount next to return vocabulary.
       amount_patterns:
         - '\b\d+(?:[.,]\d+)?\s?(?:zł|PLN|EUR|USD|€|\$)'
@@ -170,9 +172,9 @@ rules:
       figure_exclude_patterns: *return_figure_exclude
       # R14 only: percentages that are not returns (share of clients or accounts, bonuses).
       figure_extra_exclude_patterns:
-        - '\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
+        - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
         - '\bbonus\w*\s+(?:\w+\s+)?\d+(?:[.,]\d+)?\s?%'
-        - '\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
+        - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
       past_patterns:
         - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
         - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
