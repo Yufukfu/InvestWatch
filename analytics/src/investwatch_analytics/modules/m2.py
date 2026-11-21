@@ -74,7 +74,8 @@ def _texts(rules: list[RuleResult], firm: FirmRef | None) -> tuple[str, str]:
     elif unsure:
         title = f"{who}: do weryfikacji – " + ", ".join(r.name for r in unsure)
     else:
-        title = f"{who}: brak naruszeń w sprawdzonych regułach"
+        # name the rules: only R1-R3 run today, so a clean card must not read as a full UKNF check
+        title = f"{who}: brak naruszeń w regułach {checked}" if checked else f"{who}: żadna reguła nie miała zastosowania"
     if checked:
         parts = [f"Sprawdzono reguły {checked} w trybie regułowym (bez modelu językowego)."]
     else:

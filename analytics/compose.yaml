@@ -1,0 +1,40 @@
+# analytics/ deployment unit (owner Damian): the iw:documents stream worker. Included from the root compose.yaml
+# next to infra/compose.yaml, which owns postgres, redis and the data network (none is declared here),
+# and api/compose.yaml, whose one-shot api-migrate creates the tables this worker reads and writes.
+# Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml up analytics
+services:
+  analytics:
+    build: .
+    image: investwatch/analytics:${IW_VERSION:-dev}
+    restart: unless-stopped
+    environment:
+      # App role: CRUD only, no DDL (infra/postgres/init/01-app-role.sh).
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      HEALTH_PORT: "8001"
+      # LLM slots (ADR 0304), from the root .env; empty = rules-only (model.llm = null). The client is wired by the
+      # later change analytics-llm-p0. Local fallback: LLM_BASE_URL=http://ollama:11434/v1 with --profile llm.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Registry: empty = the bundled FICTIONAL seed (3 *.example.com firms); the worker logs a registry_seed WARNING.
+      # Until a real KNF registry CSV is mounted and named here, R1 results and finding.high_risk alerts for real
+      # firms are not meaningful (a real firm is unmatched, so R1 fails). Format: analytics/registry/README.md.
+      REGISTRY_CSV: ${REGISTRY_CSV:-}
+      # Optional tuning, defaults in analytics/.env.example: WORKER_CONSUMER (hostname), STREAM_BLOCK_MS,
+      # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES, MAX_DOCUMENT_BYTES.
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # data only: Postgres and Redis, internal, no route out. The worker makes no outbound call yet; analytics-llm-p0
+    # adds egress together with the hosted LLM client (ADR 0304).
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }

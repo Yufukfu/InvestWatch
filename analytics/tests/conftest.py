@@ -12,6 +12,18 @@ import pytest
 NOW = datetime(2026, 11, 21, 16, 0, tzinfo=timezone.utc)
 
 
+def pg_test_url() -> str | None:
+    """Throwaway Postgres for the store tests: `TEST_DATABASE_URL`, else CI's `TEST_DATABASE_ADMIN_URL` (#24).
+    Never `DATABASE_URL`, which may point at a real stack. The role must be allowed to CREATE DATABASE."""
+    return os.environ.get("TEST_DATABASE_URL") or os.environ.get("TEST_DATABASE_ADMIN_URL") or None
+
+
+def redis_test_url() -> str | None:
+    """Throwaway Redis for the real-Redis test: `TEST_REDIS_URL`, else CI's `IW_TEST_REDIS_URL` (#24), never
+    `REDIS_URL`."""
+    return os.environ.get("TEST_REDIS_URL") or os.environ.get("IW_TEST_REDIS_URL") or None
+
+
 def _contracts_dir() -> Path | None:
     value = os.environ.get("CONTRACTS_DIR")
     return Path(value) if value else None

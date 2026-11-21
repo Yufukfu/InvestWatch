@@ -63,7 +63,7 @@ Signals (each with a weight and evidence in `rules`):
 | S1.6 | author ≠ firm (handle/domain does not belong to the firm) | comparison with the registry |
 
 `score = σ(w·x)` with hand-tuned weights, calibrated on the gold set.
-Output matches the UKNF requirement: **firm, advertiser, content, URL** + periodic refresh (a document from the same URL ⇒ the finding is updated, not duplicated).
+Output matches the UKNF requirement: **firm, advertiser, content, URL** + periodic refresh: a re-analysis of the same document updates its finding; a changed page is a new document and gets a new finding (key `(document_id, module)`, `api-db-schema`). Grouping a URL's findings is a follow-up for the API or UI.
 Note: a missing ad label on promotional content is also a failure of rule R2 – M1 can share rules with M2.
 
 ## 5. Module M2 – risk information compliance (18 UKNF rules)
@@ -194,8 +194,11 @@ analytics/
       router.py       – which modules to run (source_kind × registry result)
       m2.py           – rule results → Finding (Polish title and summary)
     pipeline.py       – document → findings (pure function, no I/O)
-    storage.py        – store interface + Postgres (documents/findings) + in-memory store for tests
-    events.py         – publish to `iw:events` (Redis Pub/Sub) + no-op publisher
+    storage.py        – store interface + Postgres (documents/findings); test doubles live in testing.py
+    events.py         – publish to `iw:events` (Redis Pub/Sub) + no-op publisher; every message is the
+                        envelope {type, emitted_at (UTC ISO), data} with data exactly {id, module, score,
+                        title, url, platform} (no risk_level from analytics) – the API relay silently drops
+                        anything else (integration-plan §6)
     worker.py         – Redis Stream consumer (consumer group)
     cli.py            – analyze a JSON file without any infrastructure
   tests/
