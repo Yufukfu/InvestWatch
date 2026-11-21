@@ -2,9 +2,9 @@
 
 ## 1. Package skeleton, config and models
 
-- [ ] 1.1 Failing test: a `Finding` built from the models validates against `contracts/schemas/finding.schema.json` (skipped without `CONTRACTS_DIR`), every mock document parses, an unknown field is ignored, missing `text` / bad `fetched_at` raise
-- [ ] 1.2 `analytics/pyproject.toml`, pinned `requirements.txt` / `requirements-dev.txt`, `.env.example` (`REGISTRY_CSV`, `LOG_LEVEL`, `CONTRACTS_DIR`), `config.py`, `models.py`, JSON logging setup; `pytest analytics` green
-- [ ] 1.3 Mutation check; `mutations: N tried, N caught`
+- [x] 1.1 Failing test: a `Finding` built from the models validates against `contracts/schemas/finding.schema.json` (skipped without `CONTRACTS_DIR`), every mock document parses, an unknown field is ignored, missing `text` / bad `fetched_at` raise
+- [x] 1.2 `analytics/pyproject.toml`, pinned `requirements.txt` / `requirements-dev.txt`, `.env.example` (`REGISTRY_CSV`, `LOG_LEVEL`, `CONTRACTS_DIR`), `config.py`, `models.py`, JSON logging setup; `pytest analytics` green
+- [x] 1.3 Mutation check; `mutations: 6 tried, 6 caught` (one equivalent mutant removed with the dead code it hit)
 
 ## 2. Preprocessing
 
