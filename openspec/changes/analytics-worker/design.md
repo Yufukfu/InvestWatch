@@ -34,7 +34,7 @@ No ADR: the irreversible choices (schema ownership, threshold storage, event pro
 
 ## Table shape (reconciled with api-db-schema)
 
-Reconciled in task 2.1 against `api-db-schema` on `origin/api/api-db-schema` at `7af51ab` (PR #15): Alembic revisions `0001_initial`, `0002_query_indexes` and `0003_documents_text_not_empty`, the SQL section of the api README and `findings_upsert()` in the api package's `db/sql.py` (both on that branch). `analytics/tests/sql/schema.sql` mirrors the three tables analytics touches (`sources`, `documents`, `findings`) for the Postgres store tests only. The migration stays the source of truth.
+Reconciled in task 2.1 against `api-db-schema` as merged in PR #15 (`main` at `fea7ef1`): Alembic revisions `0001_initial`, `0002_query_indexes` and `0003_documents_text_not_empty`, the SQL section of the api README and `findings_upsert()` in the api package's `db/sql.py` (both on that branch). `analytics/tests/sql/schema.sql` mirrors the three tables analytics touches (`sources`, `documents`, `findings`) for the Postgres store tests only. The migration stays the source of truth.
 
 The worker connects as `iw_app` (`infra/postgres/init/01-app-role.sh` grants CRUD on tables `iw_admin` creates). It reads `documents` and inserts or updates `findings`. It never deletes, and never writes `status` or `note`.
 
