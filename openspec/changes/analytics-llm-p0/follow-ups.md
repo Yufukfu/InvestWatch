@@ -45,3 +45,19 @@
 | R23 | review group 3, can't verify | Container blocks from the scraper (body plus warning in one block) make R4 pass on the container's size | `new-item`: with follow-up R18 (block granularity, Adam) |
 | R24 | review group 3, declined | The lower weighted median makes R4 lenient on a 50/50 split | `wont-fix` for now: threshold policy for the gold set |
 | R25 | review group 3, declined | The loader ignores unknown top-level YAML keys (`shared:` lists no rule references are never validated) | `wont-fix`: predates the change; `test_catalogue_is_complete` catches a mistyped `rules:` key |
+
+## Mock divergences observed after task groups 1-4 (CLI, rules-only)
+
+`python -m investwatch_analytics.cli contracts/mocks/documents.json` at the group 4 tip. The output passes `contracts/validate.py finding`, and `contracts/mocks`, `contracts/mock-server` and `web` are unchanged. All rows are `keep-mock`.
+
+| Mock document | Mock | Ours | Note |
+|---|---|---|---|
+| `m2-alfa-landing` | score 0.86 | score 0.722 | R5, R8 (P1) and R10 (group 11) are not in `rules[]` yet; R17 passes rules-only (row 3 above) |
+| `m2-alfa-landing` | R14 absent | R14 `not_applicable` | no past performance in the text |
+| `eurotrade` | R1 `pass` | R1 `fail` | Pre-existing since `analytics-skeleton`: the page text never names the firm (domain match only), which the R1 spec scenario "Matched by domain only" makes a `fail` |
+| `eurotrade` | R2 absent | R2 `fail` | Pre-existing: the page has no ad label |
+| `eurotrade` | R3 `uncertain` (llm) | R3 `pass` (rule) | Pre-existing: the English warning is within the ±2 window |
+| `eurotrade` | R10 `fail` | not in `rules[]` | R10 is group 11 |
+| `eurotrade` | score 0.74 | score 0.538 | Follows from the rows above |
+| `m2-bank-ok` | R3 `pass` | R3 `not_applicable` | Pre-existing: no return claim in the text |
+| `m2-bank-ok` | score 0.12 | score 0 | Nothing fails |
