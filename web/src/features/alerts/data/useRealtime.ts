@@ -91,7 +91,9 @@ export function useRealtime(): RealtimeState {
   );
 
   // A toast pushed out by the cap unmounts without a pointer-leave or blur: forget its hold and timer,
-  // or it would stay held, and never time out, when the same id arrives again.
+  // or it would stay held, and never time out, when the same id arrives again. The socket handler can
+  // run between that render and this effect and see the stale hold, so every shown toast that is
+  // neither held nor timed gets its timer here: each shown toast is always one or the other.
   useEffect(() => {
     const shown = new Set(alerts.map((a) => a.id));
     for (const id of held.current) if (!shown.has(id)) held.current.delete(id);
@@ -101,7 +103,8 @@ export function useRealtime(): RealtimeState {
         timers.current.delete(id);
       }
     }
-  }, [alerts]);
+    for (const id of shown) if (!held.current.has(id) && !timers.current.has(id)) schedule(id);
+  }, [alerts, schedule]);
 
   const open = useCallback(
     (id: string) => {
