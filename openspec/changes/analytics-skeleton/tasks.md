@@ -8,9 +8,9 @@
 
 ## 2. Preprocessing
 
-- [ ] 2.1 Failing tests for the preprocessing scenarios (hash equality, `S.A.` split, pl/en guess, empty text)
-- [ ] 2.2 `preprocessing.py`; tests green
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Failing tests for the preprocessing scenarios (hash equality, `S.A.` split, pl/en guess, empty text)
+- [x] 2.2 `preprocessing.py`; tests green
+- [x] 2.3 Mutation check; `mutations: 11 tried, 11 caught` (two equivalent mutants removed with the redundant code they hit)
 
 ## 3. Firm registry
 
