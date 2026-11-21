@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
 import { investWatchApi } from '../../api/generated';
-import summary from '../../mocks/fixtures/summary.json';
+import summary from '../../test/fixtures/summary.json';
 import { server } from '../../test/setup';
 import { makeStore, storeWrapper } from '../../test/store';
 import { SummaryPage } from './SummaryPage';

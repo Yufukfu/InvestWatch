@@ -21,6 +21,6 @@ Task-group reviews already ran (`iw-commit-cycle`). This is the last pass over t
 3. **One whole-branch review**: dispatch `iw-reviewer` on the pinned range (`/code-review` is the fallback), with `focus: security` for contracts, credentials, proxies, outbound requests from stored URLs or LLM prompts built from scraped text. A contract or cross-module change gets both a normal and a security pass; a parser tweak gets one.
 4. **Verify every finding** against the code and fix the real ones (rules in `.claude/CODE_REVIEW.md`).
 5. **Follow-ups and PR body**: every row in `follow-ups.md` has a disposition. Draft the PR body: one sentence of why, the change name, the test command and result, and one line for every behaviour change a teammate would notice and for any `IW_*` escape that was used.
-6. **Hand back to the apply flow.** Closing continues with `/openspec-archive-change` as the last commit (see the config guidance), then the human decides on the push and the PR.
+6. **Hand back to the apply flow.** Closing continues with `/openspec-archive-change` as the last commit (see the config guidance), then, once the criteria in `.claude/CODE_REVIEW.md` hold, push the branch and open the PR with the drafted body (never `main`, never `--force`). Stop there: the human approves and merges.
 
 Optional, high-risk diffs only (contract changes, anything handling credentials): a second reviewer from a different model family, see `.claude/CODE_REVIEW.md`.

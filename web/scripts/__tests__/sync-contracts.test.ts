@@ -23,7 +23,7 @@ function sandbox() {
   const web = tempDir();
   fs.copyFileSync(path.join(realWeb, 'openapi-config.cjs'), path.join(web, 'openapi-config.cjs'));
   fs.cpSync(path.join(realWeb, 'src', 'api'), path.join(web, 'src', 'api'), { recursive: true });
-  fs.cpSync(path.join(realWeb, 'src', 'mocks', 'fixtures'), path.join(web, 'src', 'mocks', 'fixtures'), {
+  fs.cpSync(path.join(realWeb, 'src', 'test', 'fixtures'), path.join(web, 'src', 'test', 'fixtures'), {
     recursive: true,
   });
   const contracts = tempDir();
@@ -55,7 +55,7 @@ describe('contracts:check', () => {
     fs.writeFileSync(path.join(box.contracts, 'mocks', 'health.json'), JSON.stringify({ status: 'degraded', services: {} }));
     const result = check(box);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('src/mocks/fixtures/health.json');
+    expect(result.stderr).toContain('src/test/fixtures/health.json');
   });
 
   it('fails when generated.ts no longer matches the snapshot', () => {
@@ -69,10 +69,10 @@ describe('contracts:check', () => {
 
   it('fails when a fixture has no source mock any more', () => {
     const box = sandbox();
-    fs.writeFileSync(path.join(box.web, 'src', 'mocks', 'fixtures', 'removed-upstream.json'), '{}\n');
+    fs.writeFileSync(path.join(box.web, 'src', 'test', 'fixtures', 'removed-upstream.json'), '{}\n');
     const result = check(box);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('src/mocks/fixtures/removed-upstream.json');
+    expect(result.stderr).toContain('src/test/fixtures/removed-upstream.json');
   });
 
   it('fails when the OpenAPI spec changed', () => {

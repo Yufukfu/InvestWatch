@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The foundation of the dashboard (`web/`, owner Kacper): an API client generated from the OpenAPI contract, a mock mode over the contract mocks, hardened static delivery behind the HTTPS gateway, and per-module deployment through compose. Feature capabilities (findings, trend, alerts, calibration) build on it.
+The foundation of the dashboard (`web/`, owner Kacper): an API client generated from the OpenAPI contract that talks only to the backend (the api, or the contract mock server run on its own), a Vitest-only network fake, hardened static delivery behind the HTTPS gateway, and per-module deployment through compose. Feature capabilities (findings, trend, alerts, calibration) build on it.
 
 ## Requirements
 
@@ -16,21 +16,6 @@ The dashboard SHALL call the REST API only through the RTK Query client generate
 #### Scenario: Snapshot stale
 - **WHEN** `contracts/openapi.yaml` or a mock changed and the snapshot was not re-synced
 - **THEN** `npm run contracts:check` exits non-zero and names the stale files
-
-### Requirement: Mock mode
-The dashboard SHALL render contract mock data without the `api` service, with no change to components.
-
-#### Scenario: Findings from mocks
-- **WHEN** the app runs against the mock handlers
-- **THEN** the findings table shows the titles from `contracts/mocks/findings.json` as plain text
-
-#### Scenario: API down
-- **WHEN** the API is unreachable
-- **THEN** the health badge shows "Brak połączenia z API" and the table shows an error message instead of crashing
-
-#### Scenario: System reported down
-- **WHEN** the API answers `/health` with `status: down`
-- **THEN** the health badge shows "System nie działa", not the unreachable message
 
 ### Requirement: Hardened static delivery
 The `web` container SHALL serve the build as non-root, on a read-only filesystem, with security headers, behind the HTTPS gateway.
@@ -62,7 +47,7 @@ Dashboard feature components SHALL render only from their props, with no store, 
 - **THEN** it shows an alert reading "Nie udało się pobrać zgłoszeń." and no table
 
 #### Scenario: Data hook against the API
-- **WHEN** a feature's data hook runs against the mock handlers
+- **WHEN** a feature's data hook runs in a test against the Vitest network fake
 - **THEN** it returns the rows or values the component needs, taken from the contract mock for that endpoint
 
 #### Scenario: Data hook when the API is unreachable
@@ -91,3 +76,26 @@ Dashboard feature components SHALL render only from their props, with no store, 
 #### Scenario: Real components are checked by the tests
 - **WHEN** a real component under `src/features/*/components/` imports `src/api/`
 - **THEN** `npm test` fails
+
+### Requirement: Data from the backend
+The running dashboard SHALL get all data from the backend at `VITE_API_BASE_URL` (default `/api`) through the generated client, with no in-browser fake backend in any build. A fake network SHALL exist only in the Vitest setup, serving the contract mocks unchanged.
+
+#### Scenario: Findings from the backend
+- **WHEN** the app runs against a backend that answers `GET /api/findings` with `contracts/mocks/findings.json`
+- **THEN** the findings table shows those titles as plain text
+
+#### Scenario: No fake backend in app code
+- **WHEN** the shipped files are checked: sources under `web/src/` outside `src/test/` and test files, `web/public/`, the root `*.html`, `*.js`, `*.mjs`, `*.cjs` and `.env*` files
+- **THEN** none imports `msw`, imports from `src/test/`, registers a service worker or mentions `useMocks` or `VITE_USE_MOCKS`, and `web/public/` has no `mockServiceWorker.js`
+
+#### Scenario: No browser worker anywhere in src
+- **WHEN** every file under `web/src/`, tests and test support included, is checked
+- **THEN** none references `msw/browser` or `setupWorker`
+
+#### Scenario: API down
+- **WHEN** the API is unreachable
+- **THEN** the health badge shows "Brak połączenia z API" and the table shows an error message instead of crashing
+
+#### Scenario: System reported down
+- **WHEN** the API answers `/health` with `status: down`
+- **THEN** the health badge shows "System nie działa", not the unreachable message
