@@ -16,6 +16,7 @@ import random
 import re
 import signal
 import sys
+import threading
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -63,7 +64,7 @@ class Worker:
         catalogue: Catalogue,
         config: WorkerConfig,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-        sleep: Callable[[float], None] = time.sleep,
+        sleep: Callable[[float], None] | None = None,
         jitter: Callable[[], float] = lambda: random.uniform(0, 0.5),
     ) -> None:
         self._redis = client
@@ -73,7 +74,10 @@ class Worker:
         self._catalogue = catalogue
         self._config = config
         self._now = now
-        self._sleep = sleep
+        self._stop_event = threading.Event()
+        # Default: an Event wait, so SIGTERM cuts a 30 s backoff short (time.sleep would run to the end, PEP 475,
+        # and Docker's 10 s stop grace would SIGKILL the container).
+        self._sleep = sleep or self._stop_event.wait
         self._jitter = jitter
         self._stop = False
         self._backoff = BACKOFF_START_S
@@ -83,6 +87,7 @@ class Worker:
     def request_stop(self) -> None:
         """Called from a signal handler: finish the current message, then leave `run`."""
         self._stop = True
+        self._stop_event.set()
 
     def ensure_group(self) -> None:
         """Create the stream and the group from id 0 (backlog included); an existing group is success."""
@@ -110,6 +115,12 @@ class Worker:
                 self._backoff = BACKOFF_START_S
             except (redis.ConnectionError, redis.TimeoutError) as exc:
                 self._back_off("redis_unavailable", exc)
+            except redis.ResponseError as exc:
+                if "NOGROUP" in str(exc):  # stream or group deleted under us: recreate and carry on
+                    log.warning("consumer group missing, recreating", extra={"reason": "group_missing"})
+                    self.ensure_group()
+                else:  # e.g. READONLY during a failover: transient
+                    self._back_off("redis_unavailable", exc)
             except StoreUnavailable as exc:
                 self._back_off("db_unavailable", exc)
 
@@ -239,10 +250,14 @@ def main(env: Mapping[str, str] | None = None) -> int:
     except (RegistryError, CatalogueError, OSError) as exc:
         log.error("worker not started", extra={"reason": "config_error", "error": f"REGISTRY_CSV / catalogue: {exc}"})
         return 2
-
-    client = redis.Redis.from_url(worker_settings.redis_url, decode_responses=True,
-                                  socket_timeout=(worker_settings.stream_block_ms / 1000) + 5,
-                                  socket_connect_timeout=5, health_check_interval=30)
+    try:
+        client = redis.Redis.from_url(worker_settings.redis_url, decode_responses=True,
+                                      socket_timeout=(worker_settings.stream_block_ms / 1000) + 5,
+                                      socket_connect_timeout=5, health_check_interval=30)
+    except ValueError:
+        store.close()
+        log.error("worker not started", extra={"reason": "config_error", "error": "REDIS_URL is malformed"})
+        return 2
     worker = Worker(client, store, RedisPublisher(client), registry=registry, catalogue=catalogue,
                     config=WorkerConfig(consumer=worker_settings.consumer,
                                         block_ms=worker_settings.stream_block_ms,

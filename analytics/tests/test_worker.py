@@ -513,23 +513,38 @@ def test_main_exits_non_zero_on_bad_registry(tmp_path, capsys):
            "REGISTRY_CSV": str(bad)}
     assert main(env) == 2
     out = capsys.readouterr().out
-    assert "REGISTRY_CSV" in out or "r.csv" in out
+    assert "r.csv" in out and "config_error" in out  # names the file, not just the fixed prefix
 
 
 # ---- real Redis ---------------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(not os.environ.get("TEST_REDIS_URL"), reason="TEST_REDIS_URL not set")
-def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue):
+def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue, caplog):
     real = redis.Redis.from_url(os.environ["TEST_REDIS_URL"], decode_responses=True)
     stream = f"{STREAM}:test:{uuid.uuid4().hex[:8]}"
     try:
-        w = make_worker(real, store, registry, catalogue, consumer="a", max_deliveries=2, claim_min_idle_ms=0,
+        w = make_worker(real, store, registry, catalogue, consumer="a", max_deliveries=3, claim_min_idle_ms=0,
                         stream=stream)
         w.ensure_group()
         real.xadd(stream, {"document_id": DOC_ID, "schema": "v1"})
         real.xreadgroup(GROUP, "dead", {stream: ">"}, count=1)  # delivery 1 by a consumer that dies
-        w.run_once()  # claimed: delivery 2, processed and acked
+        import investwatch_analytics.worker as worker_mod
+
+        real_analyze = worker_mod.analyze
+        worker_mod.analyze = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bug"))
+        try:
+            with caplog.at_level(logging.INFO):
+                w.run_once()  # claimed: delivery 2 < 3 -> retry_later
+                assert real.xpending(stream, GROUP)["pending"] == 1
+                w.run_once()  # claimed: delivery 3 -> max_deliveries_exceeded, acked
+        finally:
+            worker_mod.analyze = real_analyze
+        assert real.xpending(stream, GROUP)["pending"] == 0
+        assert [(rec.outcome, rec.deliveries) for rec in caplog.records if hasattr(rec, "deliveries")] == [
+            ("retry_later", 2), ("max_deliveries_exceeded", 3)]
+        real.xadd(stream, {"document_id": DOC_ID, "schema": "v1"})
+        w.run_once()  # a healthy message on real Redis: XREADGROUP, save, XACK
         assert real.xpending(stream, GROUP)["pending"] == 0
         assert len(store.findings_for_document(DOC_ID)) == 1
     finally:
@@ -570,3 +585,56 @@ def test_stopped_worker_makes_no_more_redis_calls(r, store, registry, catalogue)
     w.request_stop()
     w.run(max_iterations=10)
     assert calls == []
+
+
+def test_stop_cuts_a_backoff_short(r, store, registry, catalogue):
+    import threading
+    import time as _time
+
+    w = Worker(r, store, Recorder(), registry=registry, catalogue=catalogue,
+               config=WorkerConfig(consumer="w1", block_ms=10, claim_min_idle_ms=0), now=lambda: NOW,
+               jitter=lambda: 0.0)  # default sleep: the stop event
+    w.ensure_group()
+    xadd(r)
+    store.unavailable = True
+    w._backoff = 30
+    threading.Timer(0.2, w.request_stop).start()
+    started = _time.monotonic()
+    w.run()
+    assert _time.monotonic() - started < 5  # not the 30 s backoff
+    assert pending(r) == 1
+
+
+def test_main_exits_non_zero_on_malformed_redis_url(capsys):
+    env = {"DATABASE_URL": "postgresql://u@127.0.0.1:1/db", "REDIS_URL": "nope://:s3cret@redis:6379/0"}
+    assert main(env) == 2
+    out = capsys.readouterr().out
+    assert "REDIS_URL is malformed" in out and "s3cret" not in out
+
+
+def test_nogroup_recreates_the_group(r, store, registry, catalogue, caplog):
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    r.delete(STREAM)  # stream and group gone (FLUSHALL, manual cleanup)
+    with caplog.at_level(logging.WARNING):
+        w.run(max_iterations=1)
+    assert [g["name"] for g in r.xinfo_groups(STREAM)] == [GROUP]
+    assert any(getattr(rec, "reason", None) == "group_missing" for rec in caplog.records)
+    xadd(r)
+    w.run(max_iterations=1)
+    assert len(store.findings_for_document(DOC_ID)) == 1
+
+
+def test_other_redis_response_error_backs_off(store, registry, catalogue, caplog):
+    class ReadOnly(fakeredis.FakeRedis):
+        def xautoclaim(self, *a, **k):
+            raise redis.ResponseError("READONLY You can't write against a read only replica.")
+
+    sleeps: list[float] = []
+    ro = ReadOnly(decode_responses=True)
+    w = make_worker(ro, store, registry, catalogue)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    with caplog.at_level(logging.WARNING):
+        w.run(max_iterations=2)
+    assert sleeps == [1, 2]

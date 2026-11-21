@@ -56,7 +56,10 @@ Postgres store details: one connection per thread (`autocommit` plus an explicit
 - [Table shape differs from the API migration] → all SQL lives in one adapter class, the in-memory store carries the specs, and the Postgres tests run against the real migration once it exists.
 - [Group starting at `0` replays a large backlog on the first start] → the replay is rules-only and the upsert publishes nothing for documents already analysed. The stream is small during the hackathon.
 - [A pipeline bug acks real documents as `max_deliveries_exceeded`] → it is logged at `ERROR` with the traceback, and the document id can be re-XADDed after the fix.
-- [`fakeredis` diverges from real Redis on XAUTOCLAIM] → one integration test against real Redis when `TEST_REDIS_URL` is set.
+- [`fakeredis` diverges from real Redis on XAUTOCLAIM] → one integration test against real Redis when `TEST_REDIS_URL` is set, covering the delivery count.
+- [XAUTOCLAIM raises `times_delivered` during an outage too, so a long outage spends the `MAX_DELIVERIES` budget of the claimed messages] → accepted (follow-up 4): only a later unexpected error acks such a message, logged at `ERROR`; a per-message error counter fixes it if needed.
+- [SIGTERM during a backoff] → the backoff waits on the stop event, not `time.sleep`, so a stop is honoured within Docker's 10 s grace.
+- [Redis 6.2 returns a 2-element XAUTOCLAIM reply] → the worker needs Redis 7+ (infra runs `redis:8-alpine`).
 
 ## Resolved questions
 
