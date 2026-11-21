@@ -17,7 +17,8 @@ Contract source of truth: `.docs/integration-plan.md` §3 (`ScrapedDocument`) an
 
 - **One identity per session**: the proxy, UA, header set and TLS profile are chosen together and stay fixed for that session's cookies. Never mix a Chrome UA with a Firefox TLS profile. Rotate the whole identity on block signals (403, 429, captcha markers, empty body), with exponential backoff and jitter.
 - **Politeness**: per-domain concurrency and rate limit in config, honour `robots.txt` and `Retry-After`, public pages only, no login or paywall bypass.
-- **Async only** in the fetch path (`asyncio`); no blocking calls in the event loop. Every request has a timeout and a retry cap.
+- **Async only** in the fetch path (`asyncio`); no blocking calls in the event loop. Every request has a timeout; retries and backoff live only in the queue.
+- **A collector reports one attempt, the queue decides** (`scraper/src/iw_scraper/jobs.py`): return an `AttemptResult` (`documents`, `error`, `http_status`, `retry_after`, or a `Deferral`); never retry, sleep or raise for an expected failure (`timeout` and 5xx are retried by the queue, a block or 404 is not). `run_source(source_id, started)` awaits `started()` once its guards pass and before its first request; a deferral is returned without calling it.
 - **Parse defensively**: selectors fail often. A parse failure yields an error row in the job log, never an empty `text`. Test parsers against saved real HTML in `tests/fixtures/`.
 - **Contract minimum**: `id, platform, url, fetched_at, text, source_kind`. `content_hash` is sha256 of normalised text (dedup). `source_kind` is set from the `sources` row, not guessed. UUID v4 and UTC ISO-8601.
 - **Config and secrets** only via env (`PROXY_LIST`, `USER_AGENTS_FILE`, `DATABASE_URL`, `REDIS_URL`, `MINIO_*`); never log a proxy URL with credentials. JSON logs to stdout via the logger (no `print`; no `console.log` in any JS).

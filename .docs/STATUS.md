@@ -17,7 +17,7 @@ Last updated: 2026-11-21 (Sat) by Damian. Update this file when a milestone move
 
 | Module | Owner | State | Active OpenSpec changes |
 |---|---|---|---|
-| scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
+| scraper | A | SDLC merged; ADRs 0101-0103 drafted, awaiting a human decision. `scraper-orchestration` (queue, run lock, concurrency cap, events, scan requests, scheduler, health) is implemented and tested against stubs except tasks 2.1 and 3.3-3.5, which wait for `scraper-v1` and `scraper-ingest` | `scraper-v1` (proposed), `scraper-orchestration` (11 of 17 tasks) |
 | dashboard | B | n/a | none yet |
 | analytics, api, contracts | Damian | plans written; contracts v1 in `contracts/`; ADRs 0301-0305 in PR #3, see `.docs/decisions/README.md` | none yet |
 
