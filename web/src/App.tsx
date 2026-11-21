@@ -1,17 +1,17 @@
-import { HealthBadge } from './features/health/HealthBadge';
-import { FindingsTable } from './features/findings/FindingsTable';
-import { SummaryCards } from './features/findings/SummaryCards';
+import { HealthPage } from './features/health/HealthPage';
+import { FindingsPage } from './features/findings/FindingsPage';
+import { SummaryPage } from './features/summary/SummaryPage';
 
 export function App() {
   return (
     <div className="app">
       <header className="app-header">
         <h1>InvestWatch</h1>
-        <HealthBadge />
+        <HealthPage />
       </header>
       <main>
-        <SummaryCards />
-        <FindingsTable />
+        <SummaryPage />
+        <FindingsPage />
       </main>
     </div>
   );
