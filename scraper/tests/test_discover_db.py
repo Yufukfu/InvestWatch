@@ -141,6 +141,20 @@ async def test_a_registered_url_is_matched_by_host_however_it_is_written(pool, r
     assert report.inserted == 0
 
 
+@pytest.mark.parametrize("registered", ["https://bücher.example/", "https://XN--BCHER-KVA.example/", "https://straße.example/"])
+async def test_an_idn_source_is_not_proposed_again_for_its_punycode_host(pool, registered):
+    # stored links go through `parsing.to_uri`, so they carry the punycode host (`straße` is `strasse` in IDNA 2003)
+    punycode = {"bücher": "xn--bcher-kva", "xn--bcher-kva": "xn--bcher-kva", "straße": "strasse"}
+    host = registered.split("//")[1].split(".")[0].lower()
+    parent = await add_source(pool, "https://alfa.example/")
+    await add_source(pool, registered, active=False)
+    await add_document(pool, parent, [f"https://{punycode[host]}.example/x"])
+
+    report = await run(pool)
+
+    assert report.inserted == 0
+
+
 async def test_a_source_row_with_an_unparseable_url_does_not_stop_the_run(pool):
     parent = await add_source(pool, "https://alfa.example/")
     await add_source(pool, "http://[abc")

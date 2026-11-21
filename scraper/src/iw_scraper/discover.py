@@ -22,6 +22,7 @@ from urllib.parse import urlsplit, urlunsplit
 import asyncpg
 
 from iw_scraper.logs import configure_logging
+from iw_scraper.parsing import to_uri
 from iw_scraper.ratelimit import host_key as _fold_www
 
 log = logging.getLogger("iw_scraper.discover")  # not __name__: the module also runs as __main__
@@ -81,9 +82,9 @@ def host_key(host: str) -> str:
 
 
 def _hostname(url: str) -> str | None:
-    """The host of a registered source URL, or None for a row we cannot parse (other writers exist)."""
+    """The host of a registered source URL as stored links write it (IDN in punycode), or None for an unparseable row."""
     try:
-        return urlsplit(url).hostname
+        return urlsplit(to_uri(url)).hostname
     except ValueError:
         return None
 
