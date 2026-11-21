@@ -87,7 +87,7 @@ S1.6 SHALL be `fail` on every M1 finding that has an author or a non-social page
 - **THEN** S1.6 is `not_applicable`
 
 ### Requirement: S1.7 targeting readers in Poland
-S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone number (quoting it), else when the page host ends in `.pl` (quoting the host from `url`), else when the language guess is `pl` (null evidence, explanation says Polish language); otherwise `pass`. An M1 candidate with S1.7 `pass` SHALL produce no finding (routing requirement, reason `not_targeting_poland`), so Polish-language ads of foreign firms are kept and foreign-language ads with no Polish marker are not.
+S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone number (quoting it), else when the page host ends in `.pl` (quoting the host from `url`), else when the language guess is `pl` (null evidence, explanation says Polish language); otherwise `pass`. For a foreign firm (`foreign_branch`, `foreign_no_branch`), an M1 candidate with S1.7 `pass` SHALL produce no finding (routing requirement, reason `not_targeting_poland`), so Polish-language ads of foreign firms are kept and foreign-language ones are not. For a firm registered in Poland (`brokerage_house`, `brokerage_bank`), S1.7 SHALL only be recorded as an attribute.
 
 #### Scenario: Złoty amount
 - **WHEN** the mock document `3c41441c…` is analyzed
@@ -96,6 +96,10 @@ S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone num
 #### Scenario: Polish language only
 - **WHEN** the mock document `182e5a42…` is analyzed
 - **THEN** S1.7 is `fail` with null evidence
+
+#### Scenario: English ad of a Polish brokerage house
+- **WHEN** an English third-party post names Alfa Inwestycje and has no Polish marker
+- **THEN** an M1 finding is returned with S1.7 `pass` and no lower certainty than the same post without S1.7
 
 ### Requirement: M1 score
 The M1 score SHALL express how certain it is that the document is a third-party ad of the matched registered firm. It SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m1_signals.yaml`, `x = 1` for `fail`, `0.5` for `uncertain`, `0` otherwise, rounded to 3 decimals and always in 0-1.

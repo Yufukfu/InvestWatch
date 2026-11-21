@@ -18,7 +18,7 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 
 ## 3. M1 signals and finding (≈ 1.5 h)
 
-- [ ] 3.1 Failing tests (`tests/test_m1.py`) for every scenario in `specs/m1-third-party-signals/spec.md`, on mocks `3c41441c…` and `182e5a42…` plus the hand-made cases (fuzzy-only, UTM only, `preferencje`, negated label, sponsored rel, past tense, author missing on a social post, bare mention below 0.6, S1.7 Polish-language-only)
+- [ ] 3.1 Failing tests (`tests/test_m1.py`) for every scenario in `specs/m1-third-party-signals/spec.md`, on mocks `3c41441c…` and `182e5a42…` plus the hand-made cases (fuzzy-only, UTM only, `preferencje`, negated label, sponsored rel, past tense, author missing on a social post, bare mention below 0.6, S1.7 Polish-language-only, English ad of a Polish brokerage house)
 - [ ] 3.2 `rules/m1.py` (S1.1-S1.7, S1.7 sharing the S3.6 detection; S1.5 rules-only `uncertain`; S1.4 `ask_llm` only on `pass`), dictionaries in `m1_signals.yaml`, `modules/m1.py` (score, Polish title and summary, `firm`, `advertiser`, `model`); tests green
 - [ ] 3.3 Mutation check; `mutations: N tried, N caught`
 
@@ -30,7 +30,7 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 
 ## 5. Routing, pipeline and CLI (≈ 1 h)
 
-- [ ] 5.1 Failing tests (`tests/test_pipeline.py`, `tests/test_cli.py`): the routing scenarios of `specs/document-analysis/spec.md` (`firm_own` matched → M2, unmatched → M3 or `no_signals`, firm's own social account → M2, `3c41441c…` → M1, English post → `not_targeting_poland`, `007bbcee…` → M3, `8721cb75…` → `no_signals`, empty text → `empty_text`, link-host match → M1, malformed link → M3, finfluencer buy calls → M1 + M3); the M2 finding assembly scenarios (builder without a firm match, domain-only match); the CLI on `contracts/mocks/documents.json` exits 0 with M1, M2 and M3 findings that pass `contracts/validate.py finding`; every evidence on the six M1/M3 mocks is a substring of one of its rule's evidence fields
+- [ ] 5.1 Failing tests (`tests/test_pipeline.py`, `tests/test_cli.py`): the routing scenarios of `specs/document-analysis/spec.md` (`firm_own` matched → M2, unmatched → M3 or `no_signals`, firm's own social account → M2, `3c41441c…` → M1, English ad of a foreign firm → `not_targeting_poland`, English ad of a Polish brokerage house → M1, `007bbcee…` → M3, `8721cb75…` → `no_signals`, empty text → `empty_text`, link-host match → M1, malformed link → M3, finfluencer buy calls → M1 + M3); the M2 finding assembly scenarios (builder without a firm match, domain-only match); the CLI on `contracts/mocks/documents.json` exits 0 with M1, M2 and M3 findings that pass `contracts/validate.py finding`; every evidence on the six M1/M3 mocks is a substring of one of its rule's evidence fields
 - [ ] 5.2 `modules/router.py` (publisher-and-registry routing), `pipeline.py` (link-host match for third-party documents, M1/M2/M3 dispatch with up to two findings, `no_signals`, `not_targeting_poland`, `module_not_implemented` removed), `cli.py` loads the signal catalogues; `pytest analytics` green; compare the CLI output for the six M1/M3 mocks with `contracts/mocks/findings.json` and record each difference (module, signal results, evidence, advertiser, score side of threshold) in `follow-ups.md` with a disposition; `git diff --stat -- contracts/ web/` is empty
 - [ ] 5.3 Mutation check; `mutations: N tried, N caught`
 

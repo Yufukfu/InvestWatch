@@ -4,7 +4,7 @@
 Analytics SHALL route by publisher identity and registry result, not by `source_kind` alone (design decisions 1-2). The publisher is a registry firm when the author's `profile_url` host or a non-social page host is one of the firm's `website_domains` (equal or subdomain), or the normalized author handle equals a normalized name, core name or alias of the firm. Analytics SHALL run:
 - M2 for the publisher firm when the publisher is a registry firm, whatever the `source_kind`;
 - M2 for a `firm_own` document that the registry matches by text or page host;
-- M1 for a `third_party` or `unknown` document whose publisher is not a registry firm and that mentions a registry firm by text or link host, unless it does not target Poland (S1.7 `pass`), in which case it SHALL produce no finding and log the reason `not_targeting_poland`;
+- M1 for a `third_party` or `unknown` document whose publisher is not a registry firm and that mentions a registry firm by text or link host, unless the matched firm is foreign (`registry_type` `foreign_branch` or `foreign_no_branch`) and the document does not target Poland (S1.7 `pass`), in which case it SHALL produce no finding and log the reason `not_targeting_poland`; a firm registered in Poland (`brokerage_house`, `brokerage_bank`) stays in M1 scope whatever the language;
 - M3 for a document whose publisher is not a registry firm and that the registry does not match, including an unmatched `firm_own` document, which SHALL never go to M2;
 - M3 in addition to M1 when the M1 document carries an S3.3 or S3.4 candidate attributed to the publisher (requirement "M3 alongside M1" in `m3-unauthorized-advice-signals`).
 An M3-only document whose advisory signals S3.2, S3.3, S3.4, S3.5 and S3.8 are all `pass` SHALL produce no finding and log the reason `no_signals`. A document SHALL produce at most one finding per module. The reason `module_not_implemented` SHALL no longer be logged.
@@ -29,9 +29,13 @@ An M3-only document whose advisory signals S3.2, S3.3, S3.4, S3.5 and S3.8 are a
 - **WHEN** the mock document `3c41441c…` (`third_party`, names EuroTrade) is analyzed
 - **THEN** exactly one finding is returned, with `module` M1
 
-#### Scenario: Third-party post not aimed at Poland
-- **WHEN** an English post on a `.com` host names EuroTrade and has no PLN amount, `+48` number or Polish text
+#### Scenario: Foreign firm's ad not aimed at Poland
+- **WHEN** an English third-party post on a `.com` host names EuroTrade (`foreign_branch`) and has no PLN amount, `+48` number or Polish text
 - **THEN** no finding is returned and the log names the reason `not_targeting_poland`
+
+#### Scenario: Polish brokerage house advertised in English
+- **WHEN** an English third-party post on a `.com` host names Alfa Inwestycje (`brokerage_house`) and has no Polish marker
+- **THEN** exactly one M1 finding is returned, with S1.7 `pass`
 
 #### Scenario: Unknown-source page of an unregistered entity
 - **WHEN** the mock document `007bbcee…` (`unknown`, no registry firm) is analyzed
