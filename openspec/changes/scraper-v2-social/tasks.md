@@ -2,7 +2,7 @@
 
 Each group from 1 on is one commit. Its first task is the failing test and its last is the mutation check (`iw-commit-cycle` step 3), completed as `mutations: N tried, N caught` (or `mutations: n/a, <reason>`). Starts after `scraper-orchestration` is merged: rebase on `origin/main` first. `scraper-v2-sources` (seed loader) and `scraper-v3-render` (hook in `run_source`) are siblings that edit `collect.py`/`seed.py` too: rebase again onto whichever merged first and keep their tests green.
 
-**Before apply (human):** (a) Damian's answer to design open question 1 (task 1.4); (b) the loader decision of design decision 13 (the `scraper-v2-sources` loader accepts only `platform = web` and one file today). Do not start group 1.4 or group 4 without them.
+**Before apply (human):** (a) Damian's answer to design open question 1 (task 1.4); (b) `scraper-v2-sources` merged or its loader contract read (design decision 13: directory scan of `scraper/seeds/*.toml`, any contract `platform`); if it is not merged, group 4 uses the `seed_knf` pattern. Do not start task 1.4 without (a).
 
 **Fixtures.** The real channel pages are copied from the research samples in the session scratchpad (`.../scratchpad/social/out/`: `rarecryptosignals`, `crypto_sygnaly`, `subetradingpl`, `kdpwiadomosci` and the `?before=2000` page; draft parser `tgparse.py`). That path is session-local and may be gone. If it is, ask the human for a go-ahead and re-fetch each page once through the production fetch layer (our identity, one request per page, about 5 s apart, `https://t.me/s/<handle>` and `?before=2000` for one channel), then save the bodies. Either way check the channels are still public, expected values in tests come from the saved files (so the ids and counts in the spec scenarios are illustrative), and the saved files hold nothing but public channel markup.
 
@@ -29,7 +29,7 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 4. Seeds
 
-- [ ] 4.1 Failing tests, then `scraper/seeds/telegram.toml` (`rarecryptosignals` M1 `third_party`, `crypto_sygnaly` and `SubeTradingPL` M3 `unknown`, `kdpwiadomosci` M1 `third_party` control; `platform = other`, `https://t.me/s/<handle>`, staggered `15`/`25`/`35`/`45 */6 * * *`) and its load through the `scraper-v2-sources` loader per design decision 13 (widened or parameterised by that change's owner; the `seed_knf` insert pattern only if it is not merged, moved at rebase); "Seeding twice" and "Signal channel is an M3 candidate" pass against PostgreSQL, and each row validates against `source.schema.json`
+- [ ] 4.1 Failing tests, then `scraper/seeds/telegram.toml` (`rarecryptosignals` M1 `third_party`, `crypto_sygnaly` and `SubeTradingPL` M3 `unknown`, `kdpwiadomosci` M1 `third_party` control; `platform = other`, `https://t.me/s/<handle>`, staggered `15`/`25`/`35`/`45 */6 * * *`) loaded by the `scraper-v2-sources` directory scan with no loader edit (design decision 13; the `seed_knf` insert pattern only if it is not merged, moved at rebase); "Seeding twice" uses the directory scan; "Seeding twice" and "Signal channel is an M3 candidate" pass against PostgreSQL, and each row validates against `source.schema.json`
 - [ ] 4.2 Mutation check for 4.1 (the idempotency guard and the `source_kind` per row); line reads `mutations: N tried, N caught`
 
 ## 5. Closing

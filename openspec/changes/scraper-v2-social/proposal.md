@@ -19,7 +19,7 @@ The challenge asks for collectors for social media, and module M1 (finfluencers)
 - Out of scope: X, YouTube, TikTok, Facebook, Instagram, Playwright, downloading media, following links, analytics changes, the web `sources` seed rows (`scraper-v2-sources`), any contract change.
 - Owner: Adam's module (`scraper/`).
 - Contracts: produces `ScrapedDocument` v1 fields only; `published_at`, `author` and `links` already exist as optional fields. `scrape_meta` gets the extra keys `message_id` and `views` (the schema allows additional properties). No REST route or event is touched; the database is touched only through `scraper-ingest`.
-- Depends on `scraper-orchestration` being merged: the run joins the pieces (`collect.py`), and this change adds a branch to it. Apply starts after that merge. It also depends on the `scraper-v2-sources` loader accepting a `platform = other` file (design decision 13), and rebases onto `scraper-v3-render` if that merged first (both touch `collect.py`).
+- Depends on `scraper-orchestration` being merged: the run joins the pieces (`collect.py`), and this change adds a branch to it. Apply starts after that merge. It also seeds through the `scraper-v2-sources` loader, which scans every `*.toml` in `scraper/seeds/` and accepts any contract `platform` (design decision 13), and rebases onto `scraper-v3-render` if that merged first (both touch `collect.py`).
 
 ## Capabilities
 
