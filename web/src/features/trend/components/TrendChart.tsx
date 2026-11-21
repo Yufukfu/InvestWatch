@@ -9,6 +9,8 @@ export type TrendChartProps = {
   isError: boolean;
   /** Fixed size for tests: jsdom has no ResizeObserver, so ResponsiveContainer cannot measure. */
   size?: { width: number; height: number };
+  /** Tests only: open the tooltip on this point (jsdom cannot hover an SVG chart). */
+  tooltipIndex?: number;
 };
 
 // Series differ by colour and by dash pattern, and the legend names them: never colour alone.
@@ -39,7 +41,7 @@ function formatFull(t: string, bucket: TrendBucket) {
   return bucket === 'day' ? dayFormat(date) : `${localDate(date)}, ${localTime(date)}`;
 }
 
-export function TrendChart({ points, bucket, onBucketChange, isLoading, isError, size }: TrendChartProps) {
+export function TrendChart({ points, bucket, onBucketChange, isLoading, isError, size, tooltipIndex }: TrendChartProps) {
   const data = points.map((p) => ({ t: p.t, M1: p.M1 ?? 0, M2: p.M2 ?? 0, M3: p.M3 ?? 0 }));
   const totals = SERIES.map((s) => ({ ...s, total: data.reduce((sum, p) => sum + p[s.key], 0) }));
   const hasData = totals.some((s) => s.total > 0);
@@ -56,7 +58,7 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
       <CartesianGrid stroke="#e5e7eb" vertical={false} />
       <XAxis dataKey="t" tickFormatter={(t: string) => formatTick(t, bucket)} minTickGap={24} />
       <YAxis allowDecimals={false} width={32} />
-      <Tooltip isAnimationActive={false} labelFormatter={(t) => formatFull(String(t), bucket)} />
+      <Tooltip isAnimationActive={false} defaultIndex={tooltipIndex} labelFormatter={(t) => formatFull(String(t), bucket)} />
       {SERIES.map((s) => (
         <Line
           key={s.key}

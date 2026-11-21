@@ -116,6 +116,12 @@ describe('TrendChart (props only, no store)', () => {
     expect(rows[1]).toHaveTextContent('21 lis, 00:00');
   });
 
+  it('shows the date and time of an hour bucket in the tooltip', () => {
+    vi.stubEnv('TZ', 'Asia/Tokyo');
+    setup({ tooltipIndex: 1 });
+    expect(document.querySelector('.recharts-tooltip-label')).toHaveTextContent('21 lis, 03:00');
+  });
+
   it.each(['America/Los_Angeles', 'Asia/Tokyo'])('labels a day bucket with its UTC date in %s', (tz) => {
     vi.stubEnv('TZ', tz);
     setup({ bucket: 'day', points: [{ t: '2026-11-20T00:00:00Z', M1: 1 }, { t: '2026-11-21T00:00:00Z', M1: 2 }] });

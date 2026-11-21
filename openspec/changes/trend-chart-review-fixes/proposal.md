@@ -12,8 +12,8 @@ Review of PR #14 (hen68) found that the trend chart puts Recharts' keyboard laye
 - Tests: dash patterns on lines and legend swatches, no stale hourly totals under `Dzień` with a delayed day response, local hour ticks, UTC day ticks in two timezones, the page with the day mock.
 - Nits: `role="status"` on loading, a labelled `role="group"` around the bucket buttons, tooltip without animation, test names, the no-op `overflow-x` and the redundant smoke test removed.
 - `TrendBucket` and `TrendPoint` move to `features/trend/model.ts`, so the data hook no longer imports from a component (ADR 0204 rule).
-- `TrendPage` is lazy-loaded from `App.tsx`, so Recharts is a separate chunk.
-- Docs: `.docs/integration-plan.md` §5 matches OpenAPI; ADR 0203 gets a short note pointing at the measurement.
+- `TrendPage` is lazy-loaded from `App.tsx`, so Recharts is a separate chunk, inside an error boundary so a chunk that fails to load leaves the rest of the dashboard working.
+- Docs: `.docs/integration-plan.md` §5 matches OpenAPI; the measurements ADR 0203 left open (bundle size, `ResizeObserver`) are recorded in `.docs/STATUS.md`, since an accepted ADR is not edited (`.docs/decisions/README.md`).
 
 **Out of scope:** module display names (the dashboard shows the codes `M1`/`M2`/`M3` everywhere, e.g. the findings table), trend filters, contract mocks in `contracts/` (owner C). Owner B.
 
@@ -28,4 +28,4 @@ Review of PR #14 (hen68) found that the trend chart puts Recharts' keyboard laye
 ## Impact
 
 - Code: `web/src/features/trend/**`, `web/src/mocks/handlers.ts`, `web/src/App.tsx`, `web/src/styles.css`.
-- Docs: `.docs/integration-plan.md` §5, ADR 0203 note, `.docs/STATUS.md`, AI log row. No dependency added; no contract change.
+- Docs: `.docs/integration-plan.md` §5, `.docs/STATUS.md`, AI log row. No dependency added; no contract change.

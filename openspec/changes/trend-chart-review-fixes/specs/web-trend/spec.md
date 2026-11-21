@@ -45,6 +45,10 @@ The trend section SHALL show a text state for loading, error and no data instead
 - **WHEN** `GET /stats/trend` fails or the API is unreachable
 - **THEN** the section shows "Nie udało się pobrać danych trendu." and the rest of the page keeps working
 
+#### Scenario: Trend chunk fails to load
+- **WHEN** the lazy-loaded trend code cannot be loaded
+- **THEN** the section shows "Nie udało się pobrać danych trendu." and the summary and findings keep working
+
 #### Scenario: No data
 - **WHEN** the response has no points, or every count is zero
 - **THEN** the section shows "Brak danych w wybranym okresie." and no chart
@@ -63,11 +67,15 @@ The plot SHALL be one image with the totals per module as its accessible name an
 - **THEN** a table lists every bucket with its M1, M2 and M3 counts, and the image contains no focusable element
 
 ### Requirement: Time labels
-Hour buckets SHALL be labelled in the viewer's local time, with the date on the tick at local midnight and in the tooltip. Day buckets SHALL be labelled with their UTC date, and the day view SHALL say that days are UTC.
+Hour buckets SHALL be labelled in the viewer's local time, with the date in the tooltip, in the data table and on the tick at local midnight whenever that tick is drawn (Recharts may skip ticks to avoid overlap). Day buckets SHALL be labelled with their UTC date, and the day view SHALL say that days are UTC.
 
 #### Scenario: Hour ticks
 - **WHEN** the hourly view renders in a browser in `Asia/Tokyo`
 - **THEN** a point at `2026-11-20T17:00:00Z` is labelled `02:00` and a point at `2026-11-20T15:00:00Z` is labelled with the date `21 lis`
+
+#### Scenario: Hour tooltip
+- **WHEN** the tooltip opens on the point `2026-11-20T18:00:00Z` in `Asia/Tokyo`
+- **THEN** its label reads `21 lis, 03:00`
 
 #### Scenario: Day ticks
 - **WHEN** the daily view renders in a browser in `America/Los_Angeles` or `Asia/Tokyo`

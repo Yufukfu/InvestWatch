@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { SectionBoundary } from './SectionBoundary';
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
@@ -15,9 +16,17 @@ export function App() {
       </header>
       <main>
         <SummaryPage />
-        <Suspense fallback={<p className="trend-state" role="status">Ładowanie wykresu…</p>}>
-          <TrendPage />
-        </Suspense>
+        <SectionBoundary
+          fallback={
+            <p className="trend-state" role="alert">
+              Nie udało się pobrać danych trendu.
+            </p>
+          }
+        >
+          <Suspense fallback={<p className="trend-state" role="status">Ładowanie wykresu…</p>}>
+            <TrendPage />
+          </Suspense>
+        </SectionBoundary>
         <FindingsPage />
       </main>
     </div>

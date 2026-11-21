@@ -14,5 +14,11 @@
 
 ## 3. Closing
 
-- [x] 3.1 Apply `iw-docs-update`: `.docs/integration-plan.md` §5 matches OpenAPI, ADR 0203 note, `.docs/STATUS.md`, AI log row, `docs-check` clean.
-- [ ] 3.2 Run `iw-reviewer` on the branch; fix real findings.
+- [x] 3.1 Apply `iw-docs-update`: `.docs/integration-plan.md` §5 matches OpenAPI, ADR 0203 measurements in `.docs/STATUS.md`, AI log row, `docs-check` clean.
+- [x] 3.2 Run `iw-reviewer` on the branch; fix real findings.
+
+## 4. Review follow-ups (iw-reviewer)
+
+- [x] 4.1 Tests first: the tooltip shows the date (`tooltipIndex`, `Asia/Tokyo`); `App` with a trend chunk that fails to load shows the trend error and keeps the summary; the trend section sits between summary and findings.
+- [x] 4.2 `SectionBoundary` around the lazy `TrendPage`; test-only `tooltipIndex`; spec narrowed for the midnight tick; ADR 0203 note removed again (accepted ADRs are not edited), numbers kept in `.docs/STATUS.md`; `follow-ups.md` added.
+- [x] 4.3 Mutation check; list every mutant and result on this line. Mutants: tooltip `labelFormatter` back to `formatTick`; `SectionBoundary` passes errors through; `getDerivedStateFromError` returns `failed: false`; findings rendered before the trend section. mutations: 4 tried, 4 caught.
