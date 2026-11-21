@@ -13,9 +13,11 @@ from playwright.async_api import Browser, Page, Request
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from iw_renderer.blocks import measure_blocks
 from iw_renderer.confine import ALLOWED_PORTS, CONTEXT_OPTIONS, AddressCheck, RequestPolicy, confined_page
 from iw_renderer.identity import browser_identity
 from iw_renderer.settings import (
+    DEFAULT_MAX_BLOCKS,
     DEFAULT_MAX_PAGE_HEIGHT,
     DEFAULT_MAX_PNG_BYTES,
     DEFAULT_TIMEOUT_SECONDS,
@@ -60,6 +62,7 @@ class RenderRequest:
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS  # for this call; the scraper passes the time left
     max_page_height: int = DEFAULT_MAX_PAGE_HEIGHT
     max_png_bytes: int = DEFAULT_MAX_PNG_BYTES
+    max_blocks: int = DEFAULT_MAX_BLOCKS
 
 
 @dataclass(frozen=True)
@@ -67,7 +70,8 @@ class RenderResult:
     status: int
     final_url: str
     png: bytes
-    truncated: bool  # the image was cut by the height or the byte cap
+    truncated: bool  # the image or the blocks were cut by a cap
+    blocks: tuple[dict, ...] = ()
 
 
 def playwright_proxy(url: str) -> dict[str, str]:
@@ -168,6 +172,7 @@ class Renderer:
             timeout_seconds=min(request.timeout_seconds, self._limits.timeout_seconds),
             max_page_height=min(request.max_page_height, self._limits.max_page_height),
             max_png_bytes=min(request.max_png_bytes, self._limits.max_png_bytes),
+            max_blocks=min(request.max_blocks, self._limits.max_blocks),
         )
         async with self._slots:
             return await self._render(self.browser, bounded, self._address_check)
@@ -240,6 +245,13 @@ async def _render(
             png, truncated = await _screenshot(page, viewport.width, viewport.height, request, deadline)
         except PlaywrightError as error:
             raise _failure(error) from None
-        return RenderResult(status=response.status, final_url=page.url, png=png, truncated=truncated)
+        try:
+            measured = await measure_blocks(session, request.viewport, request.max_blocks)
+        except PlaywrightError as error:
+            raise _failure(error) from None
+        return RenderResult(
+            status=response.status, final_url=page.url, png=png, truncated=truncated or measured.truncated,
+            blocks=measured.blocks,
+        )
     finally:
         await context.close()

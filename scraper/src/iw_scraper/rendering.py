@@ -46,6 +46,7 @@ class RenderReply:
     png: bytes
     browser_version: str
     truncated: bool
+    blocks: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,7 @@ class RenderOutput:
     truncated: bool = False
     skipped: str | None = None  # `budget` or `paused`: nothing was rendered, and that is not an error
     errors: tuple[JobError, ...] = ()
+    blocks: tuple[dict, ...] = ()  # every viewport's, in call order
 
     def __repr__(self) -> str:  # never the picture bytes
         return f"RenderOutput(viewports={list(self.screenshots)}, skipped={self.skipped}, errors={len(self.errors)})"
@@ -107,7 +109,11 @@ def http_renderer(base_url: str) -> Callable[[dict, float], Awaitable[RenderRepl
 def _reply(status: int, data: object) -> RenderReply:
     if status == 200:
         try:
-            return RenderReply(base64.b64decode(data["png_base64"], validate=True), str(data["browser_version"]), bool(data["truncated"]))
+            blocks = data.get("blocks", [])
+            if not isinstance(blocks, list) or not all(isinstance(block, dict) for block in blocks):
+                raise TypeError("blocks")
+            png = base64.b64decode(data["png_base64"], validate=True)
+            return RenderReply(png, str(data["browser_version"]), bool(data["truncated"]), tuple(blocks))
         except (KeyError, TypeError, binascii.Error):
             raise RenderCallError("failed", "renderer reply is malformed") from None
     error = data.get("error") if isinstance(data, dict) else None
@@ -135,6 +141,7 @@ class PageRenderer:
             return RenderOutput(skipped="budget")
         deadline = self._clock() + self._timeout
         shots: dict[str, bytes] = {}
+        blocks: list[dict] = []
         version, truncated = None, False
         for viewport in VIEWPORT_ORDER:
             await self._limiter.wait_turn(domain)
@@ -152,7 +159,8 @@ class PageRenderer:
             except RenderCallError as error:
                 return await self._error(source, domain, error, proxies, choice)
             shots[viewport], version, truncated = reply.png, reply.browser_version, truncated or reply.truncated
-        return RenderOutput(shots, version, truncated)
+            blocks.extend(reply.blocks)
+        return RenderOutput(shots, version, truncated, blocks=tuple(blocks))
 
     def _payload(self, source: Source, url: str, identity, viewport: str, choice, remaining: float) -> dict:
         headers = dict(identity.headers)

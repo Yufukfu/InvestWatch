@@ -7,6 +7,7 @@ DEFAULT_TIMEOUT_SECONDS = 90.0
 DEFAULT_MAX_PAGE_HEIGHT = 12000  # CSS pixels
 DEFAULT_MAX_PNG_BYTES = 8_000_000
 DEFAULT_CONCURRENCY = 1
+DEFAULT_MAX_BLOCKS = 600  # blocks per viewport
 
 
 def _positive(name: str, default: float, kind: type) -> float:
@@ -28,6 +29,7 @@ class RenderLimits:
     max_page_height: int = DEFAULT_MAX_PAGE_HEIGHT
     max_png_bytes: int = DEFAULT_MAX_PNG_BYTES
     concurrency: int = DEFAULT_CONCURRENCY
+    max_blocks: int = DEFAULT_MAX_BLOCKS
 
     @classmethod
     def from_env(cls) -> "RenderLimits":
@@ -36,4 +38,5 @@ class RenderLimits:
             max_page_height=int(_positive("RENDER_MAX_PAGE_HEIGHT", DEFAULT_MAX_PAGE_HEIGHT, int)),
             max_png_bytes=int(_positive("RENDER_MAX_PNG_BYTES", DEFAULT_MAX_PNG_BYTES, int)),
             concurrency=int(_positive("RENDER_CONCURRENCY", DEFAULT_CONCURRENCY, int)),
+            max_blocks=int(_positive("RENDER_MAX_BLOCKS", DEFAULT_MAX_BLOCKS, int)),
         )

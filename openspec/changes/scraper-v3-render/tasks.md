@@ -31,17 +31,17 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 5. Blocks for R4-R8 and R13 (desktop and mobile)
 
-- [ ] 5.1 Failing tests on synthetic pages, then the in-page measurement script and its Python wrapper: block selection (nearest block-level element with its own text, no `script`, `style`, `noscript`, `template`), `font_size_px`, `font_weight`, `bbox`, document order, caps (`RENDER_MAX_BLOCKS`, 4000-character text, `truncated`); the small-risk-text, non-text-elements and too-many-blocks scenarios pass
-- [ ] 5.2 Failing tests, then colour resolution (alpha compositing over the nearest opaque ancestor, `null` for image or gradient backgrounds, `#rrggbb` only); the colour scenarios pass
-- [ ] 5.3 Failing tests, then `visible`, `in_viewport_on_load`, `requires_interaction` (closed `details`, `aria-controls` with `aria-expanded=false`) and `region` (footer, header, aside, overlay, legal placement-word list with diacritics folded, `main` default, never null); the collapsed-accordion, below-the-fold, footer-legal, cookie-banner, placement-words and region-never-null scenarios pass
-- [ ] 5.4 Failing tests, then `overflow_clipped` and the same text measured per viewport; the same-text-per-viewport scenario passes and every emitted block validates against the contract's `block` definition (`contracts/validate.py`)
-- [ ] 5.5 Failing tests, then ingest sets `blocks` on the document and the blocks-reach-analytics scenario passes against real PostgreSQL and MinIO
-- [ ] 5.6 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 5.1 Failing tests on synthetic pages, then the in-page measurement script and its Python wrapper: block selection (nearest block-level element with its own text, no `script`, `style`, `noscript`, `template`), `font_size_px`, `font_weight`, `bbox`, document order, caps (`RENDER_MAX_BLOCKS`, 4000-character text, `truncated`); the small-risk-text, non-text-elements and too-many-blocks scenarios pass
+- [x] 5.2 Failing tests, then colour resolution (alpha compositing over the nearest opaque ancestor, `null` for image or gradient backgrounds, `#rrggbb` only); the colour scenarios pass
+- [x] 5.3 Failing tests, then `visible`, `in_viewport_on_load`, `requires_interaction` (closed `details`, `aria-controls` with `aria-expanded=false`) and `region` (footer, header, aside, overlay, legal placement-word list with diacritics folded, `main` default, never null); the collapsed-accordion, below-the-fold, footer-legal, cookie-banner, placement-words and region-never-null scenarios pass
+- [x] 5.4 Failing tests, then `overflow_clipped` and the same text measured per viewport; the same-text-per-viewport scenario passes and every emitted block validates against the contract's `block` definition (`contracts/validate.py`)
+- [x] 5.5 Failing tests, then ingest sets `blocks` on the document and the blocks-reach-analytics scenario passes against real PostgreSQL and MinIO
+- [x] 5.6 Mutation check; mutations: 43 tried, 41 caught (two equivalent: `visible` already false for a closed `details` through `checkVisibility`, and the in-page cap `>=` against `>` gives the same output once Python slices and flags the surplus)
 
 ## 6. Tablet viewport (first to drop if time is short)
 
-- [ ] 6.1 Failing tests, then the `tablet` context (820x1180, `has_touch`, the run's identity), its screenshot at `shot/{document_id}/tablet.png` and its blocks; the three-screenshots scenario passes with all three keys set
-- [ ] 6.2 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 6.1 Failing tests, then the `tablet` context (820x1180, `has_touch`, the run's identity), its screenshot at `shot/{document_id}/tablet.png` and its blocks; the three-screenshots scenario passes with all three keys set
+- [x] 6.2 Mutation check; mutations: n/a, the tablet viewport is a table entry and the call order a tuple, both pinned by the group 3 and 4 mutants (viewport width, order, per-viewport blocks)
 
 ## 7. End to end and closing
 

@@ -77,7 +77,10 @@ class Renderer:
         self.log.events.append(("call", payload["viewport"]))
         if payload["viewport"] in self.fail:
             raise self.fail[payload["viewport"]]
-        return RenderReply(png=b"PNG-" + payload["viewport"].encode(), browser_version="147.0.1", truncated=False)
+        return RenderReply(
+            png=b"PNG-" + payload["viewport"].encode(), browser_version="147.0.1", truncated=False,
+            blocks=({"viewport": payload["viewport"], "text": "t"},),
+        )
 
 
 def make(*, fail=None, pause=None, budget=None, proxies=None, clock=None, timeout=90.0, ports=(80, 443)):
@@ -98,6 +101,7 @@ async def test_one_call_per_viewport_in_order_each_after_the_rate_limit_and_the_
     assert list(output.screenshots) == ["desktop", "mobile", "tablet"]
     assert output.screenshots["mobile"] == b"PNG-mobile"
     assert output.errors == () and output.skipped is None and output.browser_version == "147.0.1"
+    assert [b["viewport"] for b in output.blocks] == ["desktop", "mobile", "tablet"]  # in call order
     host = "firm.example.com"
     assert log.events == [
         ("pause?", host), ("budget",),
@@ -369,7 +373,10 @@ async def test_the_http_call_returns_the_decoded_picture():
     async def handler(request):
         seen.append(await request.json())
         return web.json_response(
-            {"png_base64": base64.b64encode(b"PNG").decode(), "browser_version": "147.0.1", "truncated": True}
+            {
+                "png_base64": base64.b64encode(b"PNG").decode(), "browser_version": "147.0.1", "truncated": True,
+                "blocks": [{"text": "a"}],
+            }
         )
 
     server = await serve(handler)
@@ -378,7 +385,7 @@ async def test_the_http_call_returns_the_decoded_picture():
     finally:
         await server.close()
 
-    assert reply == RenderReply(b"PNG", "147.0.1", True) and seen == [{"viewport": "desktop"}]
+    assert reply == RenderReply(b"PNG", "147.0.1", True, ({"text": "a"},)) and seen == [{"viewport": "desktop"}]
 
 
 @pytest.mark.parametrize(
@@ -391,6 +398,8 @@ async def test_the_http_call_returns_the_decoded_picture():
         (500, {"unexpected": True}, "failed", "renderer answered HTTP 500", None),
         (200, {"png_base64": "!!!", "browser_version": "1", "truncated": False}, "failed", "renderer reply is malformed", None),
         (200, {"browser_version": "1"}, "failed", "renderer reply is malformed", None),
+        (200, {"png_base64": "", "browser_version": "1", "truncated": False, "blocks": "no"}, "failed", "renderer reply is malformed", None),
+        (200, {"png_base64": "", "browser_version": "1", "truncated": False, "blocks": ["no"]}, "failed", "renderer reply is malformed", None),
     ],
 )
 async def test_the_http_call_turns_an_error_answer_into_a_render_call_error(status, body, kind, detail, retry_after):

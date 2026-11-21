@@ -138,6 +138,7 @@ class Ingestor:
         candidate = {
             **doc,
             "screenshots": uploaded,
+            **({"blocks": list(output.blocks)} if output.blocks else {}),
             "scrape_meta": {
                 **doc["scrape_meta"], "render": {"browser_version": output.browser_version, "truncated": output.truncated}
             },

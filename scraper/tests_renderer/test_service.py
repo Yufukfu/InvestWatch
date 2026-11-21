@@ -44,6 +44,7 @@ async def test_a_render_returns_the_png_and_the_render_meta(server, client):
     assert payload["viewport"] == "desktop" and payload["status"] == 200
     assert payload["truncated"] is False and payload["browser_version"].split(".")[0].isdigit()
     assert payload["final_url"].startswith("http://source.test:")
+    assert [(b["text"], b["viewport"]) for b in payload["blocks"]] == [("x", "desktop")]
 
 
 async def test_a_block_is_answered_403_with_its_retry_after(server, client):

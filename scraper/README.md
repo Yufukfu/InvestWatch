@@ -17,6 +17,8 @@ Python 3.12 and the native TLS library are only in the image. From the repositor
 COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml run --rm --build test
 ```
 
+The renderer's tests need its own image (Chromium, no database): `docker build -f scraper/Dockerfile --target renderer-test -t iw-renderer:test .` then `docker run --rm --shm-size 256m iw-renderer:test pytest -q tests_renderer`. `scraper/tests/renderer_stack.sh` checks the compose service (network, no host port, health).
+
 Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
 
 ## Author provenance
@@ -48,3 +50,9 @@ Environment only; defaults in `scraper/.env.example`. `config.py` reads and vali
 | `COMPOSE_INTERNAL_HOSTS` | empty | extra host names refused as internal (bare names are always refused) |
 | `FETCH_EXTRA_HOSTS` | empty | hosts allowed for redirects and scraped links besides the active sources |
 | `CONTRACTS_DIR` | `<repo>/contracts` | JSON Schemas used for validation |
+| `SCRAPER_RENDER_ENABLED` | `false` | render `firm_own` sources that target M2 (screenshots and `blocks`); needs the renderer service |
+| `SCRAPER_RENDER_MAX_PER_HOUR` | `20` | renders per UTC hour across all workers; over it a document is stored without layout |
+| `RENDERER_URL` | `http://renderer:8080` | the renderer service on the private `render` network |
+| `RENDER_TIMEOUT_SECONDS` | `90` | all viewports of one render; `SCRAPER_ATTEMPT_TIMEOUT` must be at least this plus 60 |
+
+The renderer (`scraper/compose.renderer.yaml`, ADR 0107) is a separate container with headless Chromium: about 360 MB image, 1.5 CPU and 1 GB RAM at most, one render at a time. It holds no secret and no route to the database, Redis or object storage; `RENDER_MAX_PAGE_HEIGHT`, `RENDER_MAX_PNG_BYTES`, `RENDER_MAX_BLOCKS` and `RENDER_CONCURRENCY` bound its work (defaults in `.env.example`). A failed render never loses the document: it is stored without `blocks` and `screenshots` and the failure is a job error.

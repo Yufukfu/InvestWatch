@@ -165,6 +165,7 @@ async def _render(request: web.Request) -> web.Response:
             "png_base64": base64.b64encode(result.png).decode("ascii"),
             "truncated": result.truncated,
             "browser_version": renderer.browser.version,
+            "blocks": list(result.blocks),
         }
     )
 

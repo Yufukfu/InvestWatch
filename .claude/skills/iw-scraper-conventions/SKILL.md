@@ -11,7 +11,7 @@ Contract source of truth: `.docs/integration-plan.md` §3 (`ScrapedDocument`) an
 
 1. **Official or JSON endpoint** the site itself calls (find it in the browser network tab).
 2. **TLS-impersonating async client**: the default for HTML and XHR. Requests must look like a real browser at every layer: TLS/JA3/JA4 fingerprint, HTTP/2 settings, header order, `User-Agent`, `Accept-Language`, `sec-ch-ua*`. Candidates: `noble-tls` (async, on PyPI), `curl_cffi`, `httpx` for sites that don't fingerprint. Before wiring one, read the installed package's real API and record the choice in an ADR; do not write wrapper code from memory.
-3. **Playwright**, only where 2 fails (JS-only rendering, bot walls) **or the module needs `blocks`/`screenshots`**: analytics rules R4–R8 and R13 depend on rendered layout, so those sources must go through Playwright. Everything else must not.
+3. **Playwright**, only where 2 fails (JS-only rendering, bot walls) **or the module needs `blocks`/`screenshots`**: analytics rules R4–R8 and R13 depend on rendered layout, so those sources (`firm_own` with `M2` in `target_modules`) go through the `renderer` service (ADR 0107), once per viewport, under the same rate limit, pause, identity (a mobile variant for `mobile`) and proxy as the fetch. A render failure is a job error, never a lost document. Everything else must not use Playwright.
 
 ## Rules
 

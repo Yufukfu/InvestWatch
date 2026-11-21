@@ -12,7 +12,7 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 
 ## Active OpenSpec changes
 
-- `scraper-orchestration` (PR pending); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
+- `scraper-v3-render` (PR pending): isolated Playwright renderer service, per-viewport screenshots and `blocks` for `firm_own` + `M2` sources, off by default (`SCRAPER_RENDER_ENABLED`); `scraper-orchestration` (PR pending); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
 
 ## Blockers and open decisions
 
@@ -21,5 +21,5 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - Two redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`) and `ingest.errors.redact` (full). Keep the full one and drop the other when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).
 - Issue 36 (author provenance): no collector on `main` sets `author`; the ingest drops it from a page. A `scrape_meta` "author verified" flag would need a contract change and is only proposed (`scrape_meta.author_source`, in the issue 36 reply), not in the contract; its PR must keep the flag off a page-supplied `scrape_meta`.
 - `scrape_meta.scraper` is settled without a contract change: `httpx` plus `scrape_meta.client` (ADR 0101).
-- Playwright is required for sources that must provide `blocks`/`screenshots` (rules R4-R8, R13).
+- `blocks`/`screenshots` (rules R4-R8, R13) come from the `renderer` service (ADR 0107) once `scraper-v3-render` merges; until the root `compose.yaml` includes `scraper/compose.renderer.yaml` (one line, Kacper's file) and the worker joins the `render` network (after PR #52), render stays off.
 - Social media: one platform first; which one is open (ADR 0103).

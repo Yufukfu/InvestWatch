@@ -402,8 +402,17 @@ def rendering(output=None, *, raises=None, calls=None):
     return PAGE | {"render": render}
 
 
+def block(viewport, text="Ryzyko utraty kapitału"):
+    return {
+        "viewport": viewport, "text": text, "tag": "p", "font_size_px": 10.0, "font_weight": 400, "color": "#808080",
+        "background_color": "#ffffff", "bbox": [0.0, 1200.5, 300.0, 12.0], "visible": True,
+        "in_viewport_on_load": False, "requires_interaction": False, "region": "legal", "overflow_clipped": False,
+    }
+
+
 def shots(*viewports):
-    return RenderOutput({vp: PNG + vp.encode() for vp in viewports}, "147.0.7727.0", False)
+    blocks = tuple(block(vp) for vp in viewports)
+    return RenderOutput({vp: PNG + vp.encode() for vp in viewports}, "147.0.7727.0", False, blocks=blocks)
 
 
 async def payload_of(pool, document_id):
@@ -423,6 +432,29 @@ async def test_render_output_is_stored_with_the_document(pool, storage, redis_cl
     row = await doc_row(pool, result.document_id)
     assert row["text"] == "Zysk do 20%"
     assert sorted(payload["screenshots"].values()) == sorted(k for k in await storage.list_keys() if k.startswith("shot/"))
+
+
+async def test_the_blocks_reach_the_stored_payload(pool, storage, redis_client, stream_name, seeded_source):
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(shots("desktop", "mobile"))
+    )
+
+    payload = await payload_of(pool, result.document_id)
+    assert [(b["viewport"], b["region"], b["font_size_px"]) for b in payload["blocks"]] == [
+        ("desktop", "legal", 10.0), ("mobile", "legal", 10.0),
+    ]
+
+
+async def test_a_block_the_contract_refuses_costs_the_layout_not_the_document(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    bad = RenderOutput({"desktop": PNG}, "147.0.7727.0", False, blocks=({**block("desktop"), "region": "sidebar"},))
+
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(bad))
+
+    payload = await payload_of(pool, result.document_id)
+    assert result.outcome == "inserted" and "blocks" not in payload and "screenshots" not in payload
+    assert await reasons(pool) == ["render_failed"]
 
 
 async def test_the_static_text_and_hash_do_not_depend_on_the_render(pool, storage, redis_client, stream_name, seeded_source):
