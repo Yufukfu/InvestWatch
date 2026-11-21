@@ -163,3 +163,64 @@ P2 rules (R9, R11, R13, OCR, clustering) only if all P0/P1 work is done before 0
 ## 11. "AI-assisted development process" criterion (20% of the score)
 
 We use **OpenSpec** (spec-driven development): every change starts as a spec/proposal, contracts in `contracts/` are the single source of truth for both people and AI assistants. Alongside it we keep `doc/ai-workflow.md` – tools used (Claude Code, OpenSpec), context files (`CLAUDE.md` per service), review rules for generated code, dependency scans, example prompts. C adds an entry at every milestone.
+
+## 12. Analytics service skeleton – implementation plan
+
+**Goal:** Integration #1 (Sat 17:00) – a document taken from the queue goes through the rule-based M2 module (R1–R3), is saved as a finding that matches the contract, and an event is published.
+
+### 12.1 Portability (until the repository structure from B lands)
+
+- The whole service lives in one self-contained folder `analytics/` with its own `requirements.txt`, `Dockerfile` and `README.md`.
+- Configuration comes only from environment variables; no paths to other repo folders.
+- The firm registry is loaded from the file given in `REGISTRY_CSV`; rule definitions ship inside the package (YAML).
+- Contract tests look for the schemas under `CONTRACTS_DIR` and are skipped (not failed) when it is not set.
+- Moving into B's layout = one `git mv analytics <new-path>` + the path in `docker-compose.yml`.
+
+### 12.2 Layout
+
+```
+analytics/
+  Dockerfile, requirements.txt, requirements-dev.txt, pyproject.toml, .env.example, README.md
+  src/investwatch_analytics/
+    config.py         – settings from environment variables
+    models.py         – Pydantic: ScrapedDocument (input, lenient), Finding (output, strict)
+    preprocessing.py  – HTML strip, normalization, sentences, content hash, language guess
+    registry.py       – KNF firm registry from CSV; matching by name, alias, domain, fuzzy
+    rules/
+      engine.py       – Rule base class, RuleResult, scoring
+      m2_rules.yaml   – all 18 UKNF rules: name, severity, legal basis, dictionaries, `implemented` flag
+      m2.py           – R1, R2, R3 (rule-based version)
+    modules/
+      router.py       – which modules to run (source_kind × registry result)
+      m2.py           – rule results → Finding (Polish title and summary)
+    pipeline.py       – document → findings (pure function, no I/O)
+    storage.py        – store interface + Postgres (documents/findings) + in-memory store for tests
+    events.py         – publish to `iw:events` (Redis Pub/Sub) + no-op publisher
+    worker.py         – Redis Stream consumer (consumer group)
+    cli.py            – analyze a JSON file without any infrastructure
+  tests/
+```
+
+### 12.3 Steps
+
+| # | Step | Done when | Est. |
+|---|---|---|---|
+| 1 | Package skeleton, config, models matching the contract | a `Finding` produced by the models passes `contracts/validate.py` | 20 min |
+| 2 | Preprocessing | normalization, sentence split, hash and pl/en heuristic are covered by tests | 20 min |
+| 3 | Firm registry: CSV loader, matching, fictional test firms | "Alfa Inwestycje" matches "Alfa Inwestycje Dom Maklerski S.A."; domain matching works | 30 min |
+| 4 | Rule engine + YAML + R1, R2, R3 | tests on mocks `m2-alfa-landing` (R2, R3 fail) and `m2-bank-ok` (pass) | 40 min |
+| 5 | Router + M2 module + pipeline | `firm_own` → M2 finding; `third_party` → skipped for now (logged) | 20 min |
+| 6 | CLI: `python -m investwatch_analytics.cli doc.json` | on `contracts/mocks/documents.json` it prints findings that pass the schema | 15 min |
+| 7 | Storage (Postgres, columns + JSONB) and events (Redis Pub/Sub) | read/write against local Postgres and Redis in step 8 | 30 min |
+| 8 | Worker: XREADGROUP, XACK, XAUTOCLAIM of stale messages, JSON logs | a message on `iw:documents` ends up as a finding in the DB and a `finding.created` event | 30 min |
+| 9 | Dockerfile (python:3.13-slim, non-root user), README, `.env.example` | `docker build` succeeds; the service starts under `docker compose` | 20 min |
+
+Total ≈ 4 h. Steps 1–6 need no infrastructure and are fully testable locally; steps 7–8 need Postgres and Redis from docker-compose.
+
+### 12.4 Decisions to confirm
+
+1. **`documents` / `findings` tables:** migrations belong to the API (Alembic). Until the API exists, a temporary `analytics/sql/schema.sql`, later moved into the migrations.
+2. **Threshold for `finding.high_risk`:** analytics reads thresholds from the Redis key `iw:settings:thresholds` written by the API, with defaults 0.6 / 0.5 / 0.7 when missing – to be added to the contract.
+3. **KNF registry:** fictional firms in tests to start with; the real KNF page loader is a separate step after the skeleton.
+4. **LLM (Gemma):** outside the skeleton; `model.llm = null` marks rules-only mode.
+5. **OpenSpec:** this plan becomes a change proposal (`proposal.md`, `tasks.md`, spec) once B sets up the structure with OpenSpec.
