@@ -132,7 +132,10 @@ def load_seed(path: Path) -> list[SeedEntry]:
 
 def load_seed_dir(directory: Path) -> list[SeedEntry]:
     """Every `*.toml` of the directory in file-name order, validated as one list (a URL repeated across files is a duplicate)."""
-    return _unique([item for path in sorted(directory.glob("*.toml")) for item in _read(path)])
+    paths = sorted(directory.glob("*.toml"))
+    if not paths:  # a wrong path or an image without the seeds must not look like a successful run
+        raise SeedError(f"no .toml seed file in {directory}")
+    return _unique([item for path in paths for item in _read(path)])
 
 
 async def seed_knf(pool: asyncpg.Pool, *, cron: str | None = None) -> str | None:
@@ -142,7 +145,8 @@ async def seed_knf(pool: asyncpg.Pool, *, cron: str | None = None) -> str | None
     return str(row["id"]) if row else None
 
 
-_DATABASE_ERRORS = (OSError, ValueError, asyncpg.PostgresError, asyncpg.InterfaceError)
+_QUERY_ERRORS = (OSError, asyncpg.PostgresError, asyncpg.InterfaceError)
+_CONNECT_ERRORS = (*_QUERY_ERRORS, ValueError)  # a malformed DSN raises ValueError at connect time only
 _LOCK_KEY = 7_302_011 # a constant for this writer only: it serialises concurrent seed runs (the table has no unique url)
 _INSERT_SOURCE = """
 INSERT INTO sources (id, name, platform, url, source_kind, target_modules, schedule_cron, active)
@@ -196,13 +200,13 @@ async def main() -> None:
     # a driver's message can hold the host, user or part of the DSN: say only what failed
     try:
         pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1)
-    except _DATABASE_ERRORS:
+    except _CONNECT_ERRORS:
         raise SystemExit("cannot connect to the database (check DATABASE_URL)") from None
     try:
         report = await seed_all(pool, cron=cron_from(sys.argv))
     except SeedError as error:
         raise SystemExit(str(error)) from None
-    except _DATABASE_ERRORS:
+    except _QUERY_ERRORS:
         raise SystemExit("the database failed while seeding (check DATABASE_URL and that the schema is migrated)") from None
     finally:
         await pool.close()

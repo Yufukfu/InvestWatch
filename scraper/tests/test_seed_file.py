@@ -158,6 +158,18 @@ def test_two_files_give_both_entry_lists_in_file_name_order(tmp_path):
     assert [(e.name, e.platform) for e in loaded] == [("XTB IKE", "web"), ("A channel", "other")]
 
 
+def test_a_directory_without_seed_files_is_refused(tmp_path):
+    write(tmp_path, "README.md", "not a seed file")
+
+    with pytest.raises(SeedError, match="no .toml seed file"):
+        load_seed_dir(tmp_path)
+
+
+def test_a_missing_seed_directory_is_refused(tmp_path):
+    with pytest.raises(SeedError, match="no .toml seed file"):
+        load_seed_dir(tmp_path / "absent")
+
+
 def test_only_toml_files_of_the_directory_are_read(tmp_path):
     write(tmp_path, "sources.toml", XTB)
     write(tmp_path, "README.md", "not a seed file")

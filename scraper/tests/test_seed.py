@@ -161,6 +161,9 @@ async def test_a_writer_waits_while_another_seed_run_holds_the_lock(pool, write)
 
 
 async def test_concurrent_full_runs_leave_one_row_per_url_including_knf(pool, tmp_path):
+    (tmp_path / "one.toml").write_text(
+        '[[source]]\nname = "One"\nurl = "https://one.example/a"\nsource_kind = "unknown"\ntarget_modules = ["M3"]\n'
+    )
     await asyncio.gather(*(seed_all(pool, directory=tmp_path) for _ in range(6)))
 
     assert await pool.fetchval("SELECT count(*) FROM sources WHERE url = $1", KNF_URL) == 1
@@ -174,6 +177,26 @@ async def test_a_database_error_after_connecting_exits_with_a_fixed_message(pool
         await main()
 
     assert failed.value.code == "the database failed while seeding (check DATABASE_URL and that the schema is migrated)"
+
+
+async def test_a_bug_after_connecting_is_not_reported_as_a_database_failure(pool, monkeypatch):
+    async def broken(pool, **kwargs):
+        raise ValueError("a bug of ours")
+
+    monkeypatch.setattr("iw_scraper.seed.seed_all", broken)
+    monkeypatch.setenv("DATABASE_URL", os.environ["IW_TEST_PG_DSN"])
+
+    with pytest.raises(ValueError, match="a bug of ours"):
+        await main()
+
+
+async def test_a_malformed_database_url_exits_without_echoing_it(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://seeduser:s3cr3t-pw@localhost:notaport/seeddb")  # asyncpg raises a bare ValueError
+
+    with pytest.raises(SystemExit) as failed:
+        await main()
+
+    assert failed.value.code == "cannot connect to the database (check DATABASE_URL)"
 
 
 async def test_a_missing_database_url_exits_with_a_message(monkeypatch):

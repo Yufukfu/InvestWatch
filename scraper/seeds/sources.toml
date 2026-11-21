@@ -1,7 +1,7 @@
 # The vetted web sources the scraper starts with (OpenSpec change scraper-v2-sources, design.md decision 9).
 # Loaded by `python -m iw_scraper.seed`; a source whose URL is already in `sources` is left alone.
-# Every URL is the final one (no redirect) and was fetched with our engine: HTTP 200, robots allowed, static text.
-# `scraper/tests/test_seed_live.py` re-checks that on demand. schedule_cron is UTC; the XTB rows are staggered by
+# Every URL was researched as a final one (no redirect, HTTP 200, robots allowed, static text) with our engine.
+# `scraper/tests/test_seed_live.py` is the proof: run it before relying on a URL. schedule_cron is UTC; the XTB rows are staggered by
 # minute so one domain's concurrency cap and request interval are not hit at once.
 # No entry says that a named business breaks a rule: a row is a page that matches a signal, a negative control
 # (a page that should NOT raise a finding) or a list page.
