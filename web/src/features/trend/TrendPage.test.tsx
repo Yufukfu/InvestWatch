@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
 import { investWatchApi } from '../../api/generated';
-import trend from '../../mocks/fixtures/trend.json';
+import trend from '../../test/fixtures/trend.json';
 import { server } from '../../test/setup';
 import { TrendPage } from './TrendPage';
 
@@ -114,21 +114,27 @@ describe('TrendPage (against contract mocks)', () => {
     await waitFor(() => expect(screen.getByRole('img')).toHaveAccessibleName('Liczba zgłoszeń: M1 2, M2 0, M3 0'));
   });
 
-  it('draws the default mock summed per UTC day under Dzień', async () => {
-    const perDay = new Map<string, [number, number, number]>();
-    for (const p of trend.points) {
-      const day = p.t.slice(0, 10);
-      const [a, b, c] = perDay.get(day) ?? [0, 0, 0];
-      perDay.set(day, [a + p.M1, b + p.M2, c + p.M3]);
-    }
-    expect(perDay.size).toBeGreaterThan(1);
+  it('draws the day points exactly as the backend returns them under Dzień', async () => {
+    // Two hourly-looking points on the same UTC day: the web app must not re-aggregate what the backend sent.
+    const day = [
+      { t: '2026-11-20T00:00:00Z', M1: 3, M2: 1, M3: 0 },
+      { t: '2026-11-20T00:00:00Z', M1: 2, M2: 0, M3: 4 },
+      { t: '2026-11-21T00:00:00Z', M1: 0, M2: 7, M3: 1 },
+    ];
+    server.use(
+      http.get('http://localhost/api/stats/trend', ({ request }) =>
+        new URL(request.url).searchParams.get('bucket') === 'day'
+          ? HttpResponse.json({ bucket: 'day', points: day })
+          : HttpResponse.json(trend),
+      ),
+    );
     renderPage();
     await screen.findByRole('img');
     fireEvent.click(screen.getByRole('button', { name: 'Dzień' }));
     await screen.findByText('Dni liczone w czasie UTC.');
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
-    expect(rows.map((r) => Array.from(r.querySelectorAll('td')).map((td) => Number(td.textContent)))).toEqual([
-      ...perDay.values(),
-    ]);
+    expect(rows.map((r) => Array.from(r.querySelectorAll('td')).map((td) => Number(td.textContent)))).toEqual(
+      day.map((p) => [p.M1, p.M2, p.M3]),
+    );
   });
 });
