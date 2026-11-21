@@ -43,6 +43,21 @@ test('glob patterns: * stays in a segment, ** crosses segments', () => {
   assert.deepEqual(ownerOf(rules, 'scraper/tests/fixtures/deep/a.json'), []);
 });
 
+test('docs/* matches files directly in docs, not nested ones (GitHub semantics)', () => {
+  const rules = parseCodeowners('/docs/* @a\n*.js @b\n');
+  assert.deepEqual(ownerOf(rules, 'docs/x.md'), ['a']);
+  assert.deepEqual(ownerOf(rules, 'docs/x/y.md'), []);
+  assert.deepEqual(ownerOf(rules, 'src/deep/app.js'), ['b']);
+});
+
+test('a trailing comment cannot add an owner', () => {
+  assert.deepEqual(ownerOf(parseCodeowners('/scraper/ @hen68 # @Yufukfu\n'), 'scraper/a.py'), ['hen68']);
+});
+
+test('loadCodeowners refuses a ref that git would read as an option', () => {
+  assert.throws(() => loadCodeowners({ git: () => '', ref: '--output=/tmp/x' }), /ref/);
+});
+
 test('no match gives no owner', () => {
   assert.deepEqual(ownerOf(parseCodeowners('scraper/ @hen68\n'), 'api/main.py'), []);
 });

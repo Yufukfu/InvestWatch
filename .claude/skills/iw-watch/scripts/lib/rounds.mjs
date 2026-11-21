@@ -8,4 +8,5 @@ export function countRounds({ comments, me, sessions = 0 }) {
   return Math.max(mine, sessions);
 }
 
-export const capReached = (rounds, max) => rounds >= max;
+// a limit that is not a number stops the agent rather than turning the cap off
+export const capReached = (rounds, max) => !Number.isFinite(max) || rounds >= max;

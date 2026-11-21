@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { stateDir, loadState, saveState, ack, itemId, recordSession, dropClosed, acquireLock, releaseLock, STALE_LOCK_MS } from './lib/state.mjs';
+import { stateDir, loadState, saveState, ack, itemId, recordSession, dropClosed, acquireLock, releaseLock, refreshLock, STALE_LOCK_MS } from './lib/state.mjs';
 import { MARKER, countRounds, capReached } from './lib/rounds.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'iw-watch-'));
@@ -44,6 +44,24 @@ test('a corrupt state file is moved aside, reported, and the run starts empty', 
   assert.ok(!fs.existsSync(path.join(dir, 'state.json')));
 });
 
+test('valid JSON of the wrong shape is treated as corrupt', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'state.json'), '{"version":2,"prs":[]}');
+  assert.deepEqual(loadState(dir, { log: () => {} }), { version: 1, prs: {} });
+  assert.equal(fs.readdirSync(dir).filter((f) => f.includes('corrupt')).length, 1);
+});
+
+test('a ci-failed ack moves its own cursor, not the review cursor', () => {
+  const s = { version: 1, prs: {} };
+  ack(s, itemId({ kind: 'ci-failed', pr: 4, cursor: 'deadbeef' }));
+  assert.equal(s.prs[4].ciFailedSha, 'deadbeef');
+  assert.equal(s.prs[4].seenAt, undefined);
+});
+
+test('ack refuses a time cursor that is not a time', () => {
+  assert.throws(() => ack({ version: 1, prs: {} }, '3.address-review.zzz'), /time/);
+});
+
 test('ack moves the cursor of the item kind and nothing else', () => {
   const s = { version: 1, prs: {} };
   ack(s, itemId({ kind: 'address-review', pr: 12, cursor: '2026-11-21T10:05:00Z' }));
@@ -75,11 +93,39 @@ test('the lock is exclusive, released, and replaced when stale', () => {
   assert.ok(first, 'first runner gets the lock');
   assert.equal(acquireLock(dir, { now: () => t0 + 60_000 }), null, 'second runner is refused');
   assert.equal(acquireLock(dir, { now: () => t0 + STALE_LOCK_MS - 1 }), null, 'just under the threshold is not stale');
+  assert.equal(acquireLock(dir, { now: () => t0 + STALE_LOCK_MS }), null, 'exactly the threshold is not stale');
   const stolen = acquireLock(dir, { now: () => t0 + STALE_LOCK_MS + 1 });
   assert.ok(stolen, 'a lock older than 30 minutes is replaced');
   releaseLock(stolen);
   assert.ok(acquireLock(dir, { now: () => t0 }), 'released lock can be taken again');
   assert.equal(STALE_LOCK_MS, 30 * 60 * 1000);
+});
+
+test('a runner whose lock was taken over does not release the new owner', () => {
+  const dir = tmp();
+  const t0 = Date.parse('2026-11-21T12:00:00Z');
+  const old = acquireLock(dir, { now: () => t0 });
+  const fresh = acquireLock(dir, { now: () => t0 + STALE_LOCK_MS + 1 });
+  assert.ok(fresh);
+  releaseLock(old);
+  assert.equal(acquireLock(dir, { now: () => t0 + STALE_LOCK_MS + 2 }), null, 'the new owner still holds the lock');
+  releaseLock(fresh);
+  assert.ok(acquireLock(dir, { now: () => t0 }));
+});
+
+test('refreshLock keeps a long run from looking stale', () => {
+  const dir = tmp();
+  const t0 = Date.parse('2026-11-21T12:00:00Z');
+  const h = acquireLock(dir, { now: () => t0 });
+  refreshLock(h, { now: () => t0 + STALE_LOCK_MS });
+  assert.equal(acquireLock(dir, { now: () => t0 + STALE_LOCK_MS + 2 }), null);
+});
+
+test('a lock with an unreadable owner falls back to the directory time', () => {
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, 'lock'));
+  fs.writeFileSync(path.join(dir, 'lock', 'owner.json'), '{}');
+  assert.equal(acquireLock(dir, { now: () => Date.now() }), null, 'a fresh lock directory is not stale');
 });
 
 const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/pr-comments.json', import.meta.url), 'utf8'));
@@ -97,4 +143,5 @@ test('the cap is reached at the limit, not after it', () => {
   assert.equal(capReached(2, 3), false);
   assert.equal(capReached(3, 3), true);
   assert.equal(capReached(4, 3), true);
+  assert.equal(capReached(0, NaN), true, 'a bad limit stops instead of turning the cap off');
 });

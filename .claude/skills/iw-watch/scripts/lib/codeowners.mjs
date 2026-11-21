@@ -21,7 +21,9 @@ function toRegex(pattern) {
   }
   if (body === '*' ) return /^.*$/;
   const prefix = anchored ? '^' : '^(?:.*/)?';
-  const suffix = dirOnly ? '/.*$' : '(?:/.*)?$';
+  // `docs/*` matches files directly in docs/ only; a plain name matches a file or everything below a directory
+  const lastHasGlob = /\*/.test(body.split('/').at(-1)) && !body.endsWith('**');
+  const suffix = dirOnly ? '/.*$' : lastHasGlob ? '$' : '(?:/.*)?$';
   return new RegExp(prefix + re + suffix);
 }
 
@@ -31,7 +33,8 @@ export function parseCodeowners(text) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) return;
     const [pattern, ...rest] = line.split(/\s+/);
-    const owners = rest.filter((o) => !o.startsWith('#'));
+    const hash = rest.findIndex((o) => o.startsWith('#'));
+    const owners = hash === -1 ? rest : rest.slice(0, hash);
     const where = `CODEOWNERS line ${idx + 1}`;
     if (UNSUPPORTED.test(pattern)) throw new Error(`${where}: unsupported pattern syntax in ${JSON.stringify(pattern)}`);
     if (owners.length === 0) throw new Error(`${where}: pattern ${JSON.stringify(pattern)} has no owner`);
@@ -59,6 +62,7 @@ export function ownedDirs(rules, login) {
 
 /** Parse the CODEOWNERS of `ref` (the default branch), so a PR cannot reroute its own review. null if absent. */
 export function loadCodeowners({ git, ref }) {
+  if (!/^[A-Za-z0-9._/][A-Za-z0-9._/-]*$/.test(ref) || ref.startsWith('-')) throw new Error(`not a git ref: ${JSON.stringify(ref)}`);
   let text;
   try {
     text = git(['show', `${ref}:.github/CODEOWNERS`]);

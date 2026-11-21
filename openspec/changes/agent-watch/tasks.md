@@ -6,13 +6,13 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 
 - [x] 1.1 Write the failing test `codeowners.test.mjs`: last match wins, directory and glob patterns, no match, missing file, unknown syntax fails closed; run it and confirm it fails because the module does not exist
 - [x] 1.2 Add `.github/CODEOWNERS` (`scraper/` hen68, `web/` and `infra/` kacpermalczyk, `analytics/` `api/` `contracts/` Yufukfu) and `lib/codeowners.mjs`; verify the test passes and `node -e` resolves `infra/compose.yaml` to `kacpermalczyk`
-- [x] 1.3 Mutation check for this group: last-match order, directory prefix boundary (`web/` vs `web-old/`), fail-closed branch. Write the result on this line: `mutations: 9 tried, 9 caught`
+- [x] 1.3 Mutation check for this group: last-match order, directory prefix boundary (`web/` vs `web-old/`), fail-closed branch. Write the result on this line: `mutations: 12 tried, 12 caught` (after review: nested `*`, trailing comment, ref as option)
 
 ## 2. State, lock and round count
 
 - [x] 2.1 Write the failing tests `state.test.mjs`: atomic write, corrupt file moved aside and reported, `ack` semantics, lock acquired and released, stale lock (older than 30 minutes) replaced, second runner exits 0, round count is the larger of the `<!-- iw-watch -->` comments in a fixture and the sessions in the state
 - [x] 2.2 Implement `lib/state.mjs` and `lib/rounds.mjs`; verify the tests pass and a killed write leaves the previous file intact
-- [x] 2.3 Mutation check: temp-then-rename, stale threshold boundary, cap comparison `>=` vs `>`, the `max` of the two counts. `mutations: 13 tried, 13 caught`
+- [x] 2.3 Mutation check: temp-then-rename, stale threshold boundary, cap comparison `>=` vs `>`, the `max` of the two counts. `mutations: 21 tried, 21 caught` (after review: lock token, refresh, exact stale boundary, state shape, ci cursor, time cursor, NaN cap)
 
 ## 3. Scan and ack without a model (`--mine`, `--review-requested`)
 

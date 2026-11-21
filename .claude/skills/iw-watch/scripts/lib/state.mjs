@@ -2,10 +2,11 @@
 // state.json: { version: 1, prs: { "<n>": { seenAt, reviewedSha, capNotifiedSha, sessions } } }
 import realFs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 export const STALE_LOCK_MS = 30 * 60 * 1000;
 const EMPTY = () => ({ version: 1, prs: {} });
-const KINDS = { 'address-review': 'seenAt', 'ci-failed': 'seenAt', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha' };
+const KINDS = { 'address-review': 'seenAt', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha' };
 
 export function stateDir({ env, home, repo }) {
   if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo) || repo.split('/').some((p) => p === '..' || p === '.')) {
@@ -39,8 +40,8 @@ export function saveState(dir, state, { fs = realFs } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'state.json');
   const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`);
   try {
+    fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
     fs.renameSync(tmp, file);
   } catch (e) {
     try { realFs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
@@ -66,6 +67,7 @@ export function ack(state, id) {
   const e = entry(state, pr);
   const field = KINDS[kind];
   if (field === 'seenAt') {
+    if (Number.isNaN(Date.parse(cursor))) throw new Error(`item id cursor is not a time: ${JSON.stringify(cursor)}`);
     if (!e.seenAt || Date.parse(cursor) > Date.parse(e.seenAt)) e.seenAt = cursor;
   } else {
     e[field] = cursor;
@@ -84,26 +86,54 @@ export function dropClosed(state, openNumbers) {
   return state;
 }
 
-/** mkdir is atomic: whoever creates the directory holds the lock. Returns a handle, or null if held. */
+const readOwner = (fs, lock) => {
+  try { return JSON.parse(fs.readFileSync(path.join(lock, 'owner.json'), 'utf8')); } catch { return {}; }
+};
+
+/**
+ * mkdir is atomic: whoever creates the directory holds the lock. Returns a handle, or null if held.
+ * A stale lock (older than 30 minutes, see refreshLock) is renamed aside, which only one runner can do;
+ * if the moved lock turns out not to be the one judged stale, it is put back and this runner gives up.
+ */
 export function acquireLock(dir, { fs = realFs, now = () => Date.now() } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const lock = path.join(dir, 'lock');
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const token = randomUUID();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       fs.mkdirSync(lock);
-      fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, at: now() }));
-      return { lock, fs };
+      fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, at: now(), token }));
+      return { lock, fs, token };
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
-      let at = 0;
-      try { at = JSON.parse(fs.readFileSync(path.join(lock, 'owner.json'), 'utf8')).at; } catch { at = fs.statSync(lock).mtimeMs; }
-      if (now() - at <= STALE_LOCK_MS) return null;
-      fs.rmSync(lock, { recursive: true, force: true });
     }
+    const owner = readOwner(fs, lock);
+    let { at } = owner;
+    if (!Number.isFinite(at)) {
+      try { at = fs.statSync(lock).mtimeMs; } catch { continue; } // vanished meanwhile: try again
+    }
+    if (!(now() - at > STALE_LOCK_MS)) return null;
+    const aside = `${lock}.stale-${token}`;
+    try { fs.renameSync(lock, aside); } catch { continue; }
+    if (readOwner(fs, aside).token !== owner.token) {
+      try { fs.renameSync(aside, lock); } catch { /* someone holds it now */ }
+      return null;
+    }
+    fs.rmSync(aside, { recursive: true, force: true });
   }
   return null;
 }
 
+/** Only the holder releases: a runner whose lock was taken over leaves the new owner alone */
 export function releaseLock(handle) {
-  if (handle) handle.fs.rmSync(handle.lock, { recursive: true, force: true });
+  if (handle && readOwner(handle.fs, handle.lock).token === handle.token) {
+    handle.fs.rmSync(handle.lock, { recursive: true, force: true });
+  }
+}
+
+/** Heartbeat between items, so a long run is not judged stale */
+export function refreshLock(handle, { now = () => Date.now() } = {}) {
+  if (handle && readOwner(handle.fs, handle.lock).token === handle.token) {
+    handle.fs.writeFileSync(path.join(handle.lock, 'owner.json'), JSON.stringify({ pid: process.pid, at: now(), token: handle.token }));
+  }
 }
