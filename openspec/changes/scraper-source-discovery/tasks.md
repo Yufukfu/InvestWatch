@@ -22,7 +22,7 @@
 ## 4. Closing
 
 - [x] 4.1 Apply the `iw-docs-update` skill: document the command and the approve-by-PATCH step in `scraper/README.md` and `scraper/CLAUDE.md`, write the ADR (candidate shape and no auto-activation; check the next free number across every branch), update `.docs/status/scraper.md`, add the `iw-ai-log` row, and run `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` until it prints `docs-check: ok`
-- [ ] 4.2 Run the `iw-pr-review` skill, fix every real finding, and verify the whole scraper test suite passes in the image
+- [x] 4.2 Run the `iw-pr-review` skill, fix every real finding, and verify the whole scraper test suite passes in the image
 
 ## Workflow follow-up
 
