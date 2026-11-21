@@ -1,0 +1,24 @@
+# Test harness for the queue/orchestration tests: a real Redis plus the pytest image.
+# Run from the repository root with its own project name and no host ports:
+#   COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml run --rm --build test
+services:
+  redis:
+    image: public.ecr.aws/docker/library/redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+  test:
+    build:
+      context: ..
+      dockerfile: scraper/Dockerfile
+      target: test
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/scraper/src:ro
+      - ./tests:/app/scraper/tests:ro

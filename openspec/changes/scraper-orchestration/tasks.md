@@ -4,10 +4,10 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 1. Queue, concurrency and run lock (ADR 0102)
 
-- [ ] 1.1 Failing tests, then `arq` retries: backoff with jitter for `timeout` and 5xx only, `Retry-After` raising a delay, job timeout counted as `timeout`, one job error at the cap, deferral requeue without consuming a retry, and one domain outcome recorded per final job outcome (failure cooldown); the retry scenarios pass against a real Redis
-- [ ] 1.2 Failing tests, then the per-domain concurrency cap (Redis counting semaphore with expiring leases) across two workers and resume of pending jobs after a worker stops; the concurrency, lease-expiry and restart scenarios pass. If resume fails, supersede ADR 0102
-- [ ] 1.3 Failing tests, then the per-source Redis run lock held from first attempt to final outcome and renewed while alive; the overlap, lock-across-retries and stale-lock scenarios pass
-- [ ] 1.4 Mutation check; `mutations:`
+- [x] 1.1 Failing tests, then `arq` retries: backoff with jitter for `timeout` and 5xx only, `Retry-After` raising a delay, job timeout counted as `timeout`, one job error at the cap, deferral requeue without consuming a retry, and one domain outcome recorded per final job outcome (failure cooldown); the retry scenarios pass against a real Redis
+- [x] 1.2 Failing tests, then the per-domain concurrency cap (Redis counting semaphore with expiring leases) across two workers and resume of pending jobs after a worker stops; the concurrency, lease-expiry and restart scenarios pass. If resume fails, supersede ADR 0102
+- [x] 1.3 Failing tests, then the per-source Redis run lock held from first attempt to final outcome and renewed while alive; the overlap, lock-across-retries and stale-lock scenarios pass
+- [x] 1.4 Mutation check; `mutations: 30 tried, 30 caught`
 
 ## 2. Runs, scan requests, schedule
 
