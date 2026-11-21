@@ -158,3 +158,58 @@ async def test_a_failing_tick_does_not_stop_the_loop(redis, store):
     await asyncio.gather(task, return_exceptions=True)
 
     assert len(calls) > 2 and len(sweeps) >= 2
+
+
+async def test_a_tick_that_fails_midway_is_caught_up_by_the_next_one(redis, store):
+    store.sources[A] = make_source(A, cron="*/5 * * * *")
+    real_schedulable, failures = store.schedulable, []
+
+    async def flaky():
+        if not failures:
+            failures.append(1)
+            raise ConnectionError("database restarting")
+        return await real_schedulable()
+
+    store.schedulable = flaky
+    s = scheduler(redis, store)
+    try:
+        await s.tick(SLOT)
+    except ConnectionError:
+        pass
+
+    await s.tick(SLOT.replace(minute=6))
+
+    assert await queued(redis) == 1
+
+
+async def test_a_non_utc_clock_is_converted_to_utc_slots(redis, store):
+    from datetime import timedelta, timezone
+
+    store.sources[A] = make_source(A, cron="5 12 * * *")
+    warsaw = timezone(timedelta(hours=1))
+
+    await scheduler(redis, store).tick(datetime(2026, 11, 21, 13, 5, 20, tzinfo=warsaw))
+
+    assert await queued(redis) == 1
+    assert [j.decode() for j in await redis.zrange("arq:queue", 0, -1)] == [f"sched-{A}-20261121T1205Z"]
+
+
+async def test_a_failing_sweep_does_not_stop_ticks_and_a_failing_tick_does_not_stop_the_sweep(redis, store):
+    ticks, sweeps = [], []
+
+    async def broken_sweep():
+        sweeps.append(1)
+        raise ConnectionError("sweep failed")
+
+    class BrokenStore:
+        async def schedulable(self):
+            ticks.append(1)
+            raise ConnectionError("database down")
+
+    s = scheduler(redis, BrokenStore(), sweep=broken_sweep, tick_interval=0.05, sweep_interval=0.05)
+    task = asyncio.create_task(s.run())
+    await asyncio.sleep(0.5)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+
+    assert len(ticks) > 2 and len(sweeps) > 2

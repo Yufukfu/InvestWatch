@@ -26,7 +26,8 @@ def consumer_name() -> str:
 
 
 def _text(value) -> str:
-    return value.decode() if isinstance(value, bytes) else value
+    # undecodable bytes become U+FFFD, which no valid source_id contains: the request is malformed, not a crash
+    return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
 def _valid_uuid(value: str | None) -> bool:

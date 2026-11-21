@@ -75,8 +75,11 @@ async def execute_job(ctx: dict, source_id: str, domain: str, requested: bool = 
     except Retry:
         raise  # the lock stays held until the job's final outcome
     except Exception:
-        # the progress bar must not hang on a collector bug
-        await _finish_if_started(ctx, source_id, status="failed", documents=0)
+        # the progress bar must not hang on a collector bug, and a failed finish must not keep the lock
+        try:
+            await _finish_failed(ctx, source_id, requested)
+        except Exception:
+            logger.exception("could not publish the failed finish of a crashed job")
         await lock.release()
         raise
     except BaseException:
@@ -91,11 +94,7 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
 
     source = await ctx["sources"].get(source_id)
     if source is None or not source.collectable:
-        # a job that already announced its start must also announce its end
-        if requested and not await redis.exists(_started_key(job_id)):
-            await publish_scan_event(redis, "finished", source_id, documents=0, status="failed")
-        else:
-            await _finish_if_started(ctx, source_id, status="failed", documents=0)
+        await _finish_failed(ctx, source_id, requested)
         await lock.release()
         return "skipped"
 
@@ -142,13 +141,25 @@ def _started_key(job_id: str) -> str:
     return f"iw:started:{job_id}"
 
 
+async def _finish_failed(ctx: dict, source_id: str, requested: bool) -> None:
+    """End a job that cannot continue: a job that announced its start, or a requested one, ends `failed`."""
+    if await ctx["redis"].exists(_started_key(ctx["job_id"])):
+        await _finish_if_started(ctx, source_id, status="failed", documents=0)
+    elif requested:
+        await publish_scan_event(ctx["redis"], "finished", source_id, documents=0, status="failed")
+
+
 async def _finish_if_started(ctx: dict, source_id: str, *, status: str, documents: int) -> None:
     """Publish `scan.finished` and stamp the source, once, for a job that announced its start."""
     redis: ArqRedis = ctx["redis"]
     if not await redis.delete(_started_key(ctx["job_id"])):
         return
-    if await ctx["sources"].get(source_id) is not None:
-        await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status, documents=documents)
+    try:
+        if await ctx["sources"].get(source_id) is not None:
+            await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status, documents=documents)
+    except Exception:
+        # the marker is gone, so this is the only chance to end the progress bar
+        logger.exception("could not stamp the source after its run")
     await publish_scan_event(redis, "finished", source_id, documents=documents, status=status)
 
 

@@ -181,7 +181,7 @@ async def test_a_run_that_crashes_after_starting_still_finishes_failed(redis, st
     assert events[1]["data"]["status"] == "failed"
 
 
-async def test_a_run_that_crashes_before_starting_publishes_nothing(redis, start_worker, events):
+async def test_a_scheduled_run_that_crashes_before_starting_publishes_nothing(redis, start_worker, events):
     async def run_source(source_id, started=None):
         raise RuntimeError("collector bug")
 
@@ -191,6 +191,39 @@ async def test_a_run_that_crashes_before_starting_publishes_nothing(redis, start
     await asyncio.sleep(0.3)
 
     assert events == []
+
+
+async def test_a_requested_run_that_crashes_before_starting_still_finishes_failed(redis, start_worker, events):
+    async def run_source(source_id, started=None):
+        raise RuntimeError("collector bug")
+
+    start_worker(run_source, Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+    await asyncio.gather(job.result(timeout=5, poll_delay=0.05), return_exceptions=True)
+    await wait_for(lambda: len(events) >= 1)
+
+    assert [(e["type"], e["data"]["status"]) for e in events] == [("scan.finished", "failed")]
+
+
+async def test_finished_is_published_and_the_lock_freed_even_when_the_source_update_fails(
+    redis, start_worker, store, events
+):
+    async def broken_mark_finished(*args, **kwargs):
+        raise ConnectionError("database down")
+
+    store.mark_finished = broken_mark_finished
+    calls = []
+
+    async def run_source(source_id, started=None):
+        calls.append(1)
+        return result_of(documents=1)
+
+    start_worker(run_source, Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
+
+    assert await job.result(timeout=5, poll_delay=0.05) == "ok"
+    await wait_for(lambda: [e["type"] for e in events] == ["scan.started", "scan.finished"])
+    assert await redis.exists(f"iw:lock:{SRC}") == 0
 
 
 async def test_a_source_deactivated_between_retries_still_gets_its_finished_event(redis, start_worker, store, events):
@@ -213,3 +246,21 @@ async def test_a_source_deactivated_between_retries_still_gets_its_finished_even
 
 async def _const(value):
     return value
+
+
+async def test_the_lock_is_freed_even_when_publishing_the_failed_finish_fails(redis, start_worker, monkeypatch):
+    import iw_scraper.jobs as jobs
+
+    async def broken_publish(*args, **kwargs):
+        raise ConnectionError("redis blip")
+
+    monkeypatch.setattr(jobs, "publish_scan_event", broken_publish)
+
+    async def run_source(source_id, started=None):
+        raise RuntimeError("collector bug")
+
+    start_worker(run_source, Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+    await asyncio.gather(job.result(timeout=5, poll_delay=0.05), return_exceptions=True)
+
+    assert await redis.exists(f"iw:lock:{SRC}") == 0

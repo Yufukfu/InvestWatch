@@ -15,7 +15,7 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 - [x] 2.2 Failing tests, then `scan.started`/`scan.finished` once per job on `iw:events` (silent for deferred and coalesced jobs, `failed` for a requested job that cannot run), status derivation, and `sources.last_run_status` (`running`), `last_run_at`, `documents_count`; the progress and status scenarios pass
 - [x] 2.3 Failing tests, then the `iw:scan-requests` consumer (stable consumer name, claim of stale pending messages, enqueue with the `requested` flag, `invalid_request` with `scan.finished` failed for a known uuid, silent malformed, ack); the scan-request scenarios pass against a real Redis
 - [x] 2.4 Failing tests, then the scheduler (cron to unique-id jobs, one enqueue with two workers, re-read each minute, `null` skipped, invalid cron recorded once) and the sweep on its interval; the schedule scenarios pass. First check that `arq` rejects a duplicate job id; if not, use a Redis `SET NX` slot key
-- [x] 2.5 Mutation check; `mutations: 34 tried, 34 caught`
+- [x] 2.5 Mutation check; `mutations: 43 tried, 43 caught`
 
 ## 3. Stability, health and end to end
 

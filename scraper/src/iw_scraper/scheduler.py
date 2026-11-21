@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from arq.connections import ArqRedis
 from croniter import croniter
@@ -39,7 +39,10 @@ class Scheduler:
 
     async def tick(self, now: datetime) -> int:
         """Enqueue the jobs due since the last tick; returns how many this scheduler actually enqueued."""
-        slots = self._slots_since_last_tick(now)
+        current = now.astimezone(UTC).replace(second=0, microsecond=0)
+        if self._last_slot is None:
+            self._last_slot = current - MINUTE  # the first tick covers its own minute; a failure keeps it owed
+        slots = self._slots_since_last_tick(current)
         enqueued = 0
         for source in await self._store.schedulable():
             if not source.collectable or source.schedule_cron is None:
@@ -58,14 +61,13 @@ class Scheduler:
                         _job_id=f"sched-{source.id}-{slot:%Y%m%dT%H%MZ}",
                     )
                     enqueued += job is not None  # None: another scheduler enqueued this slot already
+        self._last_slot = max(current, self._last_slot)  # only after every enqueue went through
         return enqueued
 
-    def _slots_since_last_tick(self, now: datetime) -> list[datetime]:
-        slot = now.replace(second=0, microsecond=0)
-        first = slot if self._last_slot is None else self._last_slot + MINUTE
-        self._last_slot = max(slot, self._last_slot or slot)
+    def _slots_since_last_tick(self, current: datetime) -> list[datetime]:
+        first = self._last_slot + MINUTE
         slots = []
-        while first <= slot:
+        while first <= current:
             slots.append(first)
             first += MINUTE
         return slots[-MAX_CATCH_UP_SLOTS:]
@@ -77,7 +79,7 @@ class Scheduler:
     async def _note_invalid_cron(self, source_id: str, cron: str) -> None:
         """Record one job error per invalid value, however many ticks and schedulers see it."""
         previous = await self._redis.set(self._invalid_key(source_id), cron, get=True)
-        if previous != cron.encode():
+        if previous not in (cron, cron.encode()):
             await self._record_error(JobError(Reason.INVALID_REQUEST, "schedule_cron is not a valid cron expression", source_id))
 
     async def run(self) -> None:
@@ -85,10 +87,13 @@ class Scheduler:
         next_sweep = time.monotonic() + self._sweep_interval
         while True:
             try:
-                await self.tick(datetime.now().astimezone())
-                if self._sweep and time.monotonic() >= next_sweep:
-                    next_sweep = time.monotonic() + self._sweep_interval
-                    await self._sweep()
+                await self.tick(datetime.now(UTC))
             except Exception:
                 logger.exception("scheduler tick failed")
+            if self._sweep and time.monotonic() >= next_sweep:
+                next_sweep = time.monotonic() + self._sweep_interval
+                try:
+                    await self._sweep()
+                except Exception:
+                    logger.exception("republish sweep failed")
             await asyncio.sleep(self._tick_interval)

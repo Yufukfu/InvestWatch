@@ -119,3 +119,27 @@ async def test_a_request_added_before_the_consumer_existed_is_still_handled(redi
     await consumer.poll(block=0.2)
 
     assert len(await queued_jobs(redis)) == 1
+
+
+async def test_a_field_that_is_not_valid_utf8_makes_the_request_malformed_and_does_not_block_the_next(redis, store):
+    recorder = Recorder()
+    consumer = await make_consumer(redis, store, recorder)
+    await redis.xadd(STREAM, {"source_id": SRC, "requested_at": b"\xff\xfe"})
+    await redis.xadd(STREAM, request())
+
+    await consumer.poll(block=0.2)
+
+    assert len(await queued_jobs(redis)) == 2
+    assert await pending(redis) == 0
+
+
+async def test_every_stale_pending_message_is_claimed_not_just_the_first_batch(redis, store):
+    await make_consumer(redis, store, Recorder(), name="dead")
+    for _ in range(120):
+        await redis.xadd(STREAM, request())
+    await redis.xreadgroup(GROUP, "dead", {STREAM: ">"}, count=500)
+    alive = await make_consumer(redis, store, Recorder(), name="alive", claim_idle=0.1)
+    await asyncio.sleep(0.2)
+
+    assert await alive.poll(block=0.05) == 120
+    assert await pending(redis) == 0

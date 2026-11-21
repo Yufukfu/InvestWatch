@@ -1,6 +1,6 @@
 # Follow-ups
 
-Findings of the `iw-reviewer` pass on group 1 (`bdeb218..77cb671`) and its declined-to-judge list. Fixed findings are in the follow-up commit and not repeated here.
+Findings of the `iw-reviewer` passes on group 1 (`bdeb218..77cb671`) and group 2 (`26a3cf1..bd6be4c`) and their declined-to-judge lists. Fixed findings are in the follow-up commit and not repeated here.
 
 | Item | Disposition | Note |
 |---|---|---|
@@ -13,3 +13,12 @@ Findings of the `iw-reviewer` pass on group 1 (`bdeb218..77cb671`) and its decli
 | Awaiting the cancelled lease keeper cannot be observed by a test | wont-fix | An in-flight renewal lands server-side either way; the await only guarantees the task has stopped. |
 | `pip-audit` for `arq==0.28.0` and `redis` | docs | Run in closing task 4.2 before merge (hard rule). |
 | Rate-limit token bucket and its Redis-down fallback, scheduler, scan requests, events, `/health` | docs | Later tasks (2.x, 3.x), out of scope for group 1. |
+| `documents` of `scan.finished` and `sources.documents_count` count the final attempt only; rows inserted by an attempt that then failed transiently are not added | docs | Decision: a collector inserts rows when it succeeds, so a retried attempt has none to lose; revisit with the real ingest (2.1) if a partial attempt can insert. |
+| A `CancelledError` reaching `execute_job` (shutdown, arq's outer timeout) leaves the started marker without a `scan.finished` | fix-here | Task 3.1 with the SIGTERM work, next to the lock hand-over. |
+| A scan request redelivered after its job's arq result key expired (about 1 h) runs again | wont-fix | Needs a pending message older than the result retention; the claim idle time is far shorter. |
+| `iw:cron-invalid:*` and `iw:started:*` keys: the first has no expiry | wont-fix | One small key per bad source, removed when the cron is fixed. |
+| Who calls `ScanRequestConsumer.poll` and `Scheduler.run`, and whether they survive Redis or PostgreSQL errors | fix-here | Task 3.1/3.2 process wiring; `Scheduler.run` already logs and continues, `poll` does not catch yet. |
+| `mark_running` / `mark_finished` idempotency in the PostgreSQL `SourceStore` | docs | Task 2.1 implements the store; `execute_job` calls each once per job. |
+| `requested_at` is not validated and stale requests are not dropped | wont-fix | The spec asks only for a valid `source_id`. |
+| `croniter` accepts a 6-field (seconds) expression; `schedule_cron` is a 5-field cron per the contract | wont-fix | Evaluated per minute, so the seconds field has no effect beyond the minute. |
+| `pip-audit` for `croniter==7.0.0` and `jsonschema[format]==4.23.0` | docs | Closing task 4.2, with `arq` and `redis`. |
