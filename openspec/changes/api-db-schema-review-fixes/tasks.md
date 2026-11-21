@@ -1,0 +1,35 @@
+## 1. Null JSONB fields
+
+- [ ] 1.1 Test: a finding inserted with `firm`, `advertiser`, `model` = `None` has `firm IS NULL` (and the other two) in SQL
+- [ ] 1.2 `JSONB(none_as_null=True)` on the three nullable columns; `alembic check` stays clean
+- [ ] 1.3 Mutation check
+
+## 2. Redaction
+
+- [ ] 2.1 Test: `postgresql://iw_admin:p@ss@word@postgres:5432/db` leaves no part of the password in the whole message
+- [ ] 2.2 `_URL_CREDENTIALS` matches up to the last `@` of the token
+- [ ] 2.3 Mutation check
+
+## 3. Tests that can fail
+
+- [ ] 3.1 EXPLAIN the compiled `unpublished_documents()` and findings list statements instead of hand-typed SQL
+- [ ] 3.2 Mock round-trip keeps explicit nulls for nullable fields
+- [ ] 3.3 One test compares the contract enums in `contracts/schemas/*.json` with the CHECK definitions in `pg_constraint`; drop or rename the tests that compare `tables.py` with itself; fix the `alembic check` docstring
+- [ ] 3.4 Mutation check
+
+## 4. Non-empty document text
+
+- [ ] 4.1 Test: inserting a document with `text = ''` fails with a check violation
+- [ ] 4.2 Revision `0003` adds `ck_documents_text_not_empty`, with downgrade; `tables.py` matches
+- [ ] 4.3 Mutation check
+
+## 5. Compose
+
+- [ ] 5.1 Root `compose.yaml` includes `api/compose.yaml`; `api/compose.yaml` does not redeclare the data network and depends on `infra/compose.yaml`'s `postgres`
+- [ ] 5.2 Hand-run `docker compose up` on an empty volume with a throwaway project name: `api-migrate` exits 0 (output kept for the PR body)
+- [ ] 5.3 Mutation check
+
+## 6. Closing
+
+- [ ] 6.1 Apply iw-docs-update (STATUS row, duplicate AI log row, README, follow-ups) and add the iw-ai-log row
+- [ ] 6.2 Run iw-pr-review checks and fix real findings
