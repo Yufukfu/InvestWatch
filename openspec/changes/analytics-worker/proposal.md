@@ -36,4 +36,4 @@ The change `analytics-skeleton` gives analytics a pure `analyze(doc, *, registry
 - New code under `analytics/` only: `src/investwatch_analytics/{storage,events,worker,health}.py`, `Dockerfile`, `compose.yaml`, `.dockerignore`, additions to `config.py` and `.env.example`, `tests/`.
 - Dependencies: `psycopg[binary]` 3 and `redis` (redis-py). Dev: `fakeredis` for the unit tests. `analytics/tests/sql/schema.sql` (a test-only mirror of the API migration). Integration tests run against real Postgres and Redis when `TEST_DATABASE_URL` / `TEST_REDIS_URL` are set and are skipped otherwise. All pinned and checked with `pip-audit`.
 - Root `compose.yaml`: one `include:` line for `analytics/compose.yaml`. The root file is Kacper's, so the line is announced in the team chat (infra rule: one line per module).
-- Docs: `analytics/README.md` (run and env), `analytics/CLAUDE.md` if a rule turns out to be easy to get wrong, the analytics row of `.docs/STATUS.md`, an AI log row.
+- Docs: `analytics/README.md` (run and env), `analytics/CLAUDE.md` if a rule turns out to be easy to get wrong, the `### analytics` section of `.docs/status/platform.md`, an AI log row.

@@ -46,5 +46,5 @@ Done between groups 4 and 5 at the owner's request, so the PR ships the full `UP
 
 ## 6. Closing
 
-- [ ] 6.1 Apply the iw-docs-update skill (already added: the `iw:events` envelope rule in `analytics/CLAUDE.md` and `.docs/analytics-plan.md` §12.2, asked for by the api-v1 session; `analytics/README.md` run and env section, `analytics/CLAUDE.md` if a rule is easy to get wrong, the analytics row of `.docs/STATUS.md`, `docs-check` clean) and add the iw-ai-log row
+- [ ] 6.1 Apply the iw-docs-update skill (already added: the `iw:events` envelope rule in `analytics/CLAUDE.md` and `.docs/analytics-plan.md` §12.2, asked for by the api-v1 session; `analytics/README.md` run and env section, `analytics/CLAUDE.md` if a rule is easy to get wrong, the `### analytics` section of `.docs/status/platform.md` (ADR 0205: `.docs/STATUS.md` is team milestones only), `docs-check` clean) and add the iw-ai-log row
 - [ ] 6.2 Run the iw-pr-review skill and fix real findings
