@@ -66,7 +66,7 @@ def stream_name() -> str:
 
 @pytest_asyncio.fixture
 async def storage():
-    """A Storage on a unique bucket. The bucket is made here, as module C's `minio-init` does in the stack:
+    """A Storage on a unique bucket. The bucket is made here, as Damian's `minio-init` does in the stack:
     the service itself never creates it."""
     import asyncio
 
@@ -105,7 +105,8 @@ async def seeded_source(pool, source):
     """The `sources` row that `documents.source_id` points at."""
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO sources (id, name, platform, url, source_kind) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO sources (id, name, platform, url, source_kind, target_modules) VALUES ($1, $2, $3, $4, $5, $6)",
             uuid.UUID(source.id), source.name, source.platform, source.url, source.source_kind,
+            ["M3"],
         )
     return source

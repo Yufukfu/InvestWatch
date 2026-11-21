@@ -4,7 +4,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 1. Agreements
 
-- [x] 1.1 Agreed with C (Damian's reply, 2026-11-21): he writes the Alembic revision `0001_initial` (branch `api/api-v1`; the README of `api/` on that branch has the scraper SQL); `documents.source_id` and `content_hash` are real columns; `documents_count` is not stored (the API counts it on read); redis, minio and `minio-init` (creates `iw-raw`) come with his `infra-compose` change; the plan fix is ours (4.1). The throwaway test schema `scraper/tests/schema.sql` mirrors his DDL
+- [x] 1.1 Agreed with Damian (Damian's reply, 2026-11-21): he writes the Alembic revision `0001_initial` (branch `api/api-v1`; the README of `api/` on that branch has the scraper SQL); `documents.source_id` and `content_hash` are real columns; `documents_count` is not stored (the API counts it on read); redis, minio and `minio-init` (creates `iw-raw`) come with his `infra-compose` change; the plan fix is ours (4.1). The throwaway test schema `scraper/tests/schema.sql` mirrors his DDL
 
 ## 2. Document build and insert
 

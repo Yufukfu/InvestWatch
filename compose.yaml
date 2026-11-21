@@ -1,0 +1,7 @@
+# Whole stack with one command: docker compose up --build
+# Every module owns its compose.yaml and can be deployed on its own; this file only includes them.
+# scraper/, analytics/ and api/ add their compose.yaml here when they are containerised.
+include:
+  - infra/compose.yaml
+  - web/compose.yaml
+  - api/compose.yaml

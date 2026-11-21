@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written; accepted by the human via the PR that merges `scraper-v1`
+- Deciders: agent-written; accepted by Adam via the PR that merges `scraper-v1`
 
 ## Context
 
@@ -43,4 +43,4 @@ Rationale, from the evidence above: a working in-house Python implementation alr
 - Not yet verified: Python 3.12 (spike ran on 3.9.6), checked in task 2.1.
 - Proxy credentials stay in env; `scrape_meta.proxy` holds an identifier only.
 - Fingerprint quality against real targets is untested; task 3.1 includes a manual probe of the first target.
-- The `scrape_meta.scraper` value for this client is open with C (task 1.3); the field is not required by the schema.
+- The `scrape_meta.scraper` value for this client is open with Damian (task 1.3); the field is not required by the schema.

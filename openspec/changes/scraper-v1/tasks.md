@@ -6,7 +6,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 - [x] 1.1 Read the installed noble-tls, curl_cffi and httpx APIs and the in-house crawler repos; write ADR 0101 (`noble-tls`, `curl_cffi` fallback, Python 3.12); docs-check passes
 - [x] 1.2 Write ADR 0102 (`arq`); ADR 0103 stays criteria-only and is decided in `scraper-v2`; docs-check passes
-- [ ] 1.3 Agree with C on the `scrape_meta.scraper` value for a TLS-impersonating client (v1 enum `playwright|httpx|api|manual`; field not required; interim proposal `httpx` plus `scrape_meta.client`, or a v1 enum addition with `IW_CONTRACT_CHANGE=1` and a version bump); record in ADR 0101 and `contracts/`. Blocks nothing
+- [ ] 1.3 Agree with Damian on the `scrape_meta.scraper` value for a TLS-impersonating client (v1 enum `playwright|httpx|api|manual`; field not required; interim proposal `httpx` plus `scrape_meta.client`, or a v1 enum addition with `IW_CONTRACT_CHANGE=1` and a version bump); record in ADR 0101 and `contracts/`. Blocks nothing
 - [x] 1.4 Spike (no production code): header order, manual redirects and IP pinning work, the size cap cannot abort mid-stream (spec adjusted), older Chrome profiles are reset by KNF, the library updater is unpinned; results in ADR 0101 Consequences
 
 ## 2. Skeleton, parser, site registry, error model

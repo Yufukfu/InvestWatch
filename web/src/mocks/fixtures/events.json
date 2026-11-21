@@ -1,0 +1,106 @@
+[
+  {
+    "type": "finding.created",
+    "emitted_at": "2026-11-21T15:00:40Z",
+    "data": {
+      "id": "94f686c6-70c3-5ec9-9b6f-c97032c380c6",
+      "module": "M2",
+      "score": 0.86,
+      "risk_level": "high",
+      "title": "Obietnica 18% zysku z ostrzeżeniem o ryzyku ukrytym w stopce",
+      "url": "https://alfa-inwestycje.example.com/konto-premium",
+      "platform": "web"
+    }
+  },
+  {
+    "type": "finding.high_risk",
+    "emitted_at": "2026-11-21T15:00:40Z",
+    "data": {
+      "id": "94f686c6-70c3-5ec9-9b6f-c97032c380c6",
+      "module": "M2",
+      "score": 0.86,
+      "risk_level": "high",
+      "title": "Obietnica 18% zysku z ostrzeżeniem o ryzyku ukrytym w stopce",
+      "url": "https://alfa-inwestycje.example.com/konto-premium",
+      "platform": "web"
+    }
+  },
+  {
+    "type": "finding.created",
+    "emitted_at": "2026-11-21T14:00:40Z",
+    "data": {
+      "id": "7ee7e1f3-faa9-5c1c-b3af-ee85220e7b2c",
+      "module": "M1",
+      "score": 0.91,
+      "risk_level": "high",
+      "title": "Finfluencer @inwestor_jan reklamuje EuroTrade Markets z linkiem afiliacyjnym",
+      "url": "https://www.instagram.com/p/MOCK0001/",
+      "platform": "instagram"
+    }
+  },
+  {
+    "type": "finding.high_risk",
+    "emitted_at": "2026-11-21T14:00:40Z",
+    "data": {
+      "id": "7ee7e1f3-faa9-5c1c-b3af-ee85220e7b2c",
+      "module": "M1",
+      "score": 0.91,
+      "risk_level": "high",
+      "title": "Finfluencer @inwestor_jan reklamuje EuroTrade Markets z linkiem afiliacyjnym",
+      "url": "https://www.instagram.com/p/MOCK0001/",
+      "platform": "instagram"
+    }
+  },
+  {
+    "type": "finding.created",
+    "emitted_at": "2026-11-21T13:00:40Z",
+    "data": {
+      "id": "2f832a41-72d8-515b-a447-13d24ba96941",
+      "module": "M3",
+      "score": 0.93,
+      "risk_level": "high",
+      "title": "Podmiot spoza rejestru rekomenduje kupno i sprzedaż konkretnych instrumentów",
+      "url": "https://zlotykapital-fo.example.com/oferta",
+      "platform": "web"
+    }
+  },
+  {
+    "type": "finding.high_risk",
+    "emitted_at": "2026-11-21T13:00:40Z",
+    "data": {
+      "id": "2f832a41-72d8-515b-a447-13d24ba96941",
+      "module": "M3",
+      "score": 0.93,
+      "risk_level": "high",
+      "title": "Podmiot spoza rejestru rekomenduje kupno i sprzedaż konkretnych instrumentów",
+      "url": "https://zlotykapital-fo.example.com/oferta",
+      "platform": "web"
+    }
+  },
+  {
+    "type": "finding.updated",
+    "emitted_at": "2026-11-21T16:00:00Z",
+    "data": {
+      "id": "7ee7e1f3-faa9-5c1c-b3af-ee85220e7b2c",
+      "status": "in_review"
+    }
+  },
+  {
+    "type": "scan.started",
+    "emitted_at": "2026-11-21T15:34:00Z",
+    "data": {
+      "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+      "documents": null,
+      "status": null
+    }
+  },
+  {
+    "type": "scan.finished",
+    "emitted_at": "2026-11-21T15:35:00Z",
+    "data": {
+      "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+      "documents": 4,
+      "status": "ok"
+    }
+  }
+]

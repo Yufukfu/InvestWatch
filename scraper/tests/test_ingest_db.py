@@ -70,8 +70,8 @@ async def test_same_text_for_another_source_is_not_a_duplicate(pool, seeded_sour
     other = uuid.uuid4()
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO sources (id, name, platform, url, source_kind) "
-            "VALUES ($1, 'B', 'web', 'https://b.example.com/', 'firm_own')",
+            "INSERT INTO sources (id, name, platform, url, source_kind, target_modules) "
+            "VALUES ($1, 'B', 'web', 'https://b.example.com/', 'firm_own', ARRAY['M3'])",
             other,
         )
     await insert_document(pool, build(seeded_source))

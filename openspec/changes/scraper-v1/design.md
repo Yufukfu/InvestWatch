@@ -2,7 +2,7 @@
 
 ## Context
 
-This change is the fetch-and-parse half of module A: given a source record it fetches one URL with a browser-like identity and turns the page into contract fields, or into a typed job error. Storing and announcing documents is `scraper-ingest`; queueing, scheduling and scan requests are `scraper-orchestration`. Fetch-layer rules: `iw-scraper-conventions`. Scope: `proposal.md`.
+This change is the fetch-and-parse half of Adam's module: given a source record it fetches one URL with a browser-like identity and turns the page into contract fields, or into a typed job error. Storing and announcing documents is `scraper-ingest`; queueing, scheduling and scan requests are `scraper-orchestration`. Fetch-layer rules: `iw-scraper-conventions`. Scope: `proposal.md`.
 
 ## Goals / Non-Goals
 
@@ -26,7 +26,7 @@ This change is the fetch-and-parse half of module A: given a source record it fe
 - **Shared state in Redis**: a per-domain *rate limit* (token bucket in a Lua script, local fallback when Redis is down, as in `hen68/cheaply-self-hosted` `shared/ratelimit.py`) that spaces request starts, `Retry-After` deferral and a per-domain failure cooldown (consecutive failure outcomes recorded by the queue). A run that meets a deferral, a paused domain or an all-proxies-cooling state reports the time it ends and does not fetch; the queue (`scraper-orchestration`) requeues it. The per-domain concurrency cap and the run lock are `scraper-orchestration`.
 - **Fetch allow-list = hosts of active `sources` rows plus configured extras** (`www.` equivalent), applied to every redirect hop and every URL from scraped content, never to the source URL itself (it is on the list by construction); the source URL gets scheme and address checks. Then a refusal of private, loopback, link-local, unique-local, unspecified, multicast and IPv4-mapped addresses after our own DNS resolution, connecting to the checked address.
 - **SSRF residual risk**: behind a proxy the proxy resolves DNS itself, so a rebinding answer there cannot be excluded; accepted for the hackathon because `PROXY_LIST` is operator-controlled.
-- **`scrape_meta.scraper`** has no exact v1 value for a TLS-impersonating client (enum `playwright|httpx|api|manual`); it is not a required field, and task 1.3 settles it with C. This change does not pick a value in a contract file.
+- **`scrape_meta.scraper`** has no exact v1 value for a TLS-impersonating client (enum `playwright|httpx|api|manual`); it is not a required field, and task 1.3 settles it with Damian. This change does not pick a value in a contract file.
 - **Contracts in the image**: `CONTRACTS_DIR` points at `contracts/`, which the image build context includes.
 - **`documents` and the queue are not here.** A `JobError` is an in-memory value with a sink interface; `scraper-ingest` adds the database sink.
 

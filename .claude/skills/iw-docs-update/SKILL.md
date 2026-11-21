@@ -39,7 +39,7 @@ Then `iw-pr-review`, then `/openspec-archive-change` as the last commit (see `op
 
 ## ADRs
 
-1. Copy `.docs/decisions/0000-template.md` to the next free number in your range (A `01xx`, B `02xx`, C `03xx`, so three people never pick the same number), named `NNNN-short-title.md`.
+1. Copy `.docs/decisions/0000-template.md` to the next free number in your range (Adam `01xx`, Kacper `02xx`, Damian `03xx`, so three people never pick the same number), named `NNNN-short-title.md`.
 2. The agent writes the whole ADR: Context, Options and Evidence (benchmarks, the real API read from the installed package, links), the **Decision**, and a rationale that cites that evidence; never invent a "why". Commit it with `Status: accepted`; it takes effect when the human approves and merges the PR (the human rejects it by requesting changes in review).
 3. Add the file to the table in `.docs/decisions/README.md` (the checker fails otherwise) and remove it from the candidate list.
 4. After the PR merges, do not edit it. A later decision supersedes it with a new ADR that links the old one.
@@ -51,4 +51,4 @@ node .claude/skills/iw-docs-update/scripts/docs-check.mjs
 node --test ".claude/skills/iw-docs-update/scripts/*.test.mjs"   # only if the script changed
 ```
 
-It fails on a broken relative link or backticked `.md` path, an ADR missing from the index, and a service directory without `CLAUDE.md`. Fix each finding at its source; don't silence it. The service list is `SERVICE_DIRS` in the script; update it if B changes the layout.
+It fails on a broken relative link or backticked `.md` path, an ADR missing from the index, and a service directory without `CLAUDE.md`. Fix each finding at its source; don't silence it. The service list is `SERVICE_DIRS` in the script; update it if Kacper changes the layout.
