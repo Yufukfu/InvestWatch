@@ -1,0 +1,107 @@
+# UKNF risk-information rules for investment-firm marketing (Art. 44 of Delegated Regulation (EU) 2017/565).
+# One entry per rule; only `implemented: true` rules run. Names and legal bases of R1-R8, R10, R14, R15,
+# R17, R18 match contracts/mocks/generate_mocks.py. `legal_basis: null` = not yet checked against doc/.
+# Patterns are Python regexes, matched case-insensitively against the ORIGINAL document text.
+rules:
+  - id: R1
+    name: Identyfikacja firmy
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. a rozp. del. 2017/565
+    implemented: true
+
+  - id: R2
+    name: Oznaczenie reklamy
+    severity: medium
+    legal_basis: art. 24 ust. 3 MiFID II
+    implemented: true
+    params:
+      labels:
+        - reklama
+        - materiał reklamowy
+        - materiał marketingowy
+        - informacja promocyjna
+        - informacja reklamowa
+        - komunikat marketingowy
+        - "#reklama"
+        - "#ad"
+        - marketing communication
+        - advertisement
+      # A label only counts in a prominent place: a hashtag anywhere, or within the first or last N sentences.
+      prominent_sentences: 2
+      # Text right before a label that negates it ("to nie jest reklama", "not an advertisement").
+      # Same line only (headlines often lack punctuation); a hashtag label is never negated.
+      # "nie tylko", "nie jest jedynie", "not just" do not negate: the label is still there.
+      negation_before: '(?:\bnie|\bnot|\bno)[ \t]+(?:(?!(?:tylko|jedynie|wyłącznie|only|just)\b)\w+[ \t]+){0,2}$'
+
+  - id: R3
+    name: Informacja o ryzyku
+    severity: high
+    legal_basis: art. 44 ust. 2 lit. b rozp. del. 2017/565
+    implemented: true
+    params:
+      window: 2
+      claim_patterns:
+        - '\d+(?:[.,]\d+)?\s?%'
+        - '\bzysk\w*'
+        - '\bzarab\w*'
+        - '\bzarob\w*'
+        - '\bstop\w* zwrotu'
+        - '\bzwrot\w* z inwestycji'
+        - '\bdoch(?:ód|od(?!z))\w*'
+        - '\bprzych[óo]d\w*'
+        - '\bprofit\w*'
+        - '\breturns?\b'
+      claim_exclude_patterns:
+        - '(?:prowizj|opłat|podat|marż)\w*\s+\d+(?:[.,]\d+)?\s?%'
+        - '\b100\s?%\s+(?:online|bezpieczn\w*|za darmo|darmow\w*)'
+        - '\d+(?:[.,]\d+)?\s?%\s*(?:prowizj\w*|opłat\w*|marż\w*|podatk\w*|commission|fees?)'
+      risk_patterns:
+        - '\bstra(?:t[aęyo]|ci|ć)\w*'
+        - '\bryzyk\w*'
+        - '\butrat\w*'
+        - '\brisk\w*'
+        - '\blos(?:s|ing|e)\b'
+      # Double negatives ("nie są wolne od ryzyka") are warnings even though they contain a denial phrase.
+      risk_override_patterns:
+        - '\bnie\s+(?:ma|są|jest)\s+(?:\w+\s+){0,2}(?:bez\s+|woln\w*\s+od\s+)ryzyk\w*'
+        - '\bno\s+\w+\s+is\s+risk[- ]free'
+        - '\bnot\s+risk[- ]free'
+        # Negated exclusion of loss: "nie jest wykluczona utrata", "nie można wykluczyć straty", "nie wykluczamy strat".
+        # `nie` binds to the verb or its modal only, so "nie tylko wyklucza straty" stays a denial.
+        - '\bnie\s+(?:(?:jest|są|można|da\s+się)\s+)?wyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
+        # "nie gwarantujemy braku strat", "nie gwarantujemy uniknięcia straty".
+        - '\bnie\s+gwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
+      risk_exclude_patterns:
+        # Affirmed exclusion of loss ("wykluczamy straty", "gwarantujemy brak straty") is a denial.
+        - '\bwyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
+        - '\bgwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
+        # A denial word governs the genitive, singular or plural ("bez ryzyka", "zero ryzyk", "nie ma
+        # ryzyka straty"); a nominative "ryzyko" after it starts a new phrase ("bez opłat ryzyko utraty
+        # kapitału" is a warning), as does any risk word between the denial word and the loss word.
+        - '\b(?:bez|brak\w*|zero|żadn\w*|nie ponosi\w*|nie ma)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}ryzyka?\b(?:\s+(?:utrat|strat)\w*)?'
+        # "nie istnieje" takes the nominative: "nie istnieje ryzyko utraty".
+        - '\bnie\s+istnieje\s+(?:\w+\s+)?ryzyk\w*(?:\s+(?:utrat|strat)\w*)?'
+        - '\b(?:nie|bez|żadn\w*)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}(?:stra|utrat)\w*'
+        - '\b(?:minimaln|nisk|znikom)\w*\s+ryzyk\w*'
+        - '\bryzyk\w*\s*\?'
+        - '\bwoln\w* od ryzyka\b'
+        - '\bno risk\b'
+        - '\brisk[- ]free\b'
+      footnote_markers: ["*", "¹", "²", "³"]
+
+  - {id: R4, name: Rozmiar czcionki ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565, implemented: false}
+  - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
+  - {id: R6, name: Zakrywanie / ukrywanie ryzyka, severity: high, legal_basis: art. 44 ust. 2 lit. e rozp. del. 2017/565, implemented: false}
+  - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
+  - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
+  - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
+  - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
+  - {id: R11, name: Porównania produktów, severity: medium, legal_basis: null, implemented: false}
+  - {id: R12a, name: Wyniki historyczne – okres, severity: medium, legal_basis: null, implemented: false}
+  - {id: R12b, name: Wyniki historyczne – waluta i koszty, severity: medium, legal_basis: null, implemented: false}
+  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: null, implemented: false}
+  - {id: R14, name: Ostrzeżenie przy wynikach historycznych, severity: high, legal_basis: art. 44 ust. 4 lit. d rozp. del. 2017/565, implemented: false}
+  - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
+  - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
+  - {id: R17, name: Zakaz sugerowania aprobaty organu nadzoru, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}
+  - {id: R18, name: Nadzór jako argument bezpieczeństwa, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}
