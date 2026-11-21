@@ -67,6 +67,14 @@ COPY scraper/tests_renderer scraper/tests_renderer
 WORKDIR /app/scraper
 CMD ["pytest", "-q", "tests_renderer"]
 
+FROM renderer-base AS renderer
+# the browser runs hostile page code: a user with no shell, no home, nothing to write to but the tmpfs mounts
+RUN useradd --system --uid 10002 --no-create-home --shell /usr/sbin/nologin iwr
+USER iwr
+WORKDIR /app/scraper
+EXPOSE 8080
+CMD ["python", "-m", "iw_renderer"]
+
 FROM base AS runtime
 # code and the tls-client library stay root-owned and read-only for the runtime user
 RUN useradd --system --uid 10001 iw

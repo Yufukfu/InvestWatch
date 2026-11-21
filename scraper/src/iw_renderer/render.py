@@ -152,7 +152,7 @@ class Renderer:
     """The limits and the queue around `render_viewport`: `concurrency` renders at a time, the rest wait."""
 
     def __init__(self, browser: Browser, address_check: AddressCheck, limits: RenderLimits | None = None) -> None:
-        self._browser = browser
+        self.browser = browser  # the service asks it for the version and whether it is still alive
         self._address_check = address_check
         self._limits = limits or RenderLimits()
         self._slots = asyncio.Semaphore(self._limits.concurrency)
@@ -166,7 +166,7 @@ class Renderer:
             max_png_bytes=min(request.max_png_bytes, self._limits.max_png_bytes),
         )
         async with self._slots:
-            return await self._render(self._browser, bounded, self._address_check)
+            return await self._render(self.browser, bounded, self._address_check)
 
 
 async def render_viewport(browser: Browser, request: RenderRequest, address_check: AddressCheck) -> RenderResult:

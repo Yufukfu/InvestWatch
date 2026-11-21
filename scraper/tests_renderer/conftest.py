@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import async_playwright
 
 from iw_renderer.confine import LAUNCH_ARGS
@@ -81,6 +82,13 @@ def address_check() -> Callable[[str], Awaitable[str]]:
 async def browser():
     rules = ", ".join(f"MAP {host} 127.0.0.1" for host in FIXTURE_HOSTS)
     async with async_playwright() as playwright:
-        launched = await playwright.chromium.launch(args=[*LAUNCH_ARGS, f"--host-resolver-rules={rules}"])
+        launched = None
+        for attempt in range(3):  # Chromium sometimes dies while starting inside a busy container; the service restarts on that
+            try:
+                launched = await playwright.chromium.launch(args=[*LAUNCH_ARGS, f"--host-resolver-rules={rules}"])
+                break
+            except PlaywrightError:
+                if attempt == 2:
+                    raise
         yield launched
         await launched.close()
