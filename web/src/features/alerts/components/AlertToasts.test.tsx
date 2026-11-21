@@ -6,11 +6,35 @@ import { AlertToasts } from './AlertToasts';
 const alert = (over: Partial<AlertItem> = {}): AlertItem => ({ id: 'a', title: 'Płatne sygnały', module: 'M3', score: 0.93, ...over });
 
 describe('AlertToasts', () => {
-  it('renders a polite live region that exists even when empty', () => {
-    render(<AlertToasts alerts={[]} onOpen={vi.fn()} onDismiss={vi.fn()} />);
+  it('announces only the newest label and title in a polite live line that is always present', () => {
+    const { container, rerender } = render(<AlertToasts alerts={[]} onOpen={vi.fn()} onDismiss={vi.fn()} />);
     const region = screen.getByRole('region', { name: 'Alerty' });
-    expect(region).toHaveAttribute('aria-live', 'polite');
     expect(within(region).queryAllByRole('group')).toHaveLength(0);
+    const live = container.querySelector('[aria-live="polite"]')!;
+    expect(live).toHaveTextContent(/^$/);
+    rerender(<AlertToasts alerts={[alert({ title: 'Nowy' }), alert({ id: 'b', title: 'Stary' })]} onOpen={vi.fn()} onDismiss={vi.fn()} />);
+    expect(container.querySelector('[aria-live="polite"]')).toBe(live);
+    expect(live).toHaveTextContent(/^Wysokie ryzyko: Nowy$/);
+    expect(region.querySelectorAll('[aria-live]')).toHaveLength(1);
+  });
+
+  it('holds a toast on hover or focus and releases it when both leave', () => {
+    const onHold = vi.fn();
+    const onRelease = vi.fn();
+    render(<AlertToasts alerts={[alert({ id: 'x' })]} onOpen={vi.fn()} onDismiss={vi.fn()} onHold={onHold} onRelease={onRelease} />);
+    const toast = screen.getByRole('group');
+    fireEvent.mouseEnter(toast);
+    expect(onHold).toHaveBeenLastCalledWith('x');
+    fireEvent.mouseLeave(toast);
+    expect(onRelease).toHaveBeenLastCalledWith('x');
+    const show = screen.getByRole('button', { name: 'Pokaż' });
+    const close = screen.getByRole('button', { name: 'Zamknij alert' });
+    fireEvent.focus(show);
+    expect(onHold).toHaveBeenCalledTimes(2);
+    fireEvent.blur(show, { relatedTarget: close });
+    expect(onRelease).toHaveBeenCalledTimes(1);
+    fireEvent.blur(close, { relatedTarget: document.body });
+    expect(onRelease).toHaveBeenCalledTimes(2);
   });
 
   it('shows label, title, module and score, in the given order', () => {

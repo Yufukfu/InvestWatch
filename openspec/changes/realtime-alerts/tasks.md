@@ -16,4 +16,4 @@
 
 - [x] 3.1 Run against the contract mock server in headless Chrome: badge `Na żywo`, a high-risk toast within ~10 s, `Pokaż` opens the detail, console clean.
 - [x] 3.2 Write ADR 0208 (socket.io-client), apply the `iw-docs-update` skill (`.docs/status/dashboard.md`, `web/README.md`, `docs-check` clean) and add the `iw-ai-log` row.
-- [ ] 3.3 Run the `iw-pr-review` skill and fix real findings.
+- [x] 3.3 Run the `iw-pr-review` skill and fix real findings (5 findings and 2 test gaps fixed; review fixes mutations: 14 tried, 14 caught, one equivalent mutant removed as a redundant check; rest in follow-ups.md).

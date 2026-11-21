@@ -200,7 +200,8 @@ button.link:hover { color: #1e40af; }
 .toast { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-left: 5px solid #b91c1c; border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 8px 24px rgb(15 23 42 / 20%); animation: toast-in 0.2s ease-out; }
 .toast p { margin: 0; }
 .toast-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.toast-title { margin: 6px 0 10px !important; font-weight: 600; overflow-wrap: anywhere; }
+.toast-title { margin: 6px 0 10px !important; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 520px) { .toast:nth-of-type(n + 3) { display: none; } }
 .toast-actions { display: flex; gap: 8px; }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

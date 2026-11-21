@@ -21,7 +21,7 @@ The dashboard SHALL open exactly one Socket.IO connection to namespace `/events`
 - **THEN** one socket is created, and it is closed when the app unmounts
 
 ### Requirement: Events update the cached data
-On `finding.created` and `finding.high_risk` the dashboard SHALL invalidate the findings and stats data so they refetch, and SHALL NOT insert rows from the event payload. On `finding.updated` it SHALL set the new status on that finding in every cached findings list and in its cached detail, and SHALL refetch the stats. Payloads that lack a string `id` (or a valid `status` for `finding.updated`) SHALL be ignored.
+On `finding.created` and `finding.high_risk` the dashboard SHALL invalidate the findings and stats data so they refetch, and SHALL NOT insert rows from the event payload. On `finding.updated` it SHALL set the new status on that finding in every cached findings list and in its cached detail, and SHALL refetch the stats. Payloads whose `id` is not a UUID (or without a valid `status` for `finding.updated`) SHALL be ignored; a high-risk payload without a `title` still refreshes but raises no toast.
 
 #### Scenario: New finding
 - **WHEN** a `finding.created` event arrives
@@ -32,11 +32,11 @@ On `finding.created` and `finding.high_risk` the dashboard SHALL invalidate the 
 - **THEN** its row shows `Potwierdzone` without a list refetch
 
 #### Scenario: Malformed event
-- **WHEN** `finding.updated` arrives with `{ id }` and no status, or `finding.created` arrives with no id
+- **WHEN** `finding.updated` arrives with `{ id }` and no status, or any finding event arrives with no id or an id that is not a UUID
 - **THEN** nothing changes and nothing throws
 
 ### Requirement: High-risk toast
-On `finding.high_risk` the dashboard SHALL show a toast in a polite live region with the label `Wysokie ryzyko`, the finding title rendered as text, the module and the score, a `Pokaż` button that opens that finding's detail, and a `Zamknij` button. Toasts SHALL not take focus, SHALL disappear after 20 seconds, SHALL show at most 4 at a time with the newest first, and SHALL show one toast per finding id.
+On `finding.high_risk` the dashboard SHALL show a toast with the label `Wysokie ryzyko`, the finding title rendered as text, the module and the score, a `Pokaż` button that opens that finding's detail, and a `Zamknij` button, and SHALL announce the label and title through a polite live region. Toasts SHALL not take focus, SHALL disappear after 20 seconds unless hovered or focused, SHALL show at most 4 at a time with the newest first, and SHALL show one toast per finding id.
 
 #### Scenario: Toast content
 - **WHEN** `finding.high_risk` arrives for `{ id, module: "M3", score: 0.93, title }`
@@ -49,6 +49,10 @@ On `finding.high_risk` the dashboard SHALL show a toast in a polite live region 
 #### Scenario: Untrusted title
 - **WHEN** the title contains `<img src=x onerror=alert(1)>`
 - **THEN** it is shown literally and no element is created
+
+#### Scenario: Held toast
+- **WHEN** the pointer or keyboard focus is on a toast when its 20 seconds run out
+- **THEN** it stays, and its 20 seconds start again when both leave
 
 #### Scenario: Limits
 - **WHEN** six different high-risk events arrive, and one of them twice

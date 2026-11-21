@@ -69,6 +69,8 @@ function renderWithQueries() {
   );
 }
 
+const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
 const brief = { id: findings.items[2].id, module: 'M3', score: 0.93, title: findings.items[2].title, url: 'https://x.example', platform: 'web' };
 
 describe('useRealtime', () => {
@@ -82,7 +84,8 @@ describe('useRealtime', () => {
     const { unmount } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
     expect(fake.calls).toHaveLength(1);
     expect(fake.calls[0][0]).toBe('/events');
-    expect(fake.calls[0][1]).toMatchObject({ path: '/socket.io' });
+    // Default transports (polling, then upgrade): a blocked WebSocket must not mean no events.
+    expect(fake.calls[0][1]).toEqual({ path: '/socket.io' });
     unmount();
     expect(fake.socket.disconnected).toBe(true);
   });
@@ -141,7 +144,9 @@ describe('useRealtime', () => {
       fake.fire('finding.created', { title: 'no id' });
       fake.fire('finding.high_risk', null);
       fake.fire('finding.high_risk', { title: 'no id' });
-      fake.fire('finding.high_risk', { id: 'x' });
+      fake.fire('finding.high_risk', { ...brief, id: 'not-a-uuid' });
+      fake.fire('finding.created', { ...brief, id: 'not-a-uuid' });
+      fake.fire('finding.updated', { id: 'not-a-uuid', status: 'closed' });
     });
     await new Promise((r) => setTimeout(r, 50));
     expect(n.list).toBe(1);
@@ -153,11 +158,11 @@ describe('useRealtime', () => {
   it('collects high-risk alerts: newest first, one per id, at most 4', () => {
     const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
     act(() => {
-      for (let i = 0; i < 6; i++) fake.fire('finding.high_risk', { ...brief, id: `id-${i}`, title: `T${i}` });
-      fake.fire('finding.high_risk', { ...brief, id: 'id-5', title: 'T5 again' });
+      for (let i = 0; i < 6; i++) fake.fire('finding.high_risk', { ...brief, id: uid(i), title: `T${i}` });
+      fake.fire('finding.high_risk', { ...brief, id: uid(5), title: 'T5 again' });
     });
-    expect(result.current.alerts.map((a) => a.id)).toEqual(['id-5', 'id-4', 'id-3', 'id-2']);
-    expect(result.current.alerts[0]).toEqual({ id: 'id-5', module: 'M3', score: 0.93, title: 'T5 again' });
+    expect(result.current.alerts.map((a) => a.id)).toEqual([uid(5), uid(4), uid(3), uid(2)]);
+    expect(result.current.alerts[0]).toEqual({ id: uid(5), module: 'M3', score: 0.93, title: 'T5 again' });
   });
 
   it('does not alert on finding.created', () => {
@@ -170,11 +175,11 @@ describe('useRealtime', () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
     act(() => {
-      fake.fire('finding.high_risk', { ...brief, id: 'a' });
-      fake.fire('finding.high_risk', { ...brief, id: 'b' });
+      fake.fire('finding.high_risk', { ...brief, id: uid(1) });
+      fake.fire('finding.high_risk', { ...brief, id: uid(2) });
     });
-    act(() => result.current.dismiss('b'));
-    expect(result.current.alerts.map((a) => a.id)).toEqual(['a']);
+    act(() => result.current.dismiss(uid(2)));
+    expect(result.current.alerts.map((a) => a.id)).toEqual([uid(1)]);
     act(() => vi.advanceTimersByTime(19_999));
     expect(result.current.alerts).toHaveLength(1);
     act(() => vi.advanceTimersByTime(1));
@@ -187,6 +192,29 @@ describe('useRealtime', () => {
     act(() => fake.fire('finding.high_risk', { ...brief, id: detail.id }));
     act(() => result.current.open(detail.id));
     expect(window.location.search).toBe(`?module=M3&finding=${detail.id}`);
+    expect(result.current.alerts).toEqual([]);
+  });
+
+  it('a high-risk event without a title still refreshes, but raises no toast', async () => {
+    const n = countRequests();
+    const { result } = renderWithQueries();
+    await waitFor(() => expect(n.summary).toBe(1));
+    act(() => fake.fire('finding.high_risk', { id: brief.id, module: 'M3', score: 0.9 }));
+    await waitFor(() => expect(n.list).toBe(2));
+    expect(result.current.rt.alerts).toEqual([]);
+  });
+
+  it('a held alert stays past its time and restarts the full time when released', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1) }));
+    act(() => result.current.hold(uid(1)));
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(result.current.alerts).toHaveLength(1);
+    act(() => result.current.release(uid(1)));
+    act(() => vi.advanceTimersByTime(19_999));
+    expect(result.current.alerts).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(1));
     expect(result.current.alerts).toEqual([]);
   });
 });

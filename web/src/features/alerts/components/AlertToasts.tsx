@@ -1,17 +1,38 @@
 import type { AlertItem } from '../model';
 
-type Props = { alerts: AlertItem[]; onOpen: (id: string) => void; onDismiss: (id: string) => void };
+type Props = {
+  alerts: AlertItem[];
+  onOpen: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onHold?: (id: string) => void;
+  onRelease?: (id: string) => void;
+};
 
-// Polite live region: announced by screen readers without moving focus. The region is always in the
-// DOM, so additions are announced. Titles come from scraped content and are rendered as text.
-export function AlertToasts({ alerts, onOpen, onDismiss }: Props) {
+// The newest alert is announced through a polite live line (label and title only, not the buttons);
+// nothing takes focus. A toast holds while hovered or focused. Titles are scraped content: text only.
+export function AlertToasts({ alerts, onOpen, onDismiss, onHold, onRelease }: Props) {
+  const newest = alerts[0];
   return (
-    <section className="toasts" aria-label="Alerty" aria-live="polite">
+    <section className="toasts" aria-label="Alerty">
+      <p className="sr-label" aria-live="polite">
+        {newest ? `Wysokie ryzyko: ${newest.title}` : ''}
+      </p>
       {alerts.map((a) => {
         const score = a.score === undefined ? undefined : `wynik ${a.score.toFixed(2)}`;
         const meta = [a.module, score].filter(Boolean).join(' · ');
         return (
-          <div key={a.id} className="toast" role="group" aria-label={`Wysokie ryzyko: ${a.title}`}>
+          <div
+            key={a.id}
+            className="toast"
+            role="group"
+            aria-label={`Wysokie ryzyko: ${a.title}`}
+            onMouseEnter={() => onHold?.(a.id)}
+            onMouseLeave={() => onRelease?.(a.id)}
+            onFocus={() => onHold?.(a.id)}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onRelease?.(a.id);
+            }}
+          >
             <p className="toast-head">
               <span className="risk risk-high">Wysokie ryzyko</span>
               {meta && <span className="toast-meta">{meta}</span>}

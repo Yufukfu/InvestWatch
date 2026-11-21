@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { investWatchApi } from '../../../api/generated';
 import { setSearchParam } from '../../../url/useUrlSearch';
+import { isUuid } from '../../../url/uuid';
 import type { AlertItem, Connection } from '../model';
 import { connectEvents } from './socket';
 
@@ -20,12 +21,11 @@ function record(v: unknown): Record<string, unknown> | undefined {
   return typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : undefined;
 }
 
-// Event payloads come from the network: check the fields we use, ignore the rest.
-function toAlert(payload: unknown): AlertItem | undefined {
-  const p = record(payload);
-  if (!p || typeof p.id !== 'string' || typeof p.title !== 'string') return undefined;
+// Event payloads come from the network: check the fields we use, ignore the rest. `id` is checked by the caller.
+function toAlert(id: string, p: Record<string, unknown>): AlertItem | undefined {
+  if (typeof p.title !== 'string') return undefined;
   return {
-    id: p.id,
+    id,
     title: p.title,
     module: (MODULES as readonly unknown[]).includes(p.module) ? (p.module as AlertItem['module']) : undefined,
     score: typeof p.score === 'number' ? p.score : undefined,
@@ -37,6 +37,8 @@ export type RealtimeState = {
   alerts: AlertItem[];
   dismiss: (id: string) => void;
   open: (id: string) => void;
+  hold: (id: string) => void;
+  release: (id: string) => void;
 };
 
 // The single real-time subscription of the app (web-dashboard rules): finding.created/high_risk
@@ -53,6 +55,24 @@ export function useRealtime(): RealtimeState {
     setAlerts((list) => list.filter((a) => a.id !== id));
   }, []);
 
+  const schedule = useCallback(
+    (id: string) => {
+      clearTimeout(timers.current.get(id));
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), ALERT_TTL_MS),
+      );
+    },
+    [dismiss],
+  );
+
+  // A toast under the pointer or holding focus stays until released (WCAG 2.2.1, focus never lost).
+  const hold = useCallback((id: string) => {
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+  }, []);
+  const release = useCallback((id: string) => schedule(id), [schedule]);
+
   const open = useCallback(
     (id: string) => {
       setSearchParam('finding', id);
@@ -67,25 +87,20 @@ export function useRealtime(): RealtimeState {
     const refresh = () => dispatch(investWatchApi.util.invalidateTags(['findings', 'stats']));
 
     const onCreated = (payload: unknown) => {
-      if (typeof record(payload)?.id === 'string') refresh();
+      if (isUuid(record(payload)?.id)) refresh();
     };
     const onHighRisk = (payload: unknown) => {
-      const alert = toAlert(payload);
-      if (!alert) return;
+      const p = record(payload);
+      if (!p || !isUuid(p.id)) return;
       refresh();
-      clearTimeout(live.get(alert.id));
-      live.set(
-        alert.id,
-        setTimeout(() => {
-          live.delete(alert.id);
-          setAlerts((list) => list.filter((a) => a.id !== alert.id));
-        }, ALERT_TTL_MS),
-      );
+      const alert = toAlert(p.id, p);
+      if (!alert) return;
+      schedule(alert.id);
       setAlerts((list) => [alert, ...list.filter((a) => a.id !== alert.id)].slice(0, MAX_ALERTS));
     };
     const onUpdated = (payload: unknown) => {
       const p = record(payload);
-      if (!p || typeof p.id !== 'string' || !(STATUSES as readonly unknown[]).includes(p.status)) return;
+      if (!p || !isUuid(p.id) || !(STATUSES as readonly unknown[]).includes(p.status)) return;
       const id = p.id;
       const status = p.status as Status;
       dispatch((d: Dispatch, getState: () => { [investWatchApi.reducerPath]: State }) => {
@@ -122,7 +137,7 @@ export function useRealtime(): RealtimeState {
       live.forEach(clearTimeout);
       live.clear();
     };
-  }, [dispatch]);
+  }, [dispatch, schedule]);
 
-  return { connection, alerts, dismiss, open };
+  return { connection, alerts, dismiss, open, hold, release };
 }
