@@ -11,7 +11,7 @@ Findings of the `iw-reviewer` passes on group 1 (`bdeb218..77cb671`) and group 2
 | `iw:sem:*` keys are never deleted | wont-fix | One small key per domain, cosmetic. |
 | Awaiting the cancelled lease keeper cannot be observed by a test | wont-fix | An in-flight renewal lands server-side either way; the await only guarantees the task has stopped. |
 | `pip-audit` for `arq==0.28.0` and `redis` | docs | Run in closing task 4.2 before merge (hard rule). |
-| Rate-limit token bucket and its Redis-down fallback, scheduler, scan requests, events, `/health` | docs | Later tasks (2.x, 3.x), out of scope for group 1. |
+| Per-domain request-start rate limit (token bucket) and its Redis-down fallback | new-item | Not built here; design.md no longer claims it. It belongs to the fetch layer in `scraper-v1`, which owns the "per-domain rate limit" politeness rule. The concurrency cap is built (2.2). |
 | `documents` of `scan.finished` and `sources.documents_count` count the final attempt only; rows inserted by an attempt that then failed transiently are not added | docs | Decision: a collector inserts rows when it succeeds, so a retried attempt has none to lose; revisit with the real ingest (2.1) if a partial attempt can insert. |
 | An outer arq timeout (not a shutdown) cancels `execute_job`: the lock is kept up to `attempt_timeout` and a started job gets no `scan.finished` | docs | Shutdown cancels are requeued and finish later; the backstop timeout is rare, since the inner timeout fires first. Revisit if a collector can hang outside `run_source`. |
 | A scan request redelivered after its job's arq result key expired (about 1 h) runs again | wont-fix | Needs a pending message older than the result retention; the claim idle time is far shorter. |
@@ -28,4 +28,9 @@ Findings of the `iw-reviewer` passes on group 1 (`bdeb218..77cb671`) and group 2
 | `PROXY_ROTATION`, `PROXY_COOLDOWN_SECONDS`, `COMPOSE_INTERNAL_HOSTS` in `.env.example` (listed in task 4.1) | new-item | Nothing in this change reads them; they belong to the fetch and proxy code in `scraper-v1`. Documenting them now would describe settings that do nothing. `CONTRACTS_DIR` is documented in `scraper/.env.example`. |
 | Note to C for the `.docs/integration-plan.md` §7 variable list: the scraper reads `REDIS_URL`, `CONTRACTS_DIR`, `SCRAPER_CONSUMER` and `SCRAPER_<FIELD>` tuning variables (`scraper/.env.example`) | docs | For the human to pass on; §7 is C's section. |
 | `pip-audit` (2026-11-21): `arq`, `redis`, `croniter`, `jsonschema`, `noble-tls` clean; `pytest 8.3.4` (dev only) had PYSEC-2026-1845, fixed by `pytest 9.0.3` with `pytest-asyncio 1.5.0` (all tests pass) | docs | Re-run before merge; the bump touches `scraper/requirements-dev.txt`, which `scraper-v1` also edits. |
-
+| Consumer claim idle time, scheduler tick and sweep intervals and the health host and port are constructor arguments, not `SCRAPER_*` env settings | fix-here | Add them to `QueueSettings`/`RunnerSettings` and `.env.example` when the composition root is wired (2.1/3.3). |
+| A flood of `iw:scan-requests` is unbounded | new-item | For C: the API side rate-limits requests and caps the stream with `MAXLEN`. |
+| A malformed message that raises in the consumer could loop | fix-here | Task 2.1: isolate per-message errors once the store's error classes exist. |
+| Uppercase UUIDs in a scan request are refused as `invalid_request` | wont-fix | Contract §7 uses lowercase UUID v4. |
+| `SCRAPER_*` values are not range-validated (`DOMAIN_CONCURRENCY=0` requeues jobs forever) | wont-fix | Hackathon scope; the defaults are sane and config is set by the team. |
+| Log redaction of `http://u:p@ss@host` and `scheme://token@host`, `redis://:pw@host`, `password=x` | docs | Fixed in this change with tests (`test_logs.py`). |

@@ -47,6 +47,9 @@ class Scheduler:
         for source in await self._store.schedulable():
             if not source.collectable or source.schedule_cron is None:
                 continue
+            if not domain_of(source):
+                logger.warning("source %s has a URL without a host and is not scheduled", source.id)
+                continue
             if not croniter.is_valid(source.schedule_cron):
                 await self._note_invalid_cron(source.id, source.schedule_cron)
                 continue

@@ -6,6 +6,7 @@ from arq.jobs import Job
 
 from conftest import Recorder, make_source
 from iw_scraper.scan_requests import ScanRequestConsumer, consumer_name
+from iw_scraper.sources import domain_of
 from iw_scraper.types import JobError, Reason
 
 STREAM = "iw:scan-requests"
@@ -143,3 +144,21 @@ async def test_every_stale_pending_message_is_claimed_not_just_the_first_batch(r
 
     assert await alive.poll(block=0.05) == 120
     assert await pending(redis) == 0
+
+
+@pytest.mark.parametrize("url", ["not-a-url", "file:///etc/hosts"])
+async def test_a_source_whose_url_has_no_host_is_refused(redis, store, url):
+    store.sources[SRC] = make_source(SRC, url=url)
+    recorder = Recorder()
+    consumer = await make_consumer(redis, store, recorder)
+    await redis.xadd(STREAM, request())
+
+    await consumer.poll(block=0.2)
+
+    assert await queued_jobs(redis) == []
+    assert [e.reason for e in recorder.errors] == [Reason.INVALID_REQUEST]
+
+
+def test_the_domain_is_lowercase_and_has_no_trailing_dot():
+    assert domain_of(make_source(SRC, url="https://Example.COM./x")) == "example.com"
+    assert domain_of(make_source(SRC, url="not-a-url")) == ""

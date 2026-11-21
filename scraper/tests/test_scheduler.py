@@ -213,3 +213,11 @@ async def test_a_failing_sweep_does_not_stop_ticks_and_a_failing_tick_does_not_s
     await asyncio.gather(task, return_exceptions=True)
 
     assert len(ticks) > 2 and len(sweeps) > 2
+
+
+async def test_a_source_whose_url_has_no_host_is_not_scheduled(redis, store):
+    store.sources[A] = make_source(A, cron="* * * * *", url="not-a-url")
+
+    await scheduler(redis, store).tick(SLOT)
+
+    assert await queued(redis) == 0

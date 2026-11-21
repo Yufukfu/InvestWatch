@@ -2,7 +2,9 @@ import io
 import json
 import logging
 
-from iw_scraper.logs import JsonFormatter, configure_logging
+import pytest
+
+from iw_scraper.logs import JsonFormatter, configure_logging, redact
 
 
 def lines(stream: io.StringIO) -> list[str]:
@@ -69,6 +71,27 @@ def test_url_credentials_are_redacted_in_messages_and_tracebacks():
     [line] = lines(stream)
     assert "hunter2" not in line
     assert "http://***@proxy.local:8080" in json.loads(line)["message"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "redis://:s3cret@cache:6379/0",
+        "http://s3cret@proxy.local:8080",
+        "http://user:pa@s3cret@proxy.local:8080",
+        "postgresql://iw:s3cret@db/investwatch",
+        "connection failed: host=db password=s3cret user=iw",
+        "Token=s3cret rejected",
+    ],
+)
+def test_common_secret_shapes_are_redacted(text):
+    assert "s3cret" not in redact(text)
+
+
+def test_text_without_secrets_is_unchanged():
+    assert redact("job a1 failed after 3 attempts at https://example.test/page") == (
+        "job a1 failed after 3 attempts at https://example.test/page"
+    )
 
 
 def test_a_log_call_with_bad_arguments_still_produces_a_line():

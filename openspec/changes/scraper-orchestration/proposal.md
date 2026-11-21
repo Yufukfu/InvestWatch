@@ -26,5 +26,5 @@ With fetching and parsing (`scraper-v1`) and ingest (`scraper-ingest`) in place,
 
 ## Impact
 
-- New code under `scraper/` (queue, scheduler, consumer, health) with pytest tests; dependencies `arq`, an HTTP server for `/health` (pinned, `pip-audit` before merge).
+- New code under `scraper/` (queue, scheduler, consumer, health) with pytest tests; dependencies `arq`, `croniter` and `redis` (pinned, `pip-audit` before merge); `/health` is a small asyncio server with no dependency.
 - Docs: `scraper/CLAUDE.md`, `.docs/STATUS.md`, `iw-scraper-conventions`, `.env.example` entries.

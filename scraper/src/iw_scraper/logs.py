@@ -10,12 +10,13 @@ from typing import TextIO
 from iw_scraper.events import utc_iso
 
 _HANDLER_MARK = "_iw_json_handler"
-_URL_CREDENTIALS = re.compile(r"(://)[^/\s:@]+:[^/\s@]+@")
+_URL_CREDENTIALS = re.compile(r"(://)[^/\s]*@")  # user:pass@, :pass@ (Redis) and token@
+_KEYED_SECRET = re.compile(r"(?i)\b(password|passwd|pwd|token|secret)=\S+")  # DSN and conninfo text
 
 
 def redact(text: str) -> str:
-    """`scheme://user:password@host` -> `scheme://***@host`: proxy and database URLs must not reach the logs."""
-    return _URL_CREDENTIALS.sub(r"\1***@", text)
+    """`scheme://user:password@host` -> `scheme://***@host`, `password=x` -> `password=***`: URL and DSN secrets must not reach the logs."""
+    return _KEYED_SECRET.sub(r"\1=***", _URL_CREDENTIALS.sub(r"\1***@", text))
 
 
 class JsonFormatter(logging.Formatter):

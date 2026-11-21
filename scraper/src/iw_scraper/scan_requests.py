@@ -84,7 +84,7 @@ class ScanRequestConsumer:
             await self._record_error(JobError(Reason.INVALID_REQUEST, "scan request without a valid source_id", None))
         else:
             source = await self._store.get(source_id)
-            if source is None or not source.collectable:
+            if source is None or not source.collectable or not domain_of(source):
                 await self._record_error(
                     JobError(Reason.INVALID_REQUEST, "scan request for a source that cannot be scanned", source_id)
                 )

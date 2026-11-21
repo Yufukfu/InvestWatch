@@ -22,5 +22,5 @@ class SourceStore(Protocol):
 
 
 def domain_of(source: Source) -> str:
-    """The key of the per-domain controls."""
-    return urlsplit(source.url).hostname or ""
+    """The key of the per-domain controls: the lowercase host without a trailing dot, empty if the URL has none."""
+    return (urlsplit(source.url).hostname or "").rstrip(".")
