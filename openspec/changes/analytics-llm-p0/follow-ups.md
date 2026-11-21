@@ -151,3 +151,15 @@ Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14
 | R67 | cut plan | R10 (language consistency) and the per-sentence language guess were not built | `new-item`: a follow-up change; the R10 requirement and the Preprocessing delta were removed from this change's specs, and R10 stays `implemented: false` |
 | R68 | ADR 0317 | Whether a small Gemma 4 build exists for Ollama | `new-item`: not checked; `gemma3:4b` stays the local swap target |
 | R69 | task 12.4 | About half the hosted calls returned 503 "high demand" on 2026-11-21 | `docs`: the demo must pre-warm the cache and keep the Ollama profile ready (ADR 0317) |
+
+## Whole-branch review (focus: security)
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R70 | whole-branch review | `evaluation --llm` looked up `llm.judge_from_env`, which did not exist (spec `gold-set-evaluation`; analytics-eval-calibration follow-up 7), and the report read `judge.model` | `fix-here`: `llm.judge_from_env()`; the report reads `model_name` |
+| R71 | whole-branch review | `analytics/README.md` and `api/README.md` still said M2 0.25 | `fix-here`: the evaluation table row and both defaults updated to the re-measured numbers |
+| R72 | whole-branch review | A timeout that the document budget cut short was logged as `llm_timeout` and counted for the breaker | `fix-here`: it is `llm_budget_exhausted` and does not count; a plain timeout still does |
+| R73 | whole-branch review | The budget check left no room for the 3 s connect timeout | `fix-here`: `LLM_DOC_BUDGET_S + 3 s` must stay below `CLAIM_MIN_IDLE_MS` |
+| R74 | whole-branch review, declined | M1 sends S1.4/S1.5 (`when: always`) on every M1 document, the quota concern R60 settled for M3 | `new-item`: product decision for Damian |
+| R75 | whole-branch review, residual risk | A `pass` without a quote is allowed (spec), so an injected document can clear a deferred check (R3 borderline, S3.3/S3.4 gate) | `docs`: accepted design (ADR 0309: only deferred checks are reachable); named in the PR body |
+| R76 | whole-branch review, could not check | Real Gemma `<thought>` variants (leading whitespace, other case) and the real-Redis cache path | `new-item`: watch the logs for `llm_malformed` after deploy; run the cache with `TEST_REDIS_URL` |

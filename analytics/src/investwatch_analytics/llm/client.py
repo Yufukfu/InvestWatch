@@ -19,7 +19,7 @@ import httpx
 from ..config import LlmSettings
 
 log = logging.getLogger(__name__)
-CONNECT_TIMEOUT_S = 3.0
+CONNECT_TIMEOUT_S = 3.0  # config.CONNECT_MARGIN_S mirrors this for the budget check
 #: A chat-completions answer for a few checks is a few kB; anything far larger is not one.
 MAX_RESPONSE_BYTES = 1_000_000
 
