@@ -3,7 +3,6 @@ import uuid
 from datetime import timedelta
 
 import asyncpg
-from redis.exceptions import RedisError
 
 from iw_scraper.ingest.errors import record_error
 from iw_scraper.types import JobError, Reason
@@ -50,7 +49,7 @@ async def sweep(
         for row in await conn.fetch(_CLAIM, grace, batch):
             try:
                 await publish(redis, str(row["id"]), stream)
-            except (RedisError, OSError) as exc:
+            except Exception as exc:  # RedisError, a timeout or a client bug: stop, keep the markers already set
                 failure = JobError(
                     Reason.PUBLISH_FAILED, f"sweep: {type(exc).__name__}: {exc}", str(row["source_id"])
                 )

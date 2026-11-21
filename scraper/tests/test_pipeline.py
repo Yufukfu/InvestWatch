@@ -291,3 +291,11 @@ async def test_unexpected_publish_error_after_commit_is_recorded_not_raised(pool
     result = await run(Ingestor(pool, storage, BuggyRedis(), stream=stream_name), seeded_source)
     assert result.outcome == "inserted"  # the document is stored; the sweep announces it
     assert await reasons(pool) == ["publish_failed"]
+
+
+async def test_text_that_cannot_be_encoded_is_a_recorded_schema_error(pool, storage, redis_client, stream_name, seeded_source):
+    ingestor = Ingestor(pool, storage, redis_client, stream=stream_name)
+    result = await run(ingestor, seeded_source, {**PAGE, "text": "abc\ud800"})
+    assert result.outcome == "failed"
+    assert result.error.reason is Reason.SCHEMA_INVALID
+    assert await reasons(pool) == ["schema_invalid"]

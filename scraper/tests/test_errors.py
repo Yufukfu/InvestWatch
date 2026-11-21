@@ -89,6 +89,10 @@ def test_redaction_stays_fast_on_hostile_input(hostile):
         ("sess_id=sid-31337 expired", "sid-31337"),
         ("credential=cred-8080 rejected", "cred-8080"),
         ("passphrase=correct-horse rejected", "correct-horse"),
+        ("pass=hunter2 rejected", "hunter2"),
+        ("pw=abc-pw rejected", "abc-pw"),
+        ("auth=abc123 rejected", "abc123"),
+        ("sent Basic dXNlcjpwYXNz to proxy", "dXNlcjpwYXNz"),
         ("proxy http://:hunter2@10.0.0.1:8080 refused", "hunter2"),
     ],
 )

@@ -118,3 +118,21 @@ async def test_hung_redis_does_not_hold_the_sweep_forever(pool, stream_name, see
     document_id = await add_document(pool, seeded_source, "a", age_seconds=300)
     assert await asyncio.wait_for(sweep(pool, HungRedis(), grace=GRACE, stream=stream_name), 5) == 0
     assert await published_at(pool, document_id) is None
+
+
+async def test_an_unexpected_publish_error_keeps_earlier_markers_and_is_recorded(pool, stream_name, seeded_source):
+    class FlakyRedis:
+        calls = 0
+
+        async def xadd(self, *args, **kwargs):
+            FlakyRedis.calls += 1
+            if FlakyRedis.calls == 2:
+                raise RuntimeError("client bug")
+
+    first = await add_document(pool, seeded_source, "a", age_seconds=400)
+    second = await add_document(pool, seeded_source, "b", age_seconds=300)
+    assert await sweep(pool, FlakyRedis(), grace=GRACE, stream=stream_name) == 1
+    assert await published_at(pool, first) is not None
+    assert await published_at(pool, second) is None
+    async with pool.acquire() as conn:
+        assert await conn.fetchval("SELECT reason FROM job_errors") == "publish_failed"

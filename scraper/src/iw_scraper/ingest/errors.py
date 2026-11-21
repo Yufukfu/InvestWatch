@@ -23,10 +23,10 @@ _MAX_SOURCE_ID_IN_DETAIL = 80
 # name=value / "name": "value" pairs whose NAME looks secret. The pair pattern does not mention the secret words:
 # it finds `name sep value` and the name is judged in code, which keeps the regex free of nested repetition.
 _BARE_USERINFO = re.compile(r"\b[^\s/:@]+:\S*@(?=[\w.-]+)")
-_BEARER = re.compile(r"(?i)\bbearer\s+\S+")
+_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
 _AUTH_HEADER = re.compile(r"(?i)\b(authorization|proxy-authorization|cookie|set-cookie)(\s*:\s*).*")
 _PAIR = re.compile(r"([\w-]+[\"']?)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)")
-_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase")
+_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase", "pass", "pw", "auth")
 
 
 def _mask_secret_pairs(text: str) -> str:
@@ -62,7 +62,7 @@ def redact(detail: str) -> str:
         last_gap = max(detail.rfind(ch) for ch in string.whitespace)
         detail = detail[: max(last_gap, 0)]  # no whitespace at all: nothing can be told apart from a secret
     detail = _BARE_USERINFO.sub("***@", detail)
-    detail = _BEARER.sub("Bearer ***", detail)
+    detail = _BEARER.sub(r"\1 ***", detail)
     detail = _AUTH_HEADER.sub(r"\1\2***", detail)
     detail = _mask_secret_pairs(detail)
     return detail[:_MAX_DETAIL]

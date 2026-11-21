@@ -28,7 +28,10 @@ class Ingestor:
     async def ingest(
         self, page: dict, source: Source, *, fetched_at: datetime, duration_ms: int, proxy: str | None
     ) -> IngestResult:
-        doc = build_document(page, source, fetched_at=fetched_at, duration_ms=duration_ms, proxy=proxy)
+        try:
+            doc = build_document(page, source, fetched_at=fetched_at, duration_ms=duration_ms, proxy=proxy)
+        except UnicodeError:  # e.g. a lone surrogate in the text: it cannot be hashed or stored
+            return await self._fail(JobError(Reason.SCHEMA_INVALID, "text is not valid unicode", source.id))
         invalid = check_document(doc)
         if invalid is not None:
             return await self._fail(invalid)

@@ -15,3 +15,4 @@ Every row has a disposition. "Deferred" names where it is picked up; nothing her
 | 9 | A NUL character in `text` fails the insert and is recorded as `storage_error` after the upload (misclassified, but cleaned up). | Deferred: strip or reject NUL in the parser (`scraper-v1`). |
 | 10 | `Redis MAXLEN` trimming for `iw:documents`. | Deferred: not decided here (ADR 0104). |
 | 11 | ADR number 0104 may collide with another scraper stream's ADR. | Check at merge; renumber in the second PR if it does. |
+| 12 | `Storage` connects with `secure=False` and keeps `access_key` and `secret_key` as public attributes. | Deferred: take `secure` from config and make the keys private when the wiring (follow-up 1) reads the env. Plaintext is acceptable on the compose network. |
