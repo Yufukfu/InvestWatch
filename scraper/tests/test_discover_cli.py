@@ -130,3 +130,21 @@ async def test_a_malformed_dsn_is_a_logged_error_and_exit_one(dsn, capsys):
 
     out = capsys.readouterr().out
     assert code == 1 and "secretpw" not in out and json.loads(out.splitlines()[-1])["level"] == "ERROR"
+
+
+@pytest.mark.parametrize("error", [OSError("connection dropped"), asyncpg.InterfaceError("pool is closed")])
+async def test_a_failure_after_connecting_that_is_not_a_postgres_error_is_logged_and_exits_one(
+    pool, monkeypatch, capsys, error
+):
+    dsn = await schema_dsn(pool)
+
+    async def broken(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr("iw_scraper.discover.discover", broken)
+
+    code = await main([], {"DATABASE_URL": dsn})
+
+    lines = log_lines(capsys)
+    assert code == 1
+    assert [line["level"] for line in lines] == ["ERROR"] and "discovery failed" in lines[0]["message"]

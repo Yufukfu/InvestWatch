@@ -1,12 +1,15 @@
 """Discovery against the real `sources` and `documents` tables (columns of `api/migrations` 0001)."""
 
 import json
+import socket
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from iw_scraper.discover import Candidate, discover, insert_candidate
+from iw_scraper.pgstore import PgSourceStore
+from iw_scraper.targets import UrlGuard
 
 NOW = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
 
@@ -194,3 +197,36 @@ async def test_the_insert_itself_refuses_a_url_that_a_source_already_has(pool):
 
     assert inserted is False
     assert len(await sources(pool)) == 1
+
+
+async def test_a_fresh_candidate_is_not_collectable_and_its_host_is_not_in_the_url_guard(pool):
+    parent = await add_source(pool, "https://alfa.example/")
+    await add_document(pool, parent, ["https://new.example/oferta"])
+
+    await run(pool)
+
+    store = PgSourceStore(pool)
+    candidate_id = await pool.fetchval("SELECT id FROM sources WHERE url = 'https://new.example/oferta'")
+    candidate = await store.get(str(candidate_id))
+    guard = UrlGuard.for_sources(await store.collectable())
+    assert candidate is not None and not candidate.collectable
+    assert [s.url for s in await store.collectable()] == ["https://alfa.example/"]
+    with pytest.raises(Exception, match="host not allowed: new.example"):
+        guard.check("https://new.example/oferta")
+
+
+async def test_discovery_opens_no_network_connection_and_resolves_no_name(pool, monkeypatch):
+    parent = await add_source(pool, "https://alfa.example/")
+    await add_document(pool, parent, ["https://new.example/"])
+    await pool.fetchval("SELECT 1")  # the pool's connection exists before the sockets are closed
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("discovery touched the network")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+    monkeypatch.setattr("asyncio.base_events.BaseEventLoop.getaddrinfo", refuse)
+
+    report = await run(pool)
+
+    assert report.inserted == 1

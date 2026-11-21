@@ -255,7 +255,7 @@ async def main(argv: list[str], environ: Mapping[str, str]) -> int:
         return 1
     try:
         report = await discover(pool, since_hours=args.since, limit=args.limit, dry_run=args.dry_run)
-    except asyncpg.PostgresError as exc:
+    except (OSError, asyncpg.InterfaceError, asyncpg.PostgresError) as exc:
         log.error("discovery failed: %s: %s", type(exc).__name__, exc)
         return 1
     finally:
