@@ -27,7 +27,7 @@
 
 ## 5. Closing
 
-- [ ] 5.1 Apply the `iw-docs-update` skill: update the rule file sentence about components that still call hooks directly, the dashboard row in `.docs/STATUS.md`, check `web/CLAUDE.md`; add the `iw-ai-log` row; run `docs-check` clean.
+- [x] 5.1 Apply the `iw-docs-update` skill: update the rule file sentence about components that still call hooks directly, the dashboard row in `.docs/STATUS.md`, check `web/CLAUDE.md`; add the `iw-ai-log` row; run `docs-check` clean.
 - [ ] 5.2 Run the `iw-pr-review` skill and fix real findings.
 
 ## Workflow follow-up
