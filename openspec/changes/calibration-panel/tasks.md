@@ -8,9 +8,9 @@
 
 ## 2. Panel, chart and page
 
-- [ ] 2.1 Failing component tests: module switch, slider moves between points only and shows values next to the current ones, save disabled when unchanged or saving, warning text, error and empty states, chart accessible name and data table.
-- [ ] 2.2 Implement `CalibrationPanel`, `CalibrationChart`, `CalibrationPage`; lazy-load the section in `App.tsx`; style. Tests pass.
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`.
+- [x] 2.1 Failing component tests: module switch, slider moves between points only and shows values next to the current ones, save disabled when unchanged or saving, warning text, error and empty states, chart accessible name and data table.
+- [x] 2.2 Implement `CalibrationPanel`, `CalibrationChart`, `CalibrationPage`; lazy-load the section in `App.tsx`; style. Tests pass.
+- [x] 2.3 Mutation check; mutations: 16 tried, 16 caught (three survivors closed: labeled_samples 0 case, no early confirmation, external threshold change)
 
 ## 3. Closing
 

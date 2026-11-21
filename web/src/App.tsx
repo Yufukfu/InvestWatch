@@ -5,8 +5,11 @@ import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
 
-// Recharts is the largest dependency; load the trend section as its own chunk.
+// Recharts is the largest dependency; the chart sections load as their own chunks and share it.
 const TrendPage = lazy(() => import('./features/trend/TrendPage').then((m) => ({ default: m.TrendPage })));
+const CalibrationPage = lazy(() =>
+  import('./features/calibration/CalibrationPage').then((m) => ({ default: m.CalibrationPage })),
+);
 
 export function App() {
   return (
@@ -24,21 +27,32 @@ export function App() {
         </div>
       </header>
       <div className="app">
-      <main>
-        <SummaryPage />
-        <SectionBoundary
-          fallback={
-            <p className="trend-state" role="alert">
-              Nie udało się pobrać danych trendu.
-            </p>
-          }
-        >
-          <Suspense fallback={<p className="trend-state" role="status">Ładowanie wykresu…</p>}>
-            <TrendPage />
-          </Suspense>
-        </SectionBoundary>
-        <FindingsPage />
-      </main>
+        <main>
+          <SummaryPage />
+          <SectionBoundary
+            fallback={
+              <p className="trend-state" role="alert">
+                Nie udało się pobrać danych trendu.
+              </p>
+            }
+          >
+            <Suspense fallback={<p className="trend-state" role="status">Ładowanie wykresu…</p>}>
+              <TrendPage />
+            </Suspense>
+          </SectionBoundary>
+          <FindingsPage />
+          <SectionBoundary
+            fallback={
+              <p className="trend-state" role="alert">
+                Nie udało się wczytać panelu kalibracji.
+              </p>
+            }
+          >
+            <Suspense fallback={<p className="trend-state" role="status">Ładowanie kalibracji…</p>}>
+              <CalibrationPage />
+            </Suspense>
+          </SectionBoundary>
+        </main>
       </div>
     </>
   );
