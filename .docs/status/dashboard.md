@@ -9,7 +9,7 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 - Root compose with Postgres + HTTPS gateway (`infra/`).
 - Recharts installed ([ADR 0203](../decisions/0203-dashboard-charts-recharts.md)) with the trend chart (`web/src/features/trend/`): hour/day switch on `GET /stats/trend`, data table as text alternative, lazy-loaded (main bundle about 101 kB gzip plus a 107 kB trend chunk). jsdom needs a fixed chart size or a `ResizeObserver` stub (verified).
 - Web rules in `.claude/rules/web-dashboard.md`.
-- Supply chain ([ADR 0208](../decisions/0208-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): decision and runbook in a docs-only PR. OSV-Scanner (offline) and Gitleaks are run by hand until the CI follow-up adds their jobs, `.gitleaks.toml` and SHA-pinned actions.
+- Supply chain ([ADR 0209](../decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): decision and runbook in a docs-only PR. OSV-Scanner (offline) and Gitleaks are run by hand until the CI follow-up adds their jobs, `.gitleaks.toml` and SHA-pinned actions.
 - Frontend layering ([ADR 0204](../decisions/0204-frontend-architecture.md)) applied to health, summary, findings and trend, with a lint check on components.
 
 ## Active OpenSpec changes

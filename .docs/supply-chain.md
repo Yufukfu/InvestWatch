@@ -1,6 +1,6 @@
 # Supply chain: dependency scanning and secrets
 
-Runbook for [ADR 0208](decisions/0208-supply-chain-scanning.md). This file says how; the ADR says why. Results go to [security-audit.md](security-audit.md), one row per run.
+Runbook for [ADR 0209](decisions/0209-supply-chain-scanning.md). This file says how; the ADR says why. Results go to [security-audit.md](security-audit.md), one row per run.
 
 Every tool here is open source and runs locally with Docker or the language toolchain. None needs an account or sends source code anywhere.
 
@@ -15,7 +15,7 @@ For every new **direct** dependency (`package.json`, `requirements*.txt`):
 
 ## 2. Scan before a merge to `main`
 
-Run all three from the repository root. A finding blocks the PR until it is fixed or logged as a residual risk (ADR 0208, decision 2). `npm audit` is gated at `--audit-level=high`. `pip-audit` reports no severity and OSV-Scanner has no severity threshold, so every finding they report is fixed or logged; OSV-Scanner's table shows the CVSS score that the residual-risk row cites.
+Run all three from the repository root. A finding blocks the PR until it is fixed or logged as a residual risk (ADR 0209, decision 2). `npm audit` is gated at `--audit-level=high`. `pip-audit` reports no severity and OSV-Scanner has no severity threshold, so every finding they report is fixed or logged; OSV-Scanner's table shows the CVSS score that the residual-risk row cites.
 
 ```bash
 # Per-ecosystem, native (also in .github/workflows/ci.yml)
@@ -30,7 +30,7 @@ docker run --rm -v "$PWD":/src:ro -v osv-db:/root/.cache/osv-scanner \
   $(for f in */requirements*.txt contracts/mock-server/requirements*.txt; do printf -- '-L requirements.txt:/src/%s ' "$f"; done)
 ```
 
-**Not run to completion on this repository yet.** On a MacBook Air M1 (8 GB) under Docker Desktop, a recursive `-r /src` run found all 10 manifests in under 1 s, loaded the npm database (`npm/all.zip`) and then stalled until it was killed, leaving the cache empty. The likely cause is the size of the npm database, not the file walk (unverified). Run it in CI or on a machine with more memory, not on a developer laptop, and check that `osv-db` is non-empty after the first run. Once `osv-db` holds the database, an air-gapped host runs the same command with `--offline` in place of the two offline flags. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0208, decision 5).
+**Not run to completion on this repository yet.** On a MacBook Air M1 (8 GB) under Docker Desktop, a recursive `-r /src` run found all 10 manifests in under 1 s, loaded the npm database (`npm/all.zip`) and then stalled until it was killed, leaving the cache empty. The likely cause is the size of the npm database, not the file walk (unverified). Run it in CI or on a machine with more memory, not on a developer laptop, and check that `osv-db` is non-empty after the first run. Once `osv-db` holds the database, an air-gapped host runs the same command with `--offline` in place of the two offline flags. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0209, decision 5).
 
 ## 3. Fixing a finding
 
@@ -65,8 +65,8 @@ docker run --rm -v "$PWD:$PWD:ro" -v "$GIT_COMMON:$GIT_COMMON:ro" -w "$PWD" "$GI
 
 | Control | State |
 |---|---|
-| `pip-audit`, `npm audit` in CI | in `.github/workflows/ci.yml`, but manual `workflow_dispatch` only: not a required check and not a merge gate yet (ADR 0208, Consequences) |
+| `pip-audit`, `npm audit` in CI | in `.github/workflows/ci.yml`, but manual `workflow_dispatch` only: not a required check and not a merge gate yet (ADR 0209, Consequences) |
 | `.env` isolation (gitignore, hook, CI) | in place |
-| OSV-Scanner (offline) | manual (section 2); CI job is the ADR 0208 follow-up |
-| Gitleaks + `.gitleaks.toml` | manual (section 4); CI job is the ADR 0208 follow-up |
+| OSV-Scanner (offline) | manual (section 2); CI job is the ADR 0209 follow-up |
+| Gitleaks + `.gitleaks.toml` | manual (section 4); CI job is the ADR 0209 follow-up |
 | Actions pinned by SHA, `pip install pip-audit` pinned in CI, Postgres and Caddy images and the moving-tag Dockerfile bases (`api`, `scraper`, `web`) pinned by digest | follow-up |

@@ -1,4 +1,4 @@
-# 0208. Verifiable supply chain: open-source dependency scanning and secret isolation
+# 0209. Verifiable supply chain: open-source dependency scanning and secret isolation
 
 - Status: accepted
 - Date: 2026-11-21

@@ -27,7 +27,7 @@ Post blocking items only, each with `file:line`, the trigger and the smallest fi
 
 ## What "ready" means, in order
 
-1. Deterministic checks green after the last code edit (commands in `iw-pr-review`): tests, lint, types, a mutation-check line per task group, `openspec validate`, `docs-check`, dependency and secret scans (`.docs/supply-chain.md` §2 and §4, ADR 0208), and `docker compose up` once a compose file exists.
+1. Deterministic checks green after the last code edit (commands in `iw-pr-review`): tests, lint, types, a mutation-check line per task group, `openspec validate`, `docs-check`, dependency and secret scans (`.docs/supply-chain.md` §2 and §4, ADR 0209; the OSV-Scanner run counts once its CI job has run green once, until then it is a manual run), and `docker compose up` once a compose file exists.
 2. The reviews the table asks for ran, each on its own range.
 3. **Every finding verified against the code** before acting: real ones fixed, false ones rejected with a one-line evidence note. After 2 rounds on one range, stop and ask the human.
 4. No debug output left (`console.log` in JS/TS is hook-blocked; Python `print` is grepped by `iw-pr-review`) and no `.env` or credentials tracked.
