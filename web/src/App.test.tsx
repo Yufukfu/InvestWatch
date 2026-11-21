@@ -35,6 +35,13 @@ describe('App (against contract mocks)', () => {
     expect(region).toHaveTextContent(`${summary.total}Wszystkie zgłoszenia`);
   });
 
+  it('renders the trend section (lazy-loaded) between summary and findings', async () => {
+    renderApp();
+    const trend = await screen.findByRole('region', { name: 'Trend zgłoszeń' }, { timeout: 4000 });
+    const summaryRegion = await screen.findByRole('region', { name: 'Podsumowanie' });
+    expect(summaryRegion.compareDocumentPosition(trend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('renders markup in scraped text literally, never as HTML', async () => {
     const payload = '<img src=x onerror=alert(1)>Zysk 20%';
     server.use(

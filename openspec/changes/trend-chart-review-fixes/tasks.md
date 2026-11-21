@@ -8,9 +8,9 @@
 
 ## 2. Data: day mock, stale data, lazy page
 
-- [ ] 2.1 Write failing tests: `TrendPage` with a delayed day handler shows loading and not the hourly totals under `Dzień`; the default handlers answer `bucket=day` with UTC-day sums; `App` renders the lazy trend section. Verify they fail first.
-- [ ] 2.2 Implement the day aggregation in `mocks/handlers.ts` and the lazy `TrendPage`; verify tests, lint, typecheck, `contracts:check`, build.
-- [ ] 2.3 Mutation check; list every mutant and result on this line.
+- [x] 2.1 Write failing tests: `TrendPage` with a delayed day handler shows loading and not the hourly totals under `Dzień`; a refetch of the same bucket (`stats` invalidated) keeps the chart instead of flashing the loading text; the default handlers answer `bucket=day` with UTC-day sums; `App` renders the lazy trend section. Verify they fail first.
+- [x] 2.2 Implement the day aggregation in `mocks/handlers.ts` and the lazy `TrendPage`; verify tests, lint, typecheck, `contracts:check`, build.
+- [x] 2.3 Mutation check; list every mutant and result on this line. Mutants: `useTrend` loading from `isFetching` alone; `data` instead of `currentData`; loading from `!currentData` alone; handler ignores `bucket`; handler keys days by the full timestamp; handler drops the M2 sum; handler sums M3 from M2; `App` without `TrendPage`; trend section swapped before the summary. First run: `isFetching` alone survived (only visible on a refetch with data on screen); the refetch case was added, rerun. Lazy loading itself is checked by `vite build` (separate `TrendPage` chunk), not by a mutant. mutations: 9 tried, 9 caught.
 
 ## 3. Closing
 
