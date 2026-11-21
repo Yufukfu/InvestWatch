@@ -13,9 +13,9 @@ The running dashboard SHALL get all data from the backend at `VITE_API_BASE_URL`
 - **WHEN** the app runs against a backend that answers `GET /api/findings` with `contracts/mocks/findings.json`
 - **THEN** the findings table shows those titles as plain text
 
-#### Scenario: No mock worker in any build
-- **WHEN** the app is built, in dev or production mode
-- **THEN** no `mockServiceWorker.js` is emitted and no code registers a service worker
+#### Scenario: No fake backend in app code
+- **WHEN** the sources under `web/src/` outside `src/test/` and test files are checked
+- **THEN** none imports `msw` or registers a service worker, and `web/public/` has no `mockServiceWorker.js`
 
 #### Scenario: API down
 - **WHEN** the API is unreachable

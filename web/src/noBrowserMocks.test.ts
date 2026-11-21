@@ -11,14 +11,14 @@ function appSources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const path = join(dir, e.name);
     if (e.isDirectory()) return path === join(srcRoot, 'test') ? [] : appSources(path);
-    return /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [path] : [];
+    return /\.[jt]sx?$/.test(e.name) && !/\.test\.[jt]sx?$/.test(e.name) ? [path] : [];
   });
 }
 
 describe('no in-browser fake backend', () => {
   it('app code (outside src/test and tests) never imports msw or registers a service worker', () => {
     const offenders = appSources(srcRoot)
-      .filter((f) => /from ['"]msw|import\(['"]msw|serviceWorker/.test(readFileSync(f, 'utf8')))
+      .filter((f) => /['"]msw(\/|['"])|serviceWorker/.test(readFileSync(f, 'utf8')))
       .map((f) => relative(webRoot, f));
     expect(offenders).toEqual([]);
   });

@@ -8,4 +8,4 @@
 ## 2. Closing
 
 - [x] 2.1 Apply `iw-docs-update` (web README run steps, ADR 0205 superseding the dev-mock part of ADR 0201, `.docs/STATUS.md` row) and add the `iw-ai-log` row; `docs-check` clean.
-- [ ] 2.2 Run `iw-pr-review`; fix real findings.
+- [x] 2.2 Run `iw-pr-review`; fix real findings. iw-reviewer: nothing blocking; fixed the guard regex and file types, the overlapping spec scenario, the 0201 index row; `api-v1` still names the removed mock mode (Damian's change, flagged to him).

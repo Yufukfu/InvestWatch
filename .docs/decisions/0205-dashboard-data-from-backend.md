@@ -18,7 +18,7 @@ Checked on 2026-11-21: with the mock server on `:8000`, `npm run dev` proxies `/
 
 ## Decision
 
-Option 2. Remove `src/mocks/browser.ts`, `public/mockServiceWorker.js`, the start-up in `main.tsx` and `VITE_USE_MOCKS`. MSW handlers live in `web/src/test/handlers.ts`, cover only the routes the tests render, and return the contract fixtures (`web/src/test/fixtures/`, still synced by `npm run contracts:sync`) without computing anything the backend owns. `web/src/noBrowserMocks.test.ts` fails if app code imports `msw` or registers a service worker again.
+Option 2. Remove `src/mocks/browser.ts`, `public/mockServiceWorker.js`, the start-up in `main.tsx` and `VITE_USE_MOCKS`. The contract fixtures move from `web/src/mocks/fixtures/` (named in 0201) to `web/src/test/fixtures/`. MSW handlers live in `web/src/test/handlers.ts`, cover only the routes the tests render, and return the contract fixtures (`web/src/test/fixtures/`, still synced by `npm run contracts:sync`) without computing anything the backend owns. `web/src/noBrowserMocks.test.ts` fails if app code imports `msw` or registers a service worker again.
 
 ## Consequences
 

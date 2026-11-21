@@ -115,7 +115,7 @@ describe('TrendPage (against contract mocks)', () => {
   });
 
   it('draws the day points exactly as the backend returns them under Dzień', async () => {
-    // Two hourly-looking points on the same UTC day: the web app must not re-aggregate what the backend sent.
+    // Two points with the same day (no real backend sends that) make any web-side re-aggregation visible.
     const day = [
       { t: '2026-11-20T00:00:00Z', M1: 3, M2: 1, M3: 0 },
       { t: '2026-11-20T00:00:00Z', M1: 2, M2: 0, M3: 4 },
