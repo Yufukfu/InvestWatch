@@ -142,9 +142,11 @@ class Registry:
 
         Malformed and non-http(s) hrefs are skipped, never raised.
         """
+        from .modules.advertiser import is_social  # platform hosts never belong to a firm
+
         for link in links:
             host = http_host(link.href)
-            if host and (firm := self.firm_on_host(host)) is not None:
+            if host and not is_social(host) and (firm := self.firm_on_host(host)) is not None:
                 return FirmMatch(firm, LINK_CONFIDENCE, "link", link.href)
         return None
 
@@ -189,6 +191,10 @@ def http_host(url: str) -> str | None:
     except ValueError:
         return None
     if parts.scheme not in ("http", "https") or not host:
+        return None
+    # Browsers read "\" as "/", so "https://evil.example\@firm.pl/" opens evil.example while urlsplit
+    # reports firm.pl; an authority with a backslash, whitespace or control characters is no host at all.
+    if any(c == "\\" or c.isspace() or ord(c) < 0x20 for c in parts.netloc):
         return None
     return host
 

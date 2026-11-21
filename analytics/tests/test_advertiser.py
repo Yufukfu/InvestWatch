@@ -59,8 +59,20 @@ def test_first_matching_link_wins(registry):
     assert registry.match_links(links).firm.name.startswith("Bank")
 
 
-def test_social_link_never_matches(registry):
-    assert registry.match_links([Link(href="https://www.instagram.com/alfa/")]) is None
+def test_social_link_never_matches():
+    reg = Registry([_firm("Alfa Inwestycje", ("instagram.com",))])
+    assert reg.match_links([Link(href="https://www.instagram.com/alfa/")]) is None
+
+
+@pytest.mark.parametrize("href", [r"https://evil.example.com\@alfa-inwestycje.example.com/x",
+                                  r"https://evil.example.com\x@alfa-inwestycje.example.com/"])
+def test_backslash_authority_is_not_a_firm_link(registry, href):
+    assert registry.match_links([Link(href=href)]) is None
+
+
+def test_backslash_profile_url_is_not_the_firm(registry):
+    d = doc(text="x", author={"handle": "@kto", "profile_url": r"https://evil.example.com\@alfa-inwestycje.example.com/"})
+    assert publisher_firm(d, registry) is None
 
 
 # ---- publisher identity ------------------------------------------------------------------------
@@ -149,6 +161,23 @@ def test_malformed_profile_url_becomes_null(registry, bad):
 def test_long_strings_are_cut(registry):
     a = build_advertiser(doc(text="x", author={"name": "  " + "J" * 5000, "handle": "@" + "h" * 5000}), registry)
     assert a.name == "J" * MAX_LEN and len(a.handle) == MAX_LEN and MAX_LEN == 200
+
+
+def test_over_long_profile_url_becomes_null(registry):
+    a = build_advertiser(doc(text="x", author={"handle": "@kto",
+                                                "profile_url": "https://www.instagram.com/" + "a" * 300}), registry)
+    assert a.profile_url is None
+
+
+def test_backslash_profile_url_becomes_null(registry):
+    a = build_advertiser(doc(text="x", author={"handle": "@kto",
+                                                "profile_url": r"https://evil.example.com\@www.instagram.com/x"}), registry)
+    assert a.profile_url is None
+
+
+def test_empty_page_host_never_fails_the_advertiser(registry):
+    a = build_advertiser(doc(platform="web", url="https://www./", text="x", author=None), registry)
+    assert a.website is None and a.name is None and a.in_registry is False
 
 
 def test_firm_publisher_in_registry(registry):

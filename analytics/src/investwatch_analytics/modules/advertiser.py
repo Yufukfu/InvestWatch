@@ -75,20 +75,28 @@ def _cut(value: str | None) -> str | None:
     return value[:MAX_LEN] or None
 
 
+def _url_or_none(value: str | None) -> str | None:
+    """A scraped URL the contract accepts and that fits MAX_LEN, else None: never fail the finding on it.
+
+    Cutting a URL would break it, so an over-long one is dropped instead.
+    """
+    value = (value or "").strip()
+    if not value or len(value) > MAX_LEN or http_host(value) is None:
+        return None
+    try:
+        return _absolute_http_url(value)
+    except ValueError:
+        return None
+
+
 def build_advertiser(doc: ScrapedDocument, registry: Registry) -> AdvertiserRef:
     author = doc.author if _has_author(doc) else None
     host = page_host(doc.url)
-    profile = author.profile_url.strip() if author and author.profile_url else None
-    if profile:
-        try:
-            _absolute_http_url(profile)
-        except ValueError:
-            profile = None  # never fail the finding on a scraped URL the contract would reject
     return AdvertiserRef(
         name=_cut(author.name if author else None) or _cut(author.handle if author else None) or _cut(host),
         handle=_cut(author.handle) if author else None,
-        profile_url=profile,
-        website=None if author else f"{urlsplit(doc.url).scheme}://{host}/",
+        profile_url=_url_or_none(author.profile_url) if author else None,
+        website=None if author else _url_or_none(f"{urlsplit(doc.url).scheme}://{host}/"),
         in_registry=publisher_firm(doc, registry) is not None,
         on_warning_list=None,  # S3.7 (KNF public warnings list) is not implemented
     )
