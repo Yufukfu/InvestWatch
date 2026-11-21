@@ -6,6 +6,7 @@ basis, dictionaries) lives in `m2_rules.yaml`. Only catalogue entries with `impl
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -106,7 +107,8 @@ def metadata_fields(doc: ScrapedDocument) -> list[str]:
 
 
 def _number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    # NaN and infinities are floats but would make every score NaN or 0/1 without an error.
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def register(cls: type[Rule]) -> type[Rule]:

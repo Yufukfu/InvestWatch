@@ -27,18 +27,46 @@ def _write(tmp_path, body: str, name: str = "signals.yaml") -> Path:
 # ---- shipped catalogues ------------------------------------------------------------------------
 
 
+# Starting values of design decision 10.
+M1_WEIGHTS = {"S1.1": 0.5, "S1.2": 2.5, "S1.3": 2.0, "S1.4": 1.0, "S1.5": 2.0, "S1.6": 1.0, "S1.7": 0.5}
+M3_WEIGHTS = {"S3.1": 0.5, "S3.2": 1.0, "S3.3": 1.5, "S3.4": 3.0, "S3.5": 1.0, "S3.6": 0.5, "S3.7": 1.0,
+              "S3.8": 0.5}
+
+
 def test_m1_catalogue_ids_and_weights():
     cat = Catalogue.load_module("M1")
+    assert {s.id: s.weight for s in cat.specs} == M1_WEIGHTS and cat.bias == -3.5
     assert [s.id for s in cat.specs] == [f"S1.{i}" for i in range(1, 8)]
-    assert isinstance(cat.bias, float)
-    assert all(isinstance(s.weight, float) for s in cat.specs)
 
 
 def test_m3_catalogue_ids_and_weights():
     cat = Catalogue.load_module("M3")
+    assert {s.id: s.weight for s in cat.specs} == M3_WEIGHTS and cat.bias == -3.0
     assert [s.id for s in cat.specs] == [f"S3.{i}" for i in range(1, 9)]
     assert not cat.get("S3.7").implemented
-    assert isinstance(cat.bias, float)
+
+
+def test_llm_blocks_only_on_semantic_signals():
+    import yaml
+
+    with_llm = set()
+    for module in ("M1", "M3"):
+        data = yaml.safe_load(engine.MODULE_CATALOGUES[module].read_text(encoding="utf-8"))
+        for entry in data["rules"]:
+            if "llm" in entry:
+                assert entry["llm"]["question"].strip() and entry["llm"]["when"] in ("always", "uncertain")
+                with_llm.add(entry["id"])
+    assert with_llm == {"S1.4", "S1.5", "S3.3", "S3.4"}
+
+
+def test_s17_and_s36_share_detection():
+    assert Catalogue.load_module("M1").get("S1.7").params == Catalogue.load_module("M3").get("S3.6").params
+
+
+def test_integer_yaml_numbers_become_floats(tmp_path):
+    cat = Catalogue.load(_write(tmp_path, "bias: -1\nrules:\n  - {id: S1.1, name: x, severity: low, weight: 2}\n"),
+                         module="M1")
+    assert type(cat.bias) is float and type(cat.get("S1.1").weight) is float
 
 
 def test_m2_catalogue_keeps_default_module():
@@ -65,6 +93,8 @@ def test_signal_catalogue_minimal_loads(tmp_path):
         ("bias: 0\nrules:\n  - {id: S1.1, name: x, severity: low}\n", "M1", "S1.1"),
         ("bias: 0\nrules:\n  - {id: S1.1, name: x, severity: low, weight: true}\n", "M1", "S1.1"),
         ("rules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n", "M1", "bias"),
+        ("bias: .nan\nrules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n", "M1", "bias"),
+        ("bias: 0\nrules:\n  - {id: S1.1, name: x, severity: low, weight: .inf}\n", "M1", "S1.1"),
         ("bias: low\nrules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n", "M1", "bias"),
         ("bias: 0\nrules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n"
          "  - {id: S1.1, name: y, severity: low, weight: 1}\n", "M1", "S1.1"),
