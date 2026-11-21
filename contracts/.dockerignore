@@ -1,0 +1,11 @@
+# Build context for contracts/mock-server/Dockerfile: only schemas, mocks, openapi.yaml and the server source
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+**/.env
+mock-server/tests
+mocks/generate_mocks.py
+validate.py
+requirements.txt
