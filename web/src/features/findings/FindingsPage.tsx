@@ -31,7 +31,8 @@ export function FindingsPage() {
       <div className="panel-header">
         <h2 id="findings-heading">Zgłoszenia</h2>
         {f.isFetching && !f.isLoading && (
-          <span className="muted" role="status">
+          // Visual only: the table carries aria-busy, so screen readers are not told every 10 s.
+          <span className="muted" aria-hidden="true">
             Odświeżanie…
           </span>
         )}
