@@ -194,14 +194,14 @@ Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed
 
 ## 6. Real-time events
 
-Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/socket.io`, same origin through the gateway). Each message is `{ "type", "emitted_at", "data" }` (`contracts/schemas/events.schema.json`); the API forwards `data` unchanged under the event name `type` and drops messages that fail the schema:
+Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/socket.io`, same origin through the gateway). Each message is `{ "type", "emitted_at", "data" }` (`contracts/schemas/events.schema.json`); the API forwards `data` unchanged under the event name `type` and drops messages that fail the schema (only a log warning, so a producer bug shows up as missing alerts). For `finding.created` / `finding.high_risk`, `data` is exactly `{ id, module, score, title, url, platform }` plus an optional `risk_level`, no other keys:
 
 | Event | Payload | When |
 |---|---|---|
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
 | `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
 | `finding.updated` | `{ id, status }` | published by the API on `iw:events` after `PATCH /findings/{id}` commits (status or note change; sync between tabs) |
-| `scan.started` / `scan.finished` | `{ source_id, documents }` | scan progress bar |
+| `scan.started` / `scan.finished` | `{ source_id, documents?, status? }` (`documents` may be null; `status` is `ok`, `partial` or `failed`) | scan progress bar |
 
 ## 7. Shared conventions
 

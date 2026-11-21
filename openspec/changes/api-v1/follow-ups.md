@@ -26,3 +26,8 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 20 | review groups 5-6 | `iw:scan-requests` had no cap; unauthenticated `POST /scans` could grow it without bound | fix-here (`XADD ... MAXLEN ~ 10000`; config value, no test) |
 | 21 | review groups 5-6 | MinIO traffic is plain HTTP on the internal network | wont-fix (internal bridge; `MINIO_SECURE` passed through for a TLS endpoint) |
 | 22 | full-suite run | relay tests flaked once: the listener slept 0.3 s instead of waiting for the relay's subscription | fix-here (fixture publishes a probe until it arrives; stable test ids) |
+| 23 | whole-branch review | `analytics/CLAUDE.md` and `.docs/analytics-plan.md` say only "publish on iw:events", without the envelope the relay enforces | new-item (the coordinating session updates them, since this change does not touch `analytics/`; `.docs/integration-plan.md` §6 now states the envelope and the exact `finding_brief` keys) |
+| 24 | whole-branch review | §6 listed `scan.*` data as `{source_id, documents}` only | fix-here (optional `status`, nullable `documents`, as in the schema) |
+| 25 | whole-branch review | `.env.example` named only `API_CORS_ORIGINS` | fix-here (comment names every `api` variable and where it comes from) |
+| 26 | whole-branch review | `forwarded_allow_ips="*"` is safe only without a published port | docs (README: local runs use `API_HOST=127.0.0.1`) |
+| 27 | whole-branch review | Damian's `.docs/STATUS.md` row is not in this branch | new-item (the coordinating session adds it before opening the PR, as the root `CLAUDE.md` requires) |

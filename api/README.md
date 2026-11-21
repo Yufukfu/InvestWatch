@@ -94,7 +94,7 @@ All 11 paths of `contracts/openapi.yaml` under `/api`, and Socket.IO namespace `
 - Socket.IO accepts the same origin only (the gateway case; `X-Forwarded-Proto` is honoured). `API_CORS_ORIGINS` (comma-separated, for a local dev server) replaces that default, so it must also list the dashboard's own origin. No authentication: only the gateway on `127.0.0.1` is exposed (ADR 0202).
 - Errors use the contract shape `{"error": ..., "details"?: ...}`, including 500 (`internal error`) and 503 (`<dependency> unavailable`).
 
-Configuration (env only): `DATABASE_URL` (as `iw_app`), `REDIS_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` (default `iw-raw`), `MINIO_SECURE` (default false), `CONTRACTS_DIR` (set in the image), `CORS_ORIGINS` (compose: `API_CORS_ORIGINS`), `LOG_LEVEL`, `API_HOST` and `API_PORT` (default `0.0.0.0:8000`).
+Configuration (env only): `DATABASE_URL` (as `iw_app`), `REDIS_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` (default `iw-raw`), `MINIO_SECURE` (default false), `CONTRACTS_DIR` (set in the image), `CORS_ORIGINS` (compose: `API_CORS_ORIGINS`), `LOG_LEVEL`, `API_HOST` and `API_PORT` (default `0.0.0.0:8000`). The server trusts `X-Forwarded-*` headers (it only runs behind the gateway, with no host port); for a local run outside compose set `API_HOST=127.0.0.1`, otherwise those headers can be spoofed and the Socket.IO same-origin check weakens.
 
 ## Running it
 
@@ -111,7 +111,7 @@ Locally, from `api/`:
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt   # Windows; bin/ on Linux/macOS
 DATABASE_ADMIN_URL=postgresql://iw_admin:<password>@localhost:5432/investwatch .venv/Scripts/alembic upgrade head
 DATABASE_URL=postgresql://iw_app:<password>@localhost:5432/investwatch REDIS_URL=redis://:<password>@localhost:6379/0 \
-  MINIO_ENDPOINT=localhost:9000 MINIO_ACCESS_KEY=<key> MINIO_SECRET_KEY=<secret> .venv/Scripts/python -m investwatch_api
+  MINIO_ENDPOINT=localhost:9000 MINIO_ACCESS_KEY=<key> MINIO_SECRET_KEY=<secret> API_HOST=127.0.0.1 .venv/Scripts/python -m investwatch_api
 ```
 
 New revision: add `migrations/versions/NNNN_<slug>.py` by hand (copy the style of `0001_initial.py`), update `src/investwatch_api/db/tables.py` to match, and run the tests: `test_models_match_the_migrations` fails if tables, columns, types, indexes or unique constraints differ. It does not diff CHECK constraints: `test_enum_checks_match_the_contracts` and the rejection tests in `tests/test_constraints.py` cover those. Never edit an applied revision.
