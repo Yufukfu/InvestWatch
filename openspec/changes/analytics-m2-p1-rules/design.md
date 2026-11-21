@@ -25,7 +25,7 @@ Sources:
 
 **Goals:**
 - Build R11, R12a, R12b, R15 and R16 rules-first, so that every result is useful with the LLM off.
-- Follow ZASÓB wording. Where ZASÓB and the regulation differ, follow the regulation's condition and list it as an open question.
+- Follow ZASÓB wording. Where ZASÓB and the regulation differ, follow the regulation's condition and cite it in the rule's explanation (resolved question 1).
 - Count each violation once, in the rule that names it.
 - Prove that every catalogue pattern is ReDoS-safe, with a check at load and a timing test.
 
@@ -66,15 +66,15 @@ This means the three rules can never disagree on whether the material presents p
 
 **Overlaps that are deliberately allowed.** A forecast without a risk warning fails both R3 and R15, because those are two different warnings. A past-performance sentence with a year after the fetch year is a forecast, not past performance: R14's future patterns and the year check already make the two exclusive. A sentence with a past marker and a forecast marker, such as "zarobił 12% w 2024 r., w 2027 spodziewamy się 15%", triggers both R14 and R15. That is correct: it states both a past result and a forecast.
 
-### 2. "Flaguje w raporcie": a pass that quotes the detection (ADR 0315)
+### 2. "Flaguje w raporcie": R15 reports every forecast, R11 only violations (ADR 0315)
 
-ZASÓB R15 says "Flaguje w raporcie wykrycie prognozy". ZASÓB R11 says "flaguje naruszenia w raporcie", which refers to violations. The coordinator's stage-2 answer, recorded in the `m2_rules.yaml` comments, reads both as "report the detection even when compliant". Open question 3 asks Damian to confirm the reading for R11.
+The two rules use different ZASÓB wording, and Damian's answer (answer 3) follows it:
+- **R15** says "Flaguje w raporcie wykrycie prognozy": the detection itself is flagged. A compliant forecast is `pass`, its `evidence` is the forecast (not the warning), and its explanation starts with `Wykryto prognozę` and then names the warning that made it compliant.
+- **R11** says "flaguje naruszenia w raporcie": only violations are flagged. A compliant comparison is a plain `pass`. It still stores the quoted comparison as `evidence`, so the reviewer can see what was judged, but its explanation does not start with `Wykryto` and does not present the comparison as a flag.
 
-The finding already carries every rule result in `rules[]`. So for R11 and R15:
-- A compliant detection is `pass`.
-- Its `evidence` is the detected comparison or forecast, not the warning. R14 is different: there a `pass` quotes the disclaimer.
-- The explanation starts with `Wykryto porównanie` or `Wykryto prognozę` and then says what made it compliant.
-- No detection gives `not_applicable` with null evidence.
+In both rules, no detection gives `not_applicable` with null evidence. R14 is different again: its `pass` quotes the disclaimer.
+
+The stage-2 catalogue comment on R11 ("report the detection even when compliant") is corrected in group 7.
 
 Options considered:
 - **(a) `uncertain` for every detection.** This makes every compliant forecast half a violation in the score, so the dashboard would rank lawful pages as risky.
@@ -86,10 +86,11 @@ We chose (d).
 
 ### 3. R11 comparisons
 
+- **Scope (answer 4).** The core is ZASÓB's "porównania produktów i usług": other products, services or providers (`lepsze niż lokata`, `niższe prowizje niż w innych biurach`). Index and benchmark comparisons (`WIG20`, `benchmark`, `średnia funduszy`) are included as an extension, in their own pattern list (`benchmark_patterns`), so they can be cut alone. Inflation is out.
 - **Trigger, in two tiers.**
   - Explicit comparisons: a comparative followed by `niż` within `(?:\w+\s+){0,3}`, or a comparison marker. These go to the source and assumptions check.
-  - Superlatives without a comparator (`najlepsz…`, `nr 1`, `best`): an implicit market comparison that the rules cannot confirm. Rules-only `uncertain`.
-- **Excludes.** Temporal and inflation comparatives (`niż rok temu`, `niż wcześniej`, `niż kiedykolwiek`, `niż inflacja`) are stripped before matching, using the include-minus-exclude helper `_hits`. Art. 44 ust. 3 covers comparisons of services, instruments or providers. Inflation is not one of them (our reading, open question 4).
+  - Superlatives without a comparator (`najlepsz…`, `nr 1`, `best`): an implicit market comparison that the rules cannot confirm. R11 "weryfikuje źródło informacji", so an unsourced superlative leans toward `fail` (answer 5). Rules-only it is `uncertain`, with an explanation that names the missing source as the reason. The LLM may confirm that it is a comparison.
+- **Excludes.** Temporal and inflation comparatives (`niż rok temu`, `niż wcześniej`, `niż kiedykolwiek`, `niż inflacja`, `w porównaniu z inflacją`) are stripped before matching, using the include-minus-exclude helper `_hits`. Art. 44 ust. 3 covers comparisons of services, instruments or providers, and inflation is not one of them.
 - **Source and assumptions** may appear anywhere, footnotes included. ZASÓB asks whether they are given, not where they are, and footnote placement of risk text is R6's concern. The source dictionary is a YAML anchor (`&source_markers`) shared with R12a.
 - **Results:**
   - no source: `fail`;
@@ -101,19 +102,28 @@ We chose (d).
 
 ### 4. R12a period and scope
 
-All four elements are computed in code from YAML pattern lists, plus two numeric checks that a regex cannot express:
+R12a is modelled as three named sub-checks (answer 6), each `pass`, `fail` or `uncertain`:
+1. `5 lat / pełne okresy 12-mies.`
+2. `okres referencyjny`
+3. `źródło`
+
+The rule result is the worst sub-check. The explanation names every sub-check that is not `pass`, with its status, so the dashboard says which one failed. A small `SubCheck(name, status, sentence)` list in the class keeps this in one place, and the tests assert on the names.
+
+The sub-checks are computed in code from YAML pattern lists, plus two numeric checks that a regex cannot express:
 
 - **`N miesięcy`.** A period of N months is sub-annual unless N % 12 == 0, so `12 miesięcy` and `24 miesiące` are full periods. The regex `\b(\d{1,3})\s*miesi\w*` captures N.
 - **5-year coverage from a year range.** A range `(19|20)\d{2}\s*[-–]\s*(19|20)\d{2}` counts when `end - start + 1 >= 5`, or there are past figures for at least 5 distinct years (a `_YEAR` match in past-performance sentences).
 - **Longer periods.** `ostatnich N lat` counts for N ≥ 5, because 10 years include the last 5.
-- **Since inception.** `od początku działalności`, `od uruchomienia`, `since inception` and similar give `uncertain` when it is the only coverage. Art. 44 ust. 4 lit. b allows this only for a product that has existed for less than 5 years, and the rules cannot know the product's age. The LLM is asked whether the material states it.
+- **Since inception.** `od początku działalności`, `od uruchomienia`, `since inception` and similar make only the 5-year sub-check `uncertain`, when they are the only coverage. Art. 44 ust. 4 lit. b allows this only for a product that has existed for less than 5 years, and the rules cannot know the product's age. ZASÓB separately asks "czy wskazano okres referencyjny", so a since-inception marker without a year or date fails `okres referencyjny` outright, and the rule is `fail`. Only with a start year (`od uruchomienia w 2023 r.`) can the result be `uncertain`. The LLM is then asked whether the material states the product's age, which it can do only when the 5-year sub-check is the only one not `pass`.
 - **Reference period** is searched only in past-performance sentences. A year elsewhere on the page does not date the figure.
-- **Evidence.** The 12-month-basis failure quotes the sub-annual sentence. Every other failure quotes the first past-performance sentence. The explanation lists every missing element in a fixed order: okres 12 mies., 5 lat, okres referencyjny, źródło.
+- **Evidence.** A sub-12-month failure quotes the sub-annual sentence, an `uncertain` quotes the since-inception sentence, and every other failure quotes the first past-performance sentence. The explanation lists the sub-checks in the fixed order given above.
 
 ### 5. R12b currency and costs
 
 - **Costs** always apply when past performance is present. ZASÓB asks whether the impact of fees is stated. The regulation requires it only for gross performance (ust. 4 lit. f), but the rules cannot tell gross from net unless the text says so, and a net statement satisfies the check anyway.
-- **Currency** applies only to past results given in a non-PLN currency, or a product denominated in one (ust. 4 lit. e: "denominated in a currency other than that of the Member State in which the retail client is resident"). ZASÓB R12b states the currency warning without that condition. Requiring it on every PLN page would fail almost every domestic fund advert, so we follow the regulation's condition. Open question 1 asks Damian to confirm.
+- **Fees in scope (answer 1).** The fees and charges check ("wskazano wpływ prowizji, opłat i obciążeń na wyniki") always applies when past performance is shown.
+- **Currency** applies only to past results given in a non-PLN currency, or a product denominated in one (ust. 4 lit. e: "denominated in a currency other than that of the Member State in which the retail client is resident"). ZASÓB R12b ("Weryfikuje, czy zawarto ostrzeżenie o wpływie zmian kursów walutowych…") states the currency warning without that condition. Requiring it on every PLN page would fail almost every domestic fund advert, so we follow the regulation's condition, as Damian confirmed.
+- **Explanation.** So that a juror who reads ZASÓB sees why the condition exists, every R12b explanation cites `art. 44 ust. 4 lit. e` for the currency part. When the part does not apply, it says so: "ostrzeżenie walutowe niewymagane – wyniki w PLN (art. 44 ust. 4 lit. e)".
 - **Rules-only.** There is no `llm:` block: both checks are lexical.
 
 ### 6. R15 forecasts
@@ -124,7 +134,9 @@ All four elements are computed in code from YAML pattern lists, plus two numeric
   - A weak marker with result vocabulary and no figure is `uncertain`, and goes to the LLM.
 
   `będzie` alone is everywhere in Polish marketing (`konto będzie aktywne`), and it would flood R15.
-- **The promotional imperative** (`Zarabiaj nawet do 18% rocznie`) is not a forecast. It is a return claim, and R3 owns its risk warning (decision 1). Open question 2 asks Damian whether he wants R15 to catch imperatives too.
+- **A figure tied to a future period** is a forecast (answer 2), even in the fetch year. A future-tense return verb (`zarobisz`, `zyskasz`, `przyniesie`, `wypracuje`, `osiągnie`) together with a figure is a strong marker (`W 2026 zarobisz 12%`), and so are `w przyszłym roku spodziewamy się…` and a year after the fetch year.
+- **The promotional imperative** (`Zarabiaj nawet do 18% rocznie`, `zyskaj`, `earn`) is not a forecast. It is a return claim, and R3 owns its risk warning (decision 1, answer 2). The imperative forms are listed as excludes, so `zyska…` does not catch `zyskaj`.
+- **Every detected forecast is reported** (decision 2).
 - **The forecast warning** is a separate list (`&forecast_disclaimers`). The R14 disclaimer ("wyniki historyczne nie są gwarancją przyszłych wyników") speaks about past results, and ZASÓB R15 names the forecast explicitly. A sentence that matches both lists ("ani prognozy, ani wyniki historyczne nie są…") satisfies both rules.
 - **Excludes.** Forecast-warning sentences are removed from the trigger, so a lone warning is `not_applicable`. Fee and tax percentages are removed with `&return_figure_exclude`.
 - **`llm:` block:** `when: uncertain`. The question asks "does this sentence forecast future results of the product (fail if there is no warning, pass if not a forecast)?" and asks for a quote.
@@ -158,7 +170,7 @@ Kacper found a catastrophic-backtracking regex in preprocessing. Catalogue patte
   Names stay as they are, because they match `contracts/mocks/generate_mocks.py`.
 - **R9** gets the comment "LLM-first (no rules signal); `not_applicable` with `brak informacji o ryzyku` without risk information".
 - **R13** gets the comment "visual, needs `blocks` (#29)".
-- **New parameter keys** go into `KNOWN_PARAMS`. All of them end in `_patterns`, so the existing validation applies: `comparison_patterns`, `comparison_exclude_patterns`, `superlative_patterns`, `source_patterns`, `assumption_patterns`, `short_period_patterns`, `five_year_patterns`, `inception_patterns`, `fee_patterns`, `foreign_currency_patterns`, `currency_warning_patterns`, `forecast_patterns`, `forecast_weak_patterns`, `performance_patterns`, `forecast_disclaimer_patterns`, `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns`, `tax_context_patterns`.
+- **New parameter keys** go into `KNOWN_PARAMS`. All of them end in `_patterns`, so the existing validation applies: `comparison_patterns`, `comparison_exclude_patterns`, `benchmark_patterns`, `superlative_patterns`, `forecast_exclude_patterns`, `forecast_verb_patterns`, `source_patterns`, `assumption_patterns`, `short_period_patterns`, `five_year_patterns`, `inception_patterns`, `fee_patterns`, `foreign_currency_patterns`, `currency_warning_patterns`, `forecast_patterns`, `forecast_weak_patterns`, `performance_patterns`, `forecast_disclaimer_patterns`, `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns`, `tax_context_patterns`.
 
 ### 10. LLM blocks and the seam
 
@@ -169,7 +181,7 @@ On the base branch the loader already parses `llm:` blocks, so groups 1-6 work w
 ## Risks / Trade-offs
 
 - **Lexical source and assumption detection is lenient.** `Źródło: opracowanie własne` passes the source check, and "w okresie" anywhere counts as assumptions. → The gold set calibrates this. Missing assumptions alone give `uncertain`, not `pass`.
-- **A rules-only `uncertain` raises the score**, by half a fail, for superlatives (R11), since-inception periods (R12a) and weak forecasts (R15). → With the LLM on, it resolves them. With it off, the cases are visible and honest. Open question 5 asks whether superlatives should instead be `pass` rules-only.
+- **A rules-only `uncertain` raises the score**, by half a fail, for superlatives (R11), dated since-inception periods (R12a) and weak forecasts (R15). → With the LLM on, it resolves them. With it off, the cases are visible and honest, and for unsourced superlatives the lean toward `fail` is what Damian asked for (answer 5).
 - **R12a can fail on pages that are legal but terse.** For example, a fund page that gives 5 years in a table the scraper flattens without years. → The text fallback with distinct years covers flattened tables. The rest is gold-set work.
 - **Results differ from the mocks.** `eurotrade` gets R12a and R12b `fail` (absent in the mock) and R15 with `method: rule` instead of `llm`. `m2-bank-ok` gets R16 `pass`. The mocks are never edited; the differences are in `follow-ups.md`.
 - **Merge order.** This change modifies the "Rule catalogue" requirement, which `analytics-llm-p0` also modifies. This change's delta restates the post-stage-2 text, so it must be archived after `analytics-llm-p0`. When rebasing onto `main`, re-read the main spec and re-check the delta's full text.
@@ -181,27 +193,27 @@ The total is about 7.5 h of agent work plus closing. If time runs short, cut in 
 
 1. **Group 7** (LLM blocks tested against the judge). The rules-only results stand.
 2. **Group 6** (R11). It has the weakest lexical signal and the most `uncertain` results. Without the LLM it adds noise.
-3. **The superlative tier of R11 only.** Keep the explicit comparisons.
-4. **The since-inception branch of R12a.** Treat it as coverage met, with a follow-up.
+3. **The benchmark extension and the superlative tier of R11.** Keep the explicit comparisons with products, services and providers.
+4. **The since-inception branch of R12a.** Without a date it still fails `okres referencyjny`. With a date it is treated as `uncertain` through the plain "no 5-year coverage" path, and a follow-up is recorded.
 
 Never cut group 1 (the ReDoS guard). Every later group adds patterns that it protects.
 
 ## Resolved questions
 
-Settled by the brief and the stage-2 answers. Damian can override them.
+The general principles were settled by the brief and the stage-2 answers:
+- Each rule is `not_applicable` without its trigger, and a violation is counted once, by the owner of the element (decision 1, ADR 0315).
+- R9 is not built here: there is no cheap rules signal, so it waits for an LLM-first change. R13 is not built here: it needs `blocks` (#29).
+- The mocks are not edited. The differences go to `follow-ups.md`.
 
-1. R11 and R15 report a compliant detection: a `pass` quoting the detection (decision 2).
-2. Each rule is `not_applicable` without its trigger, and a violation is counted once, by the owner of the element (decision 1, ADR 0315).
-3. R9 is not built here: there is no cheap rules signal, so it waits for an LLM-first change. R13 is not built here: it needs `blocks` (#29).
-4. The mocks are not edited. The differences go to `follow-ups.md`.
+The six product questions were answered by Damian on 2026-11-21 and relayed by the coordinating session, which checked them against the exact ZASÓB wording. Damian also set this change as the lowest priority of stage 3. Implementation starts only after `analytics-llm-p0` groups 5-12, on the coordinator's go.
+
+1. **R12b currency.** The warning is conditional on non-PLN figures (art. 44 ust. 4 lit. e), and the explanation and this design cite that article, because ZASÓB states no condition. The fees and charges check always applies when past performance is shown (decision 5).
+2. **R15 imperatives.** `Zarabiaj nawet do 18% rocznie` is not a forecast: it is R3's return claim. A figure tied to a future period (`w 2026 zarobisz…`, `w przyszłym roku spodziewamy się…`) is a forecast, and a detected forecast is always reported (decisions 2 and 6).
+3. **R11 reporting.** "Flaguje naruszenia w raporcie" means violations only. A compliant comparison is a plain `pass` that stores the quoted comparison as evidence, without a flag (decision 2).
+4. **R11 scope.** The core is other products, services and providers. Index and benchmark comparisons are included as an extension. Inflation is out (decision 3).
+5. **R11 superlatives.** An unsourced superlative leans toward `fail`. Rules-only it is `uncertain`, with the missing source named as the reason, and the LLM may confirm it is a comparison (decision 3).
+6. **R12a since inception.** It is modelled as named sub-checks. "Od początku działalności" without dates fails `okres referencyjny` outright, and only the 5-year / 12-month sub-check can be `uncertain` (decision 4).
 
 ## Open Questions
 
-For Damian. Each one has a default, which the plan implements unless he answers otherwise.
-
-1. **R12b currency warning.** Should it be needed only for non-PLN results (art. 44 ust. 4 lit. e; the default), or on every past-performance page (ZASÓB's wording, without the condition)?
-2. **R15 and promotional imperatives.** Is `Zarabiaj nawet do 18% rocznie` a forecast? The default is no: it is a return claim owned by R3. Yes would make R15 fail on `m2-alfa-landing` too.
-3. **R11 "flaguje naruszenia".** ZASÓB R11 flags violations, and R15 flags detections. Is a compliant comparison reported as a `pass` with the comparison quoted (the default, the same as R15), or left as a plain `pass` without evidence?
-4. **R11 scope.** Are comparisons with inflation or a market index product comparisons? The default excludes inflation and includes indices and benchmarks.
-5. **R11 superlatives rules-only.** Should `Najlepsze konto na rynku` without a source be `uncertain` (the default, half a fail) or `pass` with the LLM off?
-6. **R12a since inception.** Should "od początku działalności" with no product age be `uncertain` (the default) or `pass`?
+None. All product questions are resolved above.

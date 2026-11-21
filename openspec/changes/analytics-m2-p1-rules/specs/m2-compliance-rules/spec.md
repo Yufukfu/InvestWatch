@@ -49,16 +49,18 @@ Shared dictionaries MAY be written once with YAML anchors and reused by several 
 
 ## ADDED Requirements
 
-### Requirement: Detection rules report a compliant detection
-Some rules check content only when it is present. For these rules, R11 and R15, ZASÓB says the detection is flagged in the report. For these rules, a `pass` SHALL quote the detected content (the comparison or the forecast) as `evidence`. The Polish explanation SHALL say what was detected and what made it compliant. A `pass` adds no violation to the score. Without the detected content, the rule SHALL be `not_applicable` and its `evidence` SHALL be null.
+### Requirement: A detected forecast is always reported
+ZASÓB R15 says "Flaguje w raporcie wykrycie prognozy przyszłych wyników", so every detected forecast SHALL be reported, compliant or not. A compliant R15 `pass` SHALL quote the detected forecast as `evidence`, and its Polish explanation SHALL start with `Wykryto prognozę` and then say which warning made it compliant. A `pass` adds no violation to the score. Without a forecast, R15 SHALL be `not_applicable` with null evidence.
+
+ZASÓB R11 says "flaguje naruszenia w raporcie", which covers violations only. So a compliant comparison SHALL be a plain `pass`. It quotes the comparison as `evidence`, but its explanation SHALL NOT start with `Wykryto` and SHALL NOT present the comparison as a flag.
 
 #### Scenario: Compliant forecast is still reported
 - **WHEN** a material contains a forecast and the forecast warning
 - **THEN** R15 is `pass`, its `evidence` is the forecast sentence, and the explanation starts with `Wykryto prognozę`
 
-#### Scenario: Compliant comparison is still reported
+#### Scenario: Compliant comparison is a plain pass
 - **WHEN** a material contains a comparison with a source and the assumptions
-- **THEN** R11 is `pass`, its `evidence` is the comparison sentence, and the explanation starts with `Wykryto porównanie`
+- **THEN** R11 is `pass`, its `evidence` is the comparison sentence, and the explanation does not start with `Wykryto`
 
 ### Requirement: Past performance is detected once
 R12a, R12b and R14 SHALL use one past-performance detector: R14's definition of a past-performance sentence (see the R14 requirement). When the detector finds no such sentence, all three SHALL be `not_applicable` with `Materiał nie prezentuje wyników historycznych.`
@@ -86,11 +88,11 @@ None of them SHALL check an element that another of them owns.
 ### Requirement: R11 product comparisons
 R11 SHALL detect comparisons of products and services and check that the source of the information and the assumptions are given (ZASÓB R11, art. 44 ust. 3).
 
-A comparison sentence is either of these:
+The core of R11 is ZASÓB's "porównania produktów i usług": a comparison with other products, services or providers, such as `lepsze niż lokata` or rival brokers. A comparison with a market index or benchmark (`WIG20`, `indeks`, `benchmark`, `średnia funduszy`) is included as an extension. A comparison sentence is either of these:
 - A comparative followed by `niż` within 3 words: `lepsz…`, `wyższ…`, `niższ…`, `tańsz…`, `korzystniejsz…`, `więcej` or `better/higher/lower/cheaper than`.
 - One of these markers: `w porównaniu z/do`, `vs`, `versus`, `N razy więcej`, `bije … (lokaty|konkurencję|rynek|indeks)`, `outperform…`, `compared to/with`.
 
-A temporal or inflation comparison is excluded, because it compares no product or service: `niż rok temu`, `niż wcześniej`, `niż kiedykolwiek`, `niż inflacja`.
+A temporal or inflation comparison is excluded, because it compares no product, service or provider: `niż rok temu`, `niż wcześniej`, `niż kiedykolwiek`, `niż inflacja`, `w porównaniu z inflacją`.
 
 A superlative without a comparator, such as `najlepsz…`, `najtańsz…`, `najwyższ… oprocentowanie`, `nr 1` or `best`, is an implicit comparison.
 
@@ -100,10 +102,10 @@ R11 SHALL produce:
 - `not_applicable` without any comparison or superlative;
 - `fail`, quoting the first comparison, when a comparison has no source;
 - `uncertain`, quoting the comparison, when a source is given but no assumptions;
-- `uncertain`, quoting the superlative, when the only trigger is a superlative without a source;
-- `pass`, quoting the first comparison (see "Detection rules report a compliant detection"), when a source and assumptions are given.
+- `uncertain`, quoting the superlative, when the only trigger is a superlative without a source. ZASÓB R11 "weryfikuje źródło informacji", so the explanation SHALL name the missing source as the reason. Only the rules cannot confirm that a superlative is a comparison;
+- `pass`, quoting the first comparison as a plain pass (see "A detected forecast is always reported"), when a source and assumptions are given.
 
-Its `llm:` block (`when: uncertain`) SHALL ask whether the material compares products or services and whether it states the source and the key assumptions.
+Its `llm:` block (`when: uncertain`) SHALL ask whether the material compares products, services or providers and whether it states the source and the key assumptions.
 
 #### Scenario: Comparison without a source
 - **WHEN** the text is `Nasze konto daje 3 razy więcej niż lokata w banku.` and nothing else names a source
@@ -121,9 +123,21 @@ Its `llm:` block (`when: uncertain`) SHALL ask whether the material compares pro
 - **WHEN** the only comparative is `Zyski są wyższe niż rok temu.`
 - **THEN** R11 is `not_applicable`
 
+#### Scenario: Inflation is out of scope
+- **WHEN** the only comparative is `Zysk wyższy niż inflacja.`
+- **THEN** R11 is `not_applicable`
+
+#### Scenario: Rival provider comparison
+- **WHEN** the text is `Prowizje niższe niż w innych biurach maklerskich.` with no source
+- **THEN** R11 is `fail` with that sentence as evidence
+
+#### Scenario: Benchmark comparison is included
+- **WHEN** the text is `Fundusz pobił WIG20 o 5 pkt proc.` or `lepszy niż benchmark`, with no source
+- **THEN** R11 is `fail`
+
 #### Scenario: Superlative only
 - **WHEN** the only trigger is `Najlepsze konto maklerskie na rynku!` with no source
-- **THEN** R11 is `uncertain` with that sentence as evidence
+- **THEN** R11 is `uncertain` with that sentence as evidence, and the explanation names the missing source
 
 #### Scenario: No comparison
 - **WHEN** the `m2-bank-ok` mock is analyzed
@@ -136,22 +150,27 @@ Its `llm:` block (`when: uncertain`) SHALL ask whether the material compares pro
 ### Requirement: R12a past performance, period and scope
 ZASÓB R12a checks that the past performance covers the last 5 years and is based on full 12-month periods, and that the reference period and the source are given (art. 44 ust. 4). R12a SHALL apply to the past-performance sentences from the shared detector.
 
-It SHALL check four elements:
-- **12-month basis.** No past-performance sentence uses a period shorter than 12 months. Such periods are `w ostatnim miesiącu`, `w N miesiącach` with N not a multiple of 12, `od początku roku`, `YTD`, `w I…IV kwartale`, a month name, `tygodni…` and `dzienn…`.
-- **5-year coverage.** One of these is given: `ostatnich/minionych 5 (or more) lat`, `5-letn…`, `pięcioletn…`, `5-year`, a year range spanning 5 or more calendar years, or past figures for 5 or more distinct years.
-- **Reference period.** A year, a year range, a date or `ostatnich N lat/miesięcy` appears in a past-performance sentence.
-- **Source.** The same source markers as R11 appear anywhere in the material.
+R12a SHALL evaluate three named sub-checks. Each sub-check is `pass`, `fail` or `uncertain`:
+- **Okres 5 lat i pełne okresy 12-miesięczne** (the 5-year and full-12-month sub-check):
+  - It fails when a past-performance sentence uses a period shorter than 12 months. Such periods are `w ostatnim miesiącu`, `w N miesiącach` with N not a multiple of 12, `od początku roku`, `YTD`, `w I…IV kwartale`, a month name, `tygodni…` and `dzienn…`.
+  - It passes when 5-year coverage is given: `ostatnich/minionych 5 (or more) lat`, `5-letn…`, `pięcioletn…`, `5-year`, a year range spanning 5 or more calendar years, or past figures for 5 or more distinct years.
+  - It is `uncertain` when coverage rests only on a since-inception marker (`od początku działalności`, `od uruchomienia`, `od powstania`, `since inception`). Art. 44 ust. 4 lit. b allows a shorter period only for a product younger than 5 years, which the rules cannot verify.
+  - It fails otherwise.
+- **Okres referencyjny** (reference period): it passes when a year, a year range, a date or `ostatnich N lat/miesięcy` appears in a past-performance sentence, and fails otherwise. ZASÓB asks "czy wskazano okres referencyjny", so a since-inception marker without a date or year is no reference period and fails this sub-check outright.
+- **Źródło** (source): it passes when the same source markers as R11 appear anywhere in the material, and fails otherwise.
 
-R12a SHALL produce:
-- `fail`, quoting the first offending past-performance sentence, when any element is missing. The Polish explanation lists every missing element.
-- `uncertain`, when coverage rests only on a since-inception marker (`od początku działalności`, `od uruchomienia`, `od powstania`, `since inception`) and the other elements are met. Art. 44 ust. 4 lit. b allows a shorter period only for a product younger than 5 years, which the rules cannot verify.
-- `pass` otherwise, quoting the first past-performance sentence.
+The result SHALL be the worst sub-check: `fail` > `uncertain` > `pass`.
+- On `fail`, the evidence quotes the sentence that failed the first failing sub-check: the sub-12-month sentence, or the first past-performance sentence.
+- On `uncertain`, the evidence quotes the since-inception sentence.
+- On `pass`, the evidence quotes the first past-performance sentence.
 
-Its `llm:` block (`when: uncertain`) SHALL ask whether the material states that the product has existed for less than 5 years.
+The Polish explanation SHALL name every sub-check that is not `pass`, by its name above and with its status, in the fixed order 5 lat / 12 mies., okres referencyjny, źródło.
+
+Its `llm:` block (`when: uncertain`) SHALL ask whether the material states that the product has existed for less than 5 years. It is reached only when the 5-year sub-check is the only one that is not `pass`.
 
 #### Scenario: One year, no source
 - **WHEN** the `eurotrade` mock is analyzed (`Nasi klienci zarobili średnio 34% w 2025 roku.`)
-- **THEN** R12a is `fail` with that sentence as evidence, and the explanation names the missing 5-year coverage and the missing source
+- **THEN** R12a is `fail` with that sentence as evidence, the explanation names the 5-year sub-check and `źródło` as failed, and `okres referencyjny` (2025) is not named
 
 #### Scenario: Five years with source
 - **WHEN** `W latach 2021–2025 fundusz wypracował średnio 7% rocznie.` is followed by `Źródło: dane własne TFI.`
@@ -169,9 +188,13 @@ Its `llm:` block (`when: uncertain`) SHALL ask whether the material states that 
 - **WHEN** the only past-performance sentence is `Nasi klienci zarobili 34%.`
 - **THEN** R12a is `fail` and the explanation names the missing reference period
 
-#### Scenario: Since inception
-- **WHEN** the only coverage is `Od początku działalności fundusz zarobił 18%.`, with a source
-- **THEN** R12a is `uncertain` with that sentence as evidence
+#### Scenario: Since inception without a date
+- **WHEN** the only past performance is `Od początku działalności fundusz zarobił 18%.`, with a source
+- **THEN** R12a is `fail`, and the explanation names `okres referencyjny` as failed and the 5-year sub-check as `uncertain`
+
+#### Scenario: Since inception with a start year
+- **WHEN** the only past performance is `Od uruchomienia w 2023 r. fundusz zarobił 18%.`, with a source
+- **THEN** R12a is `uncertain` with that sentence as evidence, and the explanation names only the 5-year sub-check
 
 #### Scenario: No past performance
 - **WHEN** the `m2-alfa-landing` mock is analyzed
@@ -182,17 +205,18 @@ ZASÓB R12b checks that the material warns about the effect of exchange-rate cha
 
 It has two parts:
 - **Costs.** This part always applies. It is met by a fee-impact statement anywhere in the material: `po potrąceniu/odliczeniu/uwzględnieniu … opłat/prowizji/kosztów`, `nie uwzględnia… opłat/prowizji`, `wyniki netto/brutto`, `opłaty … obniżają/pomniejszają`, `net of fees`, `before/after/excluding fees`.
-- **Currency.** This part applies only when a past-performance sentence gives the result in a currency other than PLN (`EUR`, `USD`, `CHF`, `GBP`, `€`, `$`, `w euro`, `w dolarach`), or when the material says that the product is denominated in a foreign currency (`denominowan… w`, `w walucie obcej`). This follows art. 44 ust. 4 lit. e. It is met by a currency warning anywhere: `zmian/wahań kursów walut`, `ryzyko walutowe`, `currency fluctuations`, `exchange rate`.
+- **Currency.** This part applies only when a past-performance sentence gives the result in a currency other than PLN (`EUR`, `USD`, `CHF`, `GBP`, `€`, `$`, `w euro`, `w dolarach`), or when the material says that the product is denominated in a foreign currency (`denominowan… w`, `w walucie obcej`). ZASÓB states the currency warning without a condition. The condition comes from art. 44 ust. 4 lit. e, which requires the warning when the figure is in a currency other than the client's own. The currency part is met by a currency warning anywhere: `zmian/wahań kursów walut`, `ryzyko walutowe`, `currency fluctuations`, `exchange rate`.
 
 R12b SHALL produce:
 - `fail` when an applicable part is not met. The evidence quotes the first past-performance sentence, or, for a currency failure, the foreign-currency sentence. The Polish explanation names each missing part.
+- On every result where the material has past performance, the Polish explanation SHALL cite `art. 44 ust. 4 lit. e` for the currency part, so a reader of ZASÓB sees why the part was or was not required. When the currency part does not apply, the explanation SHALL say it was not required because the results are given in PLN.
 - `pass` otherwise, quoting the first past-performance sentence.
 
 It is rules-only.
 
 #### Scenario: No fee statement
 - **WHEN** the `eurotrade` mock is analyzed
-- **THEN** R12b is `fail` and the explanation names the missing statement on fees and commissions only
+- **THEN** R12b is `fail`, the explanation names the missing statement on fees and commissions as the only missing part, and it says the currency warning was not required for PLN results under art. 44 ust. 4 lit. e
 
 #### Scenario: Fee statement, PLN figures
 - **WHEN** the past performance is `Fundusz zarobił 8% w 2025 r.` and the material says `Wyniki uwzględniają opłatę za zarządzanie.`
@@ -215,7 +239,9 @@ R15 SHALL recognize forecasts, check for a clear warning that a forecast is not 
 
 A forecast sentence has result vocabulary together with a forecast marker:
 - **Result vocabulary:** `wynik…`, `zysk…`, `stopa zwrotu`, `zwrot…`, `rentown…`, `dochód`, `wzrost…`, a percentage that is not a fee or tax (R3's exclude list), `return`, `performance`, `growth`.
-- **Strong forecast marker:** `prognoz…`, `spodziewa…`, `oczekuj…`, `przewidu…`, `szacuj…`, `w przyszłym/kolejnym/następnym roku`, `cel… zwrotu`, `expect…`, `forecast…`, `projected`, `target return`, or a year later than the `fetched_at` year.
+- **Strong forecast marker:** `prognoz…`, `spodziewa…`, `oczekuj…`, `przewidu…`, `szacuj…`, `w przyszłym/kolejnym/następnym roku`, `cel… zwrotu`, `expect…`, `forecast…`, `projected`, `target return`, or a year later than the `fetched_at` year. A future-tense return verb (`zarobisz`, `zyskasz`, `zarobimy`, `przyniesie`, `wypracuje`, `osiągnie`) together with a figure is also a strong marker, even in the `fetched_at` year (`W 2026 zarobisz 12%.`). It ties a figure to a future period.
+
+An imperative return promise (`zarabiaj`, `zyskaj`, `pomnażaj`, `earn`) is not a forecast marker. It is a return claim, and R3 owns it.
 - **Weak forecast marker:** `będzie`, `będą`, `może przynieść/osiągnąć`, `will`.
 
 Sentences that match the forecast warning itself SHALL never count as forecasts.
@@ -233,7 +259,7 @@ R15 SHALL produce:
 - `fail`, quoting the first forecast sentence, when a strong-marker forecast exists and there is no warning;
 - `uncertain`, quoting the first candidate, when only weak-marker sentences exist, all of them without a figure, and there is no warning;
 - a fail (not `uncertain`) for a weak marker together with a figure, as in `Fundusz będzie zarabiał 12% rocznie.`;
-- `pass`, quoting the first forecast sentence, when a warning exists (see "Detection rules report a compliant detection").
+- `pass`, quoting the first forecast sentence, when a warning exists (see "A detected forecast is always reported").
 
 Its `llm:` block (`when: uncertain`) SHALL ask whether the sentence forecasts future results.
 
@@ -244,6 +270,10 @@ Its `llm:` block (`when: uncertain`) SHALL ask whether the sentence forecasts fu
 #### Scenario: Forecast with a warning
 - **WHEN** `Prognozujemy stopę zwrotu 6% w 2027 roku.` is followed by `Prognozy nie są wiarygodnym wskaźnikiem przyszłych wyników.`
 - **THEN** R15 is `pass` with the forecast sentence as evidence
+
+#### Scenario: Figure tied to a future period
+- **WHEN** the text is `W 2026 zarobisz nawet 12%.`, `fetched_at` is in 2026, and there is no forecast warning
+- **THEN** R15 is `fail` with that sentence as evidence
 
 #### Scenario: Weak marker with a figure
 - **WHEN** the text is `Fundusz będzie zarabiał 12% rocznie.` with no warning

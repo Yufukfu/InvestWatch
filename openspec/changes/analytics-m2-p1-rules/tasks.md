@@ -1,6 +1,6 @@
 # Tasks
 
-Stage 3. The work starts on `analytics/analytics-llm-p0`, and the branch is rebased onto `main` once `analytics-worker` and `analytics-llm-p0` merge. Groups 1-6 need only the stage-2 rule engine and R14, which are already on the base branch. Group 7 needs `analytics-llm-p0` task group 8 (the judge seam). The estimates are for one agent session, tests included. If time runs short, cut in the order of the "Cut plan" in `design.md`. Tests read `contracts/mocks/*.json` but never edit them. Every new pattern uses bounded gaps only (design decision 8).
+Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` task groups 5-12 are done and the coordinator gives the go. The work starts on `analytics/analytics-llm-p0`, and the branch is rebased onto `main` once `analytics-worker` and `analytics-llm-p0` merge. Groups 1-6 need only the stage-2 rule engine and R14, which are already on the base branch. Group 7 needs `analytics-llm-p0` task group 8 (the judge seam). The estimates are for one agent session, tests included. If time runs short, cut in the order of the "Cut plan" in `design.md`. Tests read `contracts/mocks/*.json` but never edit them. Every new pattern uses bounded gaps only (design decision 8).
 
 ## 1. ReDoS guard and the shared past-performance detector (~1 h)
 
@@ -39,32 +39,36 @@ Stage 3. The work starts on `analytics/analytics-llm-p0`, and the branch is reba
   - `m2-alfa-landing` gives `not_applicable`;
   - a lone warning sentence gives `not_applicable`;
   - a year after `fetched_at` is a strong marker;
+  - `W 2026 zarobisz nawet 12%.`, fetched in 2026, gives `fail` (a future-tense verb with a figure);
+  - the imperatives `zarabiaj` and `zyskaj` are never forecast markers;
   - a fee percentage with `będzie` is not a forecast.
-- [ ] 3.2 Write the R15 class. Add `forecast_patterns`, `forecast_weak_patterns`, `performance_patterns` and `forecast_disclaimer_patterns` (`&forecast_disclaimers`), reusing `*return_figure_exclude`, and set `implemented: true`. Tests green.
+- [ ] 3.2 Write the R15 class. Add `forecast_patterns`, `forecast_verb_patterns`, `forecast_exclude_patterns` (the imperatives), `forecast_weak_patterns`, `performance_patterns` and `forecast_disclaimer_patterns` (`&forecast_disclaimers`), reusing `*return_figure_exclude`, and set `implemented: true`. Tests green.
 - [ ] 3.3 Mutation check; record `mutations: N tried, N caught`.
 
 ## 4. R12a period and scope (~1.25 h)
 
 - [ ] 4.1 Write the failing tests for the R12a scenarios:
-  - `eurotrade` gives `fail`, naming 5 years and the source;
+  - `eurotrade` gives `fail`, naming the sub-checks `5 lat / 12 mies.` and `źródło`, and not `okres referencyjny`;
   - 2021–2025 with a source gives `pass`;
   - `od początku roku` gives `fail`, quoting that sentence;
   - `ostatnich 12 miesiącach` is a full period;
   - `w 3 miesiące` is sub-annual;
-  - no reference period gives `fail`;
-  - since inception gives `uncertain`;
+  - no reference period gives `fail`, naming `okres referencyjny`;
+  - since inception without a date gives `fail` (reference period), with the 5-year sub-check named as `uncertain`;
+  - since inception with a start year gives `uncertain`, naming only the 5-year sub-check;
   - `ostatnich 10 lat` covers 5 years;
   - five distinct past years cover 5 years;
   - `m2-alfa-landing` gives `not_applicable`;
-  - the explanation lists the missing elements in a fixed order;
+  - the explanation names the sub-checks that are not `pass`, with their status, in a fixed order;
   - shared trigger: R12a, R12b and R14 are `not_applicable` together on `m2-bank-ok`.
-- [ ] 4.2 Write the R12a class on `_PastPerformance`. Add `short_period_patterns`, `five_year_patterns`, `inception_patterns` and `source_patterns` (`&source_markers`), the N-month and year-range checks in code (ReDoS-tested in group 1's timing test), the legal basis art. 44 ust. 4, and `implemented: true`. Tests green.
+- [ ] 4.2 Write the R12a class on `_PastPerformance`, with the three named sub-checks as a `SubCheck` list and the result taken as the worst of them. Add `short_period_patterns`, `five_year_patterns`, `inception_patterns` and `source_patterns` (`&source_markers`), the N-month and year-range checks in code (ReDoS-tested in group 1's timing test), the legal basis art. 44 ust. 4, and `implemented: true`. Tests green.
 - [ ] 4.3 Mutation check; record `mutations: N tried, N caught`.
 
 ## 5. R12b currency and costs (~45 min)
 
 - [ ] 5.1 Write the failing tests for the R12b scenarios:
-  - `eurotrade` gives `fail`, naming fees only;
+  - `eurotrade` gives `fail`, naming fees only, and the explanation says the currency warning is not required for PLN results under `art. 44 ust. 4 lit. e`;
+  - every R12b explanation cites `art. 44 ust. 4 lit. e`;
   - a fee statement with PLN figures gives `pass`;
   - `nie uwzględniają opłat` counts as a fee statement;
   - USD without a warning gives `fail`, quoting the USD sentence;
@@ -79,14 +83,16 @@ Stage 3. The work starts on `analytics/analytics-llm-p0`, and the branch is reba
 
 - [ ] 6.1 Write the failing tests for the R11 scenarios:
   - `3 razy więcej niż lokata` with no source gives `fail`;
-  - a source and assumptions give `pass`, quoting the comparison, with the explanation starting `Wykryto porównanie`;
+  - a source and assumptions give a plain `pass`: it quotes the comparison, and the explanation does not start with `Wykryto`;
   - a source without assumptions gives `uncertain`;
-  - `niż rok temu` and `niż inflacja` give `not_applicable`;
-  - a superlative only gives `uncertain`;
+  - `niż rok temu`, `niż inflacja` and `w porównaniu z inflacją` give `not_applicable`;
+  - `niższe niż w innych biurach maklerskich` with no source gives `fail`;
+  - `pobił WIG20` and `lepszy niż benchmark` with no source give `fail` (the extension);
+  - a superlative only gives `uncertain`, and the explanation names the missing source;
   - `m2-bank-ok` gives `not_applicable`;
   - empty text gives `not_applicable` without raising;
   - a source in a footnote counts.
-- [ ] 6.2 Write the R11 class. Add `comparison_patterns`, `comparison_exclude_patterns`, `superlative_patterns`, `source_patterns: *source_markers` and `assumption_patterns`, set the legal basis to art. 44 ust. 3, and set `implemented: true`. Tests green.
+- [ ] 6.2 Write the R11 class. Add `comparison_patterns`, `comparison_exclude_patterns`, `benchmark_patterns` (the extension, in its own list), `superlative_patterns`, `source_patterns: *source_markers` and `assumption_patterns`, set the legal basis to art. 44 ust. 3, and set `implemented: true`. Tests green.
 - [ ] 6.3 Mutation check; record `mutations: N tried, N caught`.
 
 ## 7. Catalogue scenarios and `llm:` blocks (~45 min, needs `analytics-llm-p0` group 8)
@@ -97,7 +103,7 @@ Stage 3. The work starts on `analytics/analytics-llm-p0`, and the branch is reba
   - every entry has a legal basis;
   - `FakeJudge`: an R15 weak-marker `uncertain` is deferred and its verdict merged as `hybrid`; R15's strong `fail` is never deferred; an R11 superlative is deferred; an R12a since-inception case is deferred; R12b and R16 never send a check;
   - the evidence check over all mocks holds, rules-only and with the stub judge.
-- [ ] 7.2 Write the `llm:` blocks with Polish questions on R11, R12a and R15 (`when: uncertain`). Set the legal bases for R9 and R13, and add the catalogue comments on R9 (LLM-first) and R13 (visual, #29). Tests green.
+- [ ] 7.2 Write the `llm:` blocks with Polish questions on R11, R12a and R15 (`when: uncertain`). Set the legal bases for R9 and R13, and add the catalogue comments on R9 (LLM-first) and R13 (visual, #29). Correct the stage-2 R11 comment to say that ZASÓB "flaguje naruszenia" means violations only (follow-up F6). Tests green.
 - [ ] 7.3 Mutation check; record `mutations: N tried, N caught`.
 
 ## 8. Mock run (~30 min)
