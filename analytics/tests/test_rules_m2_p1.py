@@ -272,6 +272,21 @@ def test_r15_fee_or_tax_percentage_is_not_a_forecast(text, registry, catalogue):
     assert run(text, registry, catalogue, **FETCHED_2026)["R15"].result == "not_applicable"
 
 
+def test_r15_noun_zysk_after_a_fee_word_keeps_the_forecast(registry, catalogue):
+    # Group 5 review: the fee exclude stops at the return noun `zysk` too (not `zysków`).
+    text = "Po odliczeniu opłat zysk funduszu będzie wynosił 8%."
+    assert run(text, registry, catalogue, **FETCHED_2026)["R15"].result == "fail"
+
+
+def test_r15_fee_word_before_a_digit_run_is_fast(registry, catalogue):
+    import time
+
+    text = "Fundusz zarobił 8% w 2025 r. Opłata" + "1" * 2000 + " będzie."
+    started = time.perf_counter()
+    run(text, registry, catalogue)
+    assert time.perf_counter() - started < 2.0  # 13 s with `\w*` after the stem
+
+
 def test_r15_year_after_fetch_year_is_a_strong_marker(registry, catalogue):
     text = "W 2028 roku wyniki funduszu wzrosną."
     assert run(text, registry, catalogue, **FETCHED_2026)["R15"].result == "fail"
@@ -469,6 +484,13 @@ def test_r12b_both_missing_names_both(registry, catalogue):
     r = run(USD, registry, catalogue)["R12b"]
     assert r.result == "fail"
     assert "opłat" in r.explanation and "kursów walut" in r.explanation and LIT_E in r.explanation
+
+
+def test_r12b_explanation_cites_lit_e_when_only_fees_are_missing(registry, catalogue):
+    # Group 5 review: foreign currency with its warning, no fee statement; the explanation still cites lit. e.
+    r = run(f"{USD} {FX_WARNING}", registry, catalogue)["R12b"]
+    assert r.result == "fail"
+    assert LIT_E in r.explanation and "opłat" in r.explanation
 
 
 def test_r12b_bank_ok_not_applicable(mock_documents, registry, catalogue):

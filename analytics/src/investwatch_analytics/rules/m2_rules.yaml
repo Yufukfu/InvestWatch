@@ -344,8 +344,9 @@ rules:
         - '\b(?:zarabiaj|zyskaj|pomnażaj|pomnóż|earn)\w*'
         # From the fee or tax word to its percentage within one sentence (at most 60 characters) unless a return
         # verb starts in between, so "po odliczeniu opłat fundusz będzie zarabiał 8%" keeps its forecast while
-        # "Podatek od zysków kapitałowych (19%)" is still a tax figure (the noun `zysków` is not a verb; group 3-4 reviews).
-        - '\b(?:prowizj|opłat|marż|podat|koszt)\w*(?:(?!\b(?:zarab|zarob|zyska|zyskuj|wypracow|wypracu|przyni|osiąg))[^.!?]){0,60}?\d+(?:[.,]\d+)?\s?%'
+        # "Podatek od zysków kapitałowych (19%)" is still a tax figure, while "zysk funduszu będzie wynosił 8%" is not
+        # (group 3-5 reviews). Letters only after the stem: `\w*` would eat a digit run and backtrack quadratically.
+        - '\b(?:prowizj|opłat|marż|podat|koszt)[^\W\d]*(?:(?!\b(?:zarab|zarob|zysk(?!ów|u\s+kapitałow)|wypracow|wypracu|przyni|osiąg))[^.!?]){0,60}?\d+(?:[.,]\d+)?\s?%'
       figure_patterns: *pp_figure
       amount_patterns: *pp_amount
       figure_exclude_patterns: *return_figure_exclude

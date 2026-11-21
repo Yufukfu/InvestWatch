@@ -846,5 +846,6 @@ class R12bCurrencyAndCosts(_PastPerformance):
         if not missing:
             return self.result("pass", claims[0], f"Wyniki historyczne z informacją o wpływie opłat; {currency}.")
         quote = foreign if foreign is not None and not warned else claims[0]
-        note = f"; {currency}" if foreign is None else ""
+        # Every explanation cites lit. e (spec): unless the missing currency warning already does, add the status.
+        note = "" if foreign is not None and not warned else f"; {currency}"
         return self.result("fail", quote, f"Wyniki historyczne bez {' ani '.join(missing)}{note}.")

@@ -68,6 +68,8 @@ ADVERSARIAL = {
     "one-word": "a" * 20_000,
     "digit-space": "1 " * 10_000,
     "digit-then-spaces": "1" + " " * 20_000,
+    # Group 5 review: a stem + `\w*` before a digit run is quadratic (about 36 s at this size, 27 min at 20 000).
+    "fee-word-digits": "opłat" + "1" * 3_000,
 }
 
 
