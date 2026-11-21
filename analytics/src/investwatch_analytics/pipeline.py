@@ -25,6 +25,9 @@ log = logging.getLogger(__name__)
 #: Foreign firms without a Polish branch are in M1 scope only through ads aimed at Polish readers (a branch
 #: is registered in Poland; #35 review).
 FOREIGN_TYPES = {"foreign_no_branch"}
+#: Routing (the registry match) and the M1/M3 rules see at most this prefix of the text, so one hostile 2 MB page
+#: cannot tie up the worker (#35 review 2, item 8). A prefix keeps every evidence quote a substring of the original.
+SCAN_MAX = 200_000
 
 
 @dataclass(frozen=True)
@@ -54,14 +57,17 @@ def analyze(
         _skipped(doc, "empty_text")
         return []
     signals = signals or default_signal_catalogues()
-    r = route(doc, registry)
-    ctx = Context(doc=doc, pre=pre, firm_match=r.firm_match, registry=registry)
+    scan = doc if len(doc.text) <= SCAN_MAX else doc.model_copy(update={"text": doc.text[:SCAN_MAX]})
+    scan_pre = pre if scan is doc else preprocess(scan.text)
+    r = route(scan, registry)
+    ctx = Context(doc=scan, pre=scan_pre, firm_match=r.firm_match, registry=registry)
+    m2_ctx = Context(doc=doc, pre=pre, firm_match=r.firm_match, registry=registry)  # M2 rules see the whole text
     findings: list[Finding] = []
     if r.module is None:
         _skipped(doc, r.reason)
         return []
     if r.module == "M2":
-        findings.append(m2.build_finding(ctx, catalogue, now=now, new_id=new_id))
+        findings.append(m2.build_finding(m2_ctx, catalogue, now=now, new_id=new_id))
     elif r.module == "M1":
         findings += _m1_and_m3(ctx, signals, now=now, new_id=new_id)
     else:

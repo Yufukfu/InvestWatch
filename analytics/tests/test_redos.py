@@ -174,3 +174,27 @@ def test_evidence_is_capped(registry):
     assert rules["S3.4"].result == "uncertain" and len(rules["S3.4"].evidence) == EVIDENCE_MAX
     assert rules["S3.4"].evidence in doc.text
     assert len(rules["S3.1"].evidence) == EVIDENCE_MAX and rules["S3.1"].evidence in doc.author.handle
+
+
+@pytest.mark.parametrize("unit", ["1,", "​", "x "], ids=["digit-commas", "zero-width", "letter-words"])
+def test_megabyte_of_hostile_text_costs_no_more_than_the_scan_cap(unit):
+    """1 MB through the pipeline: a generous absolute limit, and no more than about the cost of the 200 KB scan cap
+    (without the cap it grows about 5x)."""
+    from investwatch_analytics.pipeline import SCAN_MAX
+
+    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+
+    def run(size: int) -> float:
+        doc = ScrapedDocument.model_validate(make_doc(source_kind="third_party", platform="web",
+                                                      url="https://forum.example.com/t/1",
+                                                      text="Wpis: " + unit * (size // len(unit))))
+        return elapsed(lambda: analyze(doc, registry=registry, catalogue=Catalogue.load(), now=NOW))
+
+    small, big = run(SCAN_MAX), run(1_000_000)
+    assert big < 20.0 and big < 2 * small + 1.0, (small, big)
+
+
+def test_page_host_of_a_backslash_url_is_empty():
+    from investwatch_analytics.modules.advertiser import page_host
+
+    assert page_host(r"https://attacker.net\@alfa-inwestycje.example.com/") == ""

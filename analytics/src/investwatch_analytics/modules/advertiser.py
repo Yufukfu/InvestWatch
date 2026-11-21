@@ -40,6 +40,8 @@ def firm_key(name: str) -> str:
 
 def page_host(url: str) -> str:
     """Host of the page URL as written there (original case, so it quotes as a substring of `url`), no www."""
+    if http_host(url) is None:  # e.g. a backslash authority: no trustworthy host to name or quote
+        return ""
     netloc = urlsplit(url).netloc.rsplit("@", 1)[-1]
     host = netloc.split(":", 1)[0] if not netloc.startswith("[") else netloc.split("]", 1)[0] + "]"
     return host[4:] if host.lower().startswith("www.") else host

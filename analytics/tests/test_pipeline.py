@@ -404,3 +404,42 @@ def test_foreign_no_branch_own_page_matched_by_name_is_out_of_scope(registry, ca
     with caplog.at_level(logging.INFO):
         assert run(raw, registry, catalogue) == []
     assert "out_of_scope_m2_foreign_no_branch" in reasons(caplog)
+
+
+# ---- second review of #35, items 7 and 8 -------------------------------------------------------------
+
+BACKSLASH = r"https://attacker.net\@alfa-inwestycje.example.com/"
+
+
+def test_backslash_page_url_is_not_the_firms_domain_on_the_m1_path(registry, catalogue):
+    raw = make_doc(source_kind="third_party", platform="web", url=BACKSLASH, text="Polecam, bonus 200 zł na start.")
+    assert all(f.module != "M1" for f in run(raw, registry, catalogue))
+
+
+def test_backslash_page_url_is_not_the_firms_own_page(registry, catalogue, caplog):
+    raw = make_doc(url=BACKSLASH, text="Reklama. Otwórz konto i zarabiaj 18% rocznie.")
+    with caplog.at_level(logging.INFO):
+        findings = run(raw, registry, catalogue)
+    assert all(f.module != "M2" for f in findings)
+
+
+def test_scan_cap_keeps_evidence_in_the_original_text(registry, catalogue):
+    from investwatch_analytics.pipeline import SCAN_MAX
+
+    before = make_doc(**SOCIAL, author={"handle": "@ola"}, text="Konto w Alfa Inwestycje DM. " + "x " * SCAN_MAX)
+    [f] = run(before, registry, catalogue)
+    from investwatch_analytics.rules.engine import metadata_fields
+
+    fields = metadata_fields(ScrapedDocument.model_validate(before))  # the original text, author, links, URL
+    assert f.module == "M1" and all(r.evidence is None or any(r.evidence in x for x in fields) for r in f.rules)
+    after = make_doc(**SOCIAL, author={"handle": "@ola"}, text="x " * SCAN_MAX + "Konto w Alfa Inwestycje DM.")
+    assert all(f.module != "M1" for f in run(after, registry, catalogue))
+
+
+def test_m2_rules_see_the_whole_text(registry, catalogue):
+    from investwatch_analytics.pipeline import SCAN_MAX
+
+    text = "Konto Alfa Inwestycje. " + "Słowo. " * (SCAN_MAX // 7 + 10) + "Reklama."
+    [f] = run(make_doc(text=text), registry, catalogue)
+    assert f.module == "M2" and {r.rule_id: r.result for r in f.rules}["R2"] == "pass"
+

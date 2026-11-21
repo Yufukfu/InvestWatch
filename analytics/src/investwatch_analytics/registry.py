@@ -159,9 +159,12 @@ class Registry:
     def match(self, text: str, url: str) -> FirmMatch | None:
         # (rank key, match); the smallest key wins: own domain, confidence, earliest, longest quote.
         candidates: list[tuple[tuple, FirmMatch]] = []
-        host = _normalize_domain(url)
+        # Through http_host, like match_links and publisher_firm: a backslash authority
+        # ("https://attacker.net\\@firm/", which browsers open as attacker.net) has no domain match (#35 review 2).
+        page = http_host(url)
+        host = _normalize_domain(page) if page else ""
         # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
-        segments = [[w.lower() for w in _WORD.findall(seg)] for seg in _PUNCT.split(text)]
+        segments = [words for seg in _PUNCT.split(text) if (words := [w.lower() for w in _WORD.findall(seg)])]
         for firm in self.firms:
             on_domain = not is_social(host) and any(host == d or host.endswith("." + d) for d in firm.domains)
             if m := self._find(firm, text):
@@ -170,7 +173,7 @@ class Registry:
                 match = FirmMatch(firm, NAME_CONFIDENCE, "name", m.group(0))
             elif on_domain:
                 match, pos = FirmMatch(firm, DOMAIN_CONFIDENCE, "domain", None), len(text)
-            elif (ratio := max((_best_fuzzy(firm.core, w) for w in segments), default=0.0)) >= FUZZY_MIN_RATIO:
+            elif (ratio := _best_fuzzy_in(firm.core, segments)) >= FUZZY_MIN_RATIO:
                 match, pos = FirmMatch(firm, round(ratio / 100 * FUZZY_FACTOR, 3), "fuzzy", None), len(text)
             else:
                 continue
@@ -178,15 +181,18 @@ class Registry:
         return min(candidates, key=lambda c: c[0])[1] if candidates else None
 
 
-def _best_fuzzy(core: str, words: list[str]) -> float:
+def _best_fuzzy_in(core: str, segments: list[list[str]]) -> float:
+    """Best ratio over all segments; the core name is tokenized once, and segments shorter than it are skipped."""
     # Tokenize the name like the text, so "Alfa-Beta Inwestycje" compares as "alfa beta inwestycje".
     target_words = [w.lower() for w in _WORD.findall(core)]
     if not target_words:  # a name of punctuation only ("&") would otherwise match every text at ratio 100
         return 0.0
-    n = len(target_words)
-    target = " ".join(target_words)
-    grams = (" ".join(words[i:i + n]) for i in range(len(words) - n + 1))
-    return max((fuzz.ratio(target, g) for g in grams), default=0.0)
+    n, target = len(target_words), " ".join(target_words)
+    best = 0.0
+    for words in segments:
+        for i in range(len(words) - n + 1):
+            best = max(best, fuzz.ratio(target, " ".join(words[i:i + n])))
+    return best
 
 
 def is_social(host: str) -> bool:
