@@ -492,3 +492,19 @@ def test_bad_borderline_margin_fails_at_load(tmp_path, bad):
     p.write_text(text.replace("borderline_margin: 2", bad), encoding="utf-8")
     with pytest.raises(CatalogueError, match="borderline_margin"):
         Catalogue.load(p)
+
+
+def test_no_m3_rule_signal_sends_no_m3_request(mock_documents, registry, catalogue):
+    """R60 (Damian, 2026-11-21): the M3 LLM call runs only when the M3 rules already found a candidate."""
+    from investwatch_analytics.pipeline import analyze
+
+    for prefix in ("72acbb3b", "8721cb75"):  # family-office explainer without a recommendation; an ETF tutorial
+        judge = RecordingJudge()
+        analyze(_mock(mock_documents, prefix), registry=registry, catalogue=catalogue, now=NOW, judge=judge)
+        assert [c for c in judge.calls if c["module"] == "M3"] == [], prefix
+
+
+def test_m3_llm_signals_are_not_always_asked():
+    m3 = Catalogue.load_module("M3")
+    for rule_id in ("S3.3", "S3.4"):
+        assert m3.get(rule_id).llm["when"] == "uncertain", rule_id

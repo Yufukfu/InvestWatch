@@ -170,9 +170,10 @@ def test_per_call_timeout_overrides_setting(stub_llm):
     from investwatch_analytics.llm.client import LlmUnavailable
 
     stub_llm.script.append(Reply(sleep_s=2))
+    client = client_for(stub_llm, LLM_TIMEOUT_S="20")
     start = time.perf_counter()
     with pytest.raises(LlmUnavailable):
-        client_for(stub_llm, LLM_TIMEOUT_S="20").complete("s", "u", timeout_s=0.3)
+        client.complete("s", "u", timeout_s=0.3)
     assert time.perf_counter() - start < 1.5
 
 
@@ -326,3 +327,60 @@ def test_network_guard_blocks_loopback_ports_that_are_not_a_stub():
 
     with pytest.raises(AssertionError, match="not a test stub"):
         httpx.Client().get("http://127.0.0.1:11434/v1/models")  # a developer's real local Ollama
+
+
+# ---- hosted Gemma 4 (task 12.4) and the embeddings-session review holes ----------------------------------
+
+
+def test_leading_thought_block_is_stripped(stub_llm):
+    content = '<thought>*   Input: a document.\n*   Plan: answer.</thought>\n{"results": []}'
+    stub_llm.script.append(Reply(content=content))
+    assert client_for(stub_llm).complete("s", "u") == {"results": []}
+
+
+def test_thought_block_with_fenced_json(stub_llm):
+    stub_llm.script.append(Reply(content='<thought>x</thought>\n```json\n{"results": []}\n```'))
+    assert client_for(stub_llm).complete("s", "u") == {"results": []}
+
+
+@pytest.mark.parametrize("content", [
+    '<thought>never closed {"results": []}',          # unterminated thought: not an answer
+    '<thought> {"results": []}',                       # unterminated, even when JSON follows
+    'Sure! {"results": []}',                           # prose before the object is still malformed
+])
+def test_other_wrappers_stay_malformed(stub_llm, content):
+    from investwatch_analytics.llm.client import LlmMalformed
+
+    stub_llm.script.append(Reply(content=content))
+    with pytest.raises(LlmMalformed):
+        client_for(stub_llm).complete("s", "u")
+
+
+def test_deeply_nested_json_is_malformed_not_a_crash(stub_llm):
+    from investwatch_analytics.llm.client import LlmMalformed
+
+    deep = "[" * 100_000 + "]" * 100_000
+    stub_llm.script.append(Reply(content=deep))
+    with pytest.raises(LlmMalformed):
+        client_for(stub_llm).complete("s", "u")
+
+
+def test_deeply_nested_envelope_is_malformed(stub_llm):
+    from investwatch_analytics.llm.client import LlmMalformed
+
+    stub_llm.script.append(Reply(body=b"[" * 100_000 + b"]" * 100_000))
+    with pytest.raises(LlmMalformed):
+        client_for(stub_llm).complete("s", "u")
+
+
+@pytest.mark.parametrize("url", [
+    "http://ollama:99999/v1", "http://ollama:abc/v1", "http://ollama:11434/v 1", "http://oll ama:11434/v1",
+    "http://ollama:11434/\tv1", "http://ollama:11434/v1\x00",  # a trailing newline is stripped on purpose
+])
+def test_bad_port_or_whitespace_in_base_url(url):
+    with pytest.raises(ConfigError, match="LLM_BASE_URL"):
+        LlmSettings.from_env({"LLM_BASE_URL": url, "LLM_MODEL": "m"})
+
+
+def test_valid_port_is_accepted():
+    assert LlmSettings.from_env({"LLM_BASE_URL": "http://ollama:11434/v1", "LLM_MODEL": "m"}).enabled

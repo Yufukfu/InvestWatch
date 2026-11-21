@@ -51,7 +51,7 @@ rules:
         - '(?<!\w)indywidualnie\s+dobier\w*'
         - '(?<!\w)szyt\w*\s+na\s+miarę(?!\w)'
     llm:
-      when: always
+      when: uncertain
       question: >-
         Czy oferta dopasowuje rekomendacje do sytuacji konkretnego klienta (profil, ankieta, konsultacja
         indywidualna) i czy jest to oferta autora materiału? fail = tak, pass = nie. Zacytuj zdanie.
@@ -95,7 +95,7 @@ rules:
         - '(?<!\w)nie\s+(?:udzielamy|udzielam|dajemy|polecamy|polecam|rekomendujemy|rekomenduję)\b[^.!?,;]*'
       window: 1
     llm:
-      when: always
+      when: uncertain
       question: >-
         Czy autor materiału rekomenduje nabycie, zbycie albo trzymanie konkretnych instrumentów finansowych
         (akcje, obligacje, ETF, CFD, opcje, kontrakty terminowe, certyfikaty, jednostki funduszy)?

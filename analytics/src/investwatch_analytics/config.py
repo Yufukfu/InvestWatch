@@ -129,12 +129,15 @@ def _check_base_url(url: str, *, has_key: bool) -> None:
 
     The message never quotes the URL: it could carry a password or a key in the query.
     """
+    if any(ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in url):
+        raise ConfigError("LLM_BASE_URL must not contain whitespace or control characters")
     try:
         parts = urlsplit(url)
         host = parts.hostname
         userinfo = parts.username is not None or parts.password is not None
+        parts.port  # noqa: B018 - urlsplit validates the port only when it is read
     except ValueError:
-        raise ConfigError("LLM_BASE_URL is not a valid URL") from None
+        raise ConfigError("LLM_BASE_URL is not a valid URL (check the host and port)") from None
     if parts.scheme not in ("http", "https") or not host:
         raise ConfigError("LLM_BASE_URL must be an http(s) URL with a host, e.g. http://ollama:11434/v1")
     if userinfo or parts.query or parts.fragment:

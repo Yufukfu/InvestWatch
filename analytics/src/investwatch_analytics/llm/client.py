@@ -44,6 +44,24 @@ class LlmMalformed(LlmError):
     reason = "llm_malformed"
 
 
+def _strip_wrappers(content: str) -> str:
+    """Hosted Gemma 4 prefixes even JSON-mode answers with a `<thought>...</thought>` block (task 12.4,
+    ADR 0317), and some models fence the object in a ```json block. Only these two wrappers are removed:
+    any other text around the object stays malformed."""
+    text = content.strip()
+    if text.startswith("<thought>"):
+        end = text.find("</thought>")
+        if end < 0:
+            raise LlmMalformed("unterminated <thought> block")
+        text = text[end + len("</thought>"):].strip()
+    if text.startswith("```"):
+        first_newline = text.find("\n")
+        if first_newline < 0 or not text.endswith("```"):
+            raise LlmMalformed("unterminated code fence")
+        text = text[first_newline + 1:-3].strip()
+    return text
+
+
 class ChatClient:
     def __init__(self, settings: LlmSettings, *, transport: httpx.BaseTransport | None = None):
         self._s = settings
@@ -106,13 +124,15 @@ class ChatClient:
         try:
             envelope = json.loads(raw)
             content = envelope["choices"][0]["message"]["content"]
-        except (ValueError, KeyError, IndexError, TypeError):
+        except Exception:  # noqa: BLE001 - ValueError, KeyError, RecursionError on deep nesting, ...
             raise LlmMalformed("not a chat completions response") from None
         if not isinstance(content, str):
             raise LlmMalformed("message content is not a string")
         try:
-            parsed = json.loads(content)
-        except ValueError:
+            parsed = json.loads(_strip_wrappers(content))
+        except LlmMalformed:
+            raise
+        except Exception:  # noqa: BLE001 - a deeply nested body raises RecursionError, not ValueError
             raise LlmMalformed("message content is not JSON") from None
         if not isinstance(parsed, dict):
             raise LlmMalformed("message content is not a JSON object")
