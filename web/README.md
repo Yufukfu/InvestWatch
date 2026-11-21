@@ -2,7 +2,7 @@
 
 Dashboard: findings with filters, trend charts, real-time alerts, threshold calibration panel.
 
-- **Owner:** B
+- **Owner:** Kacper
 - **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), MSW for mocks, Vitest.
 - **Status:** foundation (app shell, generated client, mock mode, container). Features come next.
 
@@ -20,7 +20,7 @@ In docker the app is served by unprivileged nginx behind the gateway: `docker co
 
 ## API client (contract-first)
 
-`contracts/openapi.yaml` (owner C) is the source of truth. The web app never hand-writes requests:
+`contracts/openapi.yaml` (owner Damian) is the source of truth. The web app never hand-writes requests:
 
 ```bash
 npm run api:generate     # sync the contract snapshot + regenerate src/api/generated.ts

@@ -21,6 +21,6 @@ Kacper's review of PR #15 (`api-db-schema`, at 73680fa) asked for changes. Three
 
 ## Impact
 
-- Owner: C (`api/`). One new revision (`0003`); `0001` and `0002` are not edited. No contract, REST route or event changes.
-- Root `compose.yaml` gets one `include:` line (owner B's file, requested in his review).
+- Owner: Damian (`api/`). One new revision (`0003`); `0001` and `0002` are not edited. No contract, REST route or event changes.
+- Root `compose.yaml` gets one `include:` line (Kacper's file; Kacper asked for it in the review).
 - Out of scope: review items 7 (sweep locking), 12 (`finding_status_history`, for `api-v1`) and 13 (no CI) are recorded in this change's `follow-ups.md`. `openspec/changes/api-v1/` stays in PR #15 as a proposal only (review item 14).

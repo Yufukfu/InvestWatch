@@ -1,6 +1,6 @@
 # infra
 
-Shared infrastructure, owned by B (repository layout). Each module has its own `compose.yaml`; the root `compose.yaml` only includes them, so a module is deployed, scaled or replaced without touching the others.
+Shared infrastructure, owned by Kacper (repository layout). Each module has its own `compose.yaml`; the root `compose.yaml` only includes them, so a module is deployed, scaled or replaced without touching the others.
 
 | Service | Purpose | Reachable from |
 |---|---|---|
@@ -12,7 +12,7 @@ Shared infrastructure, owned by B (repository layout). Each module has its own `
 - `iw_admin` (from `POSTGRES_ADMIN_*`): migrations and ops only.
 - `iw_app` (from `POSTGRES_APP_*`): what services use. CRUD on tables in `public`, no DDL, no superuser.
 - Connection for services on `iw-data`: `postgresql://iw_app:<password>@postgres:5432/investwatch`.
-- Schema comes from migrations (Alembic in `api`, owner C), never by hand. Run migrations as `iw_admin`: `iw_app` gets CRUD automatically only on tables created by `iw_admin`. The init script runs only on an empty volume; to reset: `docker compose down -v`.
+- Schema comes from migrations (Alembic in `api`, owner Damian), never by hand. Run migrations as `iw_admin`: `iw_app` gets CRUD automatically only on tables created by `iw_admin`. The init script runs only on an empty volume; to reset: `docker compose down -v`.
 
 A service that needs the DB joins `iw-data` in its own compose file:
 

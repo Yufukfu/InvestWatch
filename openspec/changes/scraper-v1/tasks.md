@@ -4,8 +4,8 @@
 
 - [x] 1.1 Read the installed noble-tls, curl_cffi and httpx APIs and draft options in `.docs/decisions/` for the fetch client; verify with `node .claude/skills/iw-docs-update/scripts/docs-check.mjs`
 - [x] 1.2 Draft options for the job queue/scheduler and for the first social platform note; same docs-check passes. Group 6 waits for the queue ADR to be decided by a human.
-- [ ] 1.3 Agree with C on the `scrape_meta.scraper` value for a TLS-impersonating client (the v1 enum is `playwright|httpx|api|manual`, so a TLS client fits none honestly: use an existing value or request a v1 enum addition before the freeze); recorded in ADR 0101 and `contracts/`. Group 3 waits for this.
-- [ ] 1.4 Agree with C who creates the Alembic migration for the `documents` unique index `(source_id, content_hash)`, the `job_errors` table and the published marker (`.docs/integration-plan.md` §7: migrations live in `api`, A never creates tables by hand; `api/` does not exist yet); recorded as an open item in `.docs/STATUS.md`. Group 5 waits for this.
+- [ ] 1.3 Agree with Damian on the `scrape_meta.scraper` value for a TLS-impersonating client (the v1 enum is `playwright|httpx|api|manual`, so a TLS client fits none honestly: use an existing value or request a v1 enum addition before the freeze); recorded in ADR 0101 and `contracts/`. Group 3 waits for this.
+- [ ] 1.4 Agree with Damian who creates the Alembic migration for the `documents` unique index `(source_id, content_hash)`, the `job_errors` table and the published marker (`.docs/integration-plan.md` §7: migrations live in `api`, A never creates tables by hand; `api/` does not exist yet); recorded as an open item in `.docs/STATUS.md`. Group 5 waits for this.
 
 ## 2. Scraper skeleton and parser
 

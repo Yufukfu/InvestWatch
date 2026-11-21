@@ -23,5 +23,5 @@ Kacper's review of PR #10 (`analytics-skeleton`) found two important defects (a 
 
 ## Impact
 
-- Owner: C (`analytics/`). Touches no contract, REST route or event. Output still validates against `finding.schema.json` v1.
+- Owner: Damian (`analytics/`). Touches no contract, REST route or event. Output still validates against `finding.schema.json` v1.
 - Out of scope: nothing else from the review; follow-ups #10, #16 and #19 are updated in the archived `follow-ups.md`. The reviewer's out-of-scope notes on this change are in this change's `follow-ups.md`.

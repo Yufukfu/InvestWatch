@@ -2,7 +2,7 @@
 
 REST API and real-time (Socket.IO) gateway between the shared database and the dashboard, and the home of the database migrations for the whole stack.
 
-- **Owner:** Damian (module C)
+- **Owner:** Damian
 - **Status:** the shared schema (change `api-db-schema`) is implemented: Alembic revisions `0001` (tables), `0002` (query indexes) and `0003` (non-empty `documents.text`), and the one-shot `api-migrate` container in `api/compose.yaml`, which the root `compose.yaml` includes. REST and Socket.IO come with change `api-v1`.
 
 ## What it does

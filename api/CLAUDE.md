@@ -1,4 +1,4 @@
-# api (module C, owner Damian)
+# api (Damian's module)
 
 REST API and Socket.IO gateway for the dashboard, and the owner of the shared Postgres schema (Alembic). Stack and placement: [ADR 0302](../.docs/decisions/0302-api-service.md); schema ownership: [ADR 0303](../.docs/decisions/0303-database-schema-ownership.md); driver and table layout: [ADR 0307](../.docs/decisions/0307-database-driver-and-table-layout.md); thresholds: [ADR 0305](../.docs/decisions/0305-threshold-storage.md). The logic lives in the docs, not here:
 

@@ -12,7 +12,7 @@ Nothing in the stack has tables yet. The scraper cannot insert documents (`scrap
 - `findings`: filterable fields as columns plus JSONB for `firm`, `advertiser`, `rules`, `model`; unique on `(document_id, module)` so a re-scan of the same document updates the finding instead of adding a duplicate. `risk_level` is not stored ([ADR 0305](../../../.docs/decisions/0305-threshold-storage.md)).
 - Add `api/compose.yaml` with a one-shot `api-migrate` service that runs `alembic upgrade head` as `iw_admin`, so scraper and analytics can wait for it. Adding it to the root `include:` is coordinated with the `infra-compose` change (the root file is not edited here).
 - Add `api` to the services table in the root `CLAUDE.md` and a row in `.docs/INDEX.md` (`.docs/INDEX.md` rules for a new service directory).
-- Owner: Damian (module C, `api/`).
+- Owner: Damian (`api/`).
 - Out of scope: every REST route and Socket.IO (change `api-v1`), `registry_firms` and `gold_labels` (added by the analytics changes that need them, as later Alembic revisions here), the Postgres and Redis containers themselves (`infra/`, change `infra-compose`), any writer code in the scraper or analytics.
 
 ## Contracts
