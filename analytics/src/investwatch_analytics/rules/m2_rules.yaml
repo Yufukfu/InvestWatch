@@ -93,6 +93,14 @@ rules:
         - '\bno risk\b'
         - '\brisk[- ]free\b'
       footnote_markers: &footnote_markers ["*", "¹", "²", "³"]
+    # LLM refinement (analytics-llm-p0 group 9): only the borderline proximity case is deferred, never an
+    # absent or footnote-only warning (ZASÓB: the warning "bezpośrednio towarzyszy" the claim).
+    llm:
+      when: uncertain
+      question: >-
+        Czy ostrzeżenie o ryzyku bezpośrednio towarzyszy informacji o zyskach (to samo zdanie, akapit lub
+        blok)? Odpowiedz fail, jeśli ostrzeżenie jest oddzielone od obietnicy zysku, pass, jeśli jej
+        bezpośrednio towarzyszy. Zacytuj dosłownie zdanie z obietnicą zysku lub z ostrzeżeniem.
 
   # ZASÓB R4: risk font vs "przeważająca wielkość czcionki materiału" (dominant size = length-weighted median
   # of the visible blocks per viewport). Visual: not_applicable without `blocks`, never pass.
@@ -108,6 +116,7 @@ rules:
       risk_exclude_patterns: *risk_exclude_patterns
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
+  # R5 (P1, not built here): not_applicable with "brak informacji o ryzyku" when the material has none (ZASÓB).
   - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
   # ZASÓB R6 "ryzyko ukryte w przypisach": a risk block only in the footer / legal region or a footnote and
   # not in the viewport on load. Visual: not_applicable without `blocks`, never pass. Viewports desktop,
@@ -125,10 +134,12 @@ rules:
       risk_override_patterns: *risk_override_patterns
       risk_exclude_patterns: *risk_exclude_patterns
       footnote_markers: *footnote_markers
+  # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
   - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
   - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
   - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
+  # R11 (P2): ZASÓB "Flaguje w raporcie" – report a detected comparison even when it is compliant.
   - {id: R11, name: Porównania produktów, severity: medium, legal_basis: null, implemented: false}
   - {id: R12a, name: Wyniki historyczne – okres, severity: medium, legal_basis: null, implemented: false}
   - {id: R12b, name: Wyniki historyczne – waluta i koszty, severity: medium, legal_basis: null, implemented: false}
@@ -183,7 +194,66 @@ rules:
         - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
+  # R15 (P1): ZASÓB "Flaguje w raporcie" – report a detected forecast even when it is compliant.
   - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
   - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
-  - {id: R17, name: Zakaz sugerowania aprobaty organu nadzoru, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}
-  - {id: R18, name: Nadzór jako argument bezpieczeństwa, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}
+  # ZASÓB R17: a supervisor mention "używane do sugerowania zatwierdzenia lub aprobaty produktu/usługi".
+  # Stating supervision alone is not a violation: detect the mention, then classify its use. An approval word
+  # in the same sentence is a rules fail; otherwise pass rules-only, and the LLM judges the wording (always).
+  - id: R17
+    name: Zakaz sugerowania aprobaty organu nadzoru
+    severity: high
+    legal_basis: art. 44 ust. 8 rozp. del. 2017/565
+    implemented: true
+    params:
+      supervisor_patterns: &supervisor_patterns
+        - '\bU?KNF\b'
+        - '\bnadz[oó]r\w*'
+        - '\bESMA\b'
+        - '\bregulowan\w*'
+        - '\blicencj\w*'
+        - '\bsupervis\w*'
+        - '\bregulated\s+by\b'
+        - '\b(?:FCA|CySEC|BaFin)\b'
+      approval_patterns:
+        - '\bzatwierdz\w*'
+        - '\bzaaprobowa\w*'
+        - '\baprob\w*'
+        - '\b(?:rekomendowan|polecan)\w*\s+przez\b'
+        - '\bcertyfik\w*'
+        - '\b(?:approved|endorsed|certified|recommended)\s+by\b'
+    llm:
+      when: always
+      question: >-
+        Czy odwołanie do organu nadzoru (np. KNF, ESMA) jest użyte tak, że sugeruje zatwierdzenie lub aprobatę
+        produktu albo usługi przez ten organ? Samo stwierdzenie, że firma podlega nadzorowi, nie jest
+        naruszeniem (pass). Odpowiedz fail, jeśli treść sugeruje aprobatę, i zacytuj dosłownie to zdanie.
+
+  # ZASÓB R18, a "szczególny przypadek" of R17: supervision used as a safety argument ("w pełni bezpieczna –
+  # spełniamy rygorystyczne wymogi nadzorcze KNF"). A safety word in the same sentence as the mention is a
+  # deterministic fail (never deferred); a safety word only in a neighbouring sentence is uncertain and goes to
+  # the LLM.
+  - id: R18
+    name: Nadzór jako argument bezpieczeństwa
+    severity: high
+    legal_basis: art. 44 ust. 8 rozp. del. 2017/565
+    implemented: true
+    params:
+      supervisor_patterns: *supervisor_patterns
+      safety_patterns:
+        - '\bbezpieczn\w*'
+        - '\bgwarantowan\w*'
+        - '\bpewn(?:a|e|y|ą|ość|ości)\b'
+        - '\bchronion\w*'
+        - '\bbez\s+ryzyka\b'
+        - '\bsafe(?:ly|ty)?\b'
+        - '\bsecure\w*'
+        - '\bguaranteed\b'
+        - '\bprotected\b'
+      window: 1
+    llm:
+      when: uncertain
+      question: >-
+        Czy nadzór (np. KNF) jest w tej treści użyty jako argument, że inwestycja lub środki klienta są
+        bezpieczne, gwarantowane lub pewne? Odpowiedz fail i zacytuj dosłownie zdanie, jeśli tak; pass, jeśli
+        nadzór i bezpieczeństwo nie są ze sobą powiązane.

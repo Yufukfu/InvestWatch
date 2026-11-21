@@ -467,3 +467,126 @@ def test_r6_quote_comes_from_inside_the_block(registry, catalogue):
     blocks = [block("Zysk 8% rocznie."), block(footer, region="footer", in_view=False)]
     r = run(text, registry, catalogue, blocks=blocks)["R6"]
     assert r.evidence == "Inwestowanie wiąże się z ryzykiem utraty kapitału."
+
+
+# ---- R17 / R18, rules-only part; catalogue `llm:` blocks ----------------------------------------
+
+BANK_TEXT = (
+    "Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. "
+    "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału. "
+    "Traktowanie podatkowe zależy od indywidualnej sytuacji klienta i może ulec zmianie."
+)
+ALFA_KNF = "Działamy pod nadzorem KNF – Twoje środki są bezpieczne."
+
+
+def test_r17_explicit_approval_fails(registry, catalogue):
+    r = run("Reklama. Produkt zatwierdzony przez KNF. Zysk 5%.", registry, catalogue)["R17"]
+    assert r.result == "fail" and r.evidence == "Produkt zatwierdzony przez KNF." and r.method == "rule"
+
+
+def test_r17_bare_mention_passes_rules_only(registry, catalogue):
+    r = run(ALFA_TEXT, registry, catalogue)["R17"]
+    assert r.result == "pass" and r.evidence == ALFA_KNF and r.method == "rule"
+
+
+def test_r17_no_supervisor_is_not_applicable(registry, catalogue):
+    assert run(BANK_TEXT, registry, catalogue)["R17"].result == "not_applicable"
+
+
+def test_r17_approval_word_in_another_sentence_does_not_fail(registry, catalogue):
+    text = "Jesteśmy nadzorowani przez KNF. Nasz produkt został zatwierdzony przez zarząd."
+    assert run(text, registry, catalogue)["R17"].result == "pass"
+
+
+@pytest.mark.parametrize("text", [
+    "Fundusz rekomendowany przez Komisję Nadzoru Finansowego.",
+    "Approved by ESMA for retail investors.",
+    "Platforma z certyfikatem KNF.",
+])
+def test_r17_approval_variants(text, registry, catalogue):
+    assert run(text, registry, catalogue)["R17"].result == "fail"
+
+
+def test_r18_same_sentence_fails(registry, catalogue):
+    r = run(ALFA_TEXT, registry, catalogue)["R18"]
+    assert r.result == "fail" and r.evidence == ALFA_KNF and r.method == "rule"
+
+
+def test_r18_zasob_example_fails(registry, catalogue):
+    text = "Inwestycja w pełni bezpieczna – spełniamy rygorystyczne wymogi nadzorcze KNF."
+    r = run(text, registry, catalogue)["R18"]
+    assert r.result == "fail" and r.evidence == text
+
+
+def test_r18_neighbouring_sentence_is_uncertain(registry, catalogue):
+    text = "Jesteśmy nadzorowani przez KNF. Twoje pieniądze są u nas bezpieczne."
+    r = run(text, registry, catalogue)["R18"]
+    assert r.result == "uncertain" and r.evidence == "Jesteśmy nadzorowani przez KNF."
+
+
+def test_r18_safety_word_two_sentences_away_passes(registry, catalogue):
+    text = "Jesteśmy nadzorowani przez KNF. Otwórz konto w 5 minut. Twoje pieniądze są u nas bezpieczne."
+    assert run(text, registry, catalogue)["R18"].result == "pass"
+
+
+def test_r18_neutral_legal_footer_passes(registry, catalogue):
+    text = "Zysk 5% rocznie. Dom Maklerski podlega nadzorowi Komisji Nadzoru Finansowego."
+    r = run(text, registry, catalogue)["R18"]
+    assert r.result == "pass" and r.evidence == "Dom Maklerski podlega nadzorowi Komisji Nadzoru Finansowego."
+
+
+def test_r18_no_supervisor_is_not_applicable(registry, catalogue):
+    assert run("Twoje środki są bezpieczne.", registry, catalogue)["R18"].result == "not_applicable"
+
+
+def test_r18_pewnego_is_not_a_safety_word(registry, catalogue):
+    text = "Pewnego dnia dołączyliśmy do rynku nadzorowanego przez KNF."
+    assert run(text, registry, catalogue)["R18"].result == "pass"
+
+
+def test_llm_blocks_only_on_r3_r17_r18(catalogue):
+    with_llm = [s.id for s in catalogue.specs if s.llm is not None]
+    assert with_llm == ["R3", "R17", "R18"]
+    assert all(catalogue.get(i).llm["question"].strip() for i in with_llm)
+    assert catalogue.get("R17").llm["when"] == "always"
+
+
+def _catalogue_text() -> str:
+    src = Path(__file__).resolve().parents[1] / "src" / "investwatch_analytics" / "rules" / "m2_rules.yaml"
+    return src.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("bad", [
+    "    llm: {question: '', when: always}\n",
+    "    llm: {question: 'Czy?', when: sometimes}\n",
+    "    llm: 'Czy?'\n",
+    "    llm: {question: 'Czy?', when: always, model: x}\n",
+])
+def test_bad_llm_block_fails_at_load(tmp_path, bad):
+    from investwatch_analytics.rules.engine import CatalogueError
+
+    text = _catalogue_text()
+    anchor = "  - id: R1\n    name: Identyfikacja firmy\n"
+    assert text.count(anchor) == 1
+    p = tmp_path / "rules.yaml"
+    p.write_text(text.replace(anchor, anchor + bad), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="R1.*llm"):
+        Catalogue.load(p)
+
+
+def test_llm_block_must_be_a_mapping(tmp_path):
+    from investwatch_analytics.rules.engine import CatalogueError
+
+    anchor = "  - id: R1\n    name: Identyfikacja firmy\n"
+    p = tmp_path / "rules.yaml"
+    p.write_text(_catalogue_text().replace(anchor, anchor + "    llm: 'Czy?'\n"), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="R1 llm must be a mapping"):
+        Catalogue.load(p)
+
+
+def test_llm_when_defaults_to_uncertain(tmp_path):
+    text = _catalogue_text()
+    anchor = "  - id: R1\n    name: Identyfikacja firmy\n"
+    p = tmp_path / "rules.yaml"
+    p.write_text(text.replace(anchor, anchor + "    llm: {question: 'Czy firma jest podana?'}\n"), encoding="utf-8")
+    assert Catalogue.load(p).get("R1").llm == {"question": "Czy firma jest podana?", "when": "uncertain"}

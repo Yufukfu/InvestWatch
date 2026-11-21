@@ -19,6 +19,8 @@ from ..registry import FirmMatch, Registry
 
 DEFAULT_CATALOGUE = Path(__file__).with_name("m2_rules.yaml")
 SEVERITIES = {"high", "medium", "low"}
+# `llm:` block on a catalogue entry (analytics-llm-p0, design §1-2): when the engine may defer to the LLM.
+LLM_WHEN = {"always", "uncertain"}
 # Every rule parameter a rule class reads (rules/m2.py); anything else in the YAML is a typo.
 KNOWN_PARAMS = {
     "labels", "prominent_sentences", "negation_before",
@@ -27,6 +29,7 @@ KNOWN_PARAMS = {
     # analytics-llm-p0 (M2 P0 rules)
     "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
     "hiding_regions", "figure_extra_exclude_patterns", "min_ratio",
+    "supervisor_patterns", "approval_patterns", "safety_patterns",
 }
 _RULES: dict[str, type["Rule"]] = {}
 
@@ -43,6 +46,7 @@ class RuleSpec:
     legal_basis: str | None
     implemented: bool
     params: dict[str, Any] = field(default_factory=dict)
+    llm: dict[str, str] | None = None  # {question, when}; None = never sent to the LLM
 
 
 @dataclass(frozen=True)
@@ -132,10 +136,29 @@ class Catalogue:
             if implemented and rule_id not in _RULES:
                 raise CatalogueError(f"{path}: {rule_id} is marked implemented but has no rule class")
             params = _check_params(path, rule_id, entry.get("params") or {})
+            llm = _check_llm(path, rule_id, entry.get("llm"))
             seen.add(rule_id)
             specs.append(RuleSpec(rule_id, entry["name"], entry["severity"], entry.get("legal_basis"),
-                                  implemented, params))
+                                  implemented, params, llm))
         return cls(specs)
+
+
+def _check_llm(path: Path, rule_id: str, block: Any) -> dict[str, str] | None:
+    """`llm: {question: <non-empty string>, when: always | uncertain}`; `when` defaults to `uncertain`."""
+    if block is None:
+        return None
+    if not isinstance(block, dict):
+        raise CatalogueError(f"{path}: {rule_id} llm must be a mapping with `question` and `when`")
+    unknown = sorted(set(block) - {"question", "when"})
+    if unknown:
+        raise CatalogueError(f"{path}: {rule_id} llm has unknown key(s) {', '.join(map(str, unknown))}")
+    question = block.get("question")
+    if not isinstance(question, str) or not question.strip():
+        raise CatalogueError(f"{path}: {rule_id} llm.question must be a non-empty string")
+    when = block.get("when", "uncertain")
+    if when not in LLM_WHEN:
+        raise CatalogueError(f"{path}: {rule_id} llm.when must be one of {sorted(LLM_WHEN)}, got {when!r}")
+    return {"question": question.strip(), "when": when}
 
 
 def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:

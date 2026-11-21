@@ -358,3 +358,79 @@ class R4RiskFontSize(_RiskWarnings):
             "pass", self.warning_quote(ctx, b),
             f"Czcionka ostrzeżenia proporcjonalna do treści: {sizes}.", locator_for(b),
         )
+
+
+# ---- supervisor mentions (R17, R18) ------------------------------------------------------------
+
+
+class _SupervisorMention(Rule):
+    """Detect a supervisor mention first, then classify how it is used (ZASÓB R17 / R18)."""
+
+    @cached_property
+    def _supervisor(self) -> list[re.Pattern]:
+        return compile_patterns(self.spec.params.get("supervisor_patterns", []))
+
+    def mentions(self, ctx: Context) -> list[int]:
+        return [i for i, s in enumerate(ctx.pre.sentences) if any(p.search(s.text) for p in self._supervisor)]
+
+
+@register
+class R17SupervisoryApproval(_SupervisorMention):
+    rule_id = "R17"
+
+    @cached_property
+    def _approval(self) -> list[re.Pattern]:
+        return compile_patterns(self.spec.params.get("approval_patterns", []))
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        sentences = ctx.pre.sentences
+        idx = self.mentions(ctx)
+        if not idx:
+            return self.result("not_applicable", None, "Materiał nie odwołuje się do organu nadzoru.")
+        approving = next((i for i in idx if any(p.search(sentences[i].text) for p in self._approval)), None)
+        if approving is not None:
+            return self.result(
+                "fail", sentences[approving].text,
+                "Odwołanie do organu nadzoru sugeruje zatwierdzenie lub aprobatę produktu.",
+            )
+        return self.result(
+            "pass", sentences[idx[0]].text,
+            "Odwołanie do nadzoru bez słów sugerujących aprobatę produktu (samo stwierdzenie nadzoru nie jest naruszeniem).",
+        )
+
+
+@register
+class R18SupervisionAsSafety(_SupervisorMention):
+    rule_id = "R18"
+
+    @cached_property
+    def _safety(self) -> list[re.Pattern]:
+        return compile_patterns(self.spec.params.get("safety_patterns", []))
+
+    def _safe(self, text: str) -> bool:
+        return any(p.search(text) for p in self._safety)
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        sentences = ctx.pre.sentences
+        idx = self.mentions(ctx)
+        if not idx:
+            return self.result("not_applicable", None, "Materiał nie odwołuje się do organu nadzoru.")
+        same = next((i for i in idx if self._safe(sentences[i].text)), None)
+        if same is not None:
+            return self.result(
+                "fail", sentences[same].text,
+                "Nadzór jest użyty jako argument bezpieczeństwa inwestycji w tym samym zdaniu.",
+            )
+        window = int(self.spec.params.get("window", 1))
+        near = next(
+            (i for i in idx
+             if any(self._safe(sentences[j].text)
+                    for j in range(max(0, i - window), min(len(sentences), i + window + 1)) if j != i)),
+            None,
+        )
+        if near is not None:
+            return self.result(
+                "uncertain", sentences[near].text,
+                "Odwołanie do nadzoru sąsiaduje z zapewnieniem o bezpieczeństwie – do weryfikacji.",
+            )
+        return self.result("pass", sentences[idx[0]].text, "Nadzór nie jest użyty jako argument bezpieczeństwa.")
