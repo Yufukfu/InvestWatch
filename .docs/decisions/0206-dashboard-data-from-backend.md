@@ -1,4 +1,4 @@
-# 0205. Dashboard data from the backend only; MSW only in tests
+# 0206. Dashboard data from the backend only; MSW only in tests
 
 - Status: accepted
 - Date: 2026-11-21

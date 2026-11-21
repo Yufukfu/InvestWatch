@@ -9,11 +9,12 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0101](0101-scraper-fetch-client.md) | Scraper fetch client | proposed (agent draft, no decision) |
 | [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | proposed (agent draft, no decision) |
 | [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research) |
-| [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted; dev mocks superseded by [0205](0205-dashboard-data-from-backend.md) |
+| [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted; dev mocks superseded by [0206](0206-dashboard-data-from-backend.md) |
 | [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted |
 | [0203](0203-dashboard-charts-recharts.md) | Dashboard charts: Recharts (the only chart library in `web/`) | accepted (takes effect when PR merges) |
 | [0204](0204-frontend-architecture.md) | Frontend layering: feature data hooks wrap the generated client, components take props | accepted (takes effect when PR merges) |
-| [0205](0205-dashboard-data-from-backend.md) | Dashboard data from the backend only; MSW only in tests (supersedes 0201's dev mocks) | accepted (takes effect when PR merges) |
+| [0205](0205-status-per-domain.md) | Status split per domain: `.docs/STATUS.md` team-wide only, one file per owner in `.docs/status/` | accepted (takes effect when the PR merges) |
+| [0206](0206-dashboard-data-from-backend.md) | Dashboard data from the backend only; MSW only in tests (supersedes 0201's dev mocks) | accepted (takes effect when PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |

@@ -23,7 +23,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 | # | Stage | Tool | Gate |
 |---|---|---|---|
-| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md`, the owning spec | agent | none |
+| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md` and your domain file in `.docs/status/`, the owning spec | agent | none |
 | 1 | Size, worktree, branch | `iw-implement` | branch prefix = module |
 | 2 | Explore (only if scope is foggy) | `/openspec-explore` | none |
 | 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
@@ -44,7 +44,7 @@ Anything real but out of scope goes into the change's `follow-ups.md` with one d
 
 ## Parallel work
 
-Three people, three modules, a worktree per change, ownership by directory (`scraper/` Adam, `web/` Kacper, `analytics/` and `contracts/` Damian, plus `api/` once created). To limit merge conflicts: edit only your own row in `.docs/STATUS.md`; ADR numbers by owner (A 01xx, Kacper 02xx, Damian 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
+Three people, three modules, a worktree per change, ownership by directory (`scraper/` Adam, `web/` Kacper, `analytics/` and `contracts/` Damian, plus `api/` once created). To limit merge conflicts: edit only your own domain file in `.docs/status/` (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by owner (A 01xx, Kacper 02xx, Damian 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
 
 ## Not adopted from Neopadel (on purpose)
 

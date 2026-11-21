@@ -15,7 +15,7 @@ cp .env.example .env.local
 npm run dev                    # http://localhost:5173
 ```
 
-The app has no built-in mock data ([ADR 0205](../.docs/decisions/0205-dashboard-data-from-backend.md)): the dev server proxies `/api` and `/socket.io` to `API_PROXY_TARGET` (default `http://localhost:8000`), so run the backend there first: the contract mock server (`contracts/README.md`, "Mock server") until the api serves REST.
+The app has no built-in mock data ([ADR 0206](../.docs/decisions/0206-dashboard-data-from-backend.md)): the dev server proxies `/api` and `/socket.io` to `API_PROXY_TARGET` (default `http://localhost:8000`), so run the backend there first: the contract mock server (`contracts/README.md`, "Mock server") until the api serves REST.
 In docker the app is served by unprivileged nginx behind the gateway: `docker compose up --build` from the repo root, then https://localhost:8443.
 
 ## API client (contract-first)
