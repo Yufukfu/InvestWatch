@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates \
- && apt-get clean
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY scraper/requirements.txt scraper/requirements.txt
@@ -30,7 +30,7 @@ RUN set -eu; \
     DEPS="$(python -c 'import noble_tls, os; print(os.path.join(os.path.dirname(noble_tls.__file__), "dependencies"))')"; \
     EXPECTED="$(python -c "from noble_tls.utils.asset import generate_asset_name; print(generate_asset_name(version='${TLS_CLIENT_VERSION}'))")"; \
     mkdir -p "$DEPS"; \
-    curl -fsSL -o "$DEPS/$EXPECTED" "https://github.com/bogdanfinn/tls-client/releases/download/v${TLS_CLIENT_VERSION}/${UPSTREAM}"; \
+    curl --proto '=https' --tlsv1.2 -fsSL -o "$DEPS/$EXPECTED" "https://github.com/bogdanfinn/tls-client/releases/download/v${TLS_CLIENT_VERSION}/${UPSTREAM}"; \
     echo "${SHA}  $DEPS/$EXPECTED" | sha256sum -c -; \
     printf '%s %s' "$EXPECTED" "${TLS_CLIENT_VERSION}" > "$DEPS/.version"; \
     python -c "import noble_tls; from noble_tls import Session, Client; Session(client=Client.CHROME_146_PSK); print('tls-client loaded')"
@@ -45,7 +45,8 @@ WORKDIR /app/scraper
 CMD ["pytest", "-q"]
 
 FROM base AS runtime
-RUN useradd --system --uid 10001 iw && chown -R iw /app
+# code and the tls-client library stay root-owned and read-only for the runtime user
+RUN useradd --system --uid 10001 iw
 USER iw
 WORKDIR /app/scraper
 CMD ["python", "-m", "iw_scraper"]

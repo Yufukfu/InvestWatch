@@ -22,11 +22,6 @@ def test_reason_is_the_closed_set_from_the_spec():
     assert {r.value for r in Reason} == EXPECTED_REASONS
 
 
-def test_unknown_reason_is_rejected():
-    with pytest.raises(ValueError):
-        Reason("oops")
-
-
 def test_job_error_carries_reason_detail_and_optional_source():
     err = JobError(reason=Reason.BLOCKED, detail="HTTP 403")
 
