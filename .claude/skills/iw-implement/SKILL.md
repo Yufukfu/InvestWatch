@@ -9,7 +9,7 @@ One task = one OpenSpec change = one worktree = one branch = one PR. Parallel se
 
 ## Steps
 
-1. **Size it.** One-file fix or docs typo: skip the spec, put the plan in the PR body, and use `IW_SKIP_SPEC=1` on the commit. Anything that touches a contract (`contracts/`), a service boundary or more than one file: OpenSpec change (next step). Unclear scope: `/openspec-explore` first.
+1. **Size it.** One-file fix or docs typo: skip the spec, put the plan in the PR body, and use `IW_SKIP_SPEC=1` on the commit. A new capability (for example `scraper-v1`), or anything that touches a contract (`contracts/`) or a service boundary: OpenSpec change (next step), one per capability, not per task. Extending a capability that already has an active change (new source, parser, bug fix): add tasks to that change instead of opening another. Unclear scope: `/openspec-explore` first.
 2. **Branch name** follows the module prefix from `doc/plan-integracji.md` §7: `scraper/<slug>`, `analytics/<slug>`, `dashboard/<slug>`, or `chore/<slug>` for tooling and docs. The slug equals the OpenSpec change name.
 3. **Worktree**, from the main clone (never `cd` back into it afterwards):
    ```bash
