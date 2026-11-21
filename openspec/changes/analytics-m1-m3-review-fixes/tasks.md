@@ -28,8 +28,8 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 
 ## 5. Docs and ADR (items 1, 8, 11)
 
-- [ ] 5.1 ADR 0308 (the S3.4 gate as a deliberate "may indicate" choice, personalisation unconfirmed) and its row in `.docs/decisions/README.md`; privacy line in `analytics/README.md`; M1/M3 row in `.docs/INDEX.md`; `follow-ups.md` row linking #26's `_BOUNDARY` fix; `docs-check` clean
-- [ ] 5.2 Mutation check; `mutations: n/a, docs-only`
+- [x] 5.1 ADR 0308 (the S3.4 gate as a deliberate "may indicate" choice, personalisation unconfirmed) and its row in `.docs/decisions/README.md`; privacy line in `analytics/README.md`; M1/M3 row in `.docs/INDEX.md`; `follow-ups.md` row linking #26's `_BOUNDARY` fix; `docs-check` clean
+- [x] 5.2 Mutation check; `mutations: n/a, docs-only`
 
 ## 6. Closing
 

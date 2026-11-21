@@ -4,7 +4,8 @@ Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M
 
 - **Owner:** Damian
 - **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`): S1.5 is always `uncertain`, and S3.3/S3.4 are `uncertain` when the rules find a candidate phrase, `pass` otherwise, until it lands.
-- **Registry:** [`registry/seed.csv`](registry/seed.csv) holds three fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is treated as outside the registry.
+- **Registry:** [`registry/seed.csv`](registry/seed.csv) holds four fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is "not found in the loaded registry"; M3 findings say so, with "(dane demonstracyjne)" while the seed is loaded ([`registry/README.md`](registry/README.md)).
+- **Privacy:** rule `evidence` and `advertiser` copy scraped author names, handles, profile and referral links verbatim (cut to 200-300 characters) into `findings`, and the `iw:events` messages carry the title, which names the advertiser, so treat them as personal data taken from public posts.
 
 ## Modules and routing
 
@@ -15,10 +16,10 @@ A document gives at most one finding per module ([`modules/router.py`](src/inves
 | a registered firm (its domain, its profile host or its handle; any platform) | — | M2 for that firm |
 | `firm_own` source | firm named or page on a firm domain | M2 |
 | `firm_own` source | no firm | M3 if advisory signals, else nothing (`no_signals`) |
-| a third party | firm named in the text or linked | M1 (a foreign firm only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
+| a third party | firm named in the text or linked | M1 (a foreign firm without a Polish branch only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
 | a third party | no firm | M3 if advisory signals, else nothing (`no_signals`) |
 
-M1 score: σ(bias + Σ w·x), how certain this is a third-party ad of the firm. M3 score: the same form, capped at 0.4 unless S3.4 (a recommendation to buy, sell or hold financial instruments) is found. Signals, weights and dictionaries: [`rules/m1_signals.yaml`](src/investwatch_analytics/rules/m1_signals.yaml), [`rules/m3_signals.yaml`](src/investwatch_analytics/rules/m3_signals.yaml). Evidence may quote the author handle, a link or the page URL as well as the text. Specs: [`m1-third-party-signals`](../openspec/specs/m1-third-party-signals/spec.md), [`m3-unauthorized-advice-signals`](../openspec/specs/m3-unauthorized-advice-signals/spec.md).
+M1 score: σ(bias + Σ w·x), how certain this is a third-party ad of the firm. M3 score: the same form, capped at 0.4 unless S3.4 (a recommendation to buy, sell or hold financial instruments) is found; M3 means "may indicate" investment advice, and the summary says when personalisation (art. 76) is unconfirmed ([ADR 0308](../.docs/decisions/0308-m3-s34-gate.md)). Signals, weights and dictionaries: [`rules/m1_signals.yaml`](src/investwatch_analytics/rules/m1_signals.yaml), [`rules/m3_signals.yaml`](src/investwatch_analytics/rules/m3_signals.yaml). Evidence may quote the author handle, a link or the page URL as well as the text. Specs: [`m1-third-party-signals`](../openspec/specs/m1-third-party-signals/spec.md), [`m3-unauthorized-advice-signals`](../openspec/specs/m3-unauthorized-advice-signals/spec.md).
 
 ## Run the worker (compose)
 
