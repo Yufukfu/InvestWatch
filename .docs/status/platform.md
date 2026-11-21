@@ -15,8 +15,10 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
-- In PR #15, with Kacper's review fixed in `api-db-schema-review-fixes`. `api/` lands on `main` with that PR.
-- `api-v1` (REST, Socket.IO) in progress on `api/api-v1`.
+- Merged with PR #15 (Kacper's review fixed in `api-db-schema-review-fixes`).
+- `api-v1` applied and archived: REST under `/api` (all 11 contract paths), Socket.IO relay `iw:events` → `/events`, calibration curve from analyst labels, the `api` service in `api/compose.yaml`.
+- In PR #21, stacked on PR #18 (`infra-compose`) and merging after it; Kacper's review fixed in `api-v1-review-fixes`.
+- Open for Adam: nothing consumes `iw:scan-requests` yet, so `POST /api/scans` queues without running a scan (`.docs/integration-plan.md` §5).
 
 ### infra-compose
 - Redis 8, object storage (MinIO, bucket `iw-raw`), the optional Ollama profile `llm`, project-scoped networks (`data`, `edge`, `egress`) and the smoke test `infra/tests/smoke.sh`: applied and archived, in PR #18.
@@ -25,7 +27,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 
 ## Active OpenSpec changes
 
-- `api-v1` (in progress)
+- `api-v1` and `api-v1-review-fixes` archived in PR #21 (merges after PR #18)
 - `api-db-schema` and `api-db-schema-review-fixes` archived in PR #15
 - `infra-compose` and `infra-compose-review-fixes` archived in PR #18
 - proposed, awaiting approval: `analytics-worker`
