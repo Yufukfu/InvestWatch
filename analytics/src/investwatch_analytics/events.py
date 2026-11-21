@@ -25,8 +25,9 @@ log = logging.getLogger(__name__)
 
 EVENTS_CHANNEL = "iw:events"
 THRESHOLDS_KEY = "iw:settings:thresholds"
-#: ADR 0305 defaults, used per module when the key or its value is missing or invalid.
-DEFAULT_THRESHOLDS: dict[str, float] = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
+#: Defaults per module when the key or its value is missing or invalid. A copy of analytics/eval/thresholds.json,
+#: the best-F1 thresholds of the gold-set evaluation (ADR 0316, superseding ADR 0305's values); a test pins it.
+DEFAULT_THRESHOLDS: dict[str, float] = {"M1": 0.65, "M2": 0.25, "M3": 0.4}
 
 Clock = Callable[[], datetime]
 

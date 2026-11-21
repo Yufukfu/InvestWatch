@@ -25,9 +25,11 @@ def test_seed_loads_the_fictional_firms(registry):
     assert {f.id for f in registry.firms} == {ALFA_ID, BANK_ID, EURO_ID, ATLANTIC_ID}
 
 
-def test_default_registry_path_is_seed(monkeypatch):
+def test_default_registry_path_is_knf(monkeypatch):
+    # change analytics-knf-registry: the real KNF snapshot is the default; the seed is the test fixture
     monkeypatch.delenv("REGISTRY_CSV", raising=False)
-    assert Settings.from_env().registry_csv == SEED
+    assert Settings.from_env().registry_csv == SEED.with_name("knf.csv")
+    assert Registry.from_csv(Settings.from_env().registry_csv).firms
 
 
 @pytest.mark.parametrize(

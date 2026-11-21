@@ -217,11 +217,45 @@ def test_only_negatives_give_zero_recall(client, migrated_db):
     assert (at[0.5]["fp"], at[0.5]["precision"], at[0.5]["recall"], at[0.5]["f1"]) == (1, 0.0, 0.0, 0.0)
 
 
-def test_labels_win_over_a_stored_run(client, migrated_db):
-    _insert(migrated_db.app_url, calibration_points, [_point(uuid.uuid4(), 0.5, datetime.now(timezone.utc))])
+def _gold_run(url, counts=(10, 2, 3, 20), samples=35, thresholds=GRID):
+    run, at = uuid.uuid4(), datetime.now(timezone.utc)
+    tp, fp, fn, tn = counts
+    _insert(url, calibration_points, [dict(run_id=run, module="M2", threshold=th, tp=tp, fp=fp, fn=fn, tn=tn,
+                                           precision=0.833, recall=0.769, f1=0.8, labeled_samples=samples,
+                                           computed_at=at) for th in thresholds])
+
+
+def test_labels_added_to_a_stored_run(client, migrated_db):
+    _gold_run(migrated_db.app_url)
+    _labeled(migrated_db.app_url, [(0.9, "confirmed"), (0.4, "confirmed"), (0.6, "false_positive"),
+                                   (0.2, "false_positive")])
+    r = client.get("/api/calibration", params={"module": "M2"})
+    assert_response_matches("/calibration", "get", r)
+    body = r.json()
+    assert body["labeled_samples"] == 39
+    at = {p["threshold"]: p for p in body["points"]}
+    assert at[0.5] == {"threshold": 0.5, "tp": 11, "fp": 3, "fn": 4, "tn": 21, "precision": 0.786,
+                       "recall": 0.733, "f1": 0.759}
+    assert (at[0.05]["tp"], at[0.05]["fp"], at[0.05]["fn"], at[0.05]["tn"]) == (12, 4, 3, 20)
+
+
+def test_one_label_does_not_replace_the_gold_curve(client, migrated_db):
+    _gold_run(migrated_db.app_url)
     _labeled(migrated_db.app_url, [(0.9, "confirmed")])
     body = client.get("/api/calibration", params={"module": "M2"}).json()
-    assert body["labeled_samples"] == 1 and len(body["points"]) == 19
+    assert body["labeled_samples"] == 36 and len(body["points"]) == 19
+    for p in body["points"]:
+        assert (p["tp"], p["fp"], p["fn"], p["tn"]) in ((11, 2, 3, 20), (10, 2, 4, 20))
+
+
+def test_stored_point_off_the_grid_is_ignored_when_combining(client, migrated_db):
+    _gold_run(migrated_db.app_url, thresholds=(0.5, 0.33))
+    _labeled(migrated_db.app_url, [(0.9, "confirmed")])
+    body = client.get("/api/calibration", params={"module": "M2"}).json()
+    assert [p["threshold"] for p in body["points"]] == GRID
+    at = {p["threshold"]: p for p in body["points"]}
+    assert (at[0.5]["tp"], at[0.5]["tn"]) == (11, 20)
+    assert (at[0.3]["tp"], at[0.3]["tn"]) == (1, 0)  # no stored point at 0.3: labels only
 
 
 @pytest.mark.parametrize("params", [{}, {"module": "M4"}])

@@ -120,6 +120,7 @@ describe('useFindings', () => {
     expect(window.history.length).toBe(start);
     act(() => result.current.setFilters({ module: 'M1' }));
     expect(window.history.length).toBe(start + 1);
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
   });
 
   it('a failed refetch clears the last rows (not shown as current)', async () => {

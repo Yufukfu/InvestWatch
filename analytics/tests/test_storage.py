@@ -495,7 +495,7 @@ def test_postgres_size_is_measured_in_the_database(pg_url):
 
 def test_pipeline_m1_and_m3_round_trip(backend, finding_validator):
     """analytics-m1-m3: the real pipeline's M1 + M3 findings (advertiser, S-ids, metadata evidence) survive storage."""
-    from investwatch_analytics.config import Settings
+    from investwatch_analytics.config import SEED_REGISTRY, Settings
     from investwatch_analytics.pipeline import analyze
     from investwatch_analytics.registry import Registry
     from investwatch_analytics.rules.engine import Catalogue
@@ -504,7 +504,7 @@ def test_pipeline_m1_and_m3_round_trip(backend, finding_validator):
                          text="Konto mam w EuroTrade Markets. Moja grupa: co tydzień mówię, co kupić z akcji WIG20."),
                  {"author": {"name": "Ola", "handle": "@trader_ola", "profile_url": "https://www.instagram.com/trader_ola/"}})
     doc = load(backend)
-    findings = analyze(doc, registry=Registry.from_csv(Settings.from_env().registry_csv), catalogue=Catalogue.load(),
+    findings = analyze(doc, registry=Registry.from_csv(SEED_REGISTRY), catalogue=Catalogue.load(),
                        now=NOW)
     assert [f.module for f in findings] == ["M1", "M3"]
     backend.store.save_findings(doc, findings)
