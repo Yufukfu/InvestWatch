@@ -34,7 +34,7 @@ iw:documents ─▶ [1] load + preprocessing ─▶ [2] gate: "is this investmen
 | 1 | strip HTML (if raw), normalize (Unicode NFKC, whitespace, emoji→text), detect language, dedup by `content_hash` + near-dup (SimHash/MinHash), sentence split | `selectolax`, `langdetect`/`lingua`, `datasketch` |
 | 2 | filters out non-financial content | dictionary (inwestycja, zysk, stopa zwrotu, akcje, CFD, forex, krypto, obligacje, ETF, portfel, makler…) + embedding similarity to class centroids; low threshold – we prefer to let content through |
 | 3 | firm names, handles, domains, NIP/KRS; fuzzy match against the registry | regex + alias dictionary from the registry, `rapidfuzz`; page domain ↔ firm domain; optional NER (spaCy `pl_core_news`) |
-| 4 | decides which modules to run (possibly several) | rules on `source_kind`, `firm.authorized`, author ≠ firm |
+| 4 | decides which modules to run (M1 and M3 may both run) | publisher identity first (a registered firm's own account → M2), then `source_kind` and the registry match by text or link host (change `analytics-m1-m3`, `analytics/README.md` "Modules and routing") |
 | 5 | merges results, computes `score`, title and summary | rule weights; summary from the LLM (optional) |
 
 ## 3. Reference data – firm registry (task for Damian, start now)
@@ -112,7 +112,7 @@ For social media content (no `blocks`) the visual rules return `not_applicable`;
 | S3.6 | targeting Poland (Polish language, PLN, +48, .pl domain) | regex |
 | S3.7 | entity on the KNF public warnings list | registry (bonus) |
 
-Hard gate: no S3.4 and no S3.3 ⇒ `score` capped at 0.4 (financial "education" alone is not advice). The LLM gets the definition from annex 3 in the system prompt and must return a quote of the recommendation.
+Hard gate: no S3.4 ⇒ `score` capped at 0.4 (financial "education" or personalization alone is not advice; Art. 76 needs a recommendation concerning instruments). Changed from "no S3.4 and no S3.3" by `analytics-m1-m3`. Plain crypto-assets are outside Art. 2 (signal S3.8, capped). The LLM gets the definition from annex 3 in the system prompt and must return a quote of the recommendation.
 Output matches the UKNF requirement: **entity data, offer content, URL**.
 
 ## 7. LLM layer

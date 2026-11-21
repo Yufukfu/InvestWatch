@@ -3,7 +3,22 @@
 Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M1–M3, LLM integration.
 
 - **Owner:** Damian
-- **Status:** pipeline (change `analytics-skeleton`): M2 for firm pages with rules-only R1–R3. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM (`model.llm = null`), M1 or M3 yet.
+- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`); semantic signals (S1.5, S3.3, S3.4) stay `uncertain` until it lands.
+- **Registry:** [`registry/seed.csv`](registry/seed.csv) holds three fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is treated as outside the registry.
+
+## Modules and routing
+
+A document gives at most one finding per module ([`modules/router.py`](src/investwatch_analytics/modules/router.py), [`pipeline.py`](src/investwatch_analytics/pipeline.py)):
+
+| Who publishes | Registry | Module |
+|---|---|---|
+| a registered firm (its domain, its profile host or its handle; any platform) | — | M2 for that firm |
+| `firm_own` source | firm named or page on a firm domain | M2 |
+| `firm_own` source | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| a third party | firm named in the text or linked | M1 (a foreign firm only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
+| a third party | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+
+M1 score: σ(bias + Σ w·x), how certain this is a third-party ad of the firm. M3 score: the same form, capped at 0.4 unless S3.4 (a recommendation to buy, sell or hold financial instruments) is found. Signals, weights and dictionaries: [`rules/m1_signals.yaml`](src/investwatch_analytics/rules/m1_signals.yaml), [`rules/m3_signals.yaml`](src/investwatch_analytics/rules/m3_signals.yaml). Evidence may quote the author handle, a link or the page URL as well as the text. Specs: [`m1-third-party-signals`](../openspec/specs/m1-third-party-signals/spec.md), [`m3-unauthorized-advice-signals`](../openspec/specs/m3-unauthorized-advice-signals/spec.md).
 
 ## Run the worker (compose)
 
@@ -67,5 +82,6 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a test-
 - `src/investwatch_analytics/pipeline.py`: `analyze(doc, *, registry, catalogue, now)` → findings. Pure, no I/O.
 - `src/investwatch_analytics/rules/m2_rules.yaml`: all 18 UKNF rules (name, severity, legal basis, dictionaries). Only entries with `implemented: true` run.
 - `src/investwatch_analytics/rules/m2.py`: R1 firm identification, R2 ad labeling, R3 risk information next to return claims.
+- `src/investwatch_analytics/rules/m1.py`, `rules/m3.py`: the M1/M3 signal classes; `modules/m1.py`, `modules/m3.py`: the M1/M3 findings; `modules/advertiser.py`: publisher identity and `advertiser`; `rules/scoring.py`: the sigmoid score.
 - `src/investwatch_analytics/worker.py`: the stream consumer (`python -m investwatch_analytics.worker`); `storage.py`: Postgres and in-memory stores; `events.py`: `iw:events` publisher and the live threshold read (ADR 0305); `health.py`: `/health`.
 - Spec: [`openspec/specs/document-analysis/`](../openspec/specs/document-analysis/spec.md) and [`openspec/specs/m2-compliance-rules/`](../openspec/specs/m2-compliance-rules/spec.md); design and review follow-ups: [`openspec/changes/archive/2026-11-21-analytics-skeleton/`](../openspec/changes/archive/2026-11-21-analytics-skeleton/); plan: [`.docs/analytics-plan.md`](../.docs/analytics-plan.md).

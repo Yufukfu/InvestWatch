@@ -20,7 +20,7 @@ The sibling stage-2 change `analytics-llm-p0` builds the LLM client (OpenAI-comp
 - Route by who publishes and which registered firm is concerned, as the challenge defines the modules, not by `source_kind` alone.
 - Rules-only M1 and M3 that produce contract-valid, explainable findings for the six mock documents, without an LLM.
 - M1 and M3 on the shared rule engine (YAML catalogues, evidence safety net), so the LLM seam of `analytics-llm-p0` applies to them without new merge code.
-- The LLM fills S1.4 (adds only), S1.5, S3.3 and S3.4 later, with a defined rules-only degradation.
+- The LLM fills S1.4 (adds only), S1.5, S3.3 and S3.4 later (a follow-up change), with a defined rules-only degradation.
 - Only small, additive edits to `rules/engine.py`, and none to `rules/m2.py` or `m2_rules.yaml`, which `analytics-llm-p0` changes.
 
 **Non-Goals:**
@@ -57,7 +57,7 @@ The sibling stage-2 change `analytics-llm-p0` builds the LLM client (OpenAI-comp
    - S1.4, `when: always`, with an `ask_llm` override that asks only when the rules result is `pass`: the LLM can add an implicit call to action, never remove a dictionary hit.
    - S1.5, S3.3, S3.4, `when: always`: rules-only, S1.5 is `uncertain` with null evidence; S3.3/S3.4 are `uncertain` quoting the rule candidate, or `pass` with no candidate. A verified verdict replaces the result (`hybrid` when the rule had evidence, else `llm`).
    - No judge, or no verdict (down, breaker open, budget, invalid output): the rules-only results stand and `model.llm = null`; otherwise `model.llm` comes from `JudgeOutcome.model`, as for M2.
-   Landing order: groups 1-5 need nothing from `analytics-llm-p0`; before it lands, `llm:` blocks are ignored by the skeleton loader (it reads only known entry keys). Group 6 wires the judge and starts only after `analytics-llm-p0` is merged.
+   Landing order: this change needs nothing from `analytics-llm-p0`; before it lands, `llm:` blocks are ignored by the loader (it reads only known entry keys). Wiring the judge into M1/M3 is deferred to a follow-up change after `analytics-llm-p0` is merged (tasks.md group 6).
 
 8. **M3 scoring follows Art. 76.** `score = σ(bias + Σ wᵢ·xᵢ)` (decision 10) with the gate: when S3.4 (recommendation to buy, sell or hold instruments) is neither `fail` nor `uncertain`, the score is `min(score, 0.4)` and the summary says so. So personalization plus instruments is strongest, an instrument recommendation alone is strong (above the 0.7 threshold once confirmed), personalization without instruments is weak (capped), and general education is capped low or has no finding. An `uncertain` S3.4 lifts the gate, so a rules-only page like `007bbcee…` can still reach the threshold; the finding then shows "do weryfikacji". This replaces plan §6's "no S3.4 and no S3.3".
 

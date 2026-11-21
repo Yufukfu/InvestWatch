@@ -2,7 +2,7 @@
 
 Rule for every group: `contracts/mocks/`, `contracts/mock-server/` and the `web/` mock mode are a test double and stay untouched. Tests read `documents.json` and `findings.json` only; a difference from the mock findings is recorded in `follow-ups.md`, never fixed in the mocks.
 
-Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` (proposal, Dependencies). Groups 1-5 are rules-only and do not need `analytics-llm-p0`. Group 6 starts only after `analytics-llm-p0` is merged (design decision 6).
+Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` (proposal, Dependencies). Groups 1-5 are rules-only and do not need `analytics-llm-p0`. Group 6 (LLM wiring) is deferred to a follow-up change.
 
 ## 1. Signal catalogues on the shared engine and evidence fields (≈ 1 h)
 
@@ -34,13 +34,11 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 - [x] 5.2 `modules/router.py` (publisher-and-registry routing), `pipeline.py` (link-host match for third-party documents, M1/M2/M3 dispatch with up to two findings, `no_signals`, `not_targeting_poland`, `module_not_implemented` removed), `cli.py` loads the signal catalogues; `pytest analytics` green; compare the CLI output for the six M1/M3 mocks with `contracts/mocks/findings.json` and record each difference (module, signal results, evidence, advertiser, score side of threshold) in `follow-ups.md` with a disposition; `git diff --stat -- contracts/ web/` is empty
 - [x] 5.3 Mutation check; `mutations: 16 tried, 16 caught` (two first survivors, the publisher's own name quote and the worker startup check, which hung on Redis instead of failing, got a test case and a stub); review fix: `mutations: 1 tried, 1 caught` (M3 alongside after the foreign-firm filter)
 
-## 6. LLM wiring for M1/M3 (≈ 45 min, after `analytics-llm-p0` is merged)
+## 6. LLM wiring for M1/M3 (deferred)
 
-- [ ] 6.1 Rebase on `main`, re-read `llm/judge.py` and the `llm-analysis` spec; failing tests with the sibling's `FakeJudge` for the scenarios of the "LLM seam and rules-only degradation for signals" requirement (no judge, judge without verdicts, S3.4 confirmed on `cdbf5306…` reaching 0.7, only S1.5 asked on `3c41441c…`, S1.4 found by the LLM), the M3 "mass signals" comparison and "instrument recommendation alone" with a real verdict
-- [ ] 6.2 Pass `judge`, `module` and `M1_CONTEXT` / `M3_CONTEXT` (M1 definition from the challenge; Art. 76 and the Art. 2-3 instrument list from annex 3, including whose offer it is) to `run_rules` in `modules/m1.py` and `modules/m3.py`; set `model.llm` as M2 does; tests green
-- [ ] 6.3 Mutation check; `mutations: N tried, N caught`
+Moved out of this change (coordinator decision on Damian's instruction, Sat 2026-11-21) so the rules-only M1/M3 land for Integration #2. It becomes a small follow-up change after `analytics-llm-p0` is merged: pass `judge`, `module` and `M1_CONTEXT` / `M3_CONTEXT` to `run_rules` in `modules/m1.py` and `modules/m3.py`, set `model.llm` as M2 does, and test the seam with that change's `FakeJudge`. The seam is already in place here: `llm:` blocks on S1.4, S1.5, S3.3 and S3.4 (`test_llm_blocks_only_on_semantic_signals`), `S14CallToAction.ask_llm`, and rules-only fallbacks that the LLM replaces. The requirement "LLM seam and rules-only degradation for signals" moved with it (follow-ups row 40).
 
 ## 7. Closing
 
-- [ ] 7.1 Apply the iw-docs-update skill (`analytics/README.md` modules and signals, `.docs/analytics-plan.md` §2 routing and §6 S3.4 gate, the skeleton open question answered here, your own analytics row in `.docs/STATUS.md` unless the coordinating session still owns STATUS updates, ADRs: none expected, `docs-check` clean) and add the iw-ai-log row
+- [x] 7.1 Apply the iw-docs-update skill (`analytics/README.md` modules and signals, `.docs/analytics-plan.md` §2 routing and §6 S3.4 gate, the skeleton open question answered here, your own analytics row in `.docs/STATUS.md` unless the coordinating session still owns STATUS updates, ADRs: none expected, `docs-check` clean) and add the iw-ai-log row
 - [ ] 7.2 Run the iw-pr-review skill and fix real findings

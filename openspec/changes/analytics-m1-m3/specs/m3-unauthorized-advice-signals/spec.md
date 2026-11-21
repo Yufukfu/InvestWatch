@@ -116,7 +116,7 @@ The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m
 - **THEN** the score is at least 0.7 (the M3 default threshold)
 
 #### Scenario: Instrument recommendation alone is strong
-- **WHEN** a page by an unregistered Polish entity has S3.4 `fail` (from a fake judge) and S3.2, S3.3 and S3.5 `pass`
+- **WHEN** a page by an unregistered Polish entity has S3.4 `fail` (as the LLM will confirm it) and S3.2, S3.3 and S3.5 `pass`
 - **THEN** the score is at least 0.7
 
 #### Scenario: Personalization alone is weak
@@ -137,7 +137,7 @@ The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m
 
 #### Scenario: Mass signals without the LLM
 - **WHEN** the mock document `cdbf5306…` is analyzed without a judge
-- **THEN** the score is above 0.4 and below the score with a judge that confirms S3.4
+- **THEN** the score is above 0.4 and below the score of the same results with S3.4 `fail`
 
 ### Requirement: M3 alongside M1
 When a document is routed to M1 and S3.3 or S3.4 is `fail` or `uncertain`, analytics SHALL also emit an M3 finding against the publisher if any sentence holding such a candidate does not name the matched registry firm (its name, core name or alias), because the offer is then the publisher's own. When every such sentence names the firm, the offer is the firm's and analytics SHALL emit no M3 finding. The M3 finding SHALL have `firm: null` and the publisher as `advertiser`.

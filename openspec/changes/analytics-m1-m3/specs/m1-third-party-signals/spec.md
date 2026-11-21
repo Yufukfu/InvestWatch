@@ -65,11 +65,15 @@ S1.3 SHALL record whether a partnership label is present: `fail` when the text h
 - **THEN** the M1 score equals σ of the bias plus the other signals' terms alone, and adding `#współpraca` to the same post raises it
 
 ### Requirement: S1.4 call to action
-S1.4 SHALL be `fail` when the text has a call-to-action phrase from its dictionary (imperatives such as `otwórz konto`, `załóż konto`, `zarejestruj się`, `odbierz bonus`, `link w bio`, `kliknij`, `dołącz`, `skorzystaj z kodu`), quoting it, and `pass` otherwise. Only a `pass` is sent to the LLM (LLM seam requirement).
+S1.4 SHALL be `fail` when the text has a call-to-action phrase from its dictionary (imperatives such as `otwórz konto`, `załóż konto`, `zarejestruj się`, `odbierz bonus`, `link w bio`, `kliknij`, `dołącz`, `skorzystaj z kodu`), quoting it, and `pass` otherwise. It carries an `llm:` block, and its `ask_llm` hook SHALL ask the LLM only about a `pass`, so the LLM can add an implicit call to action but never remove a dictionary hit.
 
 #### Scenario: Link in bio
 - **WHEN** the mock document `3c41441c…` is analyzed
 - **THEN** S1.4 is `fail` with evidence that starts with `link w bio`
+
+#### Scenario: Only a pass goes to the LLM
+- **WHEN** S1.4's `ask_llm` hook is given a `pass` and then a `fail` result
+- **THEN** it answers true for the `pass` and false for the `fail`
 
 #### Scenario: Past tense is not a call to action
 - **WHEN** the mock document `182e5a42…` (`jak założyłam rachunek`) is analyzed
