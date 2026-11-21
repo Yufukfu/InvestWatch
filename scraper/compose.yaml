@@ -5,11 +5,9 @@
 # Order: api-migrate -> seed (registers the KNF source with a cron) -> worker and scheduler. One image, three roles.
 # Checked by scraper/tests/stack.sh (spec scraper-deployment, ADR 0106).
 
+# One image, built once by `worker` only: three services that each build and export the same tag race on Docker's
+# containerd image store ("image ... already exists"). seed and scheduler reuse the image compose builds first.
 x-scraper-image: &scraper-image
-  build:
-    context: ..
-    dockerfile: scraper/Dockerfile
-    target: runtime
   image: investwatch/scraper:${IW_VERSION:-dev}
 
 # Hardening shared by every role. /tmp is the one writable path: every fetch spools its body to a temp file, at most
@@ -56,6 +54,10 @@ services:
   # port). Scale with `--scale worker=N`: the queue, run lock and domain limits are shared through Redis.
   worker:
     <<: [*scraper-image, *hardening]
+    build:
+      context: ..
+      dockerfile: scraper/Dockerfile
+      target: runtime
     command: ["python", "-m", "iw_scraper", "worker"]
     restart: unless-stopped
     # 30 s deadline + 10 s requeue (worker.CLOSE_TIMEOUT) + margin: a stop never ends in SIGKILL.

@@ -24,3 +24,4 @@ Before group 1: the branch is on `origin/main` (it has PR #38; the branch was cu
 
 - [x] 4.1 Apply the `iw-docs-update` skill (`scraper/README.md` Quick Start and hardware note, `scraper/CLAUDE.md`, `.docs/status/scraper.md`, `.docs/integration-plan.md` §2 and diagram, grep `infra/README.md` and `.docs/INDEX.md` for the service name), run `docs-check` clean, and add the `iw-ai-log` row
 - [x] 4.2 Run the `iw-pr-review` skill and fix real findings
+- [x] 4.3 PR #52 review (blocking): the image is built by `worker` only, and `stack.sh` has the check "one image, built by worker only" (red when `seed` also builds); `stack.sh` 24/24 direct, run group 10/10 through the root compose.yaml; `mutations: 1 tried, 1 caught`

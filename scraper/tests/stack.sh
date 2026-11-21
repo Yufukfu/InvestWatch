@@ -85,6 +85,13 @@ restart_policies() {
     for (const s of ["worker", "scheduler"]) if (c.services[s].restart !== "unless-stopped") fail(s + " restart " + c.services[s].restart);
     if (c.services.seed.restart !== "no") fail("seed restart " + c.services.seed.restart)'
 }
+image_built_once() { # three builds of one tag race on the containerd image store: only worker may build
+  js '
+    const builders = ["seed", "worker", "scheduler"].filter((n) => c.services[n].build);
+    if (builders.join() !== "worker") fail("services that build the image: " + builders.join(",") + " (want worker only)")
+    const tags = new Set(["seed", "worker", "scheduler"].map((n) => c.services[n].image));
+    if (tags.size !== 1) fail("the roles use different images: " + [...tags].join(","))'
+}
 single_scheduler() {
   js '
     const s = c.services.scheduler;
@@ -167,6 +174,7 @@ group_config() {
   check "start order gates are declared" gates_declared
   check "restart policies" restart_policies
   check "scheduler is defined once" single_scheduler
+  check "one image, built by worker only" image_built_once
   check "secrets have no default" secrets_have_no_default
   check "no admin credential, app role in DATABASE_URL" no_admin_credential
   check "seed holds the database URL only" seed_holds_less
@@ -186,7 +194,7 @@ knf_rows() { # prints "<count>|<schedule_cron>"
 }
 
 invalid_cron_refused() {
-  dc build seed >/dev/null || return 1  # never judge a stale image tagged by an earlier run
+  dc build worker >/dev/null || return 1  # never judge a stale image tagged by an earlier run
   dc up -d --wait api-migrate minio-init || return 1
   local out
   if out=$(SCRAPER_SEED_CRON='not a cron' dc run --rm --no-deps seed 2>&1); then echo "seed accepted an invalid cron"; return 1; fi
