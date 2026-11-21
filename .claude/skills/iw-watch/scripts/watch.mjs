@@ -2,15 +2,25 @@
 // iw-watch runner. The runner decides what to do (poll, filter, dedupe, cap); the model decides how.
 //   watch.mjs scan [--mine] [--review-requested] [--author L] [--max-rounds N] [--json]
 //   watch.mjs ack <item-id>...
+//   watch.mjs run  [same filters] [--dry-run] [--limit N] [--budget-usd X] [--model M]
 // Exit codes: 0 ok (also "already running"), 2 GitHub or environment error, 64 usage error.
 import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { makeGh, GhError } from './lib/gh.mjs';
 import { scan } from './lib/scan.mjs';
-import { stateDir, loadState, saveState, ack, dropClosed, acquireLock, releaseLock } from './lib/state.mjs';
+import { stateDir, loadState, saveState, ack, dropClosed, acquireLock, releaseLock, refreshLock, recordSession } from './lib/state.mjs';
+import { loadCodeowners, ownerOf } from './lib/codeowners.mjs';
+import { buildPrompt, safeBranch } from './lib/prompt.mjs';
+import { claudeArgs, runSession, pushDenied } from './lib/session.mjs';
+import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman } from './lib/worktree.mjs';
+import { makeNotifier } from './lib/notify.mjs';
 
-const USAGE = `usage: watch.mjs scan|ack|run [--mine] [--review-requested] [--author <login>] [--domain <dir>|mine]
-                 [--max-rounds N] [--json] [--dry-run] [--limit N]
+const USAGE = `usage: watch.mjs scan|run [--mine] [--review-requested] [--author <login>] [--domain <dir>|mine]
+                 [--max-rounds N] [--json]                                  (scan)
+                 [--dry-run] [--limit N] [--budget-usd X] [--model M]       (run)
        watch.mjs ack <item-id>...`;
 
 class UsageError extends Error {}
@@ -18,7 +28,7 @@ class UsageError extends Error {}
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   if (!['scan', 'ack', 'run'].includes(cmd)) throw new UsageError(`unknown command ${JSON.stringify(cmd ?? '')}`);
-  const o = { cmd, mine: false, reviewRequested: false, author: null, domains: [], maxRounds: 3, json: false, dryRun: false, limit: 3, ids: [] };
+  const o = { cmd, mine: false, reviewRequested: false, author: null, domains: [], maxRounds: 3, json: false, dryRun: false, limit: null, budgetUsd: 2, model: null, ids: [] };
   const value = (flag) => {
     const v = rest.shift();
     if (v === undefined || v.startsWith('--')) throw new UsageError(`${flag} needs a value`);
@@ -39,27 +49,39 @@ export function parseArgs(argv) {
     else if (a === '--limit') o.limit = count(a);
     else if (a === '--json') o.json = true;
     else if (a === '--dry-run') o.dryRun = true;
-    else if (cmd === 'ack' && !a.startsWith('-')) o.ids.push(a);
+    else if (a === '--budget-usd') {
+      o.budgetUsd = Number(value(a));
+      if (!(o.budgetUsd > 0 && o.budgetUsd <= 20)) throw new UsageError('--budget-usd must be more than 0 and at most 20');
+    } else if (a === '--model') {
+      o.model = value(a);
+      if (!/^[A-Za-z0-9._-]+$/.test(o.model)) throw new UsageError('--model must be a model name or alias');
+    } else if (cmd === 'ack' && !a.startsWith('-')) o.ids.push(a);
     else throw new UsageError(`unknown argument ${JSON.stringify(a)}`);
   }
   if (o.author && !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(o.author)) throw new UsageError('--author must be a GitHub login');
   if (cmd === 'ack' && !o.ids.length) throw new UsageError('ack needs at least one item id');
   if (o.domains.length) throw new UsageError('--domain is not implemented yet');
-  if (cmd === 'scan' && (o.dryRun || o.limit !== 3)) throw new UsageError('--dry-run and --limit apply to run only');
+  if (cmd === 'scan' && (o.dryRun || o.limit !== null || o.model)) throw new UsageError('--dry-run, --limit and --model apply to run only');
   if (cmd !== 'ack' && !o.mine && !o.reviewRequested && !o.author && !o.domains.length) {
     throw new UsageError('say what to watch: --mine, --review-requested, --author <login> or --domain <dir>');
   }
+  o.limit ??= 3;
   return o;
 }
 
 export function defaultDeps() {
   return {
     gh: makeGh(),
+    git: realGit,
     env: process.env,
     home: os.homedir(),
     stdout: (s) => process.stdout.write(s),
     stderr: (s) => process.stderr.write(s),
     now: () => Date.now(),
+    mainRoot: null, // found from the current directory when needed
+    spawnClaude: spawnSync,
+    spawnNotify: spawnSync,
+    claudeAvailable: () => !spawnSync('claude', ['--version'], { stdio: 'ignore' }).error,
   };
 }
 
@@ -105,6 +127,91 @@ function printItems(deps, items, json) {
 // Titles and logins are other people's text: no terminal escape sequences reach the terminal
 export const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '?');
 
+function scanState(deps, ctx, o, state) {
+  const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode: { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author }, state, maxRounds: o.maxRounds, warn: (m) => deps.stderr(`${m}\n`) });
+  if (r.open) dropClosed(state, r.open);
+  return r;
+}
+
+function owners(deps, mainRoot, ctx, files) {
+  const git = (args) => deps.git(['-C', mainRoot, ...args]);
+  try { git(['fetch', '--quiet', 'origin', ctx.defaultBranch]); } catch { /* offline: use what we have */ }
+  let rules = null;
+  try { rules = loadCodeowners({ git, ref: `origin/${ctx.defaultBranch}` }); } catch (e) { deps.stderr(`iw-watch: CODEOWNERS ignored: ${e.message}\n`); }
+  return files.slice(0, 200).map((p) => ({ path: p, owners: rules ? ownerOf(rules, p) : [] }));
+}
+
+/** One item, one headless session. Returns the notice to emit. The item is acknowledged in every case but a crash. */
+function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
+  const base = { pr: it.pr, title: it.title, url: it.url, item: it.id, kindOfItem: it.kind };
+  if (it.kind === 'cap-reached') {
+    return { ...base, kind: 'needs-human', detail: `round cap ${it.maxRounds} reached on #${it.pr}; the agents stop here, over to you` };
+  }
+  if (!safeBranch(it.headRef) || !safeBranch(it.baseRef)) {
+    return { ...base, kind: 'needs-human', detail: `refused branch name ${JSON.stringify(clean(it.headRef))}: only [A-Za-z0-9._/-] is handled` };
+  }
+  const draftDir = path.join(sdir, 'drafts', it.id.replace(/[^0-9a-z.-]/gi, '_'));
+  let clone;
+  try {
+    clone = prepareClone({ git: deps.git, mainRoot, item: it });
+  } catch (e) {
+    if (e instanceof NeedsHuman) return { ...base, kind: 'needs-human', detail: e.message };
+    return { ...base, kind: 'needs-human', detail: `could not prepare a clone: ${String(e.stderr || e.message).split('\n')[0]}` };
+  }
+  recordSession(state, it.pr);
+  saveState(sdir, state); // a crash during the session still counts the round
+  const prompt = buildPrompt({ item: it, me: ctx.me, owners: owners(deps, mainRoot, ctx, it.files), dryRun: o.dryRun });
+  const args = claudeArgs({ kind: it.kind, pr: it.pr, headRef: it.headRef, dryRun: o.dryRun, budgetUsd: o.budgetUsd, model: o.model });
+  const res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
+  const copied = collectDrafts({ dir: clone.dir, to: draftDir });
+  fs.writeFileSync(path.join(draftDir, 'session.json'), `${JSON.stringify({ item: it.id, kind: it.kind, ok: res.ok, code: res.code, timedOut: res.timedOut, cost: res.cost, turns: res.turns, subtype: res.subtype, denials: res.denials, summary: res.summary, clone: clone.dir }, null, 2)}\n`, { mode: 0o600 });
+  const own = it.kind === 'address-review' || it.kind === 'ci-failed';
+  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost };
+  if (!res.ok) {
+    return { ...at, kind: 'needs-human', detail: `session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`}); the clone is kept at ${clone.dir}` };
+  }
+  if (o.dryRun) {
+    const steps = [`cd ${clone.dir}`];
+    if (own) steps.push(`git push origin ${it.headRef}`);
+    if (copied.includes('reply.md')) steps.push(`gh pr comment ${it.pr} --body-file ${path.join(draftDir, 'reply.md')}`);
+    return { ...at, kind: 'draft-ready', detail: `dry run: nothing was pushed or posted. To publish: ${steps.join(' && ')}` };
+  }
+  if (own && pushDenied(res.denials)) {
+    return { ...at, kind: 'needs-human', detail: `the push was denied; the commits and the reply are kept (clone ${clone.dir}, drafts ${draftDir})` };
+  }
+  const left = own ? unpushed({ git: deps.git, dir: clone.dir, headRef: it.headRef }) : 0;
+  if (left > 0) {
+    return { ...at, kind: 'needs-human', detail: `${left} commit${left > 1 ? 's' : ''} in ${clone.dir} not pushed` };
+  }
+  removeClone({ dir: clone.dir });
+  delete at.clone;
+  return { ...at, kind: 'done', detail: res.summary.slice(0, 500) };
+}
+
+function runCmd(deps, ctx, o) {
+  if (!deps.claudeAvailable()) {
+    deps.stderr('iw-watch: the claude CLI is not on PATH. Install Claude Code (https://code.claude.com/docs) or use the in-session mode: /loop 2m /iw-watch --mine\n');
+    return 2;
+  }
+  const mainRoot = deps.mainRoot || findMainRoot({ git: deps.git });
+  const notify = makeNotifier({ env: deps.env, stdout: deps.stdout, stderr: deps.stderr, now: deps.now, spawn: deps.spawnNotify });
+  const res = withState(deps, ctx.repo, (state, sdir, lock) => {
+    const { items } = scanState(deps, ctx, o, state);
+    saveState(sdir, state);
+    for (const it of items.slice(0, o.limit)) {
+      refreshLock(lock, { now: deps.now });
+      const notice = handle({ deps, ctx, o, state, sdir, mainRoot, it });
+      ack(state, it.id);
+      saveState(sdir, state);
+      notify(notice);
+    }
+    if (items.length > o.limit) deps.stderr(`iw-watch: ${items.length - o.limit} more item(s) wait for the next run (--limit ${o.limit})\n`);
+    return { count: items.length };
+  });
+  if (!res.skipped && res.count === 0) deps.stderr('iw-watch: nothing new\n');
+  return 0;
+}
+
 export async function main(argv, deps = defaultDeps()) {
   let o;
   try {
@@ -114,7 +221,9 @@ export async function main(argv, deps = defaultDeps()) {
     deps.stderr(`iw-watch: ${e.message}\n${USAGE}\n`);
     return 64;
   }
+  deps = { ...defaultDeps(), ...deps };
   try {
+    if (o.cmd === 'run' && !deps.claudeAvailable()) return runCmd(deps, null, o);
     const ctx = context(deps);
     if (o.cmd === 'ack') {
       withState(deps, ctx.repo, (state) => { for (const id of o.ids) ack(state, id); });
@@ -122,16 +231,11 @@ export async function main(argv, deps = defaultDeps()) {
       return 0;
     }
     if (o.cmd === 'scan') {
-      const res = withState(deps, ctx.repo, (state) => {
-        const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode: { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author }, state, maxRounds: o.maxRounds, warn: (m) => deps.stderr(`${m}\n`) });
-        if (r.open) dropClosed(state, r.open);
-        return r;
-      });
+      const res = withState(deps, ctx.repo, (state) => scanState(deps, ctx, o, state));
       if (!res.skipped) printItems(deps, res.items, o.json);
       return 0;
     }
-    deps.stderr('iw-watch: run is not implemented yet\n');
-    return 64;
+    return runCmd(deps, ctx, o);
   } catch (e) {
     if (e instanceof GhError) {
       deps.stderr(`iw-watch: ${e.kind}: ${e.message}\n`);

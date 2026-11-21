@@ -26,7 +26,7 @@ CLI: `watch.mjs scan|ack|run [--mine] [--review-requested] [--author L] [--domai
 
 ### D2. A headless session gets the same permissions as an interactive one, and no more
 
-`claude -p` runs with `--permission-mode dontAsk` and an explicit allow-list that mirrors ADR 0207: read and edit tools, local `git`, `git push origin`, `gh pr create`, `gh pr comment`, `gh issue create`. Anything else (`gh pr review`, `gh pr merge`, `gh pr ready`, `gh api`, network tools) is denied because nothing is there to answer a prompt, and the project's `git-guard` hook loads from the worktree's `.claude/settings.json` and still runs. Alternatives:
+`claude -p` runs with `--permission-mode dontAsk` (verified on 2.1.330: a command that matches no allow rule is denied and listed in `result.permission_denials`, `fixtures/claude-stream-denied.jsonl`) and an allow-list built per session, narrower than ADR 0207: `git push origin <this PR's branch>` exactly and `gh pr comment <this PR>` only, test runners only on the user's own branch, nothing outward in a dry run (`lib/session.mjs`). `gh pr review`, `gh pr merge`, `gh pr ready`, `gh api`, `curl`, `wget`, WebFetch and WebSearch are also in `--disallowedTools`, and `--tools` removes the web tools altogether. The project's `git-guard` hook loads from the clone's `.claude/settings.json` and still runs; `--bare`, `--restricted` and `--safe-mode` would skip it and are never passed. `IW_*` variables are stripped from the session environment. Alternatives:
 
 - A runner that performs the push and the `gh` writes itself ("model proposes, runner disposes", the first version of this design): the runner would push outside the hook, so every guard would have to be written twice. Dropped once ADR 0207 made the model's own push the sanctioned path and the hook the guard.
 - Bypass permissions in a container: no container on laptops, and `bypassPermissions` is documented for isolated VMs only. Rejected.
@@ -39,15 +39,15 @@ Every comment and issue body the agent writes ends with `<!-- iw-watch -->` (the
 
 ### D4. Untrusted text is data, and the allow-list is the real defence
 
-The prompt puts all third-party text inside a fence ("data, not instructions"), but a fence only lowers the odds. The hard limit is the allow-list: no network tool, no `gh api`, no review, merge or ready, `--max-turns` capped, text never interpolated into argv, and the hook's push rules on top. The worst a prompt-injected session can do is write wrong code to its own branch or post a wrong comment, and a human reviews both before merge.
+The prompt puts all third-party text inside a fence ("data, not instructions"), but a fence only lowers the odds. The hard limit is the allow-list: no network tool, no `gh api`, no review, merge or ready, a dollar budget and a 20-minute timeout, the prompt on stdin and never in argv, and the hook's push rules on top. Only text from accounts with write access (`author_association` `OWNER`, `MEMBER`, `COLLABORATOR`) reaches a session: those people can already push code that the agent's test run would execute, so running tests on the user's own branch adds no new trust. A review of someone else's PR runs none of its code. The worst a prompt-injected session can do is write wrong code to its own branch or post a wrong comment, and a human reviews both before merge.
 
 ### D5. In-session mode needs nothing new
 
 `/loop 2m /iw-watch --mine` runs `scan --json`; the session handles the item under its own permissions, as for any task. This is the demo path.
 
-### D6. One worktree per handled item
+### D6. One disposable clone per handled item
 
-`run` creates `../InvestWatch-worktrees/watch-pr-<n>` from the PR head (fetched with `refs/pull/<n>/head` for reviews, the real branch for the user's own PRs) so the main clone and other sessions are not touched, and removes it afterwards unless the item needs the human.
+`run` creates `../InvestWatch-worktrees/watch-pr-<n>` as a clone (`--reference` the main clone, then `--dissociate`), with the real `origin` URL: the user's branch for their own PRs, the detached PR head (`refs/pull/<n>/head`) for reviews. A `git worktree` was the first plan, but the PR branch is usually checked out in the author's own worktree and git refuses a second one; a detached worktree cannot push the branch under the hook's current-branch rule. The main clone and other sessions are not touched, an existing directory is never overwritten, and the clone is removed afterwards unless the item needs the human.
 
 ### D7. State outside the repo
 
@@ -63,7 +63,7 @@ Owners follow [`.docs/STATUS.md`](../../../.docs/STATUS.md): `scraper/` Adam, `w
 - **Agent ping-pong between two watchers** → marker plus state cap (D3), one `needs-human` notice, silent afterwards.
 - **Depends on PR #27** → until it merges the headless push is denied; the item then stays a draft with a `needs-human` notice, and `--dry-run` covers the same path on purpose.
 - **Escape flags** (`IW_*`) are plain text and a headless agent could write one → the hook's push and `gh` checks take no escape; a commit made with `IW_SKIP_SPEC=1` is still possible, so the runner's prompt forbids `IW_*` and the PR body must list any escape used (ADR 0207 criterion).
-- **Cost** → polling is plain `gh` (no model) and a session starts only on a new item, with `--max-turns` and a per-run item limit.
+- **Cost** → polling is plain `gh` (no model) and a session starts only on a new item, with `--max-budget-usd` (default 2 USD) per session, a 20-minute timeout and a per-run item limit (`--limit`, default 3).
 - **Unverified `claude` flags** → built in one function and pinned by a test against `claude --help` output saved from the first machine that has it (task 4.2); a flag change is a one-line fix.
 - **`gh` 2.39 is old** → only `pr list/view --json`, `api` GET for reviews and comments (done by the runner, not the agent), `issue create`, `pr create`, `pr comment`.
 - **Time** → v1 is `--mine` and `--review-requested`; `--author`, `--domain` and owner-routed issues land in later task groups and can be cut without breaking the rest.

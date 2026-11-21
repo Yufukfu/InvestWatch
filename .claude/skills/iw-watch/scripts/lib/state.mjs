@@ -77,6 +77,7 @@ export function ack(state, id) {
     if (!keys) throw new Error(`unknown item id ${id}: not pending (run scan first, or it was already acknowledged)`);
     e.handled = [...new Set([...(e.handled || []), ...keys])].slice(-HANDLED_MAX);
     delete e.pending[id];
+    if (!Object.keys(e.pending).length) delete e.pending;
   } else {
     e[KINDS[kind]] = cursor;
   }

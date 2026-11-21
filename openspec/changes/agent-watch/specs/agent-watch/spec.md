@@ -127,7 +127,7 @@ Text from reviews, comments, issue bodies, titles and branch names SHALL reach t
 - **THEN** the runner passes it as a single argv element, never through a shell, and refuses names outside `[A-Za-z0-9._/-]`
 
 ### Requirement: Restrict the headless agent
-The runner SHALL start the headless agent with `--permission-mode dontAsk`, a turn limit and an explicit allow-list: read and edit tools, local `git` (`status`, `diff`, `log`, `add`, `commit`), `git push origin`, `gh pr create`, `gh pr comment` and `gh issue create`. It SHALL NOT allow `gh pr review`, `gh pr merge`, `gh pr ready`, `gh api`, network tools or `bypassPermissions`, and the repository's `git-guard` hook SHALL stay active in the session.
+The runner SHALL start the headless agent with `--permission-mode dontAsk`, `--permission-prompts none`, a dollar budget and a wall-clock timeout, the built-in tools limited to `Bash Read Edit Write Grep Glob`, and `gh pr review`, `gh pr merge`, `gh pr ready`, `gh api` and network tools in `--disallowedTools`. It SHALL NOT pass `bypassPermissions`, `--bare`, `--restricted` or `--safe-mode`, so the `git-guard` hook stays active, and SHALL strip `IW_*` variables from the session environment.
 
 #### Scenario: Agent pushes its own branch
 - **WHEN** the agent pushes the head branch of my PR to `origin`
@@ -140,6 +140,21 @@ The runner SHALL start the headless agent with `--permission-mode dontAsk`, a tu
 #### Scenario: Agent commits
 - **WHEN** the agent commits a fix for a review comment
 - **THEN** the repository hooks still run, including the contract-freeze and spec checks
+
+### Requirement: Build the allow-list per session
+The runner SHALL build each session's allow-list from its item: read tools, `gh pr view|diff` and `gh issue list|view` always; `git add`, `git commit`, the test commands and `git push origin <the PR branch>` (exact, no wildcard) only on the user's own PR; `gh pr comment <the PR number>`, `gh issue create` and `gh issue comment` only outside a dry run.
+
+#### Scenario: My PR
+- **WHEN** a session addresses a review on my PR #11 with branch `web/fe`
+- **THEN** the allow-list has `Bash(git push origin web/fe)` and `Bash(gh pr comment 11:*)`, and no wildcard push
+
+#### Scenario: Someone else's PR
+- **WHEN** a session reviews PR #28 by a teammate
+- **THEN** the allow-list has no `git commit`, no `git push` and no test command, and the PR head is checked out detached
+
+#### Scenario: Unsafe branch name
+- **WHEN** the branch name is outside `[A-Za-z0-9._/-]` or unsafe for git
+- **THEN** no allow-list is built and the item goes to the human
 
 ### Requirement: Never approve or merge
 The agent SHALL post reviews of other people's PRs as comments (`gh pr comment`) that say an approval is left to a human, and SHALL NOT approve, merge or mark a PR ready.
@@ -184,7 +199,7 @@ If `gh` is missing, unauthenticated or rate limited, the runner SHALL exit non-z
 - **THEN** no partial state is written and the next scheduled run retries
 
 ### Requirement: Support session and headless use
-`scan` and `ack` SHALL work without the `claude` CLI so a running session can drive them (for example under `/loop`); `run` SHALL start one headless session per item in its own git worktree and SHALL remove the worktree afterwards unless the item needs the human.
+`scan` and `ack` SHALL work without the `claude` CLI so a running session can drive them (for example under `/loop`); `run` SHALL start one headless session per item in its own disposable clone (`../InvestWatch-worktrees/watch-pr-<n>`) and SHALL remove the clone afterwards unless the item needs the human.
 
 #### Scenario: In-session loop
 - **WHEN** a session runs `scan --mine --json` and handles the printed item itself
