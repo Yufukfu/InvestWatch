@@ -37,11 +37,15 @@ Option 2. The hosted default is Gemma 4 on the Gemini API through its OpenAI-com
 
 ```
 LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemma-4-26b-a4b-it   # measured ~9.5 s per call; gemma-4-31b-it measured ~57 s
+LLM_MODEL=gemma-4-31b-it
 LLM_API_KEY=<Gemini API key, only in .env>
 ```
 
-Damian named `gemma-4-31b-it` in the team `.env`. This ADR records that the measured latency of `gemma-4-26b-a4b-it` was about six times lower. The choice between the two stays an `.env` value.
+The default model is `gemma-4-31b-it` (Damian, 2026-11-21). `gemma-4-26b-a4b-it` is the tested alternative to switch to, by `.env` only, when 31b keeps returning 503 "high demand". Measured on 2026-11-21:
+- 31b: 3 of 3 calls returned 503 in the CLI run;
+- 26b: 3 of 5 calls returned 200 in 15-30 s each, one returned 503 and one timed out at 60 s.
+
+The circuit breaker's fall-back to rules-only stays the safety net for both.
 
 For either model, the defaults must change: `LLM_TIMEOUT_S` 20 is below the measured latency. For the hosted Gemma, set `LLM_TIMEOUT_S=45` and `LLM_DOC_BUDGET_S=50`. Because the per-document budget must stay below the worker's claim idle time ([ADR 0310](0310-llm-chunking-and-budget.md)), also set `CLAIM_MIN_IDLE_MS=90000`.
 
@@ -50,6 +54,18 @@ For either model, the defaults must change: `LLM_TIMEOUT_S` 20 is below the meas
 - **503 and 429** count as `LlmUnavailable`: the circuit breaker opens and the documents fall back to rules-only. The Redis cache makes re-scans free ([ADR 0309](0309-llm-prompt-and-cache-contract.md)).
 
 Rationale: the task text names Gemma 4, and the measured endpoint accepts exactly the request ADR 0309 defines. The only difference is the reasoning prefix, which a small, tested strip handles. The poor availability is absorbed by the paths that already exist (breaker, rules-only, cache).
+
+## Default M2 threshold re-measured (successor note to ADR 0316)
+
+Damian accepted on 2026-11-21 an M2 default threshold of **0.1**, down from 0.25. This change follows ADR 0316's procedure unchanged: the default is the best-F1 threshold of the rules-only gold run, written by `python analytics/eval/run.py --write-thresholds`. ADR 0316 itself is not edited.
+
+- **Why it moved:** this change adds the M2 P0 rules R4, R6, R14, R17 and R18. On most gold documents they are `pass` or `not_applicable`, which adds weight to the score's denominator and lowers M2 scores.
+- **Numbers:** rules-only run (no LLM), 69 gold documents; for M2, 23 positives and 12 negatives.
+  - At 0.1: precision 0.933, recall 0.609, F1 0.737 (tp 14, fp 1, fn 9, tn 11).
+  - At 0.25: precision 0.929, recall 0.565, F1 0.703 (tp 13, fp 1, fn 10, tn 11).
+  - The F1 plateau is 0.05-0.1.
+- **Where it is copied:** `analytics/eval/thresholds.json`, `analytics/src/investwatch_analytics/events.py` `DEFAULT_THRESHOLDS` and `api/src/investwatch_api/thresholds.py` `DEFAULTS`. `analytics/tests/test_eval_thresholds.py` pins all three.
+- **Next measurement:** re-measured with the LLM (`run.py --llm`) after this change merges. LLM verdicts can move R3, R17 and R18, and with them the best threshold.
 
 ## Consequences
 

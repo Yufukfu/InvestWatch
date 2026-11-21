@@ -22,7 +22,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
   - Hosted default Gemma 4 on the Gemini API (ADR 0317). Measured on 2026-11-21: valid JSON after a `<thought>` strip; 15-30 s per call on `gemma-4-26b-a4b-it`; about half the calls returned 503 "high demand". The demo must not depend on it: pre-warm the cache, keep the Ollama profile ready.
   - R10 (language consistency) was cut and deferred (follow-ups R67).
   - The M2 default threshold was re-measured from 0.25 to 0.1 (ADR 0316 procedure).
-  - Waiting for Damian: the M2 threshold drop, and `gemma-4-26b-a4b-it` versus `gemma-4-31b-it` in `.env`.
+  - Decided by Damian: the default model stays `gemma-4-31b-it` (`gemma-4-26b-a4b-it` is the documented fallback), and the M2 default 0.1 is accepted (ADR 0317). It is re-measured with the LLM after merge.
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
