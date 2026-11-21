@@ -1,8 +1,10 @@
 """KNF firm registry: CSV loader and document-to-firm matching (`.docs/analytics-plan.md` §2 step 3, §3).
 
-Matching order (best confidence wins): name or alias in the text (0.95), page host equal to or a
+Per firm, the strongest signal: name or alias in the text (0.95), page host equal to or a
 subdomain of a firm domain (0.9), fuzzy match of the name core on word n-grams (ratio x 0.85,
 only at ratio >= 88, which for short names means an exact word anyway).
+Across firms: the firm whose domain hosts the page wins (a firm's own page that names a partner
+firm is still that firm's page), then the highest confidence, then the earliest and the longest quote.
 Name matches quote the ORIGINAL text, so the quote can serve as rule evidence.
 """
 
@@ -112,26 +114,34 @@ class Registry:
 
     def find_name(self, firm: Firm, text: str) -> str | None:
         """Exact quote of the firm's name or an alias in `text`, or None."""
+        m = self._find(firm, text)
+        return m.group(0) if m else None
+
+    def _find(self, firm: Firm, text: str) -> re.Match | None:
         for pattern in self._patterns[firm.id]:
             m = pattern.search(text)
             if m:
-                return m.group(0)
+                return m
         return None
 
     def match(self, text: str, url: str) -> FirmMatch | None:
-        candidates: list[FirmMatch] = []
+        # (rank key, match); the smallest key wins: own domain, confidence, earliest, longest quote.
+        candidates: list[tuple[tuple, FirmMatch]] = []
         host = _normalize_domain(url)
         # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
         segments = [[w.lower() for w in _WORD.findall(seg)] for seg in _PUNCT.split(text)]
         for firm in self.firms:
-            quote = self.find_name(firm, text)
-            if quote:
-                candidates.append(FirmMatch(firm, NAME_CONFIDENCE, "name", quote))
-            elif any(host == d or host.endswith("." + d) for d in firm.domains):
-                candidates.append(FirmMatch(firm, DOMAIN_CONFIDENCE, "domain", None))
+            on_domain = any(host == d or host.endswith("." + d) for d in firm.domains)
+            if m := self._find(firm, text):
+                match, pos = FirmMatch(firm, NAME_CONFIDENCE, "name", m.group(0)), m.start()
+            elif on_domain:
+                match, pos = FirmMatch(firm, DOMAIN_CONFIDENCE, "domain", None), len(text)
             elif (ratio := max((_best_fuzzy(firm.core, w) for w in segments), default=0.0)) >= FUZZY_MIN_RATIO:
-                candidates.append(FirmMatch(firm, round(ratio / 100 * FUZZY_FACTOR, 3), "fuzzy", None))
-        return max(candidates, key=lambda m: m.confidence, default=None)
+                match, pos = FirmMatch(firm, round(ratio / 100 * FUZZY_FACTOR, 3), "fuzzy", None), len(text)
+            else:
+                continue
+            candidates.append(((not on_domain, -match.confidence, pos, -len(match.evidence or "")), match))
+        return min(candidates, key=lambda c: c[0])[1] if candidates else None
 
 
 def _best_fuzzy(core: str, words: list[str]) -> float:

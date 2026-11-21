@@ -77,14 +77,43 @@ def test_lookalike_domain_does_not_match(registry):
     assert registry.match("Otwórz konto.", "https://fakealfa-inwestycje.example.com/") is None
 
 
-def test_name_beats_domain(registry):
-    m = registry.match("Bank Przykładowy zaprasza.", "https://alfa-inwestycje.example.com/")
-    assert m.firm.id == BANK_ID and m.method == "name"
+def test_own_domain_beats_other_firms_name(registry):
+    m = registry.match("Bank Przykładowy jest depozytariuszem.", "https://alfa-inwestycje.example.com/")
+    assert m.firm.id == ALFA_ID and m.method == "domain"
 
 
-def test_best_confidence_wins_regardless_of_order(registry):
+def test_own_domain_with_own_name_quotes_the_name(registry):
+    m = registry.match("Bank Przykładowy i Alfa Inwestycje.", "https://alfa-inwestycje.example.com/")
+    assert m.firm.id == ALFA_ID and m.method == "name" and m.evidence == "Alfa Inwestycje"
+
+
+def test_name_on_foreign_domain_is_not_the_page_owner(registry):
     m = registry.match("Alfa Inwestycje zaprasza.", "https://eurotrade-markets.example.com/")
-    assert m.firm.id == ALFA_ID and m.method == "name"
+    assert m.firm.id == EURO_ID and m.method == "domain"
+
+
+def test_name_beats_fuzzy_regardless_of_csv_order(registry):
+    m = registry.match("Klienci Alfa Inwestycji i EuroTrade.", "https://x.example.org/")
+    assert m.firm.id == EURO_ID and m.method == "name"
+
+
+def test_earliest_name_wins_a_tie(registry):
+    m = registry.match("Bank Przykładowy i Alfa Inwestycje.", "https://x.example.org/")
+    assert m.firm.id == BANK_ID
+    m = registry.match("Alfa Inwestycje i Bank Przykładowy.", "https://x.example.org/")
+    assert m.firm.id == ALFA_ID
+
+
+def test_longest_name_wins_at_the_same_position(tmp_path):
+    csv = tmp_path / "r.csv"
+    csv.write_text(
+        "id,name,aliases,type,country,website_domains,source_url\n"
+        f"{ALFA_ID},Alfa Dom Maklerski S.A.,,brokerage_house,PL,,\n"
+        f"{BANK_ID},Alfa Inwestycje Dom Maklerski S.A.,,brokerage_house,PL,,\n",
+        encoding="utf-8",
+    )
+    m = Registry.from_csv(csv).match("Alfa Inwestycje zaprasza.", "https://x.example.org/")
+    assert m.firm.id == BANK_ID and m.evidence == "Alfa Inwestycje"
 
 
 def test_fuzzy_match_on_declension(registry):
@@ -181,3 +210,8 @@ def test_empty_registry_rejected(tmp_path):
     path.write_text("id,name,type\n", encoding="utf-8")
     with pytest.raises(RegistryError, match="empty.csv"):
         Registry.from_csv(path)
+
+
+def test_higher_fuzzy_confidence_beats_earlier_fuzzy(registry):
+    m = registry.match("Alfa Inwestycji oraz EuroTrad Markets.", "https://x.example.org/")
+    assert m.firm.id == EURO_ID and m.method == "fuzzy"
