@@ -170,7 +170,7 @@ async def _finish_if_started(ctx: dict, source_id: str, *, status: str, document
         return
     try:
         if await ctx["sources"].get(source_id) is not None:
-            await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status, documents=documents)
+            await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status)
     except Exception:
         # the marker is gone, so this is the only chance to end the progress bar
         logger.exception("could not stamp the source after its run")

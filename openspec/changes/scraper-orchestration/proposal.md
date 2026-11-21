@@ -8,14 +8,14 @@ With fetching and parsing (`scraper-v1`) and ingest (`scraper-ingest`) in place,
 
 - A job queue (`arq`, ADR 0102) runs every collection with a per-domain concurrency cap, retries owned by the queue, resume after restart and a per-source run lock held for the whole job.
 - A run that reports a deferral (`Retry-After`, paused domain, all proxies cooling) is requeued with a delay, not failed; the queue records one outcome per job into the domain failure cooldown.
-- Scan requests from Redis Stream `iw:scan-requests` enqueue jobs; `scan.started` / `scan.finished` are published on `iw:events` once per job; `sources.last_run_at`, `last_run_status` and `documents_count` are written.
+- Scan requests from Redis Stream `iw:scan-requests` enqueue jobs; `scan.started` / `scan.finished` are published on `iw:events` once per job; `sources.last_run_at` and `last_run_status` are written (the API counts `documents` rows on read, so there is no `documents_count` column).
 - A scheduler enqueues each due job exactly once across workers from `schedule_cron` (`null` = manual only) and runs the republish sweep on an interval.
 - Workers are stateless and stop gracefully; jobs have a timeout; Redis and PostgreSQL reconnect with backoff; `GET /health`; JSON logs on stdout.
 - First real end-to-end test on the KNF page (served by a local stub), including two workers and an opt-in live smoke test with a seed script.
 - Out of scope: social-media collectors (`scraper-v2`), Playwright rendering (`scraper-v3`), crawling beyond one URL per run, the REST API, analytics consumption.
 - Owner: module A (`scraper/`).
 - Depends on: `scraper-v1` (fetch, parse, guards) and `scraper-ingest` (storage, publish, `job_errors`) merged, and on C's migration and compose file (`scraper-ingest` task 1.1). Starts from a branch stacked on those.
-- Contracts: consumes the `scan_request` message from `iw:scan-requests`, publishes `scan.started`/`scan.finished` events on `iw:events` and writes `sources.last_run_*` / `documents_count`. It changes none of those shapes.
+- Contracts: consumes the `scan_request` message from `iw:scan-requests`, publishes `scan.started`/`scan.finished` events on `iw:events` and writes `sources.last_run_at` and `last_run_status` only. It changes none of those shapes.
 
 ## Capabilities
 

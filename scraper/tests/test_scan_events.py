@@ -57,7 +57,7 @@ async def test_source_is_marked_running_while_the_job_runs_and_finished_after(re
 
     assert seen["during"] == {"last_run_status": "running"}
     after = store.status[SRC]
-    assert (after["last_run_status"], after["documents_count"]) == ("ok", 3)
+    assert after["last_run_status"] == "ok"
     assert abs((datetime.now(UTC) - after["last_run_at"]).total_seconds()) < 10
 
 
@@ -96,10 +96,11 @@ async def test_a_block_with_no_document_is_failed_and_stamps_last_run_at(redis, 
     assert store.status[SRC]["last_run_at"] is not None
 
 
-async def test_a_run_that_finds_only_duplicates_records_zero_documents(redis, start_worker, store):
+async def test_a_run_that_finds_only_duplicates_finishes_ok_with_zero_documents(redis, start_worker, store, events):
     await run_job(redis, start_worker, lambda s, started=None: _const(result_of(documents=0)))
+    await wait_for(lambda: len(events) >= 2)
 
-    assert store.status[SRC]["documents_count"] == 0
+    assert events[1]["data"] == {"source_id": SRC, "documents": 0, "status": "ok"}
     assert store.status[SRC]["last_run_status"] == "ok"
 
 

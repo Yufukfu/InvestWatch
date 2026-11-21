@@ -14,8 +14,8 @@ class SourceStore(Protocol):
     async def mark_running(self, source_id: str) -> None:
         """`last_run_status = 'running'`."""
 
-    async def mark_finished(self, source_id: str, *, at: datetime, status: str, documents: int) -> None:
-        """`last_run_at`, `last_run_status` and `documents_count` of the job that just ended."""
+    async def mark_finished(self, source_id: str, *, at: datetime, status: str) -> None:
+        """`last_run_at` and `last_run_status` of the job that just ended."""
 
     async def schedulable(self) -> Sequence[Source]:
         """Every source the scheduler may look at (it filters on `collectable` and `schedule_cron`)."""

@@ -73,8 +73,8 @@ class FakeSourceStore:
     async def mark_running(self, source_id) -> None:
         self.status[source_id] = {"last_run_status": "running"}
 
-    async def mark_finished(self, source_id, *, at: datetime, status: str, documents: int) -> None:
-        self.status[source_id] = {"last_run_at": at, "last_run_status": status, "documents_count": documents}
+    async def mark_finished(self, source_id, *, at: datetime, status: str) -> None:
+        self.status[source_id] = {"last_run_at": at, "last_run_status": status}
 
     async def schedulable(self):
         return list(self.sources.values())
