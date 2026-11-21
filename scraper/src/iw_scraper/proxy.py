@@ -74,6 +74,16 @@ class ProxyRun:
     def penalize(self, choice: ProxyChoice) -> None:
         self._rotator.penalize(choice)
 
+    def deferral(self) -> Deferral | None:
+        """A `Deferral` when every proxy is cooling, so a run can wait before it announces itself. Uses nothing up."""
+        rotator = self._rotator
+        if not rotator.proxies:
+            return None
+        cooling = rotator._cooling(rotator._clock())
+        if len(cooling) < len(rotator.proxies):
+            return None
+        return Deferral(until=min(cooling.values()))
+
     def pick(self) -> ProxyChoice | Deferral | None:
         """The proxy for the next request; a `Deferral` when none may be used now; None for a direct request."""
         rotator = self._rotator
