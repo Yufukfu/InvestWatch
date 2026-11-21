@@ -1,0 +1,10 @@
+# Build context is the repository root (see api/Dockerfile); send only what the image needs.
+**
+!api/requirements.txt
+!api/alembic.ini
+!api/migrations/**
+!api/src/**
+!contracts/schemas/**
+!contracts/openapi.yaml
+**/__pycache__
+**/*.pyc
