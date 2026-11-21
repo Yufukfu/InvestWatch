@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Deduplicate by content hash
-The scraper SHALL compute `content_hash` as the sha256 of the normalised text (Unicode NFC, every run of whitespace collapsed to one space, leading and trailing whitespace removed; case is preserved) and SHALL NOT insert a second document with the same `content_hash` for the same `source_id`. For a document whose `platform` is not `web` (a post, where `url` is the permalink of one item), the hashed input SHALL be the `url`, a line feed and the normalised text, so that identical text posted at two permalinks of one source is two documents. The value is still a lowercase sha256 hex string, so the schema pattern, the `ck_documents_content_hash` check and the `(source_id, content_hash)` unique index are unchanged.
+The scraper SHALL compute `content_hash` as the sha256 of the normalised text (Unicode NFC, every run of whitespace collapsed to one space, leading and trailing whitespace removed; case is preserved) and SHALL NOT insert a second document with the same `content_hash` for the same `source_id`. For a document whose `platform` is not `web` (a post, where `url` is the permalink of one item), the hashed input SHALL be the `canonical_url` when the document has one, otherwise the `url`, then a line feed and the normalised text, so that identical text posted at two permalinks of one source is two documents while share or tracking parameters on one permalink do not make a second one. The value is still a lowercase sha256 hex string, so the schema pattern, the `ck_documents_content_hash` check and the `(source_id, content_hash)` unique index are unchanged.
 
 #### Scenario: Rerun of unchanged page
 - **WHEN** the same page is collected twice with identical text
@@ -34,6 +34,14 @@ The scraper SHALL compute `content_hash` as the sha256 of the normalised text (U
 #### Scenario: Same post collected again
 - **WHEN** a document with `platform = other` is collected twice with the same url and text
 - **THEN** one row exists for it
+
+#### Scenario: Tracking parameter on the permalink
+- **WHEN** two documents with `platform = other` have the same text and `canonical_url`, and `url` values that differ only by a query parameter
+- **THEN** their `content_hash` values are equal and one row exists
+
+#### Scenario: No canonical URL
+- **WHEN** a document with `platform = other` has no `canonical_url`
+- **THEN** the `url` is hashed with the text
 
 #### Scenario: Web page hash is unchanged
 - **WHEN** a document with `platform = web` is hashed

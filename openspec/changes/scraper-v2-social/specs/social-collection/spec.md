@@ -16,11 +16,15 @@ A Telegram source SHALL have a URL of the form `https://t.me/s/<handle>` with `<
 - **THEN** no page is requested, no document is emitted and the refusal is not recorded as a block
 
 ### Requirement: One document per post
-The collector SHALL emit one document per post that has text, with `url` the permalink of the post, `text` the post text without markup, `published_at` the post time in UTC ISO-8601, `platform` and `source_kind` copied from the source row, `title` and `lang` null and `canonical_url` equal to `url`. `scrape_meta` SHALL add `message_id` (the numeric id) and `views` (an integer, or null when the page shows none) to the fields of the fetch layer. The raw HTML stored for the document SHALL be the markup of that post only, not the whole channel page. Re-collecting an unchanged post SHALL add nothing (`document-ingest` dedup).
+The collector SHALL emit one document per post that has text, with `url` the permalink of the post, `text` the post text without markup, `published_at` the post time in UTC ISO-8601, `platform` and `source_kind` copied from the source row, `title` and `lang` null and `canonical_url` equal to `url`. `scrape_meta` SHALL add `message_id` (the numeric id), `views` (an integer, or null when the page shows none) and `network` (the string `telegram`) to the fields of the fetch layer. The raw HTML stored for the document SHALL be the markup of that post only, not the whole channel page. Re-collecting an unchanged post SHALL add nothing (`document-ingest` dedup).
 
 #### Scenario: Text post
 - **WHEN** a channel page contains a post with id 1999, text `Sygnał: BTC long, zysk do 30%` and time `2026-11-20T09:15:00+00:00`
 - **THEN** one document is emitted with url `https://t.me/<handle>/1999`, that text, `published_at` `2026-11-20T09:15:00+00:00` and `scrape_meta.message_id` 1999
+
+#### Scenario: Network marker
+- **WHEN** a post is collected
+- **THEN** its `scrape_meta.network` is `telegram` while `platform` is `other`
 
 #### Scenario: Post markup is the stored HTML
 - **WHEN** a page with 20 posts is collected
@@ -36,7 +40,7 @@ The collector SHALL emit one document per post that has text, with `url` the per
 
 #### Scenario: Identical text in two posts
 - **WHEN** a channel posts the same text twice, as posts 1998 and 1999
-- **THEN** two documents are stored, one per permalink, because the identity of a social document includes its permalink (`document-ingest`, "Deduplicate by content hash")
+- **THEN** two documents are stored, one per permalink, because the identity of a social document includes its canonical URL, which is its permalink (`document-ingest`, "Deduplicate by content hash")
 
 #### Scenario: Same post collected again
 - **WHEN** post 1999 is collected in two runs with unchanged text
