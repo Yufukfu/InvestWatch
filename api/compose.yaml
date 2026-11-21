@@ -1,5 +1,5 @@
 # api/ deployment unit (owner Damian). Included from the root compose.yaml next to infra/compose.yaml, which owns
-# the `postgres` service and the `data` network this file uses (so neither is declared here).
+# the `postgres` service and the `data` and `edge` networks this file uses (so none of them is declared here).
 # Without the root file, run it together with infra: docker compose -f infra/compose.yaml -f api/compose.yaml up
 # api-migrate applies the shared schema once and exits; scraper, analytics and api start only after it:
 #   depends_on:
@@ -26,3 +26,35 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.5", memory: 256M }
+
+  # REST under /api and Socket.IO under /socket.io on :8000; reached only through the gateway (no host port).
+  api:
+    image: investwatch/api:${IW_VERSION:-dev}
+    command: ["python", "-m", "investwatch_api"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL in .env (infra-compose)}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env (infra-compose)}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (infra-compose)}
+      MINIO_BUCKET: ${MINIO_BUCKET:-iw-raw}
+      # Same origin through the gateway needs nothing here; a list REPLACES that default (README).
+      CORS_ORIGINS: ${API_CORS_ORIGINS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+    networks: [edge, data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 384M }

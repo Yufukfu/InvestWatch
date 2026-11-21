@@ -41,9 +41,9 @@ Starts after change `api-db-schema` groups 1-3 (package, tables, migrate service
 
 ## 6. Container and end to end
 
-- [ ] 6.1 Add the `api` service to `api/compose.yaml` (uvicorn on 8000, `iw-edge` + `iw-data`, `depends_on` `api-migrate` completed and Postgres/Redis healthy, read-only filesystem, `no-new-privileges`, resource limits, MinIO variable names agreed with `infra-compose`); `docker compose up --build` starts it healthy
-- [ ] 6.2 Failing end-to-end check, then fix what it shows: through `https://localhost:8443`, a document inserted by hand and a finding upserted with the `api-db-schema` SQL appear in `GET /api/findings`, a published `finding.created` reaches a Socket.IO client on `/events` ("Same-origin connection"), and a `PATCH` is seen by a second client; output pasted in the PR body
-- [ ] 6.3 Mutation check; line reads `mutations: n/a, end-to-end check only` unless code changed in 6.2
+- [x] 6.1 Add the `api` service to `api/compose.yaml` (uvicorn on 8000, `iw-edge` + `iw-data`, `depends_on` `api-migrate` completed and Postgres/Redis healthy, read-only filesystem, `no-new-privileges`, resource limits, MinIO variable names agreed with `infra-compose`); `docker compose up --build` starts it healthy
+- [x] 6.2 Failing end-to-end check, then fix what it shows: through `https://localhost:8443`, a document inserted by hand and a finding upserted with the `api-db-schema` SQL appear in `GET /api/findings`, a published `finding.created` reaches a Socket.IO client on `/events` ("Same-origin connection"), and a `PATCH` is seen by a second client; output pasted in the PR body
+- [x] 6.3 Mutation check; mutations: 1 tried, 1 caught (6.2 found the MinIO client retrying for seconds per health ping; it now fails fast)
 
 ## 7. Closing
 
