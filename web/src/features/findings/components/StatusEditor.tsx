@@ -58,7 +58,9 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
         <textarea id={`${id}-note`} value={text} disabled={isSaving} maxLength={2000} onChange={(e) => setText(e.target.value)} />
       </div>
       <div className="status-actions">
-        <button type="submit" className="btn btn-primary" disabled={isSaving || (!statusChanged && !noteChanged)}>
+        {/* aria-disabled, not disabled: a disabled button drops keyboard focus to <body> (out of the
+            dialog) the moment a save starts or completes; onSubmit ignores the click instead. */}
+        <button type="submit" className="btn btn-primary" aria-disabled={isSaving || (!statusChanged && !noteChanged)}>
           {isSaving ? 'Zapisywanie…' : 'Zapisz'}
         </button>
         {/* Both live regions are always in the DOM, so a new message is announced. */}

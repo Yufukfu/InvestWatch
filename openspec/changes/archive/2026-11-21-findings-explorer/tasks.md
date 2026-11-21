@@ -35,3 +35,5 @@
 - [x] 6.1 Run against the contract mock server (`docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts`, run on :8000, `npm run dev`): filters, detail, status change work and the browser console is clean.
 - [x] 6.2 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `docs-check` clean) and add the `iw-ai-log` row.
 - [x] 6.3 Run the `iw-pr-review` skill and fix real findings (7 of 8 fixed; review fixes mutations: 12 tried, 12 caught; rest in follow-ups.md).
+
+Note (PR #39 review, Adam): the `mutations:` lines above count only the mutants chosen by the author. An independent run over the new code (174 mutants) left 70 alive, 66 of them real gaps. They are closed in `findings-explorer-review-fixes`.

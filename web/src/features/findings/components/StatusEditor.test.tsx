@@ -22,10 +22,10 @@ describe('StatusEditor', () => {
     const onSave = vi.fn();
     render(<StatusEditor {...base} onSave={onSave} />);
     const save = screen.getByRole('button', { name: 'Zapisz' });
-    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute('aria-disabled', 'true');
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'confirmed' } });
     fireEvent.change(screen.getByLabelText('Notatka'), { target: { value: 'Potwierdzone ręcznie' } });
-    expect(save).toBeEnabled();
+    expect(save).toHaveAttribute('aria-disabled', 'false');
     fireEvent.click(save);
     expect(onSave).toHaveBeenCalledWith({ status: 'confirmed', note: 'Potwierdzone ręcznie' });
   });
@@ -50,7 +50,7 @@ describe('StatusEditor', () => {
     render(<StatusEditor {...base} isSaving onSave={vi.fn()} />);
     expect(screen.getByLabelText('Status')).toBeDisabled();
     expect(screen.getByLabelText('Notatka')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Zapisywanie…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Zapisywanie…' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('shows the API error and the saved confirmation', () => {
