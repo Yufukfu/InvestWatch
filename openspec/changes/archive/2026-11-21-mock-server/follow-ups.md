@@ -59,3 +59,6 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 53 | PR #8 review (Adam) | `status=,` dropped the filter; `sort` had no tie-breaker; thresholds accepted `true`/`"0.5"` | fix-here (422, ties by `id`, strict numbers) |
 | 54 | PR #8 review (Adam) | Docker base image on a floating tag | fix-here (ECR mirror, `3.13.18-slim` pinned by index digest) |
 | 55 | PR #8 review (Adam) | mock data lacks Facebook/TikTok, several M2 rules and `evidence_locator`; M1 lacks firm-advertiser relation and `first_seen`/`last_seen`; `SourceInput` has no `required`, `PATCH /sources` no 422 in the spec; contract tests against the real `api/` later | new-item (contract and stack level, for the team; with rows 8 and 31) |
+| 56 | review of rows 46-55 | README `docker run -p 8000:8000` published the unauthenticated mock on every interface | fix-here (`-p 127.0.0.1:8000:8000`) |
+| 57 | review of rows 46-55 | HEALTHCHECK hardcoded port 8000; trend loses counts of findings dropped by the cap; native mock behind the gateway needs `MOCK_HOST=0.0.0.0` | fix-here (healthcheck reads `MOCK_PORT`; README notes) |
+| 58 | review of rows 46-55 | `contracts/requirements.txt` pins (jsonschema 4.23.0, PyYAML 6.0.2) differ from the mock's (4.26.0, 6.0.4) | new-item (align when `contracts/` deps are next touched; both are audited) |

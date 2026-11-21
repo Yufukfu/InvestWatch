@@ -28,6 +28,6 @@ ENV PYTHONPATH=/app/mock-server/src \
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"MOCK_PORT\", \"8000\")}/api/health', timeout=2)"
 
 CMD ["python", "-m", "iw_mock_server"]

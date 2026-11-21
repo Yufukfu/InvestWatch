@@ -56,3 +56,4 @@
 - [x] 8.4 `MOCK_MAX_ADDED` cap and text length limits; mutations: 10 tried, 10 caught
 - [x] 8.5 CI job for contracts and the mock server, pinned base image; mutations: n/a, config only (workflow, Dockerfile)
 - [x] 8.6 README for `web/` (Vite proxy), new variables and behaviour; mutations: n/a, docs only
+- [x] 8.7 Review of 8.1-8.6: README binds Docker to loopback, healthcheck follows `MOCK_PORT`; mutations: n/a, docs and Dockerfile (verified: healthy with `MOCK_PORT=9000`)

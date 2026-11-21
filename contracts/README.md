@@ -48,10 +48,10 @@ Run in Docker (build context is `contracts/`):
 
 ```
 docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts
-docker run --rm -p 8000:8000 iw-mock-server
+docker run --rm -p 127.0.0.1:8000:8000 iw-mock-server   # loopback only: /__mock/* has no auth
 ```
 
-Using it from `web/`: run the mock on port 8000, then `npm run dev` in `web/` with no `VITE_*` overrides. The app calls same-origin `/api` and `/events`, and the Vite dev server proxies `/api` and `/socket.io` to `API_PROXY_TARGET` (default `http://localhost:8000`). These are the same paths the HTTPS gateway uses, so nothing in the components changes when the real API arrives. Behind the gateway, point `API_UPSTREAM` at the mock.
+Using it from `web/`: run the mock on port 8000, then `npm run dev` in `web/` with no `VITE_*` overrides. The app calls same-origin `/api` and `/events`, and the Vite dev server proxies `/api` and `/socket.io` to `API_PROXY_TARGET` (default `http://localhost:8000`). These are the same paths the HTTPS gateway uses, so nothing in the components changes when the real API arrives. Behind the gateway, point `API_UPSTREAM` at the mock; a mock run outside Docker must then listen on `MOCK_HOST=0.0.0.0`, because the gateway container cannot reach the host's loopback.
 
 | What | Address on the mock itself |
 |---|---|
@@ -67,7 +67,7 @@ Configuration (environment variables, all optional). The server reads only the p
 | `MOCK_CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173` | browser origins allowed for REST and Socket.IO; `*` allows any. Socket.IO also accepts same-origin (`X-Forwarded-Proto`/`Host` honoured), so the dashboard works behind the gateway without listing its origin |
 | `MOCK_REPLAY_INTERVAL_S` | `10` | every N seconds a new finding (cloned from a mock one) is added and `finding.created` / `finding.high_risk` are emitted, while a client is connected; `0` disables |
 | `MOCK_SCAN_DELAY_S` | `2` | seconds between `scan.started` and `scan.finished` after `POST /api/scans`; the source shows `last_run_status: running` meanwhile |
-| `MOCK_MAX_ADDED` | `500` | most findings added at runtime (replay, `/__mock/emit`) kept in memory; the oldest are dropped, mock findings never |
+| `MOCK_MAX_ADDED` | `500` | most findings added at runtime (replay, `/__mock/emit`) kept in memory; the oldest are dropped, mock findings never (the trend loses their counts with them) |
 | `CONTRACTS_DIR` | the parent `contracts/` folder | where `schemas/` and `mocks/` are read from |
 | `LOG_LEVEL` | `INFO` | JSON logs on stdout |
 
