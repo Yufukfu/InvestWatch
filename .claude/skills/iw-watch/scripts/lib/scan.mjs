@@ -104,7 +104,10 @@ function capItem(b, r, maxRounds, st) {
 function minePr(gh, repo, me, pr, st, maxRounds, state) {
   const b = base(pr, repo);
   const act = activity(gh, repo, pr.number);
-  const others = events(act).filter((e) => lc(e.author) !== lc(me) && !isBot(e.user) && !isHandled(st, e.key));
+  // my own comments are not work, except an answer that starts with /iw (questions.mjs)
+  const others = events(act)
+    .map((e) => (lc(e.author) === lc(me) && /^\/iw\b/.test(e.body.trim()) ? { ...e, type: 'answer', trusted: true } : e))
+    .filter((e) => (lc(e.author) !== lc(me) || e.type === 'answer') && !isBot(e.user) && !isHandled(st, e.key));
   const outsiders = others.filter((e) => !e.trusted).length;
   const fresh = others
     .filter((e) => e.trusted)

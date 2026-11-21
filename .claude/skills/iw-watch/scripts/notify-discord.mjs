@@ -9,9 +9,11 @@ import { pathToFileURL } from 'node:url';
 const LABEL = { done: '✅ done', 'draft-ready': '📝 draft ready', 'needs-human': '🙋 needs you' };
 const WEBHOOK = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/;
 
-export function message([kind, title, url]) {
-  const line = `**iw-watch** ${LABEL[kind] || kind}: ${title} ${url}`.slice(0, 1900);
-  return { content: line, allowed_mentions: { parse: [] } };
+export function message([kind, title, url, text]) {
+  const head = `**iw-watch** ${LABEL[kind] || kind}: ${title} ${url}`.slice(0, 600);
+  // what to do next, with the commands to copy, in a code block so Discord renders nothing in it
+  const body = text ? `\n\`\`\`\n${String(text).replace(/\`\`\`/g, "'''").slice(0, 1300)}\n\`\`\`` : "";
+  return { content: `${head}${body}`, allowed_mentions: { parse: [] } };
 }
 
 export async function send(argv, { env = process.env, fetch = globalThis.fetch, stderr = (s) => process.stderr.write(s) } = {}) {

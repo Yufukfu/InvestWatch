@@ -328,6 +328,22 @@ test('run: a session that wrote no reply is not "done" or "draft-ready"; its fin
   }
 });
 
+test('run: the agent\'s questions reach the notifier as copy-paste /iw commands', async () => {
+  const s = setup({ env: { IWATCH_NOTIFY_CMD: 'n' } });
+  s.deps.spawnClaude = (file, args, opts) => {
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/questions.md'), "- Pager now or later? => pager: teraz | pager: pozniej'; rm -rf ~\n");
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--dry-run'], s.deps);
+  const text = s.notified[0].args[3];
+  assert.match(text, /Q: Pager now or later\?/);
+  assert.ok(text.includes("gh pr comment 11 --body '/iw pager: teraz'"));
+  assert.ok(!/rm -rf ~'|;/.test(text.split('\n').filter((l) => l.includes('gh pr comment')).join('\n')), 'nothing to paste that runs more than the comment');
+  assert.equal(s.notices()[0].questions.length, 1);
+});
+
 test('run: --limit caps the sessions per run', async () => {
   const s = setup();
   await main(['run', '--mine', '--review-requested', '--limit', '1'], s.deps);

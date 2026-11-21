@@ -56,6 +56,18 @@ Drafts, session summaries (cost, denials) and the state live outside the repo in
 
 `IWATCH_NOTIFY_CMD` is run once per notice with `<kind> <"#pr title"> <url>` as separate arguments, never through a shell; use a script path without spaces. For a Discord channel: `IWATCH_DISCORD_WEBHOOK=<webhook URL>` (a secret: keep it in `.env`) and `IWATCH_NOTIFY_CMD="node /abs/path/.claude/skills/iw-watch/scripts/notify-discord.mjs"`.
 
+### Answering the agent
+
+When the agent needs a decision it writes the question, with two to four short answers, to its draft folder (questions.md). The notice, and so the Discord message, shows each answer as a command to copy:
+
+```
+Q: Pager fix in this PR or later?
+  gh pr comment 39 --body '/iw pager: w tym PR'
+  gh pr comment 39 --body '/iw pager: pozniej'
+```
+
+Paste one into a terminal (or write any `/iw ...` comment on the PR yourself). Your own comments are otherwise ignored; one that starts with `/iw` is picked up on the next round as your answer. The options are cut to plain letters, digits and `.,:_/#+-` and single-quoted, so a pasted command can only post that comment.
+
 ## Never
 
 - Approve, merge or mark ready (`gh pr review`, `gh pr merge`, `gh pr ready`): the human's click is the approval.

@@ -16,7 +16,7 @@ export function makeNotifier({ env, stdout, stderr, now = () => Date.now(), spaw
     stdout(`${JSON.stringify(line)}\n`);
     if (!cmd.length) return;
     try {
-      const r = spawn(cmd[0], [...cmd.slice(1), notice.kind, clean(`#${notice.pr} ${notice.title}`), clean(notice.url || '')], { shell: false, stdio: 'ignore', timeout: 15000 });
+      const r = spawn(cmd[0], [...cmd.slice(1), notice.kind, clean(`#${notice.pr} ${notice.title}`), clean(notice.url || ''), [notice.detail, notice.ask].filter(Boolean).join('\n\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '?').slice(0, 1500)], { shell: false, stdio: 'ignore', timeout: 15000 });
       if (r?.error) throw r.error;
     } catch (e) {
       stderr(`iw-watch: notify command failed (${e.message}); the run goes on\n`);

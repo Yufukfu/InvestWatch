@@ -17,6 +17,7 @@ import { buildPrompt, safeBranch } from './lib/prompt.mjs';
 import { claudeArgs, runSession, pushDenied } from './lib/session.mjs';
 import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman } from './lib/worktree.mjs';
 import { makeNotifier } from './lib/notify.mjs';
+import { parseQuestions, questionsText } from './lib/questions.mjs';
 
 const USAGE = `usage: watch.mjs scan|run [--mine] [--review-requested] [--author <login>] [--domain <dir>|mine]
                  [--max-rounds N] [--json]                                  (scan)
@@ -180,11 +181,13 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   const args = claudeArgs({ kind: it.kind, pr: it.pr, headRef: it.headRef, dryRun: o.dryRun, budgetUsd: o.budgetUsd, model: o.model, cwd: clone.dir });
   const res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
   const copied = collectDrafts({ dir: clone.dir, to: draftDir });
+  // questions for the human, each answer as a command to copy (Discord shows them)
+  const questions = copied.includes('questions.md') ? parseQuestions(fs.readFileSync(path.join(draftDir, 'questions.md'), 'utf8')) : [];
   // the agent's last message: when it could not write its reply file, the reply is usually in here
   fs.writeFileSync(path.join(draftDir, 'summary.md'), `${res.summary}\n`, { mode: 0o600 });
   fs.writeFileSync(path.join(draftDir, 'session.json'), `${JSON.stringify({ item: it.id, kind: it.kind, ok: res.ok, code: res.code, timedOut: res.timedOut, cost: res.cost, turns: res.turns, subtype: res.subtype, denials: res.denials, summary: res.summary, clone: clone.dir }, null, 2)}\n`, { mode: 0o600 });
   const own = it.kind === 'address-review' || it.kind === 'ci-failed';
-  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost };
+  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost, ...(questions.length ? { questions, ask: questionsText(it.pr, questions) } : {}) };
   const n = res.denials.length;
   const denied = n ? `; ${n} command${n > 1 ? 's were' : ' was'} denied (see session.json)` : '';
   // every needs-human below keeps the clone and the item: remove the clone to let the watcher retry

@@ -19,6 +19,7 @@ export function fence(source, text, nonce = randomBytes(9).toString('hex')) {
 }
 
 function describe(e) {
+  if (e.type === 'answer') return `answer from @${e.author}, the human you act for`;
   if (e.type === 'review') return `review by @${e.author} (${e.state})`;
   if (e.type === 'review-comment') return `inline comment by @${e.author} on ${e.path}${e.line ? `:${e.line}` : ''}`;
   return `comment by @${e.author}`;
@@ -57,7 +58,8 @@ const KIND_TASK = {
     '- This is a fresh clone without installed dependencies: for a Node package run `npm --prefix web ci --ignore-scripts` (never `npm install`), then `npm --prefix web test`, `npm --prefix web run lint`, `npm --prefix web run typecheck`. If a suite cannot run here, say which and why in the reply.',
     '- The commit hook needs an active OpenSpec change when service code is staged, and this PR\'s change may already be archived. Then add a small one, as the team does for review rounds: `openspec/changes/<branch name after the slash>-review-fixes/` with `proposal.md` (why: the review, linked) and `tasks.md` (one task per review item you fix, ticked), no new requirements; run `openspec validate <name> --strict` and stage it with the fix. Never use IW_SKIP_SPEC or any other escape.',
     '- You disagree: do not change the code; answer with evidence (file:line, test output).',
-    `- Ambiguous, or a product decision: do not guess. List it under "Needs @${me}" in your reply.`,
+    `- Ambiguous, or a product decision: do not guess. List it under "Needs @${me}" in your reply, and add one line per question to \`.iw-watch/questions.md\`: \`- <short question> => <option> | <option>\` (two to four short answers, plain words). @${me} gets them on Discord and answers with a comment.`,
+    `- A comment by @${me} that starts with /iw is the human's answer to an earlier question: follow it.`,
     dryRun
       ? 'This is a dry run: commit locally, but do not push and do not post. Write the reply to `.iw-watch/reply.md` and stop.'
       : `Then push with exactly \`git push origin ${item.headRef}\` and post one reply: write it to \`.iw-watch/reply.md\` and run \`gh pr comment ${item.pr} --body-file .iw-watch/reply.md\`.`,
