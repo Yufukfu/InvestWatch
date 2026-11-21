@@ -4,9 +4,9 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
 
 ## 1. Pin test (~30 min)
 
-- [ ] 1.1 Failing test `.github/tests/workflow-pins.test.mjs` (node:test, no dependencies). It covers the pin-test scenarios: `uses:` by tag only fails, a `docker run` image without `@sha256:` fails, `pip install pip-audit` without `==` fails, and each failure names the line. A fully pinned sample passes. It also asserts that `.github/workflows/security.yml` exists and passes the same checks, so the test is red until group 2.
-- [ ] 1.2 Add `".github/tests/*.test.mjs"` to the test step of `ci.yml`'s `Specs and hooks` job (no other `ci.yml` change)
-- [ ] 1.3 Mutation check: remove each of the three rules in turn, plus the "names the line" check; `mutations: N tried, N caught`
+- [x] 1.1 Failing test `.github/tests/workflow-pins.test.mjs` (node:test, no dependencies). It covers the pin-test scenarios: `uses:` by tag only fails, a `docker run` image without `@sha256:` fails, `pip install pip-audit` without `==` fails, and each failure names the line. A fully pinned sample passes. It also asserts that `.github/workflows/security.yml` exists and passes the same checks, so the test is red until group 2.
+- [x] 1.2 Add `".github/tests/*.test.mjs"` to the test step of `ci.yml`'s `Specs and hooks` job (no other `ci.yml` change)
+- [x] 1.3 Mutation check: remove each of the three rules in turn, plus the "names the line" check (once per rule); `mutations: 6 tried, 6 caught`
 
 ## 2. Security workflow and Gitleaks allowlist (~1 h)
 
