@@ -11,19 +11,17 @@ means no locks and no "dictionary changed size during iteration".
 from __future__ import annotations
 
 import logging
+import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Annotated, Literal
+from datetime import datetime, timedelta, timezone
+from typing import Annotated, Literal, get_args
 from uuid import UUID
 
-import uuid
-from datetime import timedelta
-
 from fastapi import Body, FastAPI, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .png import placeholder_png
@@ -35,12 +33,29 @@ log = logging.getLogger("iw_mock_server")
 Module = Literal["M1", "M2", "M3"]
 RiskLevel = Literal["high", "medium", "low"]
 Viewport = Literal["desktop", "tablet", "mobile"]
-STATUSES = ("new", "in_review", "confirmed", "false_positive", "closed")
-
-
 Platform = Literal["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"]
 SourceKind = Literal["firm_own", "third_party", "unknown"]
 Status = Literal["new", "in_review", "confirmed", "false_positive", "closed"]
+STATUSES: tuple[str, ...] = get_args(Status)
+
+_HTTP_URL = TypeAdapter(HttpUrl)
+
+
+def _http_url(value: str) -> str:
+    """Validate like HttpUrl but keep the string as sent: HttpUrl would add a trailing slash and
+    lowercase the host, so the source would come back different from what the client stored."""
+    _HTTP_URL.validate_python(value)
+    return value
+
+
+def _unique(values: list) -> list:
+    if len(set(values)) != len(values):  # source.schema.json: target_modules has uniqueItems
+        raise ValueError("items must be unique")
+    return values
+
+
+SourceUrl = Annotated[str, AfterValidator(_http_url)]
+TargetModules = Annotated[list[Module], Field(min_length=1), AfterValidator(_unique)]
 
 
 class _Strict(BaseModel):
@@ -67,9 +82,9 @@ class Thresholds(_Strict):
 class SourceCreate(_Strict):
     name: str = Field(min_length=1)
     platform: Platform
-    url: HttpUrl
+    url: SourceUrl
     source_kind: SourceKind
-    target_modules: list[Module] = Field(min_length=1)
+    target_modules: TargetModules
     schedule_cron: str | None = None
     active: bool = True
 
@@ -77,9 +92,9 @@ class SourceCreate(_Strict):
 class SourcePatch(_Strict):
     name: str | None = Field(default=None, min_length=1)
     platform: Platform | None = None
-    url: HttpUrl | None = None
+    url: SourceUrl | None = None
     source_kind: SourceKind | None = None
-    target_modules: list[Module] | None = Field(default=None, min_length=1)
+    target_modules: TargetModules | None = None
     schedule_cron: str | None = None
     active: bool | None = None
 

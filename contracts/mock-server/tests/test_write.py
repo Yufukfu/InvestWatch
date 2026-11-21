@@ -122,3 +122,27 @@ def test_reset_restores_original_data(client):
     assert client.get(f"/api/findings/{f['id']}").json()["status"] == "new"
     assert client.get("/api/settings/thresholds").json() == {"M1": 0.6, "M2": 0.5, "M3": 0.7}
     assert len(client.get("/api/sources").json()["items"]) == 4
+
+
+@pytest.mark.parametrize("body", [{**NEW_SOURCE, "target_modules": ["M1", "M1"]}, {**NEW_SOURCE, "url": "not a url"}])
+def test_source_breaking_the_schema_is_422(client, body):
+    # source.schema.json: target_modules has uniqueItems, url is format uri
+    assert client.post("/api/sources", json=body).status_code == 422
+
+
+def test_patch_source_with_duplicate_modules_is_422_and_unchanged(client):
+    source = client.get("/api/sources").json()["items"][0]
+
+    r = client.patch(f"/api/sources/{source['id']}", json={"target_modules": ["M2", "M2"]})
+
+    assert r.status_code == 422
+    assert client.get("/api/sources").json()["items"][0]["target_modules"] == source["target_modules"]
+
+
+@pytest.mark.parametrize("url", ["https://Example.com", "https://example.com/path?q=1"])
+def test_source_url_is_stored_as_sent(client, url):
+    created = client.post("/api/sources", json={**NEW_SOURCE, "url": url}).json()
+    assert created["url"] == url
+
+    patched = client.patch(f"/api/sources/{created['id']}", json={"url": url + "#x"}).json()
+    assert patched["url"] == url + "#x"
