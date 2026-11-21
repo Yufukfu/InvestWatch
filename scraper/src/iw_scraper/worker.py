@@ -6,12 +6,14 @@ no new jobs, lets running ones finish for `shutdown_deadline` seconds, and reque
 
 import asyncio
 import logging
+import os
 import signal
 from dataclasses import dataclass
 
 from arq.connections import RedisSettings
 from arq.worker import Worker
 
+from iw_scraper.config import from_env
 from iw_scraper.jobs import QueueSettings, job_function
 from iw_scraper.supervise import CONNECTION_ERRORS, supervise
 
@@ -29,6 +31,13 @@ class RunnerSettings:
     reconnect_cap: float = 30.0
     poll_delay: float = 0.5
     consumer_block: float = 1.0
+
+    @classmethod
+    def from_env(cls) -> "RunnerSettings":
+        """`REDIS_URL` is required; the rest come from `SCRAPER_<FIELD>` variables."""
+        if not os.environ.get("REDIS_URL"):
+            raise RuntimeError("REDIS_URL is not set")
+        return from_env(cls, redis_url=os.environ["REDIS_URL"])
 
 
 async def run_worker(

@@ -17,6 +17,7 @@ from arq.connections import ArqRedis
 from arq.worker import Function, Retry, func
 from redis.exceptions import RedisError
 
+from iw_scraper.config import from_env
 from iw_scraper.events import derive_status, publish_scan_event
 from iw_scraper.guards import DomainHealth, LeaseSemaphore, RunLock
 from iw_scraper.retry import backoff_delay, is_transient
@@ -54,6 +55,10 @@ class QueueSettings:
     requeue_delay: float = 5.0
     failure_threshold: int = 5
     domain_cooldown: float = 300.0
+
+    @classmethod
+    def from_env(cls) -> "QueueSettings":
+        return from_env(cls)
 
 
 def job_function(settings: QueueSettings) -> Function:
