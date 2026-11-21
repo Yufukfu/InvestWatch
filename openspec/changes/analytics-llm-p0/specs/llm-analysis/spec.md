@@ -15,7 +15,7 @@ Analytics SHALL configure the LLM only from environment variables (`LLM_BASE_URL
 #### Scenario: Budget longer than the claim idle time
 - **WHEN** `LLM_DOC_BUDGET_S=90` and `CLAIM_MIN_IDLE_MS=60000`
 - **THEN** startup fails with an error naming `LLM_DOC_BUDGET_S`
-- **AND** `LLM_DOC_BUDGET_S` in milliseconds SHALL be below the worker's `CLAIM_MIN_IDLE_MS`
+- **AND** `LLM_DOC_BUDGET_S` plus the 3 s connect timeout, in milliseconds, SHALL be below the worker's `CLAIM_MIN_IDLE_MS`
 
 #### Scenario: Bad base URL
 - **WHEN** `LLM_BASE_URL` has no http(s) scheme or host, carries credentials, a query or a fragment, or is plain http to a non-local host while `LLM_API_KEY` is set

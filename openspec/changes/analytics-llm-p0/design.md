@@ -112,7 +112,7 @@ The evidence for the numbers: ADR 0304 picks `gemma3:4b` on Ollama as the swap t
 ### 6. Budget, breaker, timeouts
 
 - **Per request:** `LLM_TIMEOUT_S`, 20 by default, is the read timeout, and the connect timeout is 3 s.
-- **Per document:** `LLM_DOC_BUDGET_S`, 40 by default, is the wall clock across all modules and chunks of one document. When it runs out, the remaining calls are skipped as unavailable (`llm_budget_exhausted`). Config validation requires `LLM_DOC_BUDGET_S * 1000 < CLAIM_MIN_IDLE_MS`. Otherwise a second consumer would XAUTOCLAIM a message that is still being processed (`analytics-worker` design §6). That would be harmless thanks to the upsert, but it doubles the cost.
+- **Per document:** `LLM_DOC_BUDGET_S`, 40 by default, is the wall clock across all modules and chunks of one document. When it runs out, the remaining calls are skipped as unavailable (`llm_budget_exhausted`). Config validation requires `(LLM_DOC_BUDGET_S + 3 s) * 1000 < CLAIM_MIN_IDLE_MS`. Otherwise a second consumer would XAUTOCLAIM a message that is still being processed (`analytics-worker` design §6). That would be harmless thanks to the upsert, but it doubles the cost.
 - **Circuit breaker:** after `LLM_BREAKER_FAILURES` (default 3) consecutive `LlmUnavailable`, the judge returns `status: unavailable` without calling for `LLM_BREAKER_COOLDOWN_S` (60). After the cooldown one call is tried (half-open). Without the breaker, a dead endpoint costs every document a full timeout, and the stream backs up. The breaker is per process and in memory, which is enough for one container.
 
 ### 7. Cache

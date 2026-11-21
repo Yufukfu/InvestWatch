@@ -30,7 +30,7 @@ Option 3:
 - **Timeouts and budget:**
   - `LLM_TIMEOUT_S`: the read timeout per request, 20 by default; the connect timeout is 3 s.
   - `LLM_DOC_BUDGET_S`: the wall clock per document across modules and chunks, 40 by default. When it runs out, the remaining calls are skipped as `llm_budget_exhausted`.
-  - Config validation requires `LLM_DOC_BUDGET_S * 1000 < CLAIM_MIN_IDLE_MS`.
+  - Config validation requires `(LLM_DOC_BUDGET_S + 3 s) * 1000 < CLAIM_MIN_IDLE_MS`: the budget is checked between requests, so one request can overrun it by up to its 3 s connect timeout.
 - **Circuit breaker:** after `LLM_BREAKER_FAILURES` (3) consecutive unavailable outcomes, the judge stops calling for `LLM_BREAKER_COOLDOWN_S` (60). After that, one call is tried again (half-open).
 - **Ollama context window:** infra sets `OLLAMA_CONTEXT_LENGTH=8192` on the `ollama` service (requested from Kacper through the change proposal). A chunk of about 3k tokens, a system prompt of about 1k tokens and the answer fit in it.
 

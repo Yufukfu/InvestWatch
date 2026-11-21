@@ -286,3 +286,19 @@ def test_a_plain_timeout_with_budget_left_counts_for_the_breaker(stub_llm):
                  clock=time.monotonic)
     judge.begin_document()
     assert ask(judge).status == "unavailable" and judge._open_until is not None
+
+
+def test_early_timeout_with_budget_left_counts_for_the_breaker(stub_llm):
+    """A connect timeout (3 s) is an endpoint failure even when the read timeout was shortened by the budget."""
+    from investwatch_analytics.llm.client import LlmUnavailable
+
+    clock = Clock()
+    judge = make(stub_llm.base_url, clock=clock, LLM_TIMEOUT_S="60", LLM_DOC_BUDGET_S="40", LLM_BREAKER_FAILURES="1")
+
+    def connect_timeout(*a, **k):
+        clock.t += 3  # only 3 of the 40 s budget used
+        raise LlmUnavailable("timeout after 3 s", timeout=True)
+
+    judge._client.complete = connect_timeout
+    judge.begin_document()
+    assert ask(judge).status == "unavailable" and judge._open_until is not None

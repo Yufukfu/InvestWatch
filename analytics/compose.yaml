@@ -28,7 +28,7 @@ services:
       LLM_CACHE_TTL_S: ${LLM_CACHE_TTL_S:-}
       LLM_BREAKER_FAILURES: ${LLM_BREAKER_FAILURES:-}
       LLM_BREAKER_COOLDOWN_S: ${LLM_BREAKER_COOLDOWN_S:-}
-      # Must stay above LLM_DOC_BUDGET_S * 1000 (the worker refuses to start otherwise); 90000 for hosted Gemma.
+      # Must stay above (LLM_DOC_BUDGET_S + 3 s) * 1000 (the worker refuses to start otherwise); 90000 for hosted Gemma.
       CLAIM_MIN_IDLE_MS: ${CLAIM_MIN_IDLE_MS:-}
       # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
       # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).

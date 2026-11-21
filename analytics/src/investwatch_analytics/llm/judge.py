@@ -231,17 +231,17 @@ class HttpJudge:
         if self._breaker_open():
             return self._dropped("unavailable", "llm_breaker_open", module, content_hash)
         timeout = self.settings.timeout_s
-        cut_by_budget = False
         if self._deadline is not None:
             remaining = self._deadline - self._clock()
             if remaining <= 0:
                 return self._dropped("budget_exhausted", "llm_budget_exhausted", module, content_hash)
-            cut_by_budget = remaining < timeout
             timeout = min(timeout, remaining)
         try:
             content = self._ask(system, chunk, timeout)
         except LlmError as exc:
-            if cut_by_budget and exc.reason == "llm_timeout":
+            # Only a timeout that actually used up the budget is the document's; an early one (a 3 s connect
+            # timeout) is the endpoint's and counts for the breaker (re-review of the whole-branch fixes).
+            if exc.reason == "llm_timeout" and self._deadline is not None and self._clock() >= self._deadline - 0.05:
                 # The document ran out of time, the endpoint did not fail: no breaker count (whole-branch review).
                 return self._dropped("budget_exhausted", "llm_budget_exhausted", module, content_hash)
             if isinstance(exc, LlmUnavailable):
