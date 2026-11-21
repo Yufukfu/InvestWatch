@@ -23,7 +23,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | 4 | Implement per commit | `/openspec-apply-change`, `iw-commit-cycle` | failing test first; tdd-guide; code-reviewer on pinned range |
 | 5 | Whole-branch check | `iw-pr-review` | deterministic checks green, findings verified |
 | 6 | Push and PR | human | fresh go-ahead, every time |
-| 7 | CI (advisory) | `.github/workflows/ci.yml`, manual dispatch | not a merge gate; run before milestones and hand-in for a recorded dependency audit |
+| 7 | CI (advisory for now) | `.github/workflows/ci.yml`, manual dispatch | not a merge gate during the hackathon; becomes a required check in the full SDLC; meanwhile run it before milestones and hand-in for a recorded dependency audit |
 | 8 | After merge | `/openspec-archive-change`, `doc/STATUS.md`, `iw-ai-log` | specs updated, log entry added |
 
 Sizing: **one OpenSpec change per capability, not per task.** A change such as `scraper-v1` or `scraper-social-collectors` holds many tasks in its `tasks.md` and many commits, and one active change satisfies the commit hook for all of them. Adding a source or a parser to an existing capability, bug fixes, one-file fixes and docs need no new change (`IW_SKIP_SPEC=1` on the commit if none is active). A contract, a cross-module or a security-relevant change always gets one.

@@ -1,7 +1,9 @@
 name: ci
 
-# Not a merge gate: manual only, to keep the 24h hackathon fast. Run it from the Actions tab
+# Not a merge gate for now: manual only, to keep the 24h hackathon fast. Run it from the Actions tab
 # before milestones and hand-in to get a recorded dependency audit (jury criterion).
+# Later, as part of the full SDLC: add `pull_request` and `push: main` triggers and make the jobs
+# required checks in branch protection.
 on:
   workflow_dispatch:
 
