@@ -9,7 +9,7 @@ from iw_scraper.types import JobError, Reason
 
 SRC = "22222222-2222-4222-8222-222222222222"
 DOMAIN = "example.test"
-LOCK_KEY = f"iw:lock:{SRC}"
+LOCK_KEY = f"iw:scraper:lock:{SRC}"
 
 
 async def test_overlapping_jobs_for_one_source_coalesce(redis, start_worker):
