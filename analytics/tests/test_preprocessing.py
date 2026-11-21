@@ -108,3 +108,22 @@ def test_preprocess_empty_text():
     p = preprocess(" \n\t ")
     assert p.is_empty
     assert p.sentences == []
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Wszystko jest ok. Zysk 15% rocznie.", ["Wszystko jest ok.", "Zysk 15% rocznie."]),
+        ("Zysk wynosi ok. 15% rocznie.", ["Zysk wynosi ok. 15% rocznie."]),
+        ("Zadzwoń, tel. 22 123 45 67.", ["Zadzwoń, tel. 22 123 45 67."]),
+        ("Zgodnie z art. 44 ust. 2 rozporządzenia.", ["Zgodnie z art. 44 ust. 2 rozporządzenia."]),
+        ("Zaufaj im. Zarabiaj 8%.", ["Zaufaj im.", "Zarabiaj 8%."]),
+        ("Zarobiliśmy 5 tys. Zainwestuj teraz.", ["Zarobiliśmy 5 tys.", "Zainwestuj teraz."]),
+        ("W 2024 r. Alfa Inwestycje zarobiła 12%.", ["W 2024 r. Alfa Inwestycje zarobiła 12%."]),
+        ("Od 2020r. Nasi klienci zarabiają.", ["Od 2020r. Nasi klienci zarabiają."]),
+        ("Kup np. Bitcoin. Zarabiaj.", ["Kup np. Bitcoin.", "Zarabiaj."]),
+        ("Pisze prof. Nowak. Zarabiaj.", ["Pisze prof. Nowak.", "Zarabiaj."]),
+    ],
+)
+def test_abbreviations_that_are_also_words(text, expected):
+    assert [s.text for s in split_sentences(text)] == expected

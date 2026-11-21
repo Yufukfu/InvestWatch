@@ -18,9 +18,9 @@
 
 ## 4. Sentences and logging docs
 
-- [ ] 4.1 Test: `ok.` before an uppercase word ends a sentence, before a digit it does not; `2024 r.` does not
-- [ ] 4.2 Split `_ABBREV` into always / before-digit lists; `logging_setup` docstring and `analytics/CLAUDE.md` note on stderr
-- [ ] 4.3 Mutation check
+- [x] 4.1 Test: `ok.` before an uppercase word ends a sentence, before a digit it does not; `2024 r.` does not
+- [x] 4.2 Split `_ABBREV` into always / before-digit lists; `logging_setup` docstring and `analytics/CLAUDE.md` note on stderr
+- [x] 4.3 Mutation check — mutations: 10 tried, 10 caught
 
 ## 5. Closing
 

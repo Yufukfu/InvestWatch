@@ -17,10 +17,15 @@ _WS = re.compile(r"\s+")
 _BOUNDARY = re.compile(
     r"(?:(?<=[.!?…])|(?<=[.!?…][”\"»)]))\s+(?=(?:\(\*\)|[\"'„«(\[*¹²³])?\s*[A-ZĄĆĘŁŃÓŚŹŻ0-9#])|\n\s*\n"
 )
-# Tokens that end with a period but do not end a sentence.
+# Tokens that end with a period but never end a sentence: legal forms, titles and `<year> r.`
+# (usually followed by a capitalized name, so the boundary regex alone would split there).
 _ABBREV = re.compile(
-    r"(?:\b(?:S\.A|s\.a|sp|Sp|z o\.o|o\.o|np|tj|tzn|tzw|ok|ul|nr|Nr|dr|Dr|prof|Prof|tel|Tel|zob|wg|tys|mln|itd|itp|m\.in|godz|ust|lit|art|pkt|ww|im)\.)$"
+    r"(?:\b(?:S\.A|s\.a|sp|Sp|z o\.o|o\.o|np|tj|tzn|tzw|ul|nr|Nr|dr|Dr|prof|Prof|zob|wg|itd|itp|m\.in)|\d\s?r)\.$"
 )
+# Abbreviations that are also ordinary words ("wszystko jest ok.") end a sentence unless a digit
+# follows ("ok. 15%", "tel. 22 …", "art. 44"). `im.`, `ww.`, `lit.` are not listed: before a capital
+# they end a sentence ("Zaufaj im."), and before a lowercase word there is no boundary anyway.
+_ABBREV_BEFORE_DIGIT = re.compile(r"\b(?:ok|tel|Tel|tys|mln|godz|ust|art|pkt)\.$")
 
 _PL_CHARS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
 _PL_WORDS = {
@@ -64,7 +69,9 @@ def split_sentences(text: str) -> list[Sentence]:
     start = 0
     for m in _BOUNDARY.finditer(text):
         paragraph_break = "\n\n" in re.sub(r"[^\n]", "", m.group(0))
-        if not paragraph_break and _ABBREV.search(text[start:m.start()]):
+        before = text[start:m.start()]
+        digit_next = text[m.end():m.end() + 1].isdigit()
+        if not paragraph_break and (_ABBREV.search(before) or (digit_next and _ABBREV_BEFORE_DIGIT.search(before))):
             continue
         _append(sentences, text, start, m.start())
         start = m.end()

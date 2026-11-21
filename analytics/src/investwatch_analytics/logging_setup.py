@@ -1,4 +1,8 @@
-"""JSON logs to stdout (root CLAUDE.md convention)."""
+"""JSON logs, to stdout by default (root CLAUDE.md convention).
+
+Exception: the CLI passes `stream=sys.stderr`, because its stdout carries the findings JSON
+(recorded in `analytics/CLAUDE.md`). Every other entry point keeps the stdout default.
+"""
 
 from __future__ import annotations
 
