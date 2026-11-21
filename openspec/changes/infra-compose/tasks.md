@@ -4,9 +4,9 @@ Before group 1: Damian approves ADR 0306 and the open questions in `design.md` a
 
 ## 1. Smoke harness and project-scoped networks
 
-- [ ] 1.1 Failing test: `infra/tests/smoke.sh` with a "two stacks at once" check (two projects, ports 8443/8080 and 8444/8081) and a "no cross-stack DNS" check; it fails today because `iw-edge`/`iw-data` are global names
-- [ ] 1.2 Remove the explicit network `name:` in `infra/compose.yaml` and `web/compose.yaml`; verify `docker compose -p <p> --env-file .env -f web/compose.yaml config` still resolves; both parallel-stack scenarios and the existing gateway check from `infra/CLAUDE.md` "Done" pass
-- [ ] 1.3 Mutation check (put a fixed `name:` back on one network, the parallel-stack check must fail); record `mutations: N tried, N caught`
+- [x] 1.1 Failing test: `infra/tests/smoke.sh` (throwaway env files through a new optional output-path argument of `scripts/init-env.sh`) with a "two stacks at once" check (two projects, ports 8443/8080 and 8444/8081) and a "no cross-stack DNS" check; it fails today because `iw-edge`/`iw-data` are global names
+- [x] 1.2 Remove the explicit network `name:` in `infra/compose.yaml` and `web/compose.yaml`; verify `docker compose -p <p> --env-file .env -f web/compose.yaml config` still resolves; both parallel-stack scenarios and the existing gateway check from `infra/CLAUDE.md` "Done" pass
+- [x] 1.3 Mutation check (put a fixed `name:` back on one network, the parallel-stack check must fail); mutations: 2 tried, 2 caught (fixed `name:` on `data`, fixed `name:` on `edge`)
 
 ## 2. Secrets and env
 

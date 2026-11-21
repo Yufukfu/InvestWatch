@@ -58,10 +58,10 @@ volumes:
   caddy_data:
   caddy_config:
 
+# Names are project-scoped (<project>_edge, <project>_data), so stacks from parallel worktrees
+# (different COMPOSE_PROJECT_NAME) never share a network or a service DNS name.
 networks:
-  edge:
-    name: iw-edge
+  edge: {}
   # No route outside; only services that need the database join it (api, scraper, analytics).
   data:
-    name: iw-data
     internal: true
