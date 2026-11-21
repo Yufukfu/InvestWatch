@@ -14,7 +14,7 @@ import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import SplitResult, urljoin, urlsplit
+from urllib.parse import SplitResult, unquote, urljoin, urlsplit
 
 from noble_tls import Client, Session
 
@@ -71,10 +71,11 @@ class FetchResult:
 class FetchFailure(Exception):
     """The fetch produced nothing usable; `reason` is a `Reason` from the closed set."""
 
-    def __init__(self, reason: Reason, detail: str) -> None:
+    def __init__(self, reason: Reason, detail: str, proxy_id: str | None = None) -> None:
         super().__init__(detail)
         self.reason = reason
         self.detail = detail
+        self.proxy_id = proxy_id  # the proxy involved, for `scrape_meta.proxy`; never its URL
 
 
 class ProxyAuthFailure(FetchFailure):
@@ -121,8 +122,19 @@ def _address_url(parts: SplitResult, address: str) -> str:
     return parts._replace(netloc=netloc).geturl()
 
 
-def _transport_failure(exc: Exception) -> FetchFailure:
-    message = redact(str(exc))
+def _scrub_proxy(message: str, choice: ProxyChoice | None) -> str:
+    """Swap the proxy URL and its password (raw and percent-decoded) for the identifier."""
+    if choice is None:
+        return message
+    password = urlsplit(choice.url).password
+    secrets = [choice.url] + ([password, unquote(password)] if password else [])
+    for secret in sorted(set(secrets), key=len, reverse=True):
+        message = message.replace(secret, choice.identifier)
+    return message
+
+
+def _transport_failure(exc: Exception, choice: ProxyChoice | None = None) -> FetchFailure:
+    message = redact(_scrub_proxy(str(exc), choice))
     lowered = message.lower()
     if "proxy responded with non 200 code: 407" in lowered:  # the client's wording for a refused CONNECT
         return ProxyAuthFailure(Reason.HTTP_ERROR, f"proxy authentication failed: {message}")
@@ -194,9 +206,11 @@ async def _request_once(
                 stream_output_path=path,
             )
         except (OSError, ValueError) as exc:  # TLSClientException is an OSError; a library fault may be a ValueError
-            raise _transport_failure(exc) from None
+            raise _transport_failure(exc, choice) from None
         headers = _headers_of(response)
         status = response.status_code
+        if status == 407 and choice is not None:  # the proxy itself refused us, whatever the wording
+            raise ProxyAuthFailure(Reason.HTTP_ERROR, "proxy answered 407")
         is_redirect = status in _REDIRECT_STATUSES and "location" in headers
         body = b"" if is_redirect or not 200 <= status < 300 else _read_checked_body(path, headers, max_bytes)
         return status, headers, body
@@ -222,6 +236,9 @@ async def _request_through_proxies(
             return (*await _request_once(session, url, choice, guard, timeout, max_bytes), choice)
         except ProxyAuthFailure:
             proxies.penalize(choice)
+        except FetchFailure as failure:
+            failure.proxy_id = failure.proxy_id or (choice.identifier if choice else None)
+            raise
 
 
 async def fetch(
@@ -237,21 +254,23 @@ async def fetch(
     session = _new_session(identity)
     try:
         current = url
+        proxy_id = None
         for _ in range(MAX_REDIRECTS + 1):
             status, headers, body, choice = await _request_through_proxies(
                 session, current, proxy, guard, timeout, max_bytes
             )
+            proxy_id = choice.identifier if choice else None
             if status in _REDIRECT_STATUSES and "location" in headers:
                 current = urljoin(current, headers["location"])
                 continue
             if status in _BLOCK_STATUSES:
-                raise FetchFailure(Reason.BLOCKED, f"HTTP {status}")
+                raise FetchFailure(Reason.BLOCKED, f"HTTP {status}", proxy_id)
             if not 200 <= status < 300:
-                raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}")
+                raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}", proxy_id)
             if not body:
-                raise FetchFailure(Reason.BLOCKED, "empty response body")
+                raise FetchFailure(Reason.BLOCKED, "empty response body", proxy_id)
             if marker := _block_marker(body):
-                raise FetchFailure(Reason.BLOCKED, f"block page marker: {marker}")
+                raise FetchFailure(Reason.BLOCKED, f"block page marker: {marker}", proxy_id)
             media_type, _ = content_type_params(headers.get("content-type"))
             return FetchResult(
                 url=current,
@@ -259,9 +278,9 @@ async def fetch(
                 content_type=f"{media_type or 'text/html'}; charset=utf-8",
                 body=body,
                 headers=headers,
-                proxy_id=choice.identifier if choice else None,
+                proxy_id=proxy_id,
             )
-        raise FetchFailure(Reason.HTTP_ERROR, f"more than {MAX_REDIRECTS} redirects")
+        raise FetchFailure(Reason.HTTP_ERROR, f"more than {MAX_REDIRECTS} redirects", proxy_id)
     finally:
         try:
             await session.close()

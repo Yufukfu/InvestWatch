@@ -18,3 +18,6 @@ Out-of-scope review findings and "declined to judge" items, one disposition each
 | No port restriction on allow-listed hosts (for example `:6379`) | review of 600cc26, declined to judge | fix-here | spec requirement "Fetch only allowed ports" (`ALLOWED_PORTS`, default `80,443`), implemented in task 5.2 |
 | Content type of redirect and non-2xx bodies | review of 600cc26, declined to judge | wont-fix | those bodies are never read, so their type cannot matter |
 | Supply chain of the native tls-client library | review of 600cc26, declined to judge | docs | the Dockerfile pins the release tag and verifies its sha256 (ADR 0101) |
+| `proxy_identifier` is 8 hex characters of a hash, so it can collide or be guessed for a known URL | review of 050e928 | wont-fix | it is a log label, not a key: the rotator keys cooldowns by URL, and a guess needs the full URL including its credentials |
+| Bound the `_request_through_proxies` loop in case a cooldown never ends | review of 050e928 | wont-fix | the cooldown is now validated finite and positive in `ProxyRotator` and `proxy_settings`, so every penalised proxy cools and the loop ends in a deferral |
+| The session-close warning in `fetch` is covered by `redact` only | review of 050e928 | wont-fix | it logs the exception through the redacting logger and carries no proxy URL of its own |

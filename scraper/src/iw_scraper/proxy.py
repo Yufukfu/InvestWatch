@@ -7,6 +7,7 @@ module (logs, job errors, `scrape_meta.proxy`) uses `proxy_identifier`, never th
 """
 
 import hashlib
+import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -44,7 +45,9 @@ class ProxyRotator:
     ) -> None:
         if mode not in (PER_REQUEST, PER_SESSION):
             raise ValueError(f"unknown rotation mode {mode!r}")
-        self.proxies = list(proxies)
+        if not math.isfinite(cooldown_seconds) or cooldown_seconds <= 0:
+            raise ValueError("the proxy cooldown must be a positive number of seconds")  # 0 would never cool
+        self.proxies = list(dict.fromkeys(proxies))  # a duplicated entry is one proxy
         self.mode = mode
         self._cooldown = timedelta(seconds=cooldown_seconds)
         self._clock = clock

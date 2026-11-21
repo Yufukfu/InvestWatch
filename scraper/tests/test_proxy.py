@@ -258,3 +258,114 @@ def test_the_clients_407_wording_is_a_proxy_authentication_failure():
 )
 def test_other_errors_are_not_proxy_authentication_failures(message):
     assert not isinstance(_transport_failure(TLSClientException(message)), ProxyAuthFailure)
+
+
+def test_duplicate_proxy_entries_count_as_one_proxy():
+    run = rotator(["http://a:1", "http://a:1"]).start_run()
+
+    assert {c.url for c in picks(run, 4)} == {"http://a:1"}
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "nan", "inf"])
+def test_cooldown_setting_must_be_positive_and_finite(monkeypatch, value):
+    monkeypatch.setenv("PROXY_COOLDOWN_SECONDS", value)
+
+    with pytest.raises(ValueError):
+        proxy_settings()
+
+
+@pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf")])
+def test_rotator_refuses_a_cooldown_that_would_never_cool(value):
+    with pytest.raises(ValueError):
+        rotator(cooldown=value)
+
+
+@pytest.mark.parametrize("entry", ["host:8080", "ftp://h:1", "http://", "not a url", "http://u:secret@"])
+def test_malformed_proxy_entry_is_refused_without_echoing_it(monkeypatch, entry):
+    monkeypatch.setenv("PROXY_LIST", entry)
+
+    with pytest.raises(ValueError) as err:
+        proxy_settings()
+
+    assert entry not in str(err.value) and "secret" not in str(err.value)
+
+
+@pytest.mark.parametrize("entry", ["http://p:1", "https://u:pw@p:2", "socks5://p:3"])
+def test_supported_proxy_schemes_are_accepted(monkeypatch, entry):
+    monkeypatch.setenv("PROXY_LIST", entry)
+
+    assert proxy_settings()[0] == [entry]
+
+
+@pytest.mark.parametrize(
+    "echo",
+    [
+        "dial http://user:p%2Fa%20ss@proxy.example:8080 failed",
+        "auth failed for password p/a ss",
+        "auth failed for password p%2Fa%20ss",
+    ],
+)
+def test_proxy_url_and_password_are_scrubbed_from_client_errors(echo):
+    choice = choice_of("http://user:p%2Fa%20ss@proxy.example:8080")
+
+    detail = _transport_failure(TLSClientException(echo), choice).detail
+
+    assert "p/a ss" not in detail and "p%2Fa%20ss" not in detail
+    assert "user:" not in detail
+    assert choice.identifier in detail
+
+
+def test_client_errors_without_a_proxy_are_left_readable():
+    detail = _transport_failure(TLSClientException("dial tcp 10.0.0.1:80: connection refused"), None).detail
+
+    assert "connection refused" in detail
+
+
+async def test_a_407_answer_from_the_proxy_cools_it_and_another_serves(stub, stub2):
+    stub.route("/ok", status=407, body=b"proxy auth required")
+    stub2.route("/ok", body=PAGE)
+    rot = rotator([stub.url("/"), stub2.url("/")], rng=First())
+
+    result = await fetch("http://example.test/ok", IDENTITY, rot.start_run())
+
+    assert result.proxy_id == proxy_identifier(stub2.url("/"))
+    assert rot.start_run().pick().url == stub2.url("/")
+
+
+async def test_a_407_without_a_proxy_is_just_an_http_error(stub):
+    stub.route("/ok", status=407, body=b"nope")
+
+    with pytest.raises(FetchFailure) as failure:
+        await fetch(stub.url("/ok"), IDENTITY, None)
+
+    assert failure.value.reason is Reason.HTTP_ERROR
+
+
+async def test_a_failure_through_a_proxy_names_that_proxy(stub):
+    stub.route("/ok", status=403, body=b"denied")
+    url = stub.url("/")
+
+    with pytest.raises(FetchFailure) as failure:
+        await fetch("http://example.test/ok", IDENTITY, rotator([url]).start_run())
+
+    assert failure.value.reason is Reason.BLOCKED
+    assert failure.value.proxy_id == proxy_identifier(url)
+
+
+async def test_a_transport_failure_through_a_proxy_names_that_proxy(stub):
+    stub.connect_status = 502
+    url = stub.url("/")
+
+    with pytest.raises(FetchFailure) as failure:
+        await fetch("http://example.test/ok", IDENTITY, rotator([url]).start_run())
+
+    assert failure.value.proxy_id == proxy_identifier(url)
+
+
+async def test_a_direct_failure_names_no_proxy(stub):
+    stub.route("/ok", status=404, body=b"x")
+
+    with pytest.raises(FetchFailure) as failure:
+        await fetch(stub.url("/ok"), IDENTITY, None)
+
+    assert failure.value.proxy_id is None
