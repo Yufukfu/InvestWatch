@@ -47,6 +47,15 @@ describe('App (against contract mocks)', () => {
     expect(trend.compareDocumentPosition(findingsTable!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('mounts the calibration panel (lazy-loaded) after the findings', async () => {
+    renderApp();
+    const heading = await screen.findByRole('heading', { name: 'Kalibracja progów' }, { timeout: 4000 });
+    expect(await screen.findByRole('slider', { name: 'Próg dla M2' }, { timeout: 4000 })).toBeInTheDocument();
+    const findingsTable = document.querySelector('table.findings');
+    expect(findingsTable).not.toBeNull();
+    expect(findingsTable!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('renders markup in scraped text literally, never as HTML', async () => {
     const payload = '<img src=x onerror=alert(1)>Zysk 20%';
     server.use(
