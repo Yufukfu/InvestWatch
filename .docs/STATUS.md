@@ -18,7 +18,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 | Module | Owner | State | Active OpenSpec changes |
 |---|---|---|---|
 | scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
-| dashboard | B | foundation: app shell, RTK Query client generated from `contracts/openapi.yaml`, mock mode, hardened container, root compose with Postgres + HTTPS gateway (`infra/`) | `web-setup` |
+| dashboard | B | foundation: app shell, RTK Query client generated from `contracts/openapi.yaml`, mock mode, hardened container, root compose with Postgres + HTTPS gateway (`infra/`) | none (`web-setup` archived) |
 | analytics, api, contracts | C | plans written | none yet |
 
 ## Blockers and open decisions
