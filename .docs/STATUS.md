@@ -19,7 +19,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 |---|---|---|---|
 | scraper | A | SDLC setup PR in progress; first change `scraper-v1` next | none yet |
 | dashboard | B | n/a | none yet |
-| analytics, api, contracts | C | plans written | none yet |
+| analytics, api, contracts | C | plans written; contracts draft v1 in `contracts/`; ADR drafts 0301-0305 proposed, waiting for team decisions | none yet |
 
 ## Blockers and open decisions
 
