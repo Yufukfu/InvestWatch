@@ -280,3 +280,70 @@ class R6HiddenRisk(_RiskWarnings):
             "pass": "Ostrzeżenie o ryzyku jest wyeksponowane poza stopką i przypisami lub widoczne bez przewijania.",
         }[result]
         return self.result(result, locate(ctx.doc.text, b.text), why, locator_for(b))
+
+
+def weighted_median(values: list[tuple[float, float]]) -> float:
+    """Lower weighted median of (value, weight) pairs: the first value whose cumulative weight reaches half."""
+    ordered = sorted(values)
+    half = sum(w for _, w in ordered) / 2
+    acc = 0.0
+    for value, weight in ordered:
+        acc += weight
+        if acc >= half:
+            return value
+    return ordered[-1][0]
+
+
+def _pl(x: float) -> str:
+    return f"{x:.2f}".replace(".", ",")
+
+
+def _px(x: float) -> str:
+    return f"{x:g}".replace(".", ",")
+
+
+@register
+class R4RiskFontSize(_RiskWarnings):
+    """ZASÓB R4: the risk font vs "przeważająca wielkość czcionki materiału" (the dominant size).
+
+    Dominant size = length-weighted median `font_size_px` of the visible blocks of a viewport; the task text
+    asks for a warning "proporcjonalny do informacji o zyskach oraz wyraźny". `min_ratio` is our threshold.
+    """
+
+    rule_id = "R4"
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        if not ctx.doc.blocks:
+            return self.result("not_applicable", None, NO_BLOCKS)
+        min_ratio = float(self.spec.params.get("min_ratio", 0.75))
+        measured = []  # (ratio, risk block, dominant size)
+        any_risk_block = False
+        for vp in VIEWPORTS:
+            blocks = [b for b in ctx.doc.blocks if b.viewport == vp]
+            any_risk_block |= any(self.is_warning(b.text) for b in blocks)
+            visible = [b for b in blocks if b.visible]
+            risk = [b for b in visible if self.is_warning(b.text)]
+            if not risk:
+                continue
+            dominant = weighted_median([(b.font_size_px, len(b.text)) for b in visible])
+            largest = max(risk, key=lambda b: b.font_size_px)
+            measured.append((largest.font_size_px / dominant if dominant else 1.0, largest, dominant))
+        if not measured:
+            if any_risk_block:
+                return self.result(
+                    "not_applicable", None,
+                    "Ostrzeżenie o ryzyku nie jest widoczne na stronie – widoczność ocenia R5.",
+                )
+            return self.no_risk_result(ctx)
+        ratio, b, dominant = min(measured, key=lambda m: m[0])  # worst viewport; desktop first on ties
+        sizes = f"{_px(b.font_size_px)} px przy przeważającej czcionce {_px(dominant)} px ({_pl(ratio)}×, {b.viewport})"
+        if ratio < min_ratio:
+            return self.result(
+                "fail", locate(ctx.doc.text, b.text),
+                f"Ostrzeżenie o ryzyku zbyt małą czcionką: {sizes}; wymagane co najmniej {_pl(min_ratio)}×.",
+                locator_for(b),
+            )
+        return self.result(
+            "pass", locate(ctx.doc.text, b.text),
+            f"Czcionka ostrzeżenia proporcjonalna do treści: {sizes}.", locator_for(b),
+        )

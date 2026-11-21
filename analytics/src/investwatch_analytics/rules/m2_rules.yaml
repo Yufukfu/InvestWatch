@@ -2,6 +2,7 @@
 # One entry per rule; only `implemented: true` rules run. Names and legal bases of R1-R8, R10, R14, R15,
 # R17, R18 match contracts/mocks/generate_mocks.py. `legal_basis: null` = not yet checked against doc/.
 # Patterns are Python regexes, matched case-insensitively against the ORIGINAL document text.
+# Dictionaries shared by several rules (YAML anchors); the loader reads only `rules`.
 # A pattern that starts with `\d+` gets `(?<!\d)` so it is tried once per number, not once per digit
 # (quadratic on a long digit run otherwise; see tests/test_rules_m2_p0.py, adversarial input).
 rules:
@@ -93,7 +94,20 @@ rules:
         - '\brisk[- ]free\b'
       footnote_markers: &footnote_markers ["*", "¹", "²", "³"]
 
-  - {id: R4, name: Rozmiar czcionki ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565, implemented: false}
+  # ZASÓB R4: risk font vs "przeważająca wielkość czcionki materiału" (dominant size = length-weighted median
+  # of the visible blocks per viewport). Visual: not_applicable without `blocks`, never pass.
+  - id: R4
+    name: Rozmiar czcionki ryzyka
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565
+    implemented: true
+    params:
+      min_ratio: 0.75
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
   - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
   # ZASÓB R6 "ryzyko ukryte w przypisach": a risk block only in the footer / legal region or a footnote and
   # not in the viewport on load. Visual: not_applicable without `blocks`, never pass. Viewports desktop,
@@ -105,13 +119,8 @@ rules:
     implemented: true
     params:
       hiding_regions: [footer, legal]
-      # A past-performance disclaimer is risk information too (shared with R14 below).
-      disclaimer_patterns: &past_performance_disclaimers
-        - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
-        - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
-        - '\b(?:past|historical)\s+(?:performance|results?|returns?)\b.{0,60}?\b(?:is not|are not|does not|do not|isn.t|aren.t|not a|no guarantee)\b'
-        - '\b(?:osiągnięt\w*\s+w\s+przeszłości|historyczn\w*|przeszł\w*)\s+wynik\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
-        - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
+      # A past-performance disclaimer is risk information too (shared with R4 and R14).
+      disclaimer_patterns: *past_performance_disclaimers
       risk_patterns: *risk_patterns
       risk_override_patterns: *risk_override_patterns
       risk_exclude_patterns: *risk_exclude_patterns

@@ -327,3 +327,99 @@ def test_r14_year_suffix_form_counts(registry, catalogue):
 
 def test_r14_year_with_context_still_counts(registry, catalogue):
     assert run("Za 2025 r. portfel: +11%.", registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+# ---- R4 risk font size -------------------------------------------------------------------------
+
+
+def test_weighted_median():
+    from investwatch_analytics.rules.m2 import weighted_median
+
+    assert weighted_median([(9, 70), (20, 55), (44, 46)]) == 20
+    assert weighted_median([(20, 1), (10, 1)]) == 10
+    assert weighted_median([(12, 5)]) == 12
+
+
+def test_r4_alfa_small_footer_warning_fails(registry, catalogue):
+    r = run(ALFA_TEXT, registry, catalogue, blocks=alfa_blocks())["R4"]
+    assert r.result == "fail" and r.evidence == RISK
+    assert "9 px" in r.explanation and "20 px" in r.explanation and "0,45" in r.explanation
+    assert r.evidence_locator.viewport == "desktop" and r.evidence_locator.bbox == [80, 2400, 600, 12]
+
+
+def test_r4_readable_warning_passes(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie na koncie.", size=20), block("Ryzyko utraty kapitału.", size=18)]
+    r = run("Zysk 8% rocznie na koncie. Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "pass" and r.evidence == "Ryzyko utraty kapitału."
+
+
+def test_r4_ratio_at_threshold_passes(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie na naszym koncie maklerskim.", size=20), block("Ryzyko utraty.", size=15)]
+    assert run("Zysk 8% rocznie na naszym koncie maklerskim. Ryzyko utraty.", registry, catalogue, blocks=blocks)["R4"].result == "pass"
+
+
+def test_r4_ratio_just_below_threshold_fails(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie na naszym koncie maklerskim.", size=20), block("Ryzyko utraty.", size=14.9)]
+    assert run("Zysk 8% rocznie na naszym koncie maklerskim. Ryzyko utraty.", registry, catalogue, blocks=blocks)["R4"].result == "fail"
+
+
+def test_r4_largest_risk_block_is_judged(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie na koncie.", size=20), block("Ryzyko utraty.", size=8),
+              block("Ryzyko utraty kapitału.", size=19)]
+    r = run("Zysk 8% rocznie na koncie. Ryzyko utraty. Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "pass" and r.evidence == "Ryzyko utraty kapitału."
+
+
+def test_r4_invisible_blocks_do_not_count(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie na koncie.", size=20), block("Ryzyko utraty kapitału.", size=19),
+              block("Ukryty tekst " * 30, size=60, visible=False)]
+    assert run("Zysk 8% rocznie na koncie. Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R4"].result == "pass"
+
+
+def test_r4_without_blocks_is_not_applicable(registry, catalogue):
+    from investwatch_analytics.rules.m2 import NO_BLOCKS
+
+    r = run(ALFA_TEXT, registry, catalogue)["R4"]
+    assert r.result == "not_applicable" and r.explanation == NO_BLOCKS
+
+
+def test_r4_without_risk_information_is_not_applicable(registry, catalogue):
+    r = run("Zysk 8% rocznie.", registry, catalogue, blocks=[block("Zysk 8% rocznie.")])["R4"]
+    assert r.result == "not_applicable" and "brak informacji o ryzyku" in r.explanation.lower()
+
+
+def test_r4_risk_only_in_invisible_block_is_not_applicable(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie."), block("Ryzyko utraty kapitału.", size=6, visible=False)]
+    r = run("Zysk 8% rocznie. Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "not_applicable" and "R5" in r.explanation
+
+
+def test_r4_worst_viewport_decides(registry, catalogue):
+    text = "Zysk 8% rocznie na koncie. Ryzyko utraty kapitału."
+    blocks = [
+        block("Zysk 8% rocznie na koncie.", size=20), block("Ryzyko utraty kapitału.", size=18),
+        block("Zysk 8% rocznie na koncie.", viewport="mobile", size=20),
+        block("Ryzyko utraty kapitału.", viewport="mobile", size=10, bbox=(1, 2, 3, 4)),
+    ]
+    r = run(text, registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "fail" and r.evidence_locator.viewport == "mobile" and "0,50" in r.explanation
+
+
+@pytest.mark.parametrize("bad", ["min_ratio: 0", "min_ratio: 1.5", "min_ratio: x", "min_ratio: true", "min_ratio: -0.5"])
+def test_r4_bad_min_ratio_fails_at_load(tmp_path, bad):
+    from investwatch_analytics.rules.engine import CatalogueError
+
+    src = Path(__file__).resolve().parents[1] / "src" / "investwatch_analytics" / "rules" / "m2_rules.yaml"
+    text = src.read_text(encoding="utf-8")
+    assert text.count("min_ratio: 0.75") == 1
+    p = tmp_path / "rules.yaml"
+    p.write_text(text.replace("min_ratio: 0.75", bad), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="min_ratio"):
+        Catalogue.load(p)
+
+
+def test_r4_min_ratio_one_is_allowed(tmp_path):
+    src = Path(__file__).resolve().parents[1] / "src" / "investwatch_analytics" / "rules" / "m2_rules.yaml"
+    p = tmp_path / "rules.yaml"
+    p.write_text(src.read_text(encoding="utf-8").replace("min_ratio: 0.75", "min_ratio: 1"), encoding="utf-8")
+    assert Catalogue.load(p).get("R4").params["min_ratio"] == 1

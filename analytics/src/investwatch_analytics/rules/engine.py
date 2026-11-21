@@ -26,7 +26,7 @@ KNOWN_PARAMS = {
     "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
     # analytics-llm-p0 (M2 P0 rules)
     "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
-    "hiding_regions", "figure_extra_exclude_patterns",
+    "hiding_regions", "figure_extra_exclude_patterns", "min_ratio",
 }
 _RULES: dict[str, type["Rule"]] = {}
 
@@ -164,6 +164,10 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
             isinstance(value, bool) or not isinstance(value, int) or value < 0
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a non-negative integer")
+        if key == "min_ratio" and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a number in (0, 1]")
         if key == "hiding_regions" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key.endswith("_patterns") or key == "labels":

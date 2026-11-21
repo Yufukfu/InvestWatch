@@ -16,9 +16,9 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 3. R4 risk font size (~45 min)
 
-- [ ] 3.1 Failing tests for the R4 scenarios (alfa `fail` with 9 px / 20 px / 0,45 in the explanation, readable `pass`, no blocks `not_applicable`, no risk information `not_applicable` with `brak informacji o ryzyku`, risk text only in an invisible block `not_applicable`, worst viewport decides with `evidence_locator.viewport`); a unit test for the length-weighted median
-- [ ] 3.2 R4 class, `min_ratio` param (number in (0, 1], validated); tests green
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 Failing tests for the R4 scenarios (alfa `fail` with 9 px / 20 px / 0,45 in the explanation, readable `pass`, no blocks `not_applicable`, no risk information `not_applicable` with `brak informacji o ryzyku`, risk text only in an invisible block `not_applicable`, worst viewport decides with `evidence_locator.viewport`); a unit test for the length-weighted median
+- [x] 3.2 R4 class, `min_ratio` param (number in (0, 1], validated); tests green
+- [x] 3.3 Mutation check; `mutations: 15 tried, 15 caught` (one survivor on the first run closed: the no-blocks explanation is pinned exactly)
 
 ## 4. R17 and R18, rules-only part (~1 h)
 
