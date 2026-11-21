@@ -21,6 +21,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0206](0206-dashboard-data-from-backend.md) | Dashboard data from the backend only; MSW only in tests (supersedes 0201's dev mocks) | accepted (takes effect when PR merges) |
 | [0207](0207-agent-push-and-pr.md) | Agents push their branch and open the PR; humans approve and merge | accepted (takes effect when the PR merges) |
 | [0208](0208-dashboard-realtime-socketio-client.md) | Dashboard real-time client: socket.io-client, one connection owned by the alerts feature | accepted (takes effect when the `realtime-alerts` PR merges) |
+| [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted (takes effect when the PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
