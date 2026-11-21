@@ -4,7 +4,7 @@ Dashboard: findings with filters, trend charts, real-time alerts, threshold cali
 
 - **Owner:** Kacper
 - **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), Vitest with MSW as the test-only network fake.
-- **Status:** foundation (app shell, generated client, container), data from the backend only, the trend chart (Recharts, hourly or daily buckets) and the findings workspace: filters, sort and paging in the URL (shareable links), a detail panel with the failed rules and their legal basis, and status change. Alerts and the calibration panel come next.
+- **Status:** foundation (app shell, generated client, container), data from the backend only, the trend chart (Recharts, hourly or daily buckets) and the findings workspace: filters, sort and paging in the URL (shareable links), a detail panel with the failed rules and their legal basis, and status change, and real-time alerts over Socket.IO (high-risk toasts, live badge). The calibration panel comes next.
 
 ## Run
 
@@ -22,7 +22,7 @@ docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts
 docker run --rm -p 127.0.0.1:8000:8000 iw-mock-server
 ```
 
-The mock endpoints stay until we have sensible data. A browser that ran the old mock mode on the same origin keeps its service worker until you unregister it (DevTools, Application, Service Workers). Compose does not start a REST backend yet, so `docker compose up` alone shows only the dashboard's error states.
+The mock endpoints stay until we have sensible data. The mock emits a new finding every `MOCK_REPLAY_INTERVAL_S` (10 s) while the dashboard is connected, so toasts appear on their own. It accepts Socket.IO only from origins in `MOCK_CORS_ORIGINS` (default includes `http://localhost:5173`): a dev server on another port needs `-e MOCK_CORS_ORIGINS='*'`, or the live badge falls back to `Brak połączenia na żywo`. A browser that ran the old mock mode on the same origin keeps its service worker until you unregister it (DevTools, Application, Service Workers). The root `compose.yaml` includes `api/compose.yaml`, so `docker compose up --build` starts the `api` service, and the gateway sends `/api` and `/socket.io` to it (`infra/gateway/Caddyfile`). The dashboard that compose serves (https://localhost:8443) therefore reads the api, not the mock server; what it shows depends on the api's data. The `npm run dev` server above still uses the mock server unless `API_PROXY_TARGET` points at the api.
 In docker the app is served by unprivileged nginx behind the gateway: `docker compose up --build` from the repo root, then https://localhost:8443.
 
 ## API client (contract-first)
