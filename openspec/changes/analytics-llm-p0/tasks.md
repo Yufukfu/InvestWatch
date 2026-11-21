@@ -66,19 +66,21 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 11. Per-sentence language and R10 (~1 h)
 
-- [ ] 11.1 Failing tests: `Sentence.lang` scenarios (eurotrade pl / en, `Ryzyko!` none) with the existing preprocessing tests still green; R10 scenarios (eurotrade `fail`, bank `pass`, bilingual `pass`, no warning `not_applicable` with `brak informacji o ryzyku`, English legal block does not set the main language, unknown language `uncertain`)
-- [ ] 11.2 `preprocessing.py` (per-sentence guess with a minimum signal), R10 class reusing the warning anchor, main language from non-legal, non-footer blocks when present, `implemented: true`; tests green
-- [ ] 11.3 Mutation check; `mutations: N tried, N caught`
+Cut (design "Cut plan" item 1, coordinator: groups 9-11 only if time). Deferred to a follow-up change (follow-ups R67); the R10 requirement and the per-sentence Preprocessing delta were taken out of this change's specs.
+
+- [x] 11.1 (deferred, follow-ups R67) Failing tests: `Sentence.lang` scenarios (eurotrade pl / en, `Ryzyko!` none) with the existing preprocessing tests still green; R10 scenarios (eurotrade `fail`, bank `pass`, bilingual `pass`, no warning `not_applicable` with `brak informacji o ryzyku`, English legal block does not set the main language, unknown language `uncertain`)
+- [x] 11.2 (deferred, follow-ups R67) `preprocessing.py` (per-sentence guess with a minimum signal), R10 class reusing the warning anchor, main language from non-legal, non-footer blocks when present, `implemented: true`; tests green
+- [x] 11.3 (deferred, follow-ups R67) Mutation check; `mutations: N tried, N caught`
 
 ## 12. Wiring: worker, CLI, compose (~1 h)
 
 - [x] 12.1 Failing tests: the worker builds the judge from env with its Redis client and passes it to `analyze`; `llm_mode` logged (`hosted`, `local`, `disabled`); CLI uses the judge when `LLM_BASE_URL` is set (stub), `--no-llm` forces rules-only, CLI output on `contracts/mocks/documents.json` still passes `contracts/validate.py finding` in both modes
 - [x] 12.2 `worker.py`, `cli.py`, `llm/__init__.build_judge`; `analytics/compose.yaml` passes `LLM_*` and joins `egress` again (PR #18 key, no `name:`; Kacper's #26 review removed it from the worker until the LLM client exists, so the PR body says it is re-added with the hosted-LLM client); `analytics/.env.example` documents every `LLM_*` variable (empty `LLM_BASE_URL` = rules-only; the local values for the `ollama` profile); tests green; `docker compose config` valid with and without `--profile llm`
 - [x] 12.3 Mutation check; `mutations: 10 tried, 10 caught` (worker tests use a malformed `DATABASE_URL` so a regression fails fast instead of connecting)
-- [ ] 12.4 Manual, outside pytest: run the CLI on all mock documents against the hosted default endpoint (ADR 0304) and against the local `ollama` swap target (`gemma3:4b`); note whether each returns valid JSON and the latency per document; record the result in the AI log, never in a test
+- [x] 12.4 (done 2026-11-21: Gemma 4 on the Gemini API, ADR 0317 has the numbers) Manual, outside pytest: run the CLI on all mock documents against the hosted default endpoint (ADR 0304) and against the local `ollama` swap target (`gemma3:4b`); note whether each returns valid JSON and the latency per document; record the result in the AI log, never in a test
 
 ## 13. Closing
 
-- [ ] 13.0 Run the CLI on `contracts/mocks/documents.json` (rules-only and with the stub judge) and update `follow-ups.md` with every rule result that differs from `contracts/mocks/findings.json`; `git diff --exit-code contracts/mocks contracts/mock-server web` is empty (the mocks are a test double and are never edited)
-- [ ] 13.1 Apply the iw-docs-update skill: `.docs/analytics-plan.md` §7 (object wrapper `{"results": [...]}`, `prompt_version` as prompt hash, chunk and budget defaults), §5 (P0 rules implemented); `analytics/CLAUDE.md` (LLM env variables, the "LLM only decides deferred checks" rule); `analytics/README.md`; ADRs 0309 and 0310 listed; your own row in `.docs/STATUS.md` only if the coordinator has not taken it; add the iw-ai-log row; `docs-check` clean
+- [x] 13.0 Run the CLI on `contracts/mocks/documents.json` (rules-only and with the stub judge) and update `follow-ups.md` with every rule result that differs from `contracts/mocks/findings.json`; `git diff --exit-code contracts/mocks contracts/mock-server web` is empty (the mocks are a test double and are never edited)
+- [x] 13.1 Apply the iw-docs-update skill: `.docs/analytics-plan.md` §7 (object wrapper `{"results": [...]}`, `prompt_version` as prompt hash, chunk and budget defaults), §5 (P0 rules implemented); `analytics/CLAUDE.md` (LLM env variables, the "LLM only decides deferred checks" rule); `analytics/README.md`; ADRs 0309 and 0310 listed; your own row in `.docs/STATUS.md` only if the coordinator has not taken it; add the iw-ai-log row; `docs-check` clean
 - [ ] 13.2 Run the iw-pr-review skill with a normal pass and a `focus: security` pass of iw-reviewer (prompts built from scraped text, quote verification, key handling, new `httpx` dependency, outbound egress), and fix real findings

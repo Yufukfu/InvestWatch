@@ -5,7 +5,7 @@ The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a
 
 #### Scenario: Catalogue is complete
 - **WHEN** the catalogue is loaded
-- **THEN** it holds 19 entries whose ids match the contract `rule_id` pattern, and exactly R1, R2, R3, R4, R6, R10, R14, R17 and R18 are implemented
+- **THEN** it holds 19 entries whose ids match the contract `rule_id` pattern, and exactly R1, R2, R3, R4, R6, R14, R17 and R18 are implemented
 
 #### Scenario: LLM-refined rules declare it
 - **WHEN** the catalogue is loaded
@@ -169,34 +169,6 @@ R6 (ZASÓB "ryzyko ukryte w przypisach") SHALL fail when, in a viewport, every r
 #### Scenario: No risk block
 - **WHEN** blocks exist and none is a risk warning
 - **THEN** R6 is `not_applicable` with the explanation `brak informacji o ryzyku`
-
-### Requirement: R10 language consistency
-R10 SHALL check that risk information is not given in a language other than the main message (ZASÓB). It SHALL pass when at least one risk-warning sentence is in the main language, fail quoting the first warning when none is, be `uncertain` when no warning sentence has a known language, and be `not_applicable` with the explanation `brak informacji o ryzyku` without a warning.
-
-#### Scenario: English warning on a Polish page
-- **WHEN** the `eurotrade` mock is analyzed (Polish copy, warning `Risk warning: CFDs are complex instruments…`)
-- **THEN** R10 is `fail` with evidence starting `Risk warning: CFDs are complex instruments`
-
-#### Scenario: Polish warning on a Polish page
-- **WHEN** `m2-bank-ok` is analyzed
-- **THEN** R10 is `pass`
-
-#### Scenario: Bilingual warnings
-- **WHEN** a Polish page has both a Polish and an English risk warning
-- **THEN** R10 is `pass`
-
-#### Scenario: No warning
-- **WHEN** the text has no risk warning
-- **THEN** R10 is `not_applicable` with the explanation `brak informacji o ryzyku`
-
-#### Scenario: English legal footer does not set the main language
-- **WHEN** blocks hold a Polish headline and body, a Polish risk warning in `main`, and a long English legal text in `region: legal`
-- **THEN** the main language is `pl` and R10 is `pass`
-- **AND** the main language SHALL be the length-weighted majority language of the visible non-warning blocks outside `footer` and `legal` (desktop viewport if present), or without `blocks` that of the non-warning sentences with a known language, falling back to the document guess
-
-#### Scenario: Language unknown
-- **WHEN** the only warning sentence is `Ryzyko!` (too short for a language guess)
-- **THEN** R10 is `uncertain`
 
 ### Requirement: R14 past-performance disclaimer
 R14 SHALL pass when a sentence presents past performance and a clear past-performance disclaimer (`wyniki historyczne nie są gwarancją…`, `past performance is not a reliable indicator…`) appears anywhere in the material, with no proximity requirement (ZASÓB: "obecność wyraźnego zastrzeżenia"). It SHALL fail, quoting the first past-performance sentence, when there is no disclaimer, and be `not_applicable` without past performance.
