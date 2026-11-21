@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
 import { investWatchApi } from '../../api/generated';
+import trend from '../../mocks/fixtures/trend.json';
 import { server } from '../../test/setup';
 import { TrendPage } from './TrendPage';
 
@@ -54,5 +55,13 @@ describe('TrendPage (against contract mocks)', () => {
     server.use(http.get('http://localhost/api/stats/trend', () => HttpResponse.error()));
     renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać danych trendu.');
+  });
+
+  it('renders the contract mock (default handlers) with its totals per module', async () => {
+    renderPage();
+    const sum = (k: 'M1' | 'M2' | 'M3') => trend.points.reduce((n, p) => n + p[k], 0);
+    expect(await screen.findByRole('img')).toHaveAccessibleName(
+      `Liczba zgłoszeń: M1 ${sum('M1')}, M2 ${sum('M2')}, M3 ${sum('M3')}`,
+    );
   });
 });

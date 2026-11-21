@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TrendChart, type TrendChartProps } from './TrendChart';
 
 const points = [
@@ -75,5 +75,34 @@ describe('TrendChart (props only, no store)', () => {
     expect(screen.getByRole('button', { name: 'Dzień' })).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Dzień' }));
     expect(onBucketChange).toHaveBeenCalledWith('day');
+  });
+
+  it('labels a day bucket with its UTC date, whatever the browser timezone', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    setup({ bucket: 'day', points: [{ t: '2026-11-20T00:00:00Z', M1: 1 }, { t: '2026-11-21T00:00:00Z', M1: 2 }] });
+    expect(screen.getAllByText('20 lis').length).toBeGreaterThan(0);
+    expect(screen.queryByText('19 lis')).toBeNull();
+  });
+});
+
+describe('TrendChart responsive path (no fixed size)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('draws the chart through ResponsiveContainer once it can measure its parent', async () => {
+    class FakeResizeObserver {
+      cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+      }
+      observe(target: Element) {
+        this.cb([{ target, contentRect: { width: 500, height: 260 } } as ResizeObserverEntry], this as never);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    setup({ size: undefined });
+    expect(await screen.findByRole('img')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelectorAll('path.recharts-line-curve')).toHaveLength(3));
   });
 });

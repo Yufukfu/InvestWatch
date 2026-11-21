@@ -31,7 +31,7 @@ function formatTick(t: string, bucket: TrendBucket) {
   const date = new Date(t);
   return bucket === 'hour'
     ? date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
+    : date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', timeZone: 'UTC' }); // day buckets are UTC days
 }
 
 export function TrendChart({ points, bucket, onBucketChange, isLoading, isError, size }: TrendChartProps) {
