@@ -158,6 +158,20 @@ class R3RiskNextToReturns(Rule):
 
 # A year only in a year context ("w 2025", "za 2024 r.", "2023 roku"), so amounts ("2000 zł") and
 # dates ("do 31.12.2026") are not years; an amount after a preposition ("od 2000 zł") is not either.
+def _one_of(patterns: list[str]) -> list[re.Pattern]:
+    """The patterns as one case-insensitive alternation (empty list: no pattern, never matches)."""
+    return [re.compile("|".join(f"(?:{x})" for x in patterns), re.IGNORECASE)] if patterns else []
+
+
+def _hits_fast(text: str, include: list[re.Pattern], exclude: list[re.Pattern]) -> bool:
+    """`R3RiskNextToReturns._hits` with a cheap pre-check: no include match in the raw text means none after the
+    exclusions either (an exclusion only blanks text out). Used by R14, R17 and R18, whose include patterns cannot
+    be completed by a blanked-out gap; R3 keeps the plain version."""
+    if not any(p.search(text) for p in include):
+        return False
+    return R3RiskNextToReturns._hits(text, include, exclude)
+
+
 _YEAR = re.compile(
     r"\b(?:w|we|za|od|z)\s+(?:roku\s+)?((?:19|20)\d{2})(?!\d)(?!\s*(?:zł|pln|eur|usd|€|\$|tys(?:\.|\b)))|(?<![\d.])((?:19|20)\d{2})\s*(?:r\.|rok\w*)",
     re.IGNORECASE,
@@ -179,26 +193,31 @@ class R14PastPerformanceDisclaimer(Rule):
         return {
             "figure": compile_patterns(p.get("figure_patterns", [])),
             "figure_x": compile_patterns(p.get("figure_exclude_patterns", []) + p.get("figure_extra_exclude_patterns", [])),
-            "amount": compile_patterns(p.get("amount_patterns", [])),
-            "amount_return": compile_patterns(p.get("amount_return_patterns", [])),
-            "past": compile_patterns(p.get("past_patterns", [])),
-            "future": compile_patterns(p.get("future_patterns", [])),
+            # One alternation per list: one search per sentence instead of one per pattern (timing, test_redos).
+            "amount": _one_of(p.get("amount_patterns", [])),
+            "amount_return": _one_of(p.get("amount_return_patterns", [])),
+            "past": _one_of(p.get("past_patterns", [])),
+            "future": _one_of(p.get("future_patterns", [])),
             "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
             "footnote": tuple(p.get("footnote_markers", [])),
         }
 
     def _is_past_performance(self, sentence: str, fetch_year: int) -> bool:
+        """A return figure AND a past marker. The marker is checked first: it is cheap, while the figure check
+        runs every exclusion over the sentence (adversarial-input timing, tests/test_redos.py)."""
         p = self._p
-        percent = R3RiskNextToReturns._hits(sentence, p["figure"], p["figure_x"])
-        # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
-        amount = any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
-        if not (percent or amount):
-            return False
         if any(m.search(sentence) for m in p["past"]):
-            return True
-        if any(f.search(sentence) for f in p["future"]):
+            past = True
+        elif any(f.search(sentence) for f in p["future"]):
             return False
-        return any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence))
+        else:
+            past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence))
+        if not past:
+            return False
+        if _hits_fast(sentence, p["figure"], p["figure_x"]):
+            return True
+        # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
+        return any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
 
     def evaluate(self, ctx: Context) -> RuleResult:
         p = self._p
@@ -430,11 +449,11 @@ class _SupervisorMention(Rule):
     @cached_property
     def _supervisor(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
         p = self.spec.params
-        return compile_patterns(p.get("supervisor_patterns", [])), compile_patterns(p.get("supervisor_exclude_patterns", []))
+        return _one_of(p.get("supervisor_patterns", [])), compile_patterns(p.get("supervisor_exclude_patterns", []))
 
     def mentions(self, ctx: Context) -> list[int]:
         inc, exc = self._supervisor
-        return [i for i, s in enumerate(ctx.pre.sentences) if R3RiskNextToReturns._hits(s.text, inc, exc)]
+        return [i for i, s in enumerate(ctx.pre.sentences) if _hits_fast(s.text, inc, exc)]
 
 
 @register
@@ -448,14 +467,14 @@ class R17SupervisoryApproval(_SupervisorMention):
     @cached_property
     def _approval(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
         p = self.spec.params
-        return compile_patterns(p.get("approval_patterns", [])), compile_patterns(p.get("approval_exclude_patterns", []))
+        return _one_of(p.get("approval_patterns", [])), compile_patterns(p.get("approval_exclude_patterns", []))
 
     def evaluate(self, ctx: Context) -> RuleResult:
         sentences = ctx.pre.sentences
         idx = self.mentions(ctx)
         if not idx:
             return self.result("not_applicable", None, "Materiał nie odwołuje się do organu nadzoru.")
-        approving = next((i for i in idx if R3RiskNextToReturns._hits(sentences[i].text, *self._approval)), None)
+        approving = next((i for i in idx if _hits_fast(sentences[i].text, *self._approval)), None)
         if approving is not None:
             return self.result(
                 "fail", sentences[approving].text,
@@ -474,10 +493,10 @@ class R18SupervisionAsSafety(_SupervisorMention):
     @cached_property
     def _safety(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
         p = self.spec.params
-        return compile_patterns(p.get("safety_patterns", [])), compile_patterns(p.get("safety_exclude_patterns", []))
+        return _one_of(p.get("safety_patterns", [])), compile_patterns(p.get("safety_exclude_patterns", []))
 
     def _safe(self, text: str) -> bool:
-        return R3RiskNextToReturns._hits(text, *self._safety)
+        return _hits_fast(text, *self._safety)
 
     def evaluate(self, ctx: Context) -> RuleResult:
         sentences = ctx.pre.sentences
