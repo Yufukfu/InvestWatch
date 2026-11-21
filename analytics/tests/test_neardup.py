@@ -15,6 +15,8 @@ from investwatch_analytics.neardup import NearDupIndex, build_index, shingles, s
 from investwatch_analytics.preprocessing import normalize
 
 S = NearDupSettings()
+#: First four values of signature({"zysk 20 procent co miesiac"}, 128) from a reference run (datasketch 2.0.0).
+GOLDEN = [1098134003, 4137659716, 4183501174, 1815336871]
 A, B, C, D = (f"{i}{i}{i}{i}{i}{i}{i}{i}-0000-4000-8000-000000000000" for i in range(1, 5))
 
 _WORDS = ("zysk inwestycja rynek akcje kurs portfel ryzyko dywidenda fundusz bank kredyt lokata waluta "
@@ -78,6 +80,12 @@ def test_signature_is_deterministic_and_sized():
     assert len(sig1) == S.num_perm and (sig1 == sig2).all()
 
 
+def test_signature_matches_a_golden_value():
+    """Stable across processes and machines (no per-process hash seed): other workers share the buckets."""
+    sig = signature({"zysk 20 procent co miesiac"}, 128)
+    assert [int(x) for x in sig[:4]] == GOLDEN
+
+
 # ---- detection --------------------------------------------------------------------------------
 
 
@@ -134,10 +142,15 @@ def test_too_short_writes_nothing(idx, r):
     assert r.keys("*") == []
 
 
+def est(a: str, b: str) -> float:
+    return float((signature(shingles(a, 50_000), 128) == signature(shingles(b, 50_000), 128)).mean())
+
+
 def test_best_group_wins(idx):
     base = text(400)
     far = edit(base, 50, 30, seed=1)      # J(base, far) ~0.84
     near = edit(base, 300, 15, seed=2)    # J(base, near) ~0.91; J(far, near) < 0.8
+    assert est(far, near) < 0.8 <= est(base, far) < est(base, near)  # preconditions of this test
     assert idx.observe(A, far, "a").group_id == A
     assert idx.observe(B, near, "b").group_id == B
     res = idx.observe(C, base, "c")
@@ -171,6 +184,7 @@ def test_log_has_no_text(idx, caplog):
 
 def test_long_text_is_bounded_and_fast(idx):
     big = text(2_000) * 50          # about 2 MB
+    assert len(shingles(big, S.max_chars)) <= S.max_chars // 2
     started = time.perf_counter()
     idx.observe(A, big, "u")
     assert time.perf_counter() - started < 1.0
@@ -218,6 +232,7 @@ def test_copy_of_a_copy_joins_the_first_original(idx):
     base = text(400)
     b = edit(base, 50, 25, seed=3)     # J(base, b) ~0.86
     c = edit(b, 300, 25, seed=4)       # J(b, c) ~0.86, J(base, c) < 0.8
+    assert est(base, c) < 0.8 <= min(est(base, b), est(b, c))  # preconditions
     idx.observe(A, base, "a")
     assert idx.observe(B, b, "b").group_id == A
     res = idx.observe(C, c, "c")
@@ -231,7 +246,8 @@ def test_redelivery_keeps_its_group_after_a_better_match_appears(idx):
     idx.observe(A, far, "a")
     idx.observe(B, near, "b")
     idx.observe(C, base, "c")           # joins B
-    assert idx.observe(A, far, "a").group_id == A
+    again = idx.observe(A, far, "a")
+    assert again.group_id == A and again.similarity is None  # C's similarity belongs to group B
 
 
 def test_corrupt_stored_signature_is_skipped(idx, r):
@@ -239,3 +255,68 @@ def test_corrupt_stored_signature_is_skipped(idx, r):
     r.hset(f"iw:neardup:v1:meta:{A}", "sig", "AAAAAAA=")   # 5 bytes: not a signature
     res = idx.observe(B, text(), "u2")
     assert res is not None and res.group_id == B
+
+
+# ---- review fixes (group 6) -------------------------------------------------------------------
+
+
+def test_spam_flood_is_bounded(r, monkeypatch):
+    import investwatch_analytics.neardup as nd
+
+    monkeypatch.setattr(nd, "MAX_BUCKET_SIZE", 20)
+    monkeypatch.setattr(nd, "BUCKET_SAMPLE", 8)
+    idx = NearDupIndex(r, S)
+    spam = text()
+    ids = [f"{i:08d}-0000-4000-8000-000000000000" for i in range(60)]
+    for d in ids:
+        res = idx.observe(d, spam, "u")
+    assert res.group_id == ids[0] and res.members == 60
+    buckets = r.keys("iw:neardup:v1:b:*")
+    assert buckets and max(r.scard(b) for b in buckets) == 20
+
+
+def test_bucket_reads_are_sampled(r, monkeypatch):
+    import investwatch_analytics.neardup as nd
+
+    monkeypatch.setattr(nd, "BUCKET_SAMPLE", 8)
+    idx = NearDupIndex(r, S)
+    spam = text()
+    for i in range(30):
+        idx.observe(f"{i:08d}-0000-4000-8000-000000000000", spam, "u")
+    seen = []
+    real = r.pipeline
+
+    def spy(*a, **k):
+        pipe = real(*a, **k)
+        orig = pipe.srandmember
+
+        def srandmember(key, number=None):
+            seen.append(number)
+            return orig(key, number)
+
+        pipe.srandmember = srandmember
+        return pipe
+
+    monkeypatch.setattr(r, "pipeline", spy)
+    assert idx.observe(B, spam, "b").group_id.startswith("00000000")
+    assert seen and set(seen) == {8}
+
+
+def test_original_keys_refreshed_by_new_members(r):
+    idx = NearDupIndex(r, NearDupSettings(ttl_s=1000))
+    idx.observe(A, text(), "https://a")
+    r.expire(f"iw:neardup:v1:meta:{A}", 5)
+    r.expire(f"iw:neardup:v1:doc:{A}", 5)
+    idx.observe(B, text(), "https://b")
+    assert r.ttl(f"iw:neardup:v1:meta:{A}") > 5 and r.ttl(f"iw:neardup:v1:doc:{A}") > 5
+
+
+def test_url_is_capped(idx, r):
+    idx.observe(A, text(), "https://a/" + "x" * 10_000)
+    assert len(r.hget(f"iw:neardup:v1:meta:{A}", "url")) == 2048
+
+
+def test_bucket_key_matches_a_golden_value():
+    """Little-endian bucket hashing: containers on any architecture share the buckets."""
+    sig = signature({"zysk 20 procent co miesiac"}, 128)
+    assert NearDupIndex(None, S)._bucket_keys(sig)[0] == "iw:neardup:v1:b:0:d747c2017afa4d1c"

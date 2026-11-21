@@ -127,7 +127,7 @@ The rejected option of an LLM gate costs one call per document for a yes/no that
 
 ### 5. Near-duplicates (ADR 0314)
 
-**Technique.** `datasketch.MinHash`, 128 permutations, over word 5-shingles of `strip_diacritics(normalized.lower())`, cut to 50k characters (bounded cost: about 8k shingles, one numpy pass). We keep our own LSH in Redis: 32 bands of 4 rows, bucket key `iw:neardup:v1:b:{band}:{sha1(band rows)[:16]}` → a set of document ids. The signature is stored under `iw:neardup:v1:sig:{document_id}` (128 × uint32, base64).
+**Technique.** `datasketch.MinHash`, 128 permutations, over word 5-shingles of `strip_diacritics(normalized.lower())`, cut to 50k characters (bounded cost: about 8k shingles, one numpy pass). We keep our own LSH in Redis: 32 bands of 4 rows, bucket key `iw:neardup:v1:b:{band}:{sha1(band rows)[:16]}` → a set of document ids. The signature (128 × little-endian uint32, base64) and the url (capped at 2048 characters) are stored in the hash `iw:neardup:v1:meta:{document_id}`. Buckets are read with `SRANDMEMBER` (at most 64 ids) and stop growing at 256 ids, so a flood of identical spam costs O(1) per copy and its full buckets expire.
 - Candidates from any band are verified by the Jaccard estimate (the share of equal signature values) ≥ 0.8.
 - With 32×4 bands, a pair at Jaccard 0.8 is caught with probability 1-(1-0.8⁴)³² ≈ 0.99999.
 - Candidate verification removes the extra false candidates the low band threshold lets in.
@@ -170,7 +170,7 @@ Groups are not merged transitively. A document that matches two groups joins the
   6. modules;
   7. set `model.embedder` and append the near-dup sentence.
 
-  `embedder` is an `Embedder` protocol (`embed(text, content_hash) -> EmbedOutcome(vector | None, model, status)`). `neardup` is a `NearDupIndex` protocol (`observe(document_id, text) -> NearDupResult | None`).
+  `embedder` is an `Embedder` protocol (`embed(text, content_hash) -> EmbedOutcome(vector | None, model, status)`). `neardup` is a `NearDupIndex` protocol (`observe(document_id, normalized_text, url) -> NearDupResult | None`).
 - The finding builders (M2 now, M1/M3 when `analytics-m1-m3` lands) get the embedder model and the near-dup result through `Context`. That is one additive field, `ctx.pre_extras`, so no builder signature changes.
 - `embeddings.build_embedder(settings, redis=None)` returns `None` when disabled. `neardup.build_index(settings, redis)` returns `None` without Redis.
 - **Worker:** it builds both at start, logs `embed_mode: local|remote|disabled`, and passes them to `analyze`.
@@ -204,7 +204,7 @@ Groups are not merged transitively. A document that matches two groups joins the
 - **`GATE_SIM_THRESHOLD` is not measured.** → Env, with calibration on the gold set. The default errs toward passing.
 - **`bge-m3` on CPU is slow or evicts Gemma.** → 4000-character input, a 5 s timeout, the breaker and the cache, plus infra ask 2 (`OLLAMA_MAX_LOADED_MODELS=2`). With the hosted LLM default, only `bge-m3` lives in Ollama anyway.
 - **The infra asks are not done by the demo.** → Embeddings off is a valid state: the dictionary gate, near-dup and `model.embedder = null` still work. The README says how to pull `bge-m3` by hand.
-- **The near-dup index grows without bound.** → A 30-day TTL. About 0.5 KB of signature plus 32 bucket memberships per document, which is negligible at hackathon scale.
+- **The near-dup index grows without bound.** → A 30-day TTL. About 4-5 KB per document: unrelated documents rarely share a bucket, so each creates about 32 small set keys, plus the meta hash, the doc key and the group key. That is about 4-5 GB at 1M documents in 30 days, and negligible at hackathon scale. A new member refreshes the TTL of the group and of its original, so the original's URL lives as long as the group.
 - **Shared files with `analytics-llm-p0` and `analytics-m1-m3`.** → This change lands after llm-p0 and rebases on `main`. Its spec deltas are ADDED requirements only, so archiving does not touch the requirements the other two modify.
 - **Behaviour change for `third_party`.** With M1/M3 live, off-topic posts no longer produce findings. That is intended (plan §2), and the log and counter show it.
 

@@ -27,3 +27,9 @@
 | R21 | review group 4, PLAUSIBLE | prefixes not normalized, unknown YAML keys ignored, bare `*` word accepted | `fix-here` |
 | R22 | review group 4 | tests that could not fail (embedder always None, redundant repr check), no test for uppercase or diacritic terms or the `wy` prefix | `fix-here` |
 | R23 | review group 4 | if group 5 (stretch) is cut, no test covers vocabulary-free investment posts: they are dropped by design | `docs`: noted in design §4 as the known cost of the dictionary-only gate |
+| R24 | review group 6 | a spam flood made each `observe` read every id of 32 growing buckets (O(N) per copy, O(N²) total) and the buckets never expired | `fix-here`: `SRANDMEMBER` sample of 64, no `SADD` to a bucket of 256 or more |
+| R25 | review group 6, PLAUSIBLE | memory estimate in design was about 8x too low | `docs`: design corrected; url capped at 2048 characters |
+| R26 | review group 6, PLAUSIBLE | the group outlived its original's keys, so `original_url` became null | `fix-here`: a new member refreshes `meta:{gid}` and `doc:{gid}`; the summary sentence (group 8b) also skips a null `original_url` |
+| R27 | review group 6 | a redelivered original reported a similarity to a document of another group | `fix-here` |
+| R28 | review group 6 | determinism only checked in one process; estimate-dependent tests had no preconditions; long-text test timing only | `fix-here`: golden signature and bucket key, precondition asserts, shingle-count bound |
+| R29 | review group 6 | two workers observing near-identical documents at the same instant can both become originals | `wont-fix`: one missed grouping and possibly one extra alert, no corruption (MULTI/EXEC pipeline) |

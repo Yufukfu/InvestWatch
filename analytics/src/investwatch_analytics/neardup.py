@@ -34,9 +34,14 @@ from .gate import strip_diacritics
 log = logging.getLogger(__name__)
 PREFIX = "iw:neardup:v1"
 SHINGLE_WORDS = 5
-#: Verify at most this many candidates (most shared buckets first): a flood of identical spam cannot make one
-#: document read thousands of signatures.
+#: Verify at most this many candidates (most shared buckets first).
 MAX_CANDIDATES = 50
+#: Read at most this many ids per bucket (SRANDMEMBER) and stop adding to a bucket that holds this many: a
+#: flood of identical spam costs O(1) per copy and its full buckets expire. Any member of a full bucket is a
+#: near-copy, so a sample still finds the group.
+BUCKET_SAMPLE = 64
+MAX_BUCKET_SIZE = 256
+MAX_URL_CHARS = 2048
 _WORD = re.compile(r"\w+")
 
 
@@ -87,7 +92,8 @@ class NearDupIndex:
 
     def _bucket_keys(self, sig: np.ndarray) -> list[str]:
         rows = self._s.rows
-        return [f"{PREFIX}:b:{b}:{hashlib.sha1(sig[b * rows:(b + 1) * rows].tobytes()).hexdigest()[:16]}"
+        le = sig.astype("<u4")  # fixed byte order: the same bucket on every architecture
+        return [f"{PREFIX}:b:{b}:{hashlib.sha1(le[b * rows:(b + 1) * rows].tobytes()).hexdigest()[:16]}"
                 for b in range(self._s.bands)]
 
     def observe(self, document_id: str, normalized_text: str, url: str | None) -> NearDupResult | None:
@@ -109,10 +115,15 @@ class NearDupIndex:
         buckets = self._bucket_keys(sig)
         pipe = r.pipeline()
         for key in buckets:
-            pipe.smembers(key)
+            pipe.srandmember(key, BUCKET_SAMPLE)
+            pipe.scard(key)
+        replies = pipe.execute()
         shared: Counter[str] = Counter()
-        for members in pipe.execute():
-            shared.update(m for m in (_text(x) for x in members) if m and m != doc)
+        open_buckets = []
+        for key, members, size in zip(buckets, replies[0::2], replies[1::2]):
+            shared.update(m for m in (_text(x) for x in members or []) if m and m != doc)
+            if int(size) < MAX_BUCKET_SIZE:
+                open_buckets.append(key)
 
         best_id, best_sim = None, None
         candidates = sorted(shared, key=lambda c: (-shared[c], c))[:MAX_CANDIDATES]
@@ -129,24 +140,28 @@ class NearDupIndex:
                     best_id, best_sim = c, sim
 
         existing = _text(r.get(f"{PREFIX}:doc:{doc}"))
+        best_gid = (_text(r.get(f"{PREFIX}:doc:{best_id}")) or best_id) if best_id is not None else None
         if existing:  # a redelivery keeps the group it already joined
             gid = existing
-        elif best_id is not None:
-            gid = _text(r.get(f"{PREFIX}:doc:{best_id}")) or best_id
+            if best_gid != existing:  # its best match now sits in another group: not this group's similarity
+                best_sim = None
         else:
-            gid = doc
+            gid = best_gid or doc
 
         pipe = r.pipeline()
         meta = f"{PREFIX}:meta:{doc}"
-        pipe.hset(meta, mapping={"sig": _encode(sig), "url": url or ""})
+        pipe.hset(meta, mapping={"sig": _encode(sig), "url": (url or "")[:MAX_URL_CHARS]})
         pipe.expire(meta, ttl)
-        for key in buckets:
+        for key in open_buckets:
             pipe.sadd(key, doc)
             pipe.expire(key, ttl)
         pipe.set(f"{PREFIX}:doc:{doc}", gid, ex=ttl)
         group = f"{PREFIX}:group:{gid}"
         pipe.sadd(group, doc)
         pipe.expire(group, ttl)
+        if gid != doc:  # the original lives as long as its group
+            pipe.expire(f"{PREFIX}:meta:{gid}", ttl)
+            pipe.expire(f"{PREFIX}:doc:{gid}", ttl)
         pipe.scard(group)
         pipe.hget(f"{PREFIX}:meta:{gid}", "url")
         out = pipe.execute()
