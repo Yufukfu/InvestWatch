@@ -202,3 +202,22 @@ def test_static_known_ids_match_the_stage2_catalogues():
 def test_loaded_catalogue_extends_known_ids():
     ids = known_ids({"M2": {"R1": True, "R20": False}, "M1": None, "M3": None})
     assert "R20" in ids["M2"] and "R18" in ids["M2"] and "S1.1" in ids["M1"]
+
+
+def test_unicode_line_separators_inside_text_do_not_split_lines(tmp_path):
+    doc = make_doc(text="Reklama. Zysk 10%.\x85Ryzyko straty.")
+    raw = json.dumps(line("a", document=doc), ensure_ascii=False) + "\r\n" + json.dumps(line("b")) + "\n"
+    items = load_gold(write(tmp_path, raw=raw), M2_ONLY)
+    assert [(i.id, i.line) for i in items] == [("a", 1), ("b", 2)]
+    assert " " in items[0].document.text
+
+
+@pytest.mark.parametrize(("raw_expect", "field"), [
+    ('{"M2": {"label": "positive"}, "M2": {"label": "negative"}}', "expect.M2"),
+    ('{"M2": {"label": "positive", "rules": {"R3": "fail", "R3": "pass"}}}', "expect.M2.rules.R3"),
+])
+def test_duplicate_json_keys_are_rejected(tmp_path, raw_expect, field):
+    base = json.dumps(line(), ensure_ascii=False)
+    raw = base.replace(json.dumps(line()["expect"], ensure_ascii=False), raw_expect)
+    assert raw != base
+    assert problems(write(tmp_path, raw=raw + "\n")) == [f"line 1 (g1): {field}: duplicate key"]

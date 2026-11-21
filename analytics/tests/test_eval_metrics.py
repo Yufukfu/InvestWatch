@@ -13,7 +13,8 @@ API_SCENARIO = [(0.9, True), (0.4, True), (0.6, False), (0.2, False)]
 def test_grid_is_the_api_grid():
     assert len(GRID) == 19
     assert GRID[0] == 0.05 and GRID[-1] == 0.95
-    assert GRID == tuple(round(0.05 * i, 2) for i in range(1, 20))
+    assert GRID == (0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85,
+                    0.9, 0.95)
     assert 0.3 in GRID and 0.7 in GRID  # no float drift such as 0.30000000000000004
 
 

@@ -25,6 +25,23 @@ ITEM_FIELDS = {"id", "origin", "basis", "hard_case", "document", "expect"}
 EXPECT_FIELDS = {"label", "rules"}
 
 
+class _Object(dict):
+    """A JSON object that remembers repeated keys (`json.loads` would silently keep the last value)."""
+
+    duplicates: tuple[str, ...] = ()
+
+
+def _object(pairs: list[tuple[str, Any]]) -> _Object:
+    obj = _Object(pairs)
+    keys = [k for k, _ in pairs]
+    obj.duplicates = tuple(sorted({k for k in keys if keys.count(k) > 1}))
+    return obj
+
+
+def _duplicates(value: Any, where: str) -> list[str]:
+    return [f"{where}{k}: duplicate key" for k in getattr(value, "duplicates", ())]
+
+
 class GoldError(ValueError):
     def __init__(self, problems: list[str]) -> None:
         super().__init__("; ".join(problems))
@@ -68,7 +85,7 @@ def _one_of(value: Any, allowed: tuple[str, ...]) -> str | None:
 
 def load_gold(path: Path, catalogues: Catalogues) -> list[GoldItem]:
     try:
-        raw = Path(path).read_text(encoding="utf-8-sig")
+        raw = Path(path).read_bytes().decode("utf-8-sig")  # no newline translation: line numbers stay exact
     except (OSError, UnicodeDecodeError) as exc:
         reason = exc.strerror if isinstance(exc, OSError) else "not UTF-8"
         raise GoldError([f"{path}: cannot read gold set ({reason})"]) from None
@@ -77,11 +94,14 @@ def load_gold(path: Path, catalogues: Catalogues) -> list[GoldItem]:
     problems: list[str] = []
     items: list[GoldItem] = []
     first_line: dict[str, int] = {}
-    for number, text in enumerate(raw.splitlines(), start=1):
+    # Split on LF only: str.splitlines() also breaks on U+2028, U+0085 and others, which json.dumps with
+    # ensure_ascii=False leaves raw inside strings (scraped text carries them).
+    for number, text in enumerate(raw.split("\n"), start=1):
+        text = text.removesuffix("\r")
         if not text.strip():
             continue
         try:
-            data = json.loads(text)
+            data = json.loads(text, object_pairs_hook=_object)
         except json.JSONDecodeError as exc:
             problems.append(f"line {number}: invalid JSON ({exc.msg} at column {exc.colno})")
             continue
@@ -107,7 +127,7 @@ def load_gold(path: Path, catalogues: Catalogues) -> list[GoldItem]:
 
 
 def _parse(number: int, data: dict, known: dict[str, set[str]], owner: dict[str, str]) -> tuple[GoldItem | None, list[str]]:
-    problems = [f"{k}: unknown field" for k in sorted(set(data) - ITEM_FIELDS)]
+    problems = _duplicates(data, "") + [f"{k}: unknown field" for k in sorted(set(data) - ITEM_FIELDS)]
     gid = data.get("id")
     if not isinstance(gid, str) or not gid:
         problems.append("id: must be a non-empty string")
@@ -142,6 +162,7 @@ def _expectations(raw: Any, known: dict[str, set[str]], owner: dict[str, str],
     if not raw:
         problems.append("expect: no module labeled")
         return None
+    problems.extend(_duplicates(raw, "expect."))
     out: dict[str, ModuleExpectation] = {}
     for module, value in raw.items():
         where = f"expect.{module}"
@@ -158,6 +179,7 @@ def _expectations(raw: Any, known: dict[str, set[str]], owner: dict[str, str],
         if not isinstance(rules, dict):
             problems.append(f"{where}.rules: must be an object")
             continue
+        problems.extend(_duplicates(rules, f"{where}.rules."))
         for rule_id, label in rules.items():
             if rule_id not in known[module]:
                 other = owner.get(rule_id)
