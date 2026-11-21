@@ -22,6 +22,7 @@
 | Work on the analytics pipeline, rules R1-R18, LLM layer or calibration | [analytics-plan.md](analytics-plan.md) §2, §5, §7, §8 |
 | Read the UKNF challenge and the 18 rules | the Polish materials in [../doc/](../doc/) (read-only, removed before hand-in) |
 | Use or change a contract (a change needs the whole team and a version bump) | [../contracts/README.md](../contracts/README.md), [../contracts/CLAUDE.md](../contracts/CLAUDE.md), [integration-plan.md](integration-plan.md) §3-§6 |
+| Scan dependencies, vet a new package, fix a vulnerability, or keep a secret out of git | [supply-chain.md](supply-chain.md), results in [security-audit.md](security-audit.md), why in [decisions/0208-supply-chain-scanning.md](decisions/0208-supply-chain-scanning.md) |
 | Find out why we chose X, or record a decision | [decisions/README.md](decisions/README.md) |
 | See what the system does now, or what is in flight | [../openspec/specs/](../openspec/specs/), [../openspec/changes/](../openspec/changes/) |
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
