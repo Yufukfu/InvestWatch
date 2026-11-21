@@ -18,3 +18,5 @@ investwatch_analytics = ["rules/*.yaml", "knf/*.txt"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
+markers = ["live: fetches the real KNF pages; run by hand with `pytest -m live`"]
+addopts = "-m 'not live'"

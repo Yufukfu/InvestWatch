@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PIPELINE_VERSION = "0.1.0"
-_DEFAULT_REGISTRY = Path(__file__).resolve().parents[2] / "registry" / "seed.csv"
+#: The fictional 3-firm fixture whose ids match contracts/mocks; tests name it explicitly.
+SEED_REGISTRY = Path(__file__).resolve().parents[2] / "registry" / "seed.csv"
+_DEFAULT_REGISTRY = SEED_REGISTRY
 
 
 @dataclass(frozen=True)

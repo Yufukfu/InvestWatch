@@ -1,0 +1,46 @@
+{
+  "source": "Komisja Nadzoru Finansowego, https://www.knf.gov.pl (reuse with the source named, KNF legal note)",
+  "fetched_at": "2026-11-21T20:36:58.385736Z",
+  "loader_version": "1.0",
+  "firms": 749,
+  "lists": {
+    "brokerage_houses": {
+      "url": "https://www.knf.gov.pl/podmioty/Podmioty_rynku_kapitalowego/Firmy_inwestycyjne_i_Agenci_firm_inwestycyjnych/domy_maklerskie",
+      "type": "brokerage_house",
+      "records": 28,
+      "firms": 28,
+      "pages": 2,
+      "skipped": 0
+    },
+    "banks": {
+      "url": "https://www.knf.gov.pl/podmioty/Podmioty_rynku_kapitalowego/Firmy_inwestycyjne_i_Agenci_firm_inwestycyjnych/Banki_prowadzace_dzialalnosc_maklerska",
+      "type": "brokerage_bank",
+      "records": 10,
+      "firms": 10,
+      "pages": 1,
+      "skipped": 0
+    },
+    "branches": {
+      "url": "https://www.knf.gov.pl/podmioty/Podmioty_rynku_kapitalowego/Firmy_inwestycyjne_i_Agenci_firm_inwestycyjnych/notyfikowane_firmy_inwestycyjne_oddzialy",
+      "type": "foreign_branch",
+      "records": 10,
+      "firms": 10,
+      "pages": 1,
+      "skipped": 0
+    },
+    "no_branch": {
+      "url": "https://www.knf.gov.pl/podmioty/Podmioty_rynku_kapitalowego/Firmy_inwestycyjne_i_Agenci_firm_inwestycyjnych/notyfikowane_zagraniczne_firmy_inwestycyjne",
+      "type": "foreign_no_branch",
+      "records": 712,
+      "firms": 701,
+      "pages": 36,
+      "skipped": 0
+    }
+  },
+  "domains": {
+    "knf": 293,
+    "curated": 31,
+    "curated_unverified": 31
+  },
+  "unknown_countries": 0
+}

@@ -31,10 +31,10 @@ Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip 
 
 ## 5. CLI, safe write and the committed registry (≈ 1.25 h)
 
-- [ ] 5.1 Failing tests (`tests/test_knf_cli.py`) for "Writing the registry": column order and sort, the meta file fields, the round-trip through `Registry.from_csv`, `count_dropped` and `--accept-drop`, an interrupted write leaving the old file loadable, a non-zero exit with the right reason for each failure from group 1, the summary (counts, added, removed, renamed, dropped aliases), and the loader never writing `seed.csv`
-- [ ] 5.2 `knf/__main__.py` (`--out`, `--previous`, `--accept-drop`, `--verbose`; logs to stderr; temp file and atomic rename); tests green
-- [ ] 5.3 Run the loader once against knf.gov.pl by hand (not in tests), review the summary, commit `registry/knf.csv` and `registry/knf.meta.json`; add the `live` marker test
-- [ ] 5.4 Mutation check; `mutations: N tried, N caught`
+- [x] 5.1 Failing tests (`tests/test_knf_cli.py`) for "Writing the registry": column order and sort, the meta file fields, the round-trip through `Registry.from_csv`, `count_dropped` and `--accept-drop`, an interrupted write leaving the old file loadable, a non-zero exit with the right reason for each failure from group 1, the summary (counts, added, removed, renamed, dropped aliases), and the loader never writing `seed.csv`
+- [x] 5.2 `knf/__main__.py` (`--out`, `--previous`, `--accept-drop`, `--verbose`; logs to stderr; temp file and atomic rename); tests green
+- [x] 5.3 Run the loader once against knf.gov.pl by hand (not in tests), review the summary, commit `registry/knf.csv` and `registry/knf.meta.json`; add the `live` marker test. Snapshot 2026-11-21T20:36:58Z: 749 firms from 760 records (28 + 10 + 10 + 712; 11 merges), 293 KNF domains and 31 curated, 126 aliases and 5 domains dropped, 0 unknown countries; `pytest -m live` 5 passed, deselected by default (`addopts`)
+- [x] 5.4 Mutation check; `mutations: 14 tried, 14 caught` (first run 13/14: the interrupted-write test rewrote identical content, so an in-place write passed; it now writes new content)
 
 ## 6. Default registry, start-up provenance and R1 official name (≈ 1.5 h)
 
