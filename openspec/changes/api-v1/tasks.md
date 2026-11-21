@@ -4,16 +4,16 @@ Starts after change `api-db-schema` groups 1-3 (package, tables, migrate service
 
 ## 1. App skeleton, errors and health
 
-- [ ] 1.1 Failing tests: `GET /api/health` scenarios "All up", "MinIO down" and "Postgres down", and "Malformed path id" (422 in the `{error, details}` shape)
-- [ ] 1.2 Add pinned `fastapi`, `uvicorn[standard]`, `python-socketio`, `redis`, `minio`, `jsonschema[format]` (dev: `httpx`, `pyyaml`, and `fakeredis` only if its async pub/sub works with the pinned `redis`; otherwise Redis tests skip without `TEST_REDIS_URL`); `create_app()` with the copied exception handlers, async engine, Redis client, `ObjectStore` interface over MinIO, and `/api/health`; the 1.1 tests pass
-- [ ] 1.3 Copy `openapi_check.py` from the mock server branch into `api/tests/` and seed fixtures from `contracts/mocks/` through `api-db-schema`'s mapping; a test asserts every path in `contracts/openapi.yaml` has a route (11 paths)
-- [ ] 1.4 Mutation check (iw-commit-cycle step 3); line reads `mutations: N tried, N caught`
+- [x] 1.1 Failing tests: `GET /api/health` scenarios "All up", "MinIO down" and "Postgres down", and "Malformed path id" (422 in the `{error, details}` shape)
+- [x] 1.2 Add pinned `fastapi`, `uvicorn[standard]`, `python-socketio`, `redis`, `minio`, `jsonschema[format]` (dev: `httpx`, `pyyaml`; no `fakeredis`: Redis tests use a real Redis from `TEST_REDIS_URL` and skip without it); `create_app()` with the copied exception handlers, async engine, Redis client, `ObjectStore` interface over MinIO, and `/api/health`; the 1.1 tests pass
+- [x] 1.3 Copy `openapi_check.py` from the mock server branch into `api/tests/` and seed fixtures from `contracts/mocks/` through `api-db-schema`'s mapping; the test that every path in `contracts/openapi.yaml` has a route (11 paths) lands with group 5, when the last routes exist
+- [x] 1.4 Mutation check (iw-commit-cycle step 3); mutations: 3 tried, 3 caught (committed together with group 2: both build on the app factory)
 
 ## 2. Thresholds and risk level
 
-- [ ] 2.1 Failing tests for every "Thresholds setting" scenario and "Boundaries with threshold 0.5"
-- [ ] 2.2 Threshold store (JSON string at `iw:settings:thresholds`, defaults written when missing, last-known fallback) and the SQL `CASE` for `risk_level`; `GET`/`PUT /api/settings/thresholds`; the 2.1 tests and "Redis unavailable" pass
-- [ ] 2.3 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 2.1 Failing tests for every "Thresholds setting" scenario and "Boundaries with threshold 0.5"
+- [x] 2.2 Threshold store (JSON string at `iw:settings:thresholds`, defaults written when missing, last-known fallback) and the SQL `CASE` for `risk_level`; `GET`/`PUT /api/settings/thresholds`; the 2.1 tests and "Redis unavailable" pass
+- [x] 2.3 Mutation check; mutations: 6 tried, 6 caught
 
 ## 3. Findings: list, detail, PATCH
 
