@@ -1,9 +1,12 @@
 """`allowed_urls`: the redirect allow-list follows the `sources` table without a query per run."""
 
+import asyncio
+import logging
+
 import pytest
 
 from conftest import make_source
-from iw_scraper.app import allowed_urls
+from iw_scraper.app import _run_together, allowed_urls, main
 from iw_scraper.types import Reason
 from iw_scraper.fetch import FetchFailure
 
@@ -54,3 +57,41 @@ async def test_the_list_is_cached_for_the_ttl_then_reread():
     refuses(stale, "https://beta.example.com/")
     fresh.check("https://beta.example.com/")
     assert store.queries == 2
+
+
+async def test_a_part_that_fails_stops_the_others_and_the_error_is_raised_after_they_drained():
+    stop, drained = asyncio.Event(), []
+
+    async def failing():
+        raise RuntimeError("boom")
+
+    async def long_running():
+        await stop.wait()
+        await asyncio.sleep(0.05)  # draining takes a moment
+        drained.append(True)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        async with asyncio.timeout(3):  # a sibling that is never stopped must fail the test, not hang it
+            await _run_together(stop, failing(), long_running())
+
+    assert drained == [True]
+
+
+async def test_parts_that_all_end_cleanly_return_normally():
+    stop = asyncio.Event()
+
+    async def finishes():
+        return None
+
+    await _run_together(stop, finishes(), finishes())
+
+
+def test_a_process_that_cannot_start_exits_non_zero(monkeypatch):
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    root_handlers = list(logging.getLogger().handlers)
+
+    with pytest.raises(SystemExit) as caught:
+        main("worker")
+
+    assert caught.value.code == 1
+    logging.getLogger().handlers[:] = root_handlers

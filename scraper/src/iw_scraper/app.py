@@ -129,6 +129,18 @@ async def runtime(redis_url: str):
         await pool.close()
 
 
+async def _run_together(stop: asyncio.Event, *coroutines) -> None:
+    """Run the parts of one process; when one ends with an error, stop the others (they drain) and raise it, so
+    the stores are never closed under a part that is still working."""
+    tasks = [asyncio.create_task(coroutine) for coroutine in coroutines]
+    done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    stop.set()
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, BaseException) and not isinstance(result, asyncio.CancelledError):
+            raise result
+
+
 async def run_worker_process(stop: asyncio.Event) -> None:
     runner = RunnerSettings.from_env()
     queue = QueueSettings.from_env()
@@ -142,7 +154,8 @@ async def run_worker_process(stop: asyncio.Event) -> None:
         ctx = {"sources": rt.store, "run_source": rt.collector.run_source, "record_error": rt.record_error}
         consumer = ScanRequestConsumer(rt.redis, rt.store, rt.record_error, consumer=consumer_name())
         try:
-            await asyncio.gather(
+            await _run_together(
+                stop,
                 run_worker(ctx, queue, runner, stop=stop, retry_on=RETRY_ON),
                 run_consumer(consumer, runner, stop=stop, retry_on=RETRY_ON),
             )
@@ -175,4 +188,8 @@ def main(role: str) -> None:
             loop.add_signal_handler(name, stop.set)
         await runners[role](stop)
 
-    asyncio.run(run())
+    try:
+        asyncio.run(run())
+    except Exception as error:  # startup or a crashed part: one redacted JSON line, then a non-zero exit
+        logger.exception("%s stopped: %s", role, type(error).__name__)
+        raise SystemExit(1) from None

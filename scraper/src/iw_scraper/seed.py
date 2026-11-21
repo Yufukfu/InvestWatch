@@ -1,6 +1,6 @@
 """Insert the first registered source, the KNF public warnings list, if it is not there yet.
 
-    python -m iw_scraper.seed          (needs DATABASE_URL)
+    python -m iw_scraper.seed [CRON]   (needs DATABASE_URL; CRON is a 5-field `schedule_cron`, default none)
 
 Idempotent: a source with the same URL is left alone. The dashboard owns every other `sources` edit.
 """
@@ -27,10 +27,15 @@ async def seed_knf(pool: asyncpg.Pool, *, cron: str | None = None) -> str | None
     return str(row["id"]) if row else None
 
 
+def cron_from(argv: list[str]) -> str | None:
+    """The optional first argument of the command line."""
+    return argv[1] if len(argv) > 1 else None
+
+
 async def main() -> None:
     pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=1)
     try:
-        source_id = await seed_knf(pool)
+        source_id = await seed_knf(pool, cron=cron_from(sys.argv))
     finally:
         await pool.close()
     sys.stdout.write(f"inserted {source_id}\n" if source_id else "already registered\n")

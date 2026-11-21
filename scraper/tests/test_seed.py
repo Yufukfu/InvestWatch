@@ -1,4 +1,4 @@
-from iw_scraper.seed import KNF_URL, seed_knf
+from iw_scraper.seed import KNF_URL, cron_from, seed_knf
 
 
 async def test_the_knf_source_is_inserted_once(pool):
@@ -10,3 +10,14 @@ async def test_the_knf_source_is_inserted_once(pool):
     assert [(r["id"], r["platform"], r["source_kind"], list(r["target_modules"]), r["active"]) for r in rows] == [
         (first, "web", "third_party", ["M3"], True)
     ]
+
+
+async def test_the_cron_is_stored_when_given(pool):
+    await seed_knf(pool, cron="0 * * * *")
+
+    assert await pool.fetchval("SELECT schedule_cron FROM sources WHERE url = $1", KNF_URL) == "0 * * * *"
+
+
+def test_the_cron_comes_from_the_first_argument():
+    assert cron_from(["seed", "0 * * * *"]) == "0 * * * *"
+    assert cron_from(["seed"]) is None

@@ -29,8 +29,8 @@ PAGE = "/komunikaty"
 DOCUMENTS_STREAM = "iw:documents"
 
 
-async def seed(pool, stub) -> str:
-    stub.route(PAGE, body=(FIXTURES / "knf_warnings.html").read_bytes())
+async def seed(pool, stub, *, delay=0.0) -> str:
+    stub.route(PAGE, body=(FIXTURES / "knf_warnings.html").read_bytes(), delay=delay)
     stub.route("/robots.txt", status=404, body=b"", content_type="text/plain")
     source_id = uuid.uuid4()
     async with pool.acquire() as conn:
@@ -83,11 +83,13 @@ async def _has(events, source_id, count) -> bool:
 
 
 async def test_two_workers_and_two_simultaneous_requests_store_the_page_once(pool, storage, stub, events):
-    source_id = await seed(pool, stub)
+    source_id = await seed(pool, stub, delay=1.5)  # long enough that the second job meets the first one running
     async with stack(pool, storage, stub, workers=2) as rt:
         await asyncio.gather(scan(rt, source_id), scan(rt, source_id))
         await wait_for(lambda: _settled(events, source_id))
         await asyncio.sleep(0.5)
+
+        assert len([r for r in stub.requests if r.path == PAGE]) == 1  # the run lock coalesced the second job
 
         assert await document_count(pool, source_id) == 1
         assert await rt.redis.xlen(DOCUMENTS_STREAM) == 1
