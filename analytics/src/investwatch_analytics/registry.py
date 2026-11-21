@@ -32,6 +32,7 @@ _LEGAL_FORMS = re.compile(
     re.IGNORECASE,
 )
 _WORD = re.compile(r"\w+", re.UNICODE)
+_PUNCT = re.compile(r"[^\w\s\-–]+")
 
 
 class RegistryError(ValueError):
@@ -85,14 +86,23 @@ class Registry:
     @classmethod
     def from_csv(cls, path: Path) -> "Registry":
         try:
-            with open(path, encoding="utf-8", newline="") as fh:
+            with open(path, encoding="utf-8-sig", newline="") as fh:
                 reader = csv.DictReader(fh)
                 missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
                 if missing:
                     raise RegistryError(f"{path}: missing required column(s) {', '.join(missing)}")
-                firms = [_parse_row(row, f"{path}:{line}") for line, row in enumerate(reader, start=2)]
+                firms: list[Firm] = []
+                seen: set[str] = set()
+                for line, row in enumerate(reader, start=2):
+                    firm = _parse_row(row, f"{path}:{line}")
+                    if firm.id in seen:
+                        raise RegistryError(f"{path}:{line}: duplicate id {firm.id}")
+                    seen.add(firm.id)
+                    firms.append(firm)
         except OSError as exc:
             raise RegistryError(f"{path}: cannot read registry ({exc.strerror})") from exc
+        except (UnicodeDecodeError, csv.Error) as exc:
+            raise RegistryError(f"{path}: not a UTF-8 CSV file ({exc})") from exc
         if not firms:
             raise RegistryError(f"{path}: registry has no firms")
         return cls(firms)
@@ -110,15 +120,16 @@ class Registry:
 
     def match(self, text: str, url: str) -> FirmMatch | None:
         candidates: list[FirmMatch] = []
-        host = (urlsplit(url).hostname or "").lower()
-        words = [w.lower() for w in _WORD.findall(text)]
+        host = _normalize_domain(url)
+        # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
+        segments = [[w.lower() for w in _WORD.findall(seg)] for seg in _PUNCT.split(text)]
         for firm in self.firms:
             quote = self.find_name(firm, text)
             if quote:
                 candidates.append(FirmMatch(firm, NAME_CONFIDENCE, "name", quote))
             elif any(host == d or host.endswith("." + d) for d in firm.domains):
                 candidates.append(FirmMatch(firm, DOMAIN_CONFIDENCE, "domain", None))
-            elif (ratio := _best_fuzzy(firm.core, words)) >= FUZZY_MIN_RATIO:
+            elif (ratio := max((_best_fuzzy(firm.core, w) for w in segments), default=0.0)) >= FUZZY_MIN_RATIO:
                 candidates.append(FirmMatch(firm, round(ratio / 100 * FUZZY_FACTOR, 3), "fuzzy", None))
         return max(candidates, key=lambda m: m.confidence, default=None)
 
@@ -128,6 +139,14 @@ def _best_fuzzy(core: str, words: list[str]) -> float:
     target = core.lower()
     grams = (" ".join(words[i:i + n]) for i in range(len(words) - n + 1))
     return max((fuzz.ratio(target, g) for g in grams), default=0.0)
+
+
+def _normalize_domain(value: str) -> str:
+    """'https://www.Alfa.pl./x' -> 'alfa.pl' (scheme, path, leading www. and trailing dot removed)."""
+    value = value.strip()
+    host = urlsplit(value if "//" in value else "//" + value).hostname or ""
+    host = host.lower().rstrip(".")
+    return host[4:] if host.startswith("www.") else host
 
 
 def _split_list(value: str | None) -> tuple[str, ...]:
@@ -144,12 +163,14 @@ def _parse_row(row: dict, where: str) -> Firm:
         raise RegistryError(f"{where}: empty name")
     if firm_type not in FIRM_TYPES:
         raise RegistryError(f"{where}: type {firm_type!r} not one of {sorted(FIRM_TYPES)}")
+    if not core_name(name):
+        raise RegistryError(f"{where}: name {name!r} has nothing left after removing legal forms")
     return Firm(
         id=firm_id,
         name=name,
         type=firm_type,
         country=(row.get("country") or "").strip() or None,
         aliases=_split_list(row.get("aliases")),
-        domains=tuple(d.lower() for d in _split_list(row.get("website_domains"))),
+        domains=tuple(d for d in map(_normalize_domain, _split_list(row.get("website_domains"))) if d),
         source_url=(row.get("source_url") or "").strip() or None,
     )

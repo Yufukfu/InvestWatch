@@ -130,6 +130,52 @@ def test_unknown_type_rejected(tmp_path):
         Registry.from_csv(path)
 
 
+def test_name_of_only_legal_forms_rejected(tmp_path):
+    path = tmp_path / "bad.csv"
+    path.write_text(f"id,name,type\n{ALFA_ID},Dom Maklerski S.A.,brokerage_house\n", encoding="utf-8")
+    with pytest.raises(RegistryError, match="bad.csv:2"):
+        Registry.from_csv(path)
+
+
+def test_duplicate_id_rejected(tmp_path):
+    path = tmp_path / "dup.csv"
+    path.write_text(f"id,name,type\n{ALFA_ID},Alfa,brokerage_house\n{ALFA_ID},Beta,brokerage_house\n", encoding="utf-8")
+    with pytest.raises(RegistryError, match="dup.csv:3"):
+        Registry.from_csv(path)
+
+
+def test_utf8_bom_accepted(tmp_path):
+    path = tmp_path / "bom.csv"
+    path.write_text(f"id,name,type\n{ALFA_ID},Alfa Inwestycje,brokerage_house\n", encoding="utf-8-sig")
+    assert len(Registry.from_csv(path).firms) == 1
+
+
+def test_non_utf8_file_names_it(tmp_path):
+    path = tmp_path / "cp1250.csv"
+    path.write_bytes(f"id,name,type\n{ALFA_ID},Bank Przykładowy,brokerage_bank\n".encode("cp1250"))
+    with pytest.raises(RegistryError, match="cp1250.csv"):
+        Registry.from_csv(path)
+
+
+def test_fuzzy_does_not_cross_punctuation(registry):
+    assert registry.match("Strategia alfa: inwestycje w obligacje.", "https://x.example.org/") is None
+
+
+@pytest.mark.parametrize(
+    "domain,url",
+    [
+        ("https://www.alfa.pl/", "https://oferta.alfa.pl/x"),
+        ("www.alfa.pl", "https://alfa.pl/"),
+        ("alfa.pl", "https://www.alfa.pl./konto"),
+    ],
+)
+def test_domains_are_normalized(tmp_path, domain, url):
+    path = tmp_path / "d.csv"
+    path.write_text(f"id,name,type,website_domains\n{ALFA_ID},Gamma Kapitał,brokerage_house,{domain}\n", encoding="utf-8")
+    m = Registry.from_csv(path).match("Otwórz konto.", url)
+    assert m is not None and m.method == "domain"
+
+
 def test_empty_registry_rejected(tmp_path):
     path = tmp_path / "empty.csv"
     path.write_text("id,name,type\n", encoding="utf-8")
