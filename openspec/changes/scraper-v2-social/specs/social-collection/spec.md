@@ -87,6 +87,10 @@ The collector SHALL read the newest page first and follow the page's link to old
 - **WHEN** the newest page has no link to older posts
 - **THEN** exactly one page is requested
 
+#### Scenario: Link to older posts that leaves the channel
+- **WHEN** the older-posts link of a page points to another host, another channel or a path other than `/s/<handle>?before=<number>`
+- **THEN** it is not requested and the run ends after that page
+
 #### Scenario: Each page is a polite request
 - **WHEN** a second page is requested in the same run
 - **THEN** it waits for the per-domain rate limit and passes the same guards as the first

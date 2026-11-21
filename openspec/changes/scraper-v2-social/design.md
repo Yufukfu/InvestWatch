@@ -52,6 +52,8 @@ ADR 0103 is written in the docs task as accepted: context, the options with this
 
 - Telegram's terms for on-premise collection of public channels were not researched. Only the public preview is read, politely, with no login.
 - Channels can switch the preview off, VIP content is unreachable, and the preview may show fewer posts than the channel has.
+- A run is up to three requests (`robots.txt` and two pages) spaced by the per-domain limiter, and they must fit the queue's `SCRAPER_ATTEMPT_TIMEOUT` (60 s by default). With very slow answers the second page can be cut off and the attempt retried; the retry is safe because stored posts are duplicates. A block on a later page after documents were stored is a `partial` run, which the queue counts as healthy for the domain (its rule, not changed here).
+- The older-posts link comes from the page, so it is followed only when it is `https://t.me/s/<the same handle>?before=<digits>`; anything else ends paging.
 - Post text and authorship are untrusted input: stored as text, never rendered as HTML downstream by this module.
 - Whether the seed channels contain content that violates the challenge's rules was not reviewed; they are inputs, not findings.
 

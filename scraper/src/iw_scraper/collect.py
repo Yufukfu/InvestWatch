@@ -167,7 +167,9 @@ class Collector:
                 result = await stages.fetch(
                     url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
                 )
-                if not urlsplit(result.url).path.startswith("/s/"):  # the host answers a redirect to the profile
+                final, origin = urlsplit(result.url), urlsplit(source.url)
+                if final.hostname != origin.hostname or final.path.lower() != origin.path.lower():
+                    # the host redirected to the profile page (no preview) or somewhere else: not this channel's preview
                     raise ParseFailure(Reason.PARSE_ERROR, "no public preview for this channel")
                 channel = parse(result.body, result.url)
             except (FetchDeferred, FetchFailure, ParseFailure) as failure:

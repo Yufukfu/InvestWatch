@@ -343,3 +343,33 @@ def test_channel_url_form(url, expected):
     from iw_scraper.social.telegram import valid_url
 
     assert valid_url(url) is expected
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "https://evil.example/s/SubeTradingPL?before=5",
+        "http://t.me/s/SubeTradingPL?before=5",
+        "https://t.me/s/OtherChannel?before=5",
+        "https://t.me/SubeTradingPL?before=5",
+        "/s/SubeTradingPL?before=abc",
+        "/s/SubeTradingPL?before=5&x=1",
+        "/s/SubeTradingPL",
+    ],
+)
+def test_older_link_that_leaves_the_channel_is_not_followed(href):
+    channel = parse(channel_page(posts=text_post(5, "Cześć"), older=href), SUBE_URL)
+
+    assert channel.older_url is None
+
+
+def test_older_link_of_the_same_channel_is_followed_whatever_the_handle_case():
+    channel = parse(channel_page(posts=text_post(5, "Cześć"), older="/s/subetradingpl?before=5"), SUBE_URL)
+
+    assert channel.older_url == "https://t.me/s/subetradingpl?before=5"
+
+
+def test_older_link_is_only_followed_on_a_channel_preview_path():
+    channel = parse(channel_page(posts=text_post(5, "Cześć"), older="/other?before=5"), "https://t.me/other")
+
+    assert channel.older_url is None

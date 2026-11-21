@@ -14,6 +14,7 @@ _MULTIPLIERS = {"K": 1_000, "M": 1_000_000}
 _COUNT = re.compile(r"^(\d+(?:\.\d+)?)([KM])?$", re.IGNORECASE)
 _WEB_SCHEMES = {"http", "https"}
 NETWORK = "telegram"
+_BEFORE_QUERY = re.compile(r"before=\d+")
 _CHANNEL_URL = re.compile(r"^https://t\.me/s/[A-Za-z0-9_]{5,32}$")
 
 
@@ -96,6 +97,21 @@ def _post(wrap: html.HtmlElement, base: str) -> tuple[Post | None, bool]:
     )
 
 
+def _older_url(href: str | None, final_url: str) -> str | None:
+    """The link to older posts, only when it stays on this channel (`/s/<same handle>?before=<digits>` on `t.me`).
+
+    The link comes from the page, so it is not trusted: a page must not steer the next request elsewhere.
+    """
+    if not href:
+        return None
+    resolved, current = urlsplit(urljoin(final_url, href)), urlsplit(final_url)
+    same_channel = (
+        resolved.scheme == "https" and resolved.hostname == "t.me" and resolved.path.startswith("/s/")
+        and resolved.path.lower() == current.path.lower() and _BEFORE_QUERY.fullmatch(resolved.query) is not None
+    )
+    return resolved.geturl() if same_channel else None
+
+
 def parse(body: bytes, final_url: str) -> Channel:
     """Parse one channel page. Raises `ParseFailure` (`parse_error`) when it has neither a header nor a post."""
     try:
@@ -126,5 +142,5 @@ def parse(body: bytes, final_url: str) -> Channel:
         followers=_followers(root),
         posts=tuple(posts),
         skipped=skipped,
-        older_url=urljoin(final_url, older[0]) if older else None,
+        older_url=_older_url(older[0] if older else None, final_url),
     )

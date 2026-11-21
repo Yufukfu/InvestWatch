@@ -313,3 +313,31 @@ async def test_links_to_x_youtube_and_other_channels_are_kept_and_never_requeste
     hrefs = [link["href"] for link in h.ingested[0][0]["links"]]
     assert hrefs == ["https://x.com/example/status/123", "https://youtu.be/ms4VIbaHo7Y", "https://t.me/otherchannel"]
     assert h.urls == [SUBE]  # only the channel page: no link was followed
+
+
+async def test_an_older_link_to_another_host_is_never_requested():
+    body = channel_page(posts=text_post(5, "Cześć"), older="https://evil.example/s/SubeTradingPL?before=5")
+    h = Harness({SUBE: page(SUBE, body)})
+
+    result = await run(make(h, url=SUBE), h)
+
+    assert h.urls == [SUBE]
+    assert (result.documents, result.error) == (1, None)
+
+
+async def test_a_redirect_to_another_channel_is_not_a_public_preview():
+    h = Harness({SUBE: page(SUBE, load("telegram_kdpwiadomosci.html"), final_url=KDP)})
+
+    result = await run(make(h, url=SUBE), h)
+
+    assert (result.error.reason, result.documents) == (Reason.PARSE_ERROR, 0)
+    assert h.ingested == []
+
+
+async def test_a_redirect_to_the_same_path_on_another_host_is_not_this_channel():
+    h = Harness({SUBE: page(SUBE, load("telegram_kdpwiadomosci.html"), final_url="https://example.com/s/SubeTradingPL")})
+
+    result = await run(make(h, url=SUBE), h)
+
+    assert (result.error.reason, result.documents) == (Reason.PARSE_ERROR, 0)
+    assert h.ingested == []
