@@ -16,7 +16,8 @@ const webDir = process.env.IW_WEB_DIR ?? path.resolve(path.dirname(fileURLToPath
 process.chdir(webDir);
 const contractsDir = process.env.IW_CONTRACTS_DIR ?? path.resolve(webDir, '..', 'contracts');
 const check = process.argv.includes('--check');
-const rel = (file) => path.relative(webDir, file);
+// Forward slashes on every OS, so messages (and tests) read the same on Windows.
+const rel = (file) => path.relative(webDir, file).split(path.sep).join('/');
 
 const outputs = new Map();
 
