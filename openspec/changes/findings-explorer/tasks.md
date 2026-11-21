@@ -15,7 +15,7 @@
 ## 3. Table presentation
 
 - [x] 3.1 Failing tests: risk text for each level, score display, detection time, markup rendered as text, scroll container present.
-- [ ] 3.2 Implement table upgrade and CSS tokens (AA contrast). Check 375/768/1280 px by hand against the running mock; note result in the commit body.
+- [x] 3.2 Implement table upgrade and CSS tokens (AA contrast). Check 375/768/1280 px by hand against the running mock; note result in the commit body.
 - [x] 3.3 Mutation check; mutations: 9 tried, 9 caught (one survivor at the 4/5 plural boundary, case added)
 
 ## 4. Finding detail panel
@@ -32,6 +32,6 @@
 
 ## 6. Closing
 
-- [ ] 6.1 Run against the contract mock server (`docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts`, run on :8000, `npm run dev`): filters, detail, status change work and the browser console is clean.
+- [x] 6.1 Run against the contract mock server (`docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts`, run on :8000, `npm run dev`): filters, detail, status change work and the browser console is clean.
 - [ ] 6.2 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `docs-check` clean) and add the `iw-ai-log` row.
 - [ ] 6.3 Run the `iw-pr-review` skill and fix real findings.

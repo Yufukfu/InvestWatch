@@ -170,6 +170,16 @@ describe('FindingDetailPanel', () => {
     opener.remove();
   });
 
+  it('closes on Escape when focus is outside the panel', () => {
+    const onClose = vi.fn();
+    render(<FindingDetailPanel {...base} onClose={onClose} detail={detail()} />);
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the status editor slot', () => {
     render(<FindingDetailPanel {...base} detail={detail()} statusEditor={<p>edytor</p>} />);
     expect(screen.getByText('edytor')).toBeInTheDocument();

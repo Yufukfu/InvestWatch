@@ -39,6 +39,8 @@ h1, h2, h3 { line-height: 1.2; }
 .brand-sub { color: #cbd5e1; font-size: 15px; }
 .app { max-width: 1280px; margin: 0 auto; padding: 16px; }
 main { display: grid; gap: 16px; }
+/* Grid items default to min-width: auto; without this a wide table widens the page instead of scrolling. */
+main > * { min-width: 0; }
 
 /* Panels */
 .panel, .trend { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }

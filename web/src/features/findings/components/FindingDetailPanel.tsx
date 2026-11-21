@@ -241,6 +241,15 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
     return () => previous?.focus();
   }, []);
 
+  // Escape closes from anywhere, also after a save re-rendered the form and focus fell back to <body>.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   let content: ReactNode;
   if (notFound) content = <p role="alert">To zgłoszenie nie istnieje.</p>;
   else if (isError) content = <p role="alert">Nie udało się pobrać szczegółów zgłoszenia.</p>;
@@ -253,9 +262,6 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
       role="dialog"
       aria-modal="false"
       aria-labelledby="detail-title"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
     >
       <div className="detail-header">
         <h2 id="detail-title">{detail && !isError ? detail.title : 'Szczegóły zgłoszenia'}</h2>
