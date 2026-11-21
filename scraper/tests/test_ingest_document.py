@@ -49,6 +49,26 @@ def test_build_drops_a_page_supplied_html_object_key(source):
     assert "html_object_key" not in doc
 
 
+def test_build_drops_a_page_supplied_author(source):
+    # page markup (meta, rel=author, embedded JSON) is writer-controlled and analytics routes on author (issue 36)
+    author = {"name": "Alfa", "handle": "@alfa", "profile_url": "https://alfa.example.com/"}
+    doc = build(source, {**PAGE, "author": author})
+    assert "author" not in doc
+    assert check_document(doc) is None
+
+
+def test_build_stores_an_author_the_collector_passes_explicitly(source):
+    # the trusted path: a platform collector with account data, never the page dict
+    account = {"name": "Kanał", "handle": "@kanal", "profile_url": "https://t.me/kanal", "followers": 10}
+    doc = build(source, {**PAGE, "author": {"handle": "@firm"}}, author=account)
+    assert doc["author"] == account
+    assert check_document(doc) is None
+
+
+def test_build_has_no_author_key_without_a_trusted_one(source):
+    assert "author" not in build(source)
+
+
 def test_build_does_not_mutate_the_page(source):
     page = dict(PAGE)
     build(source, page)
@@ -132,6 +152,33 @@ def test_a_scraper_value_the_page_supplied_is_kept(source):
     ],
 )
 def test_a_non_web_url_scheme_is_schema_invalid(source, field, value):
-    error = check_document(build(source, PAGE | {field: value}))
+    error = check_document(build(source) | {field: value})  # set after the build: a page cannot supply `author`
     assert error is not None and error.reason is Reason.SCHEMA_INVALID
     assert "http or https" in error.detail
+
+
+# The one definition of `content_hash` (ADR 0105, `.docs/integration-plan.md` §3): NFC, whitespace collapsed and trimmed,
+# case kept, UTF-8, sha256 hex. The hashes are literals, never computed with the code under test; the stored value feeds the
+# unique dedup index on `documents`, so a change here would turn every stored hash into a miss.
+@pytest.mark.parametrize(
+    "text,folded,expected",
+    [
+        ("ﬁnanse", "finanse", "940eee0cfc77cf748d13d9ebbb2530ff252c93ff9fffdd3114f8b10329e8093a"),  # ligature fi
+        ("m²", "m2", "09c2e207e28b877591a6d65a2e78637bea09fa49d68def18c0419b18ff47ae89"),  # superscript two
+        ("１２３%", "123%", "359a698d899b204c2eab19f1b13a75f203816dd695e6620386819c67b1b62369"),  # full-width digits
+    ],
+)
+def test_compatibility_characters_are_kept_not_folded(text, folded, expected):
+    assert normalise_text(text) == text
+    assert content_hash(text) == expected
+    assert content_hash(text) != content_hash(folded)
+
+
+def test_decomposed_and_composed_text_hash_to_the_literal():
+    assert content_hash("é") == "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"
+    assert content_hash("é") == "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"
+
+
+def test_unicode_whitespace_collapses_to_one_space():
+    assert normalise_text(" a 　\t b ") == "a b"
+    assert content_hash(" a 　b ") == "c8687a08aa5d6ed2044328fa6a697ab8e96dc34291e8c2034ae8c38e6fcc6d65"

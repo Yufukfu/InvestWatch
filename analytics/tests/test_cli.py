@@ -6,10 +6,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from conftest import make_doc
 from investwatch_analytics import cli
+from investwatch_analytics.config import SEED_REGISTRY
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _seed_registry(monkeypatch):
+    """These tests check the CLI against the mocks, whose ids are the fictional seed's (change
+    analytics-knf-registry made the real KNF snapshot the default)."""
+    monkeypatch.setenv("REGISTRY_CSV", str(SEED_REGISTRY))
 
 
 def test_cli_on_mocks_passes_contract_validator(contracts_dir, tmp_path):

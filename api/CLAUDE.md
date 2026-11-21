@@ -11,6 +11,7 @@ REST API and Socket.IO gateway for the dashboard, and the owner of the shared Po
 - Every table change is a new Alembic revision in `api/migrations/versions/`, run as `iw_admin`. Never edit an applied revision; never create tables from service code or init scripts.
 - The service connects as `iw_app` (`DATABASE_URL`); only `alembic` uses `DATABASE_ADMIN_URL`.
 - `risk_level` is derived on read from `score` and Redis `iw:settings:thresholds` (`high >= t`, `medium >= t - 0.2`, else `low`); it is never stored. The API writes that key; analytics only reads it.
+- `thresholds.DEFAULTS` is a copy of `analytics/eval/thresholds.json`, the gold-set evaluation's best-F1 thresholds ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md)); change it only by copying that file (an analytics test pins the copy), and write it only when the key is missing.
 - The relay forwards `iw:events` to Socket.IO `/events` unchanged; it applies no threshold logic. Drop messages that fail the events schema.
 - Screenshot object keys come from the `documents` row, never from the request.
 - Keep the mocks: the mock server (`contracts/mock-server/`) and the mocks (`contracts/mocks/`) stay as a test double for `web/` now that the real `api/` exists; removing or replacing them needs Damian's OK. Where the real API diverges (for example `/calibration`), record a follow-up instead of changing the mock.

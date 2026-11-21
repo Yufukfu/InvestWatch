@@ -1,6 +1,7 @@
 """The ingest pipeline end to end: PostgreSQL, MinIO and Redis are real, failures are injected."""
 
 import asyncio
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -61,6 +62,26 @@ async def doc_row(pool, document_id):
 async def doc_count(pool):
     async with pool.acquire() as conn:
         return await conn.fetchval("SELECT count(*) FROM documents")
+
+
+ACCOUNT = {"handle": "@kanal", "profile_url": "https://t.me/kanal"}
+PAGE_CLAIM = {"handle": "@firm", "profile_url": "https://alfa.example.com/"}
+
+
+async def test_stored_row_has_the_collector_author_not_the_page_one(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    result = await Ingestor(pool, storage, redis_client, stream=stream_name).ingest(
+        PAGE | {"author": PAGE_CLAIM}, seeded_source, fetched_at=FETCHED_AT, duration_ms=5, proxy=None, author=ACCOUNT
+    )
+    assert json.loads((await doc_row(pool, result.document_id))["payload"])["author"] == ACCOUNT
+
+
+async def test_stored_row_has_no_author_when_only_the_page_claims_one(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, PAGE | {"author": PAGE_CLAIM})
+    assert "author" not in json.loads((await doc_row(pool, result.document_id))["payload"])
 
 
 async def test_html_is_stored_and_referenced(pool, storage, redis_client, stream_name, seeded_source):
