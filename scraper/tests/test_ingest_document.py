@@ -57,6 +57,18 @@ def test_build_drops_a_page_supplied_author(source):
     assert check_document(doc) is None
 
 
+def test_build_stores_an_author_the_collector_passes_explicitly(source):
+    # the trusted path: a platform collector with account data, never the page dict
+    account = {"name": "Kanał", "handle": "@kanal", "profile_url": "https://t.me/kanal", "followers": 10}
+    doc = build(source, {**PAGE, "author": {"handle": "@firm"}}, author=account)
+    assert doc["author"] == account
+    assert check_document(doc) is None
+
+
+def test_build_has_no_author_key_without_a_trusted_one(source):
+    assert "author" not in build(source)
+
+
 def test_build_does_not_mutate_the_page(source):
     page = dict(PAGE)
     build(source, page)
