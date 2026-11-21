@@ -3,7 +3,7 @@
 REST API and real-time (Socket.IO) gateway between the shared database and the dashboard, and the home of the database migrations for the whole stack.
 
 - **Owner:** Damian (module C)
-- **Status:** the shared schema (change `api-db-schema`) is implemented: Alembic revisions `0001` (tables) and `0002` (query indexes), and the one-shot `api-migrate` container. REST and Socket.IO come with change `api-v1`.
+- **Status:** the shared schema (change `api-db-schema`) is implemented: Alembic revisions `0001` (tables) and `0002` (query indexes), and the one-shot `api-migrate` container in `api/compose.yaml`. The root `compose.yaml` does not include it yet (added together with the `infra-compose` change). REST and Socket.IO come with change `api-v1`.
 
 ## What it does
 
@@ -27,6 +27,7 @@ Columns follow `contracts/schemas/` v1; every enumerated field has a CHECK const
 | `calibration_points` | analytics eval | `id (identity), run_id, module, threshold, tp, fp, fn, tn, precision, recall, f1, labeled_samples, computed_at` | unique `(run_id, module, threshold)`; `(module, computed_at DESC)` |
 
 - `documents.payload` holds the nested `ScrapedDocument` fields: `author, links, media, screenshots, blocks, scrape_meta`.
+- Documents without a source (`source_id` null) deduplicate among themselves by `content_hash`; rows without a `content_hash` never collide.
 - `documents.stream_published_at` is the "announced on `iw:documents`" marker. It is not the contract's `published_at` (the content's publication date).
 - `documents_count` in the `Source` contract is not stored: the API counts the source's `documents` rows on read.
 - `findings` has no `risk_level` column: the API derives it on read ([ADR 0305](../.docs/decisions/0305-threshold-storage.md)).
@@ -73,7 +74,7 @@ The same statements in Python (SQLAlchemy) are in `src/investwatch_api/db/sql.py
 
 ## Running it
 
-Migrations, in the stack: the root `compose.yaml` includes `api/compose.yaml`, and `api-migrate` runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. A service that writes the database waits for it:
+Migrations, in the stack: once the root `compose.yaml` includes `api/compose.yaml` (pending, with `infra-compose`), `api-migrate` runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. The admin URL is built from `POSTGRES_ADMIN_*` without percent-encoding, so a hand-set password must not contain `@ : / # %` (`scripts/init-env.sh` generates hex). A service that writes the database waits for it:
 
 ```yaml
 depends_on:

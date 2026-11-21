@@ -1,7 +1,8 @@
 """Contract objects (contracts/schemas v1) <-> table rows.
 
 A null scalar and an absent key are the same thing in a column, so `*_to_contract` leaves out optional keys
-whose value is null. `risk_level` (findings) and `documents_count` (sources) are never stored: the API
+whose value is null. The `*_to_contract` functions take dict-like rows (`result.mappings()`), not plain `Row`s.
+`risk_level` (findings) and `documents_count` (sources) are never stored: the API
 derives them on read.
 """
 
@@ -31,7 +32,7 @@ def parse_time(value: str) -> datetime:
 def format_time(value: datetime) -> str:
     """UTC ISO-8601 with a Z suffix (integration-plan §7); microseconds only when present."""
     value = value.astimezone(timezone.utc)
-    spec = "milliseconds" if value.microsecond else "seconds"
+    spec = "microseconds" if value.microsecond else "seconds"
     return value.replace(tzinfo=None).isoformat(timespec=spec) + "Z"
 
 

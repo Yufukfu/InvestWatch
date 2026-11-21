@@ -63,7 +63,8 @@ def test_contract_mock_round_trips(app_engine):
 def test_time_round_trip_keeps_utc_z():
     assert format_time(parse_time("2026-11-21T15:00:40Z")) == "2026-11-21T15:00:40Z"
     assert format_time(parse_time("2026-11-21T16:00:40+01:00")) == "2026-11-21T15:00:40Z"
-    assert format_time(parse_time("2026-11-21T15:00:40.250Z")) == "2026-11-21T15:00:40.250Z"
+    assert format_time(parse_time("2026-11-21T15:00:40.250Z")) == "2026-11-21T15:00:40.250000Z"
+    assert format_time(parse_time("2026-11-21T15:00:40.123456Z")) == "2026-11-21T15:00:40.123456Z"
 
 
 def test_unknown_payload_keys_are_not_returned():
