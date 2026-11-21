@@ -23,7 +23,7 @@ const shipped = [
   ...walk(srcRoot).filter((f) => !f.startsWith(testSupport + '/') && !isTestFile(f)),
   ...walk(join(webRoot, 'public')),
   ...readdirSync(webRoot)
-    .filter((n) => /\.(html|[cm]?[jt]s)$/.test(n) || n.startsWith('.env'))
+    .filter((n) => /\.(html|[cm]?[jt]s)$/.test(n) || n === '.env.example')
     .map((n) => join(webRoot, n)),
 ];
 const read = (f: string) => readFileSync(f, 'utf8');
@@ -37,7 +37,9 @@ describe('no in-browser fake backend', () => {
 
   it('shipped code never imports the Vitest support folder (src/test)', () => {
     const offenders = shipped.filter(
-      (f) => isCode(f) && /(from\s+|import\s*\(\s*|import\s+|require\s*\(\s*)['"][^'"]*\/test(\/[^'"]*)?['"]/.test(read(f)),
+      (f) =>
+        isCode(f) &&
+        /import\.meta\.glob|(from\s+|import\s*\(\s*|import\s+|require\s*\(\s*)['"][^'"]*\/test(\/[^'"]*)?['"]/.test(read(f)),
     );
     expect(rel(offenders)).toEqual([]);
   });

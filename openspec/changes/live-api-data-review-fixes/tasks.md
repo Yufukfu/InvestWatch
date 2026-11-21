@@ -13,4 +13,4 @@
 
 ## 3. Closing
 
-- [ ] 3.1 `iw-pr-review` on the branch; fix real findings; archive this change as the last commit.
+- [x] 3.1 `iw-pr-review` run: checks green, `iw-reviewer` found 4 items (guard scanned `.env.local`, `import.meta.glob` bypass, ADR 0206 wording, README service-worker note), all fixed; `test-diff-check` flag on `TrendPage.test.tsx` (19 to 18 assertions) is the aggregation sanity check replaced by literal day points. Three `openspec validate --strict` failures (`database-schema`, `document-analysis`, `m2-compliance-rules`) are on `main`, not in this change.

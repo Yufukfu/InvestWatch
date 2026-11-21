@@ -22,7 +22,7 @@ docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts
 docker run --rm -p 127.0.0.1:8000:8000 iw-mock-server
 ```
 
-The mock endpoints stay until we have sensible data. Compose does not start a REST backend yet, so `docker compose up` alone shows only the dashboard's error states.
+The mock endpoints stay until we have sensible data. A browser that ran the old mock mode on the same origin keeps its service worker until you unregister it (DevTools, Application, Service Workers). Compose does not start a REST backend yet, so `docker compose up` alone shows only the dashboard's error states.
 In docker the app is served by unprivileged nginx behind the gateway: `docker compose up --build` from the repo root, then https://localhost:8443.
 
 ## API client (contract-first)
