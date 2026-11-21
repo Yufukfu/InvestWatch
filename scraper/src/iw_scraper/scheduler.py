@@ -9,11 +9,12 @@ from datetime import UTC, datetime, timedelta
 from arq.connections import ArqRedis
 from croniter import croniter
 
+from iw_scraper.guards import KEY_PREFIX
 from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.types import JobError, Reason
 
 MINUTE = timedelta(minutes=1)
-MAX_CATCH_UP_SLOTS = 5  # a late tick still covers the minutes it missed, but never replays hours
+MAX_CATCH_UP_SLOTS = 5  # a tick covers at most the current minute and the four before it, never hours
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,10 @@ class Scheduler:
         """Enqueue the jobs due since the last tick; returns how many this scheduler actually enqueued."""
         current = now.astimezone(UTC).replace(second=0, microsecond=0)
         if self._last_slot is None:
-            self._last_slot = current - MINUTE  # the first tick covers its own minute; a failure keeps it owed
+            # a restart covers the slots current-4..current (five minutes, this one included) that fell due while it
+            # was down; the job ids of slots that already ran are rejected for as long as arq keeps their results
+            # (`RESULT_TTL`, far longer than this window)
+            self._last_slot = current - MAX_CATCH_UP_SLOTS * MINUTE
         slots = self._slots_since_last_tick(current)
         enqueued = 0
         for source in await self._store.schedulable():
@@ -77,7 +81,7 @@ class Scheduler:
 
     @staticmethod
     def _invalid_key(source_id: str) -> str:
-        return f"iw:cron-invalid:{source_id}"
+        return f"{KEY_PREFIX}cron-invalid:{source_id}"
 
     async def _note_invalid_cron(self, source_id: str, cron: str) -> None:
         """Record one job error per invalid value, however many ticks and schedulers see it."""

@@ -1,0 +1,32 @@
+# Proposal
+
+## Why
+
+Integration #2 (Sat 22:00) needs at least one real source per module (M1, M2, M3) and the demo needs real pages, but `sources` is empty except for the one KNF row that `scraper-orchestration` seeds. A web-sources research pass fetched candidate pages with our own engine (robots allowed, HTTP 200, main text in static HTML) and produced a vetted list; this change turns it into a reviewed, repeatable seed so every teammate and the demo stack start with the same sources.
+
+## What Changes
+
+- A tracked seed file `scraper/seeds/sources.toml` with the vetted web sources for M1, M2 and M3 (name, URL, `source_kind`, `target_modules`, `schedule_cron`).
+- An idempotent seed command that inserts the entries into `sources`, keyed by URL, and never overwrites a row (the dashboard owns later edits). It extends the `seed.py` that `scraper-orchestration` task 3.5 adds for the KNF row instead of adding a second script.
+- Validation of every seed file before any write: `platform` from the contract set (default `web`; `sources.toml` itself is web only), closed `source_kind` and module sets, non-empty name, https URLs, valid 5-field cron, unique URLs. The loader reads every `*.toml` in `scraper/seeds/`, so `scraper-v2-social` adds `telegram.toml` (`platform = other`) with no loader change.
+- An opt-in live check (marker `scraper_live`) that fetches each seeded URL once and fails on a redirect to another URL, a non-200 status or an empty text, so a stale seed is found before the demo.
+- No render flag: `scraper-v3-render` renders by rule (`source_kind = firm_own` and `M2` targeted), so the five XTB and mBank M2 rows are its demo set without any field here.
+- M3 pages (the EY and Grant Thornton family-office pages as negative controls, the icobench signal-group list) use `source_kind = unknown`, which the contract enum already has: the scraper cannot know registry status and analytics routes M3 by registry mismatch. The demo's M3 positives come from `scraper-v2-social` (Telegram paid-signal channels) plus the icobench list. Naming a business from the KNF public warnings list is an optional follow-up that a human decides.
+
+Out of scope: the KNF registry parsers (`registry_firms`, `registry_warnings`; Damian's), Playwright and `blocks`/screenshots (`scraper-v3-render`), social sources (`scraper-v2-social`), dashboard source editing, any change to the `sources` table or `source` contract.
+
+Touches no contract, REST route or event. It writes existing `sources` columns only. Owner: scraper (Adam).
+
+## Capabilities
+
+### New Capabilities
+- `source-seeds`: the vetted set of web sources and the idempotent, validated way they get into `sources`.
+
+### Modified Capabilities
+<!-- none: web-collection and document-ingest are unchanged; a host with no parser uses the generic parser already -->
+
+## Impact
+
+- `scraper/seeds/sources.toml` (new), `scraper/src/iw_scraper/seed.py` (from `scraper-orchestration`, extended), `scraper/tests/` (seed tests, live check).
+- Depends on `scraper-orchestration` being merged (`run_source`, the PostgreSQL `SourceStore`, `seed.py`); implementation starts after that merge.
+- Docs: `scraper/CLAUDE.md`, `scraper/README.md` (seed step), `.docs/status/scraper.md`, AI log row.
