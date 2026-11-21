@@ -28,6 +28,10 @@ The dashboard SHALL render contract mock data without the `api` service, with no
 - **WHEN** the API is unreachable
 - **THEN** the health badge shows "Brak połączenia z API" and the table shows an error message instead of crashing
 
+#### Scenario: System reported down
+- **WHEN** the API answers `/health` with `status: down`
+- **THEN** the health badge shows "System nie działa", not the unreachable message
+
 ### Requirement: Hardened static delivery
 The `web` container SHALL serve the build as non-root, on a read-only filesystem, with security headers, behind the HTTPS gateway.
 
