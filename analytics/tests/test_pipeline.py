@@ -329,3 +329,12 @@ def test_firm_account_naming_itself_after_another_firm(registry, catalogue):
     [f] = run(raw, registry, catalogue)
     assert f.firm.name.startswith("Alfa") and f.firm.match_confidence == 0.95
     assert {r.rule_id: r.result for r in f.rules}["R1"] == "pass"
+
+
+def test_foreign_ad_not_aimed_at_poland_gives_no_m3_either(registry, catalogue, caplog):
+    raw = make_doc(source_kind="third_party", platform="web", url="https://blog.example.com/x", author={"handle": "@fx_joe"},
+                   text="EuroTrade Markets is my broker and I trade with it every single day of the week. "
+                        "Join my private group where I post the trades: co kupić z akcji.")
+    with caplog.at_level(logging.INFO):
+        assert run(raw, registry, catalogue) == []
+    assert "not_targeting_poland" in reasons(caplog)

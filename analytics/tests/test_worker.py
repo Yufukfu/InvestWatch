@@ -815,3 +815,24 @@ def test_main_exits_non_zero_on_bad_signal_catalogue(tmp_path, capsys, monkeypat
         assert "m3.yaml" in out and "config_error" in out
     finally:
         pipeline.default_signal_catalogues.cache_clear()
+
+
+def test_document_with_m1_and_m3_findings(r, store, registry, catalogue, caplog):
+    """analytics-m1-m3: one document, two modules -> two rows, two finding.created events, one ack."""
+    doc3 = "33333333-3333-4333-8333-333333333333"
+    store.put_document_row(make_doc(
+        id=doc3, source_kind="third_party", platform="instagram", url="https://www.instagram.com/p/W1/",
+        author={"handle": "@trader_ola"},
+        text="Konto mam w EuroTrade Markets. Moja grupa: co tydzień mówię, co kupić z akcji WIG20.",
+    ))
+    publisher = Recorder()
+    w = make_worker(r, store, registry, catalogue, publisher=publisher)
+    w.ensure_group()
+    xadd(r, document_id=doc3)
+    with caplog.at_level(logging.INFO):
+        w.run_once()
+    assert sorted(f.module for f in store.findings_for_document(doc3)) == ["M1", "M3"]
+    created = [e["data"]["module"] for e in publisher.sent if e["type"] == "finding.created"]
+    assert sorted(created) == ["M1", "M3"] and pending(r) == 0
+    rec = next(rec for rec in caplog.records if getattr(rec, "outcome", None) == "stored")
+    assert rec.findings_created == 2

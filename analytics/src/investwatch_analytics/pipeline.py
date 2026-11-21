@@ -79,9 +79,10 @@ def _m1_and_m3(ctx: Context, signals: SignalCatalogues, *, now: datetime, new_id
     s17 = next((r for r in finding.rules if r.rule_id == "S1.7"), None)
     foreign = ctx.firm_match is not None and ctx.firm_match.firm.type in FOREIGN_TYPES
     if foreign and s17 is not None and s17.result == "pass":
-        _skipped(ctx.doc, "not_targeting_poland", finding_module="M1")
-    else:
-        out.append(finding)
+        # Out of scope as a whole (routing requirement): no M1, and no M3 alongside it either.
+        _skipped(ctx.doc, "not_targeting_poland")
+        return []
+    out.append(finding)
     m3_rules = run_rules(signals.m3, ctx)
     if m3.offer_is_publishers(ctx, m3_rules, signals.m3):
         out.append(m3.build_finding(ctx, signals.m3, advertiser=advertiser, now=now, new_id=new_id, rules=m3_rules))

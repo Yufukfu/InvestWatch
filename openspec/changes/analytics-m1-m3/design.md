@@ -93,7 +93,7 @@ No ADR: these choices are local to `analytics/`, follow the accepted plan, the c
 
 ## Migration Plan
 
-Pure code change in `analytics/`; no table, contract or event change. Rollback is reverting the branch: `third_party`/`unknown` documents go back to `module_not_implemented`, unmatched `firm_own` pages back to M2. Findings already stored stay valid v1 rows.
+Pure code change in `analytics/`; no table, contract or event change. Rollback is reverting the branch: `third_party`/`unknown` documents go back to `module_not_implemented`, unmatched `firm_own` pages back to M2. Findings already stored stay valid v1 rows, but they are not cleaned up: the worker upserts per `(document_id, module)` and never removes a module the new analysis no longer produces. So an M2 finding with `firm: null` written by the old routing for an unregistered own page stays in the table after a re-scan routes that page to M3 or to `no_signals`, and an M1+M3 document that later yields only M1 keeps its old M3 row. Whether such rows are deleted, marked superseded or left to analysts is open (follow-ups row 35); analysts own `status` and `note`, so deleting would lose their review.
 
 ## Resolved Questions
 
