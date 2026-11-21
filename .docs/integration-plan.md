@@ -184,7 +184,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/stats/trend` | `?module&bucket=hour|day&date_from&date_to` → `[{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }]` |
 | GET | `/stats/summary` | counts per module / status / platform |
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
-| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level` |
+| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults 0.6 / 0.5 / 0.7 written when missing); analytics reads the same key (ADR 0305) |
 | GET / POST / PATCH | `/sources` | list and edit sources |
 | POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`) |
 | GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
@@ -194,13 +194,13 @@ Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed
 
 ## 6. Real-time events
 
-Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`):
+Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/socket.io`, same origin through the gateway). Each message is `{ "type", "emitted_at", "data" }` (`contracts/schemas/events.schema.json`); the API forwards `data` unchanged under the event name `type` and drops messages that fail the schema:
 
 | Event | Payload | When |
 |---|---|---|
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
 | `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
-| `finding.updated` | `{ id, status }` | status change (sync between tabs) |
+| `finding.updated` | `{ id, status }` | published by the API on `iw:events` after `PATCH /findings/{id}` commits (status or note change; sync between tabs) |
 | `scan.started` / `scan.finished` | `{ source_id, documents }` | scan progress bar |
 
 ## 7. Shared conventions

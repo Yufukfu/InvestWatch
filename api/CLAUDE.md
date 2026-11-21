@@ -3,7 +3,7 @@
 REST API and Socket.IO gateway for the dashboard, and the owner of the shared Postgres schema (Alembic). Stack and placement: [ADR 0302](../.docs/decisions/0302-api-service.md); schema ownership: [ADR 0303](../.docs/decisions/0303-database-schema-ownership.md); driver and table layout: [ADR 0307](../.docs/decisions/0307-database-driver-and-table-layout.md); thresholds: [ADR 0305](../.docs/decisions/0305-threshold-storage.md). The logic lives in the docs, not here:
 
 - Routes and shapes: [`contracts/openapi.yaml`](../contracts/openapi.yaml) and [`.docs/integration-plan.md`](../.docs/integration-plan.md) §5. Events: §6 and `contracts/schemas/events.schema.json`. `Finding` and `risk_level`: §4.
-- What the schema guarantees: `openspec/specs/database-schema/spec.md`; tables and the SQL writers use: [`README.md`](README.md). In-flight work: `openspec/changes/api-v1/` (REST, Socket.IO).
+- What the schema guarantees: `openspec/specs/database-schema/spec.md`; tables and the SQL writers use: [`README.md`](README.md). REST and Socket.IO behaviour: `openspec/specs/rest-api/spec.md` and `openspec/specs/event-relay/spec.md`; run steps and edge rules: [`README.md`](README.md).
 
 ## Rules that are easy to get wrong
 

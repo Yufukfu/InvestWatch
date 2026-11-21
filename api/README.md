@@ -3,12 +3,12 @@
 REST API and real-time (Socket.IO) gateway between the shared database and the dashboard, and the home of the database migrations for the whole stack.
 
 - **Owner:** Damian
-- **Status:** the shared schema (change `api-db-schema`) is implemented: Alembic revisions `0001` (tables), `0002` (query indexes) and `0003` (non-empty `documents.text`), and the one-shot `api-migrate` container in `api/compose.yaml`, which the root `compose.yaml` includes. REST and Socket.IO come with change `api-v1`.
+- **Status:** implemented: the shared schema (`api-db-schema`: Alembic `0001` tables, `0002` query indexes, `0003` non-empty `documents.text`, the one-shot `api-migrate`) and the REST API plus Socket.IO relay (`api-v1`, service `api`), both in `api/compose.yaml`, which the root `compose.yaml` includes. Redis, MinIO and their `.env` entries (`REDIS_URL`, `MINIO_*`) come with the `infra-compose` change; until then `docker compose up` stops at the `api` service's `${VAR:?}` guards.
 
 ## What it does
 
 - Creates the shared tables (`sources`, `documents`, `findings`, `job_errors`, `calibration_points`) with Alembic, in a one-shot `api-migrate` container that runs before the other services.
-- Serves the REST API of [`contracts/openapi.yaml`](../contracts/openapi.yaml) under `/api`, behind the HTTPS gateway (`https://localhost:8443/api`) (change `api-v1`).
+- Serves the REST API of [`contracts/openapi.yaml`](../contracts/openapi.yaml) under `/api`, behind the HTTPS gateway (`https://localhost:8443/api`).
 - Turns each finding's raw `score` into `risk_level` using the module thresholds the calibration panel sets.
 - Relays live events (new findings, high-risk alerts, status changes, scan progress) to the dashboard over Socket.IO, namespace `/events`.
 
@@ -75,6 +75,27 @@ ON CONFLICT ON CONSTRAINT uq_findings_document_module DO UPDATE SET
 
 The same statements in Python (SQLAlchemy) are in `src/investwatch_api/db/sql.py` (`document_insert_ignore_duplicate`, `unpublished_documents`, `findings_upsert`); contract dict ↔ row mapping is in `src/investwatch_api/db/mapping.py`.
 
+## REST and Socket.IO
+
+All 11 paths of `contracts/openapi.yaml` under `/api`, and Socket.IO namespace `/events` on path `/socket.io` (one process on port 8000). Rules the contract leaves open:
+
+- `risk_level` on every finding (and the `risk_level` filters, `by_risk_level`, the trend filter): `high` if `score >= t`, `medium` if `score >= t - 0.2`, else `low`, with `t` the module threshold read from Redis on every request. If Redis is down the last value read (else the defaults) is used and `/api/health` shows `redis: down`.
+- Thresholds: Redis key `iw:settings:thresholds`, a JSON string `{"M1":0.6,"M2":0.5,"M3":0.7}`; the API writes the defaults when it is missing. `PUT` with Redis down is 503.
+- `GET /findings`: filters combine with AND; `status` is comma-separated; `score_min`, `date_from`, `date_to` are inclusive; `q` is a case-insensitive literal substring (`%` and `_` are not wildcards) of title, excerpt, firm name, advertiser name and handle, at most 200 characters; `page <= 100000`; ties sort by `detected_at` descending, then `id`.
+- `GET /findings/{id}` adds `document` and `screenshot_urls` (only viewports that have a key). The contract's response schema for this route cannot validate as written (`allOf` with `additionalProperties: false`); the finding and document parts are each valid.
+- `PATCH /findings/{id}` takes `status` and/or `note` (`note: null` clears it), sets `updated_at`, and publishes `finding.updated` `{id, status}` on `iw:events` after the commit. Any status may follow any status. A failed publish is logged; the change stays.
+- `/stats/trend` buckets are UTC hours or days; without dates it covers the last 24 hours (`hour`) or 14 days (`day`); every bucket in the range is returned, empty ones as zeros; at most 2000 buckets.
+- `/stats/summary` lists every module, status and risk level (zero if none); `last_scan_at` is the latest `sources.last_run_at`.
+- `/calibration` returns the newest run stored in `calibration_points` for the module (written by analytics eval), or no points and `labeled_samples: 0`.
+- `POST /sources` requires `name, platform, url, source_kind, target_modules` (the contract's `SourceInput` has no required list); `active` defaults to true; URLs with credentials and repeated modules are rejected; `documents_count` is counted on read.
+- `POST /scans` adds `{source_id, requested_at}` to Redis Stream `iw:scan-requests` (capped at about 10000 entries); 404 for an unknown source, 503 if Redis is down.
+- Screenshots are read from MinIO bucket `iw-raw` with the key stored on the document row, never one from the request; 503 if MinIO is down.
+- `/health` always answers 200: `down` if Postgres is down, `degraded` if Redis or MinIO is, each probe at most 2 s.
+- Socket.IO accepts the same origin only (the gateway case; `X-Forwarded-Proto` is honoured). `API_CORS_ORIGINS` (comma-separated, for a local dev server) replaces that default, so it must also list the dashboard's own origin. No authentication: only the gateway on `127.0.0.1` is exposed (ADR 0202).
+- Errors use the contract shape `{"error": ..., "details"?: ...}`, including 500 (`internal error`) and 503 (`<dependency> unavailable`).
+
+Configuration (env only): `DATABASE_URL` (as `iw_app`), `REDIS_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` (default `iw-raw`), `MINIO_SECURE` (default false), `CONTRACTS_DIR` (set in the image), `CORS_ORIGINS` (compose: `API_CORS_ORIGINS`), `LOG_LEVEL`, `API_HOST` and `API_PORT` (default `0.0.0.0:8000`).
+
 ## Running it
 
 Migrations, in the stack: the root `compose.yaml` includes `api/compose.yaml`, whose `api-migrate` uses the `postgres` service and `data` network of `infra/compose.yaml` and runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. The admin URL is built from `POSTGRES_ADMIN_*` without percent-encoding, so a hand-set password must not contain `@ : / # %` or whitespace (a space would also defeat the log redactor; `scripts/init-env.sh` generates hex). A service that writes the database waits for it:
@@ -89,6 +110,8 @@ Locally, from `api/`:
 ```bash
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt   # Windows; bin/ on Linux/macOS
 DATABASE_ADMIN_URL=postgresql://iw_admin:<password>@localhost:5432/investwatch .venv/Scripts/alembic upgrade head
+DATABASE_URL=postgresql://iw_app:<password>@localhost:5432/investwatch REDIS_URL=redis://:<password>@localhost:6379/0 \
+  MINIO_ENDPOINT=localhost:9000 MINIO_ACCESS_KEY=<key> MINIO_SECRET_KEY=<secret> .venv/Scripts/python -m investwatch_api
 ```
 
 New revision: add `migrations/versions/NNNN_<slug>.py` by hand (copy the style of `0001_initial.py`), update `src/investwatch_api/db/tables.py` to match, and run the tests: `test_models_match_the_migrations` fails if tables, columns, types, indexes or unique constraints differ. It does not diff CHECK constraints: `test_enum_checks_match_the_contracts` and the rejection tests in `tests/test_constraints.py` cover those. Never edit an applied revision.
@@ -100,6 +123,13 @@ Database tests need a real Postgres 17 (constraints like `NULLS NOT DISTINCT` an
 ```bash
 docker run -d --rm --name iw-test-pg -e POSTGRES_PASSWORD=test -p 127.0.0.1:55432:5432 public.ecr.aws/docker/library/postgres:17-alpine
 TEST_DATABASE_ADMIN_URL=postgresql://postgres:test@127.0.0.1:55432/postgres .venv/Scripts/python -m pytest
+```
+
+API and relay tests also need a Redis (they flush its database 0):
+
+```bash
+docker run -d --rm --name iw-test-redis -p 127.0.0.1:56379:6379 public.ecr.aws/docker/library/redis:8-alpine redis-server --requirepass test
+TEST_REDIS_URL=redis://:test@127.0.0.1:56379/0   # together with TEST_DATABASE_ADMIN_URL
 ```
 
 Each test session creates its own `iw_test_*` databases and an `iw_test_app` role with the same grants as `infra/postgres/init/01-app-role.sh`, and drops the databases at the end. Without `TEST_DATABASE_ADMIN_URL` the database tests are skipped, not failed.

@@ -47,7 +47,7 @@ Starts after change `api-db-schema` groups 1-3 (package, tables, migrate service
 
 ## 7. Closing
 
-- [ ] 7.1 Apply the `iw-docs-update` skill (`api/CLAUDE.md`, `api/README.md` with the edge-rule assumptions of design decision 9, `.docs/integration-plan.md` §6 naming the API as producer of `finding.updated`, Damian's row in `.docs/STATUS.md`), run docs-check, run `pip-audit` on `api/requirements*.txt` and record it in `.docs/security-audit.md`, and add the `iw-ai-log` row
+- [x] 7.1 Apply the `iw-docs-update` skill (`api/CLAUDE.md`, `api/README.md` with the edge-rule assumptions of design decision 9, `.docs/integration-plan.md` §6 naming the API as producer of `finding.updated`, Damian's row in `.docs/STATUS.md`), run docs-check, run `pip-audit` on `api/requirements*.txt` and record it in `.docs/security-audit.md`, and add the `iw-ai-log` row (except Damian's `.docs/STATUS.md` row, which the coordinating session edits for this batch)
 - [ ] 7.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
