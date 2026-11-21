@@ -47,6 +47,12 @@ Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is
 
 ## 8. Near-dup alert suppression, summary sentence, gate counter (~45 min)
 
+Split on the coordinator's instruction: 8a (alert claim in `events.py`, standalone) now; 8b (summary sentence and gate counter, which need the pipeline) with the wiring later.
+
+- [x] 8a.1 Failing tests (`tests/test_events_neardup.py`): every `finding-events` delta scenario with fakeredis and `NoopPublisher`, plus two findings of one group in one save and the claim key TTL
+- [x] 8a.2 `events.py` `publish_findings(saved, groups=None)`, `alert_key()`, `RedisPublisher._claim` (`SET NX EX`), fail-open claim errors (`neardup_claim_failed`), in-memory claims in `NoopPublisher`; tests green
+- [x] 8a.3 Mutation check; `mutations: 11 tried, 11 caught`
+
 - [ ] 8.1 Failing tests: every `finding-events` delta scenario (unchanged low score, equal threshold and update cases; near-dup of an alerted document publishes only `finding.created` and logs `high_risk_suppressed`; a low-score original does not block its copy; M1 claim does not suppress M3; `SET NX` raising fails open; no index = old behaviour) with `fakeredis` and `NoopPublisher`; the summary of a non-original member names the original's URL with the right plural form for n = 2, 3, 6, the finding keeps its own `url`, and there is no sentence for the original, a single-member group or with the index off; `iw:stats:gate` `passed` / `dropped` / `bypassed` increments, and Redis raising on `HINCRBY` changes nothing
 - [ ] 8.2 `events.py` `publish_findings(saved, groups=None)` with the alert claim, the worker passes the groups from the pipeline result, the sentence helper shared by the finding builders, the counter in `gate.py` (optional Redis); tests green
 - [ ] 8.3 Mutation check; `mutations: N tried, N caught`
