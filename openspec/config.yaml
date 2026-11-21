@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  Language: en
+  All artifacts must be written in en.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Project: InvestWatch, a hackathon system that finds risky investment content online (UKNF challenge).
+  Modules: scraper/ (owner A), web/ dashboard (B), analytics/ and contracts/ (C; an api/ folder may come later). Light separate services,
+  one `docker compose up`, open-source and on-premise only. Read .docs/STATUS.md and .docs/integration-plan.md
+  (contracts ScrapedDocument and Finding, v1) before proposing anything. Contracts are frozen after
+  Sat 14:30; a change that alters one must say so and bump the version.
+  Project skills that attach to this workflow: iw-commit-cycle (commits and review), iw-docs-update
+  (docs, ADRs, STATUS), iw-ai-log (AI log row), iw-pr-review (final review). The reviewer agent is
+  iw-reviewer (.claude/agents).
+
+rules:
+  proposal:
+    - State what is out of scope and which module owns the change.
+    - Name any contract, REST route or event the change touches, or say it touches none.
+    - One change covers one capability (for example scraper-v1), not one task.
+  specs:
+    - Every requirement has at least one scenario in WHEN/THEN form that a test can check.
+    - Scenarios for scraped content cover the failure path (blocked, empty, malformed), not only success.
+    - Reference the contracts in .docs/integration-plan.md instead of restating them.
+  design:
+    - Record choices that are hard to reverse as an ADR draft in .docs/decisions/ for a human to decide.
+  tasks:
+    - Each task group is one commit-sized unit whose first task is its failing test. Keep tasks under about 2 hours.
+    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, your own row in .docs/STATUS.md, ADR drafts) and add the iw-ai-log row; (2) run the iw-pr-review skill and fix real findings.
+
+operations:
+  apply:
+    guidance:
+      - Before committing each task group, load and follow the iw-commit-cycle skill (test first, stage and commit as separate calls, iw-reviewer once per task group or before a push). Do not implement outside this apply flow.
+      - When all tasks are complete, run /openspec-archive-change as the last commit of the branch, then stop and hand the PR body to the human. Never push or open the PR yourself.
+  archive:
+    guidance:
+      - Archive as the last commit of the PR branch, after the iw-pr-review task is done. Any later code change would need a new change or IW_SKIP_SPEC=1.

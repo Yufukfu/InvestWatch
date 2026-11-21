@@ -1,0 +1,4 @@
+# Three agents append rows to the AI log table in parallel; keep both sides' lines instead of conflicting.
+# Edit the process sections above the Log table in small, separate PRs, because a union merge keeps both
+# versions of a line that two people changed.
+.docs/ai-workflow.md merge=union

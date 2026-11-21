@@ -14,3 +14,6 @@ Thumbs.db
 
 # Sync-conflict copies (e.g. iCloud "file 2.py")
 * [0-9].*
+
+# Claude Code local overrides
+.claude/settings.local.json
