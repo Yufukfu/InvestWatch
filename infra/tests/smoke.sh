@@ -175,9 +175,59 @@ group_redis() {
   check "redis is only on the internal data network" only_on_data "$p" redis
 }
 
+envval() { grep -E "^$2=" "$TMP/$1.env" | cut -d= -f2-; } # envval <project> <VAR>
+minio_image() { dc "$1" config --images 2>/dev/null | grep -m1 minio; }
+# mcp <project> <alias-url> <mc args...>: mc from the minio image, in a throwaway container on the data network.
+mcp() {
+  local p=$1 url=$2; shift 2
+  docker run --rm -i --network "${p}_data" -e MC_CONFIG_DIR=/tmp/mc -e "MC_HOST_t=$url" \
+    --entrypoint mc "$(minio_image "$p")" "$@"
+}
+app_url() { echo "http://$(envval "$1" MINIO_ACCESS_KEY):$(envval "$1" MINIO_SECRET_KEY)@minio:9000"; }
+root_url() { echo "http://$(envval "$1" MINIO_ROOT_USER):$(envval "$1" MINIO_ROOT_PASSWORD)@minio:9000"; }
+init_exited_ok() {
+  local c code; c=$(dc "$1" ps -aq minio-init); [ -n "$c" ] || { echo "no minio-init container"; return 1; }
+  code=$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$c"); echo "minio-init: $code"; [ "$code" = "exited 0" ]
+}
+bucket_exists() { mcp "$1" "$(root_url "$1")" ls t/ | grep -q ' iw-raw/'; }
+OBJ="html/00000000-0000-4000-8000-000000000001.html"
+app_scoped() {
+  local p=$1 u; u=$(app_url "$p")
+  echo '<html>smoke</html>' | mcp "$p" "$u" pipe "t/iw-raw/$OBJ" >/dev/null || { echo "app put failed"; return 1; }
+  [ "$(mcp "$p" "$u" cat "t/iw-raw/$OBJ")" = '<html>smoke</html>' ] || { echo "app get failed"; return 1; }
+  echo tmp | mcp "$p" "$u" pipe t/iw-raw/tmp/del.txt >/dev/null && mcp "$p" "$u" rm t/iw-raw/tmp/del.txt >/dev/null \
+    || { echo "app delete failed"; return 1; }
+  mcp "$p" "$u" ls t/iw-raw/html/ >/dev/null || { echo "app list failed"; return 1; }
+  if mcp "$p" "$u" mb t/iw-other >/dev/null 2>&1; then echo "app could create a bucket"; return 1; fi
+  if mcp "$p" "$u" admin user list t >/dev/null 2>&1; then echo "app has admin rights"; return 1; fi
+}
+anonymous_denied() {
+  local code; code=$(probe "$1_data" sh -c "wget -S -q -O /dev/null http://minio:9000/iw-raw/$OBJ 2>&1 | awk '/HTTP\\//{print \$2; exit}'")
+  echo "anonymous GET: $code"; [ "$code" = 403 ]
+}
+init_idempotent() {
+  local p=$1; dc "$p" up -d --force-recreate --no-deps minio-init >/dev/null 2>&1
+  dc "$p" wait minio-init >/dev/null 2>&1 || true
+  init_exited_ok "$p" && [ "$(mcp "$p" "$(app_url "$p")" cat "t/iw-raw/$OBJ")" = '<html>smoke</html>' ]
+}
+
+group_minio() {
+  local p="iw-smoke-m-$RUN_ID"
+  check "missing MINIO_ROOT_PASSWORD is named" requires_secret MINIO_ROOT_PASSWORD
+  check "missing MINIO_SECRET_KEY is named" requires_secret MINIO_SECRET_KEY
+  check "minio starts healthy and minio-init completes" up "$p" 18446 18083 minio minio-init
+  dc "$p" wait minio-init >/dev/null 2>&1 || true
+  check "minio-init exits 0" init_exited_ok "$p"
+  check "bucket iw-raw exists" bucket_exists "$p"
+  check "app credentials: read, write, delete, list on iw-raw only, no new bucket, no admin" app_scoped "$p"
+  check "anonymous GET is denied" anonymous_denied "$p"
+  check "minio-init is idempotent and keeps objects" init_idempotent "$p"
+  check "minio is only on the internal data network" only_on_data "$p" minio
+}
+
 # ---------------------------------------------------------------- main
 
-GROUPS_ALL=(parallel env redis)
+GROUPS_ALL=(parallel env redis minio)
 [ $# -gt 0 ] && SELECTED=("$@") || SELECTED=("${GROUPS_ALL[@]}")
 docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1 || docker pull -q "$PROBE_IMAGE" >/dev/null
 for g in "${SELECTED[@]}"; do log "== $g"; "group_$g"; done

@@ -42,10 +42,13 @@ services:
     command:
       - sh
       - -c
+      # Password over stdin (`-` reads config from it), so it never appears in the process arguments.
+      # maxmemory at half the container limit leaves room for the AOF-rewrite fork (copy-on-write).
       - >-
-        exec redis-server --appendonly yes --appendfsync everysec
-        --maxmemory 200mb --maxmemory-policy noeviction
-        --requirepass "$$REDIS_PASSWORD"
+        umask 0077;
+        printf 'requirepass %s\n' "$$REDIS_PASSWORD" |
+        exec redis-server - --appendonly yes --appendfsync everysec
+        --maxmemory 128mb --maxmemory-policy noeviction
     volumes:
       - redisdata:/data
     networks: [data]
@@ -60,6 +63,65 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.5", memory: 256M }
+
+  # S3-compatible object storage for bucket iw-raw (html/, shot/, media/; integration-plan §2).
+  # MinIO built from source by Chainguard, pinned by digest (ADR 0306). No host port: iw-data only.
+  minio:
+    image: &minio-image cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    restart: unless-stopped
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-iw-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env (scripts/init-env.sh)}
+      MINIO_BROWSER: "off"
+    volumes:
+      - miniodata:/data
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      # The image has bash but no curl, wget or grep: plain HTTP over /dev/tcp, no credentials needed.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /minio/health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          read -r status <&3 && [[ $$status == *' 200'* ]]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  # One-shot: private bucket + app user limited to it (infra/minio/init.sh). Modules wait for it with
+  # depends_on: { minio-init: { condition: service_completed_successfully } }.
+  minio-init:
+    image: *minio-image
+    restart: "no"
+    entrypoint: ["sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-iw-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env (scripts/init-env.sh)}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-iw-app}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (scripts/init-env.sh)}
+      MINIO_BUCKET: ${MINIO_BUCKET:-iw-raw}
+    volumes:
+      - ./minio/init.sh:/init/init.sh:ro
+    depends_on:
+      minio: { condition: service_healthy }
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
 
   gateway:
     image: public.ecr.aws/docker/library/caddy:2-alpine
@@ -87,6 +149,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  miniodata:
   caddy_data:
   caddy_config:
 

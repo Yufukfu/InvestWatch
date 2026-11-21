@@ -27,7 +27,7 @@ Public sources agree: MinIO stopped publishing community-edition binaries and im
 Object storage:
 
 1. **Last upstream MinIO image.** It cannot be pulled (table above), so it is not an option.
-2. **Chainguard's MinIO build (`cgr.dev/chainguard/minio`) plus `minio-client`, pinned by digest.** AGPLv3 MinIO, unchanged API, and nothing in the docs or contracts changes. The free tier exposes only `latest`, so the build must be pinned by digest, and a digest may be removed later. Upstream is archived, so fixes depend on Chainguard rebuilding.
+2. **Chainguard's MinIO build (`cgr.dev/chainguard/minio`), pinned by digest.** The image ships `sh`, `bash` and `mc` (checked by running it), so the init step needs no second image. `cgr.dev/chainguard/minio-client` has no shell and cannot run an init script. AGPLv3 MinIO, unchanged API, and nothing in the docs or contracts changes. The free tier exposes only `latest`, so the build must be pinned by digest, and a digest may be removed later. Upstream is archived, so fixes depend on Chainguard rebuilding.
 3. **SeaweedFS (Apache-2.0, S3 gateway).** A maintained project. It is a different server with different configuration and policy commands, the docs and the mocks' `minio` health key would need renaming or would mislead, and the only image tried is on Docker Hub, which returned 429.
 4. **Build MinIO from source in our own Dockerfile.** Full control, but a Go build of an archived project adds time to every fresh clone and still gets no upstream fixes.
 
@@ -39,14 +39,16 @@ Redis:
 
 ## Decision
 
-Object storage: option 2. The service keeps the name `minio` and the `MINIO_*` variables. It runs `cgr.dev/chainguard/minio` with a one-shot `minio-init` on `cgr.dev/chainguard/minio-client`, both pinned by the digest recorded below when the change is applied. Redis: option 1, `public.ecr.aws/docker/library/redis:8-alpine`, pinned by digest.
+Object storage: option 2. The service keeps the name `minio` and the `MINIO_*` variables. It runs `cgr.dev/chainguard/minio`, and the one-shot `minio-init` uses the same image (its `mc`), pinned by the digest below. Redis: option 1, `public.ecr.aws/docker/library/redis:8-alpine`, pinned by digest.
 
 Rationale, from the evidence above:
 - Option 2 is the only MinIO image that can be pulled at all, and it changes nothing in the contracts, mocks, `scraper-v1` or the integration plan four hours before Integration #1.
 - Clients use the S3 API through the `minio` client library, so moving to SeaweedFS later changes the image and the init script, not module code.
 - Redis 8 is the only Redis-compatible image tried that is both available on the ECR mirror (0202's pull policy) and under an OSI-approved licence.
 
-Digests (filled in by task 4.2 / 3.2 of `infra-compose`): `minio` `sha256:<tbd>`, `minio-client` `sha256:<tbd>`, `redis` `sha256:<tbd>`.
+Digests, pulled 2026-11-21:
+- `minio`: `cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec`, which reports `RELEASE.2026-11-16T00-11-40Z`, go1.27.4.
+- `redis`: `public.ecr.aws/docker/library/redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3`, Redis 8.10.3.
 
 ## Consequences
 

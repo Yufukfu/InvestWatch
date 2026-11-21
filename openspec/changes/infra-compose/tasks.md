@@ -22,9 +22,9 @@ Before group 1: Damian approves ADR 0306 and the open questions in `design.md` a
 
 ## 4. Object storage
 
-- [ ] 4.1 Failing tests: `minio-init` exits 0 and `iw-raw` exists; app credentials can put and get `html/<uuid>.html` but cannot create a bucket; anonymous get is denied; a second `up` keeps an existing object
-- [ ] 4.2 Read the installed Chainguard `minio` and `minio-client` images (entrypoint, shell, health command) before writing anything; add `minio` and `minio-init` with `infra/minio/init.sh` per design decision 3 and ADR 0306 (pinned digests, volume `miniodata`, `iw-data` only); the four object-storage scenarios pass
-- [ ] 4.3 Mutation check (grant the app user `s3:*`, then skip `--ignore-existing`; each must be caught); record `mutations: N tried, N caught`
+- [x] 4.1 Failing tests: `minio-init` exits 0 and `iw-raw` exists; app credentials can put and get `html/<uuid>.html` but cannot create a bucket; anonymous get is denied; a second `up` keeps an existing object
+- [x] 4.2 Read the installed Chainguard `minio` and `minio-client` images (entrypoint, shell, health command) before writing anything; add `minio` and `minio-init` with `infra/minio/init.sh` per design decision 3 and ADR 0306 (pinned digests, volume `miniodata`, `iw-data` only); the four object-storage scenarios pass
+- [x] 4.3 Mutation check (grant the app user `s3:*`, then skip `--ignore-existing`; each must be caught); mutations: 5 tried, 5 caught (policy `s3:*` on `*`, `mb` without `--ignore-existing`, bucket set to public download, default for `MINIO_SECRET_KEY`, policy never attached). Group 3 review fix: Redis password over stdin; an argv check was tried and dropped because it cannot fail (Redis rewrites its process title, the password-in-argv mutant survived)
 
 ## 5. Networks, egress and dev ports
 
