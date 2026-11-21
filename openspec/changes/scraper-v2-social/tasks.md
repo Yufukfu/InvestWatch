@@ -7,11 +7,13 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 - [ ] 1.1 Copy the real channel pages into `scraper/tests/fixtures/` (plus a header-only page, an image-only page and a no-preview redirect body). Failing tests for "Text post", "Post with a line break", "Image-only post", "Page of image-only posts", "Subscribers with a suffix", "Small plain count", "No counter", "Short channel" (no older link) and "Page that is not a channel", then the Telegram parser: header, posts (id, text, time, permalink, views, links, per-post HTML) and the older-posts link
 - [ ] 1.2 Failing tests, then the collector registry keyed by host ("Host with a collector", "Duplicate registration") and the widened selection ("Social source with a collector is selected", "Non-web source is skipped" (now: with no collector for its host), plus the unchanged web scenarios)
 - [ ] 1.3 Failing tests, then `build` of the contract fields per post (`platform` and `source_kind` from the row, `published_at` UTC, `author`, `links`, `scrape_meta` with `message_id` and `views`), validated against `scraped-document.schema.json` in the test; the "Text post" and "Post markup is the stored HTML" scenarios pass
-- [ ] 1.4 Mutation check; line reads `mutations: N tried, N caught`
+- [ ] 1.4 Blocked until Damian answers design open question 1. Failing tests, then the permalink in the hash for `platform != web` in `ingest/document.py`: "Same text at two permalinks", "Same post collected again", "Web page hash is unchanged" and the unchanged dedup scenarios pass, with one literal expected sha256 per case (no hash computed by the code under test). If the answer is no, drop `specs/document-ingest/spec.md` and the "Identical text in two posts" change in `social-collection`, and record the limit
+- [ ] 1.5 Mutation check; line reads `mutations: N tried, N caught`
 
 ## 2. Run and paging
 
 - [ ] 2.1 Failing tests over stubbed stages, then the social branch of `run_source`: URL form check (`invalid_request`), robots, one fetch per page through the limiter and guards, paging by the `before` link up to `SOCIAL_MAX_POSTS`, early stop when a whole page is `duplicate`, "no public preview" as `parse_error`, a later-page failure keeping earlier documents; the "Accept only a public channel URL", "Paging is bounded and stateless", "Channel without a public preview" and "Failures never produce a document" scenarios pass
+- [ ] 2.1a Failing test with a recording stub for "Identity and proxy come from the shared layer", "Paging respects the domain limit" and "Blocked page ends the run": two pages of one run carry the one identity drawn for the run, each request comes through the shared proxy rotation, no request bypasses the fetch layer (the collector module imports no HTTP client), the limiter interval separates the two page requests, and a block ends the run; then make them pass
 - [ ] 2.2 Failing tests, then the links rule: `x.com`, YouTube and `t.me` links kept in `links` and never requested (a stub server records requests); the "Links are pointers, never fetched" scenarios pass
 - [ ] 2.3 Mutation check; line reads `mutations: N tried, N caught`
 
@@ -20,6 +22,9 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 - [ ] 3.1 Failing end-to-end test on docker compose: a seeded `platform = other` source on a local stub that serves a saved channel page (two pages) yields schema-valid `documents` rows with per-post MinIO objects, `iw:documents` entries and `scan.finished`; a rerun adds nothing and requests only one page. `SOCIAL_MAX_POSTS` is in `.env.example`
 - [ ] 3.2 Opt-in live smoke test (marker `scraper_live`, deselected by default and outside CI) that collects one public channel once through the full stack; its handle comes from an environment variable
 - [ ] 3.3 Mutation check; line reads `mutations: n/a, end-to-end and smoke tests only` unless code changed
+
+- [ ] 3.4 Failing tests, then `scraper/seeds/telegram.toml` (`rarecryptosignals` M1 `third_party`, `crypto_sygnaly` and `SubeTradingPL` M3 `unknown`, `kdpwiadomosci` M1 `third_party` control; `platform = other`, `https://t.me/s/<handle>`, staggered `15`/`25`/`35`/`45 */6 * * *`) and its call from `iw_scraper.seed` (the `seed_sources` of `scraper-v2-sources` after the rebase; the `seed_knf` insert pattern if it is not merged); "Seeding twice" and "Signal channel is an M3 candidate" pass against PostgreSQL, and each row validates against `source.schema.json`
+- [ ] 3.5 Mutation check for 3.4 (the idempotency guard and the `source_kind` per row); line reads `mutations: N tried, N caught`
 
 ## 4. Closing
 

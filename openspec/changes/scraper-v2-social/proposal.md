@@ -10,9 +10,13 @@ The challenge asks for collectors for social media, and module M1 (finfluencers)
 - Paging with `?before=<id>` (20 posts a page), bounded by `SOCIAL_MAX_POSTS` (default 40) and by "a whole page of posts we already have".
 - Posts that carry no text are skipped; a channel without a public preview is reported once and not retried.
 - Links found in a post (including `x.com/<user>/status/<id>` and YouTube URLs) are kept in `links` as pointers and never fetched.
+- Document identity for posts includes the permalink: for `platform != web` the ingest hashes `url + "\n" + normalised text`, so identical text at two permalinks is two documents and each ad keeps its exact URL (no schema, migration or index change; needs Damian's OK, see design).
+- Social collection goes through the same fetch layer, identity draw, proxy rotation, robots check, rate limit and URL guards as web pages (the brief asks for UA and proxy rotation in social collectors).
+- The Telegram `sources` rows (`rarecryptosignals` M1 `third_party`; `crypto_sygnaly` and `SubeTradingPL` M3 `unknown`; `kdpwiadomosci` M1 neutral control) are seeded by this change.
+- Follow-up only, no edit here: propose a `telegram` value for the `platform` enum to the team (schemas, OpenAPI, `web/`).
 - A collector registry keyed by host, next to the page-parser registry, so a later platform is a module plus a `sources` row. `Source` selection learns that a `platform = other` source is collectable when a collector is registered for its host.
 - ADR 0103 is decided here (Telegram), with the evidence and X and YouTube as later options.
-- Out of scope: X, YouTube, TikTok, Facebook, Instagram, Playwright, downloading media, following links, analytics changes, the `sources` seed rows (`scraper-v2-sources` adds the Telegram channels with the other seeds; this change's tests use their own rows), any contract change.
+- Out of scope: X, YouTube, TikTok, Facebook, Instagram, Playwright, downloading media, following links, analytics changes, the web `sources` seed rows (`scraper-v2-sources`), any contract change.
 - Owner: Adam's module (`scraper/`).
 - Contracts: produces `ScrapedDocument` v1 fields only; `published_at`, `author` and `links` already exist as optional fields. `scrape_meta` gets the extra keys `message_id` and `views` (the schema allows additional properties). No REST route or event is touched; the database is touched only through `scraper-ingest`.
 - Depends on `scraper-orchestration` being merged: the run joins the pieces (`collect.py`), and this change adds a branch to it. Apply starts after that merge.
@@ -24,6 +28,7 @@ The challenge asks for collectors for social media, and module M1 (finfluencers)
 
 ### Modified Capabilities
 - `web-collection`: "Collect active sources only" now also accepts a `platform = other` source whose host has a registered social collector.
+- `document-ingest`: "Deduplicate by content hash" hashes the permalink together with the text for `platform != web`; web documents hash as before.
 
 ## Impact
 

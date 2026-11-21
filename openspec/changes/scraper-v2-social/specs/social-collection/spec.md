@@ -35,8 +35,12 @@ The collector SHALL emit one document per post that has text, with `url` the per
 - **THEN** a second document with a different `content_hash` is stored for the same permalink
 
 #### Scenario: Identical text in two posts
-- **WHEN** a channel posts the same text twice
-- **THEN** one document is stored, because deduplication is per source and text
+- **WHEN** a channel posts the same text twice, as posts 1998 and 1999
+- **THEN** two documents are stored, one per permalink, because the identity of a social document includes its permalink (`document-ingest`, "Deduplicate by content hash")
+
+#### Scenario: Same post collected again
+- **WHEN** post 1999 is collected in two runs with unchanged text
+- **THEN** one document exists for it
 
 ### Requirement: Posts without text are skipped
 A post that has no text (an image, video or sticker with no caption) SHALL NOT produce a document and SHALL NOT be a job error. The run SHALL log the count of skipped posts.
@@ -119,6 +123,32 @@ A blocked response (403, 429, block marker), a timeout, an HTTP error status, or
 #### Scenario: Empty channel
 - **WHEN** the response has the header and no posts
 - **THEN** the run ends without a document and without a job error
+
+### Requirement: Social collection uses the same fetch path as web pages
+The collector SHALL request every page of a channel through the same fetch layer, robots check, per-domain rate limit and URL guards as a web page, with no HTTP client, proxy handling or header logic of its own. The identity (user agent, TLS profile and client hints as one unit) SHALL be drawn once per run and used for every page of that run, and a proxy SHALL be chosen per request with the same rotation and cooldown as for web sources. The challenge brief asks for user-agent and proxy rotation in social collectors; this is how this collector meets it.
+
+#### Scenario: Identity and proxy come from the shared layer
+- **WHEN** a run collects two pages of a channel with proxies configured
+- **THEN** both requests carry the identity drawn for that run, each request is made through a proxy picked by the shared rotation, and no request is made outside the fetch layer
+
+#### Scenario: Paging respects the domain limit
+- **WHEN** the collector requests the second page right after the first
+- **THEN** the per-domain interval of the rate limiter elapses between the two request starts
+
+#### Scenario: Blocked page ends the run
+- **WHEN** a page of the channel is answered as a block
+- **THEN** the run ends, documents already stored stay, and no further page is requested
+
+### Requirement: Telegram channels are seeded as sources
+This change SHALL provide the Telegram `sources` rows for the demo, written through the seed mechanism of `scraper-orchestration` (idempotent by URL, never overwriting, the dashboard owns later edits). Each row has `platform = other`, a `https://t.me/s/<handle>` URL and a schedule. A channel that promotes registered brokers with referral or bonus offers targets `M1` with `source_kind = third_party`; a channel selling signals or advice targets `M3` with `source_kind = unknown`, because the scraper cannot know registry status. A neutral news channel may be seeded as a control.
+
+#### Scenario: Seeding twice
+- **WHEN** the seed runs twice against the same database
+- **THEN** each channel has exactly one `sources` row
+
+#### Scenario: Signal channel is an M3 candidate
+- **WHEN** the seed rows are read
+- **THEN** `crypto_sygnaly` and `SubeTradingPL` have `source_kind = unknown` and `target_modules = [M3]`, and `rarecryptosignals` has `source_kind = third_party` and `target_modules = [M1]`
 
 ### Requirement: Register a collector per host
 Social collectors SHALL be registered by host in a registry beside the page-parser registry. A host with no collector SHALL NOT be collected by the social path.
