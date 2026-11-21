@@ -622,3 +622,103 @@ test('run: a conflict inside .claude/ is not given to an agent', async () => {
   assert.match(s.notices()[0].detail, /conflicts in \.claude\/settings\.json/);
   assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha);
 });
+
+test('run: the protected-path check sees renames out of .claude/ and non-ASCII paths (Adam, PR #48)', async () => {
+  for (const change of [(r) => { git(r, 'mv', 'README.md', 'x.md'); fs.mkdirSync(path.join(r, '.github/workflows'), { recursive: true }); fs.writeFileSync(path.join(r, '.github/workflows/é.yml'), 'x\n'); }, (r) => { fs.mkdirSync(path.join(r, 'dír'), { recursive: true }); fs.writeFileSync(path.join(r, 'dír/CLAUDE.md'), 'x\n'); }]) {
+    const s = setup();
+    git(s.mainRoot, 'checkout', '-q', 'web/fe');
+    change(s.mainRoot);
+    git(s.mainRoot, 'add', '-A');
+    git(s.mainRoot, 'commit', '-q', '-m', 'hostile');
+    git(s.mainRoot, 'push', '-q', 'origin', 'web/fe');
+    s.deps.gh = fakeGh({ 'pr list mine': [{ ...s.pr11, headRefOid: git(s.mainRoot, 'rev-parse', 'HEAD') }], 'pr list open': [{ number: 11 }] }).gh;
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(s.calls.length, 0);
+    assert.match(s.notices()[0].detail, /changes .*(\.github\/workflows\/é\.yml|dír\/CLAUDE\.md)/);
+  }
+});
+
+test('run: a session that moves the tracking ref cannot hide a protected change; the push check uses the cloned sha', async () => {
+  const s = setup();
+  s.deps.spawnClaude = (file, args, opts) => {
+    fs.mkdirSync(path.join(opts.cwd, '.github'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.github/evil.yml'), 'x');
+    git(opts.cwd, 'add', '.github/evil.yml');
+    git(opts.cwd, 'commit', '-q', '-m', 'ci');
+    git(opts.cwd, 'update-ref', 'refs/remotes/origin/web/fe', 'HEAD');
+    git(opts.cwd, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, 'nothing pushed');
+  assert.match(s.notices()[0].detail, /change \.github\/evil\.yml/);
+});
+
+test('run: a secret written into a committed file or a commit message is never pushed; nor is a binary file', async () => {
+  for (const [file, content, msg, re] of [['web/fixture.json', '{"t":"ghp_abcdefghijklmnopqrstuvwxyz123456"}', 'fix', /commits contain something that looks like a credential/], ['web/a.ts', 'export const a = 3;\n', 'fix sk-ant-abcdefghijklmnop', /looks like a credential/], ['web/blob.bin', Buffer.from([0, 1, 2, 0, 255]), 'fix', /binary files \(web\/blob\.bin\)/]]) {
+    const s = setup();
+    s.deps.spawnClaude = (f, args, opts) => {
+      fs.writeFileSync(path.join(opts.cwd, file), content);
+      git(opts.cwd, 'add', file);
+      git(opts.cwd, 'commit', '-q', '-m', msg);
+      fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+      fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+      return { status: 0, stdout: stream(), stderr: '' };
+    };
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, file);
+    assert.match(s.notices()[0].detail, re);
+  }
+});
+
+test('run: a PR merged or moved while the agent worked gets no push and no comment', async () => {
+  for (const [stateRoute, re] of [[{ state: 'MERGED', headRefOid: 'x' }, /merged now/], [{ state: 'OPEN', headRefOid: 'e'.repeat(40) }, /moved to eeeeeeeeeeee/]]) {
+    const s = setup({ over: { 'pr state': stateRoute } });
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha);
+    assert.deepEqual(s.posts(), []);
+    assert.match(s.notices()[0].detail, re);
+  }
+});
+
+test('run: a dry run is not a round, and a crash on one item does not stop the run', async () => {
+  const s = setup();
+  await main(['run', '--mine'], s.deps);
+  const st = JSON.parse(fs.readFileSync(path.join(s.stateDir, 'state.json'), 'utf8'));
+  assert.equal(st.prs[11].sessions, undefined, 'a draft does not count toward the cap');
+  const t = setup();
+  t.deps.spawnClaude = () => { throw Object.assign(new Error('git status exploded'), { stderr: 'fatal: boom' }); };
+  assert.equal(await main(['run', '--mine', '--review-requested', '--limit', '2'], t.deps), 0);
+  assert.match(t.notices()[0].detail, /runner failed on this item: fatal: boom/);
+  assert.equal(t.notices().length, 2, 'the next item still ran');
+});
+
+test('the sandbox also refuses writes to .github/ and the agent files of the clone', async () => {
+  const s = setup();
+  await main(['run', '--mine'], s.deps);
+  const settings = JSON.parse(s.calls[0].args[s.calls[0].args.indexOf('--settings') + 1]);
+  for (const p of ['.github', '.claude', 'CLAUDE.md']) assert.ok(settings.sandbox.filesystem.denyWrite.includes(path.join(s.clone(11), p)), p);
+});
+
+test('run: when a teammate pushed meanwhile, the runner\'s push is rejected, never forced over their commit', async () => {
+  const s = setup();
+  const stub = s.deps.spawnClaude;
+  let theirs;
+  s.deps.spawnClaude = (...a) => {
+    const r = stub(...a);
+    const other = path.join(s.root, 'other');
+    git(s.root, 'clone', '-q', '--branch', 'web/fe', s.origin, other);
+    fs.writeFileSync(path.join(other, 'web/b.ts'), 'export const b = 1;\n');
+    git(other, 'add', '.');
+    git(other, 'commit', '-q', '-m', 'teammate');
+    git(other, 'push', '-q', 'origin', 'web/fe');
+    theirs = git(other, 'rev-parse', 'HEAD');
+    return r;
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), theirs, 'the teammate\'s commit is still the head');
+  assert.equal(s.notices()[0].kind, 'needs-human');
+  assert.deepEqual(s.posts(), []);
+});

@@ -33,7 +33,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | 6 | Archive, as the last commit of the branch | `/openspec-archive-change` | specs updated |
 | 7 | Push the branch and open the PR | agent | PR-ready criteria in `.claude/CODE_REVIEW.md`; `origin` and the current branch only, never `main`, never `--force` (hook); the PR body lists every `IW_*` escape used and says that it loosens no permission beyond ADR 0207 |
 | 7b | Approve and merge | human | review, approval and merge are always the human's (`gh pr merge`, `gh pr ready` and `gh pr review` stay in `permissions.ask`; the hook denies `gh api` merge and approve calls) |
-| 7c | Hand-offs between teammates' agents (optional) | `iw-watch`: `/loop 2m /iw-watch --mine` in a session, or `watch.mjs run` from launchd or cron | headless sessions get a per-item allow-list (push only that PR's branch, comment only on that PR), never approve or merge, stop at 3 rounds per PR and hand over to the human |
+| 7c | Hand-offs between teammates' agents (optional) | `iw-watch`: `/loop 2m /iw-watch --mine` in a session, or `watch.mjs run` from launchd or cron | headless sessions run sandboxed and publish nothing; the runner checks their commits and pushes that PR's branch and one comment, only with `--publish` (ADR 0210); never approve or merge, stop at 3 rounds per PR and hand over to the human |
 | 8 | CI (advisory for now) | `.github/workflows/ci.yml`, manual dispatch | not a merge gate during the hackathon; becomes a required check in the full SDLC |
 | 9 | After merge | remove the worktree | nothing else: docs, log and archive were in the PR |
 

@@ -17,7 +17,7 @@ import { stateDir, loadState, saveState, ack, dropClosed, acquireLock, releaseLo
 import { loadCodeowners, ownerOf } from './lib/codeowners.mjs';
 import { buildPrompt, safeBranch } from './lib/prompt.mjs';
 import { claudeArgs, runSession, childEnv, denyReadPaths } from './lib/session.mjs';
-import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman, newCommitPaths, pushBranch, installDeps, findEnvFiles, gitSnapshot, startMerge, finishMerge } from './lib/worktree.mjs';
+import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman, newCommitPaths, pushBranch, installDeps, findEnvFiles, gitSnapshot, startMerge, finishMerge, pushedContent } from './lib/worktree.mjs';
 import { makeNotifier, KINDS } from './lib/notify.mjs';
 import { parseQuestions, questionsText } from './lib/questions.mjs';
 import { MARKER } from './lib/rounds.mjs';
@@ -227,7 +227,8 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   }
   // the clone exists: a later failure of this item is news again, so the human hears about it
   delete (state.prs[it.pr] ??= {}).blockedItem;
-  recordSession(state, it.pr);
+  // a dry run is not a round: turning --publish on later must still get to handle the PR
+  if (!o.dryRun) recordSession(state, it.pr);
   saveState(sdir, state); // a crash during the session still counts the round
   // the session has no network: the runner installs the lockfiles, without install scripts
   if (own) installDeps({ run: deps.exec, dir: clone.dir, files: it.files, env: childEnv(deps.env) });
@@ -249,7 +250,7 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (!res) {
     const prompt = buildPrompt({ item: it, me: ctx.me, owners: fileOwners, dryRun: o.dryRun });
     const denyRead = denyReadPaths({ home: deps.home, stateDir: sdir, configDir: deps.env.CLAUDE_CONFIG_DIR, envFiles: findEnvFiles({ mainRoot }) });
-    const args = claudeArgs({ kind: it.kind, pr: it.pr, baseRef: it.baseRef, budgetUsd: o.budgetUsd, model: o.model, denyRead });
+    const args = claudeArgs({ kind: it.kind, pr: it.pr, baseRef: it.baseRef, budgetUsd: o.budgetUsd, model: o.model, denyRead, cwd: clone.dir });
     res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
   }
   const copied = collectDrafts({ dir: clone.dir, to: draftDir });
@@ -275,17 +276,29 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (dirty) return human(`uncommitted changes in ${dirty.split('\n').length} file(s) were left; nothing is thrown away`);
   if (!copied.includes('reply.md')) return human(`the session wrote no reply (.iw-watch/reply.md); its last message is in ${path.join(draftDir, 'summary.md')}`);
   // the agent's commits are checked before anything leaves the machine
-  const bad = own ? newCommitPaths({ git, dir: clone.dir, headRef: it.headRef, baseRef: it.baseRef }) : [];
+  const bad = own ? newCommitPaths({ git, dir: clone.dir, headSha: clone.head, baseSha: clone.baseSha }) : [];
   if (bad.length) return human(`the agent's commits change ${bad.slice(0, 3).join(', ')}; the runner does not push settings, hooks, CI or agent instructions`);
   const body = postBody({ me: ctx.me, it, text: fs.readFileSync(path.join(draftDir, 'reply.md'), 'utf8') });
   const issueText = copied.includes('issue.md') ? fs.readFileSync(path.join(draftDir, 'issue.md'), 'utf8') : '';
   // a test the agent ran can write into its own reply: never post what looks like a credential
   if (leaks(`${body}\n${issueText}`, deps.env)) return human('the reply or the issue contains something that looks like a credential; nothing is posted, check the drafts');
+  // the commits are scanned too: a test can write a secret into a fixture or a commit message
+  if (own) {
+    const pushed = pushedContent({ git, dir: clone.dir, headSha: clone.head });
+    if (pushed.binary.length) return human(`the agent's commits add binary files (${pushed.binary.slice(0, 3).join(', ')}); the runner pushes text only`);
+    if (pushed.text.length > 2 * 1024 * 1024) return human('the agent\'s commits are larger than 2 MB; the runner does not push them');
+    if (leaks(pushed.text, deps.env)) return human('the agent\'s commits contain something that looks like a credential; nothing is pushed');
+  }
   fs.writeFileSync(path.join(draftDir, 'post.json'), JSON.stringify({ body }), { mode: 0o600 });
   if (o.dryRun) {
     return { ...at, kind: 'draft-ready', detail: `dry run: nothing was pushed or posted${denied}. The draft reply is in ${path.join(draftDir, 'reply.md')}; run with --publish to push and post` };
   }
   const left = own ? unpushed({ git, dir: clone.dir, headRef: it.headRef }) : 0;
+  // the PR must still be open and at the head the agent worked on: a merged PR with a deleted branch would be recreated
+  let now;
+  try { now = deps.gh(['pr', 'view', String(it.pr), '--json', 'state,headRefOid']); } catch (e) { return human(`could not re-check #${it.pr} before publishing: ${clean(e.message)}`); }
+  if (now?.state !== 'OPEN') return human(`#${it.pr} is ${String(now?.state || 'gone').toLowerCase()} now; nothing is pushed or posted`);
+  if (own && now.headRefOid !== clone.head) return human(`#${it.pr} moved to ${String(now.headRefOid).slice(0, 12)} while the agent worked; nothing is pushed`);
   if (left > 0) {
     try {
       pushBranch({ git, dir: clone.dir, headRef: it.headRef });
@@ -356,7 +369,14 @@ function runCmd(deps, ctx, o) {
     saveState(sdir, state);
     for (const it of items.slice(0, o.limit)) {
       refreshLock(lock, { now: deps.now });
-      const { keep, ...notice } = handle({ deps, ctx, o, state, sdir, mainRoot, it });
+      let r;
+      try {
+        r = handle({ deps, ctx, o, state, sdir, mainRoot, it });
+      } catch (e) {
+        // one broken item does not stop the run; it is kept, so it is retried once the cause is gone
+        r = { pr: it.pr, title: it.title, url: it.url, item: it.id, kindOfItem: it.kind, kind: 'needs-human', keep: true, detail: `the runner failed on this item: ${clean(String(e.stderr || e.message).split('\n')[0])}` };
+      }
+      const { keep, ...notice } = r;
       const e = (state.prs[it.pr] ??= {});
       if (keep) {
         // not acknowledged, so it is retried; the human is told once per item, not on every poll

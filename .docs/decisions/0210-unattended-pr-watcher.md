@@ -31,7 +31,7 @@ He also pointed to the docs: Bash allow rules do not contain subprocesses, and t
    Environment variables still passed through, since `GH_TOKEN` was visible, so the runner has to filter the environment itself. A second probe with the exact argv and `runSession` of `lib/session.mjs`, with `GH_TOKEN=fake` in the parent, got these results (`.claude/skills/iw-watch/scripts/fixtures/README.md`):
    - `git diff /etc/hosts /dev/null` and `gh pr list` were denied;
    - inside `node --test`, `~/.config/gh` and `~/.zshenv` returned EPERM, the network returned ENOTFOUND and `GH_TOKEN` was unset;
-   - `git add` and `git commit` worked. The PR workflow already works end to end with this runner: #39 was fixed and replied to by the watcher and then merged, and #40 got two rounds.
+   - `git add` and `git commit` worked. Earlier live runs on #39 and #40 predate this design (the session pushed and posted then), so they show the review loop, not this boundary; the evidence for the boundary is the probes and the tests.
 2. **[`anthropics/claude-code-action`](https://github.com/anthropics/claude-code-action) on GitHub runners.** This is the documented route for unattended PR and issue automation. It comes with a write-access gate, bot-actor rejection, per-PR concurrency and `--max-turns`, and it does not touch any laptop. Against it before the hand-in (Sun 2026-11-22 10:30):
    - it needs an Anthropic key or OAuth token in the repository's secrets, which an owner has to set up;
    - it needs a workflow per trigger, tested on real PRs;
@@ -68,9 +68,16 @@ A security pass by `iw-reviewer` on these fixes found seven more gaps, and each 
 | `.Claude/` on a case-insensitive disk; a branch `.npmrc` steering `npm ci` | The protected-path check ignores case and covers `.npmrc` and `.yarnrc` |
 | Background test processes outliving the session | The process group is killed after every session, not only on a timeout |
 
+Adam's fourth review ([6008673170](https://github.com/Yufukfu/InvestWatch/pull/48#pullrequestreview-6008673170), on cc43ca4) found four more, and a third probe settled the sandbox writes:
+- the protected-path check now reads `git diff --name-only -z --no-renames`, so renames out of `.claude/` and non-ASCII paths count, and it also covers .gitattributes, .gitmodules and CLAUDE.local.md;
+- the push check diffs against the head and base shas recorded at clone time, because a sandboxed command could rewrite `.git/refs` (probed);
+- the pushed diff and commit messages are scanned like the reply, and binary files and pushes over 2 MB are refused;
+- the probe shows that the sandbox already refuses writes to `.claude/hooks/` and `.git/config`; `.github/` was writable and is now in `denyWrite`;
+- before publishing, the runner checks that the PR is still open and at the cloned head.
+
 **The boundary that is left:**
 - The runner pushes and comments with the user's own git and `gh` credentials, outside the sandbox, so a published reply is posted as that person.
-- A sandboxed session can still read files that are not in `denyRead` and copy them into reply.md, which the runner then posts on the PR.
+- A sandboxed session can still read files that are not in `denyRead` (for example a `.env` of another repository or `~/.pgpass`) and smuggle them out encoded (base64 beats the scan) in its reply or commits. Run `--publish` only on a machine without such secrets; inverting `denyRead` to deny the whole home directory is the follow-up.
 - Agents post from human accounts, so the round cap (default 3) and the event-id dedupe are the only loop protection. GitHub's bot-actor checks do not apply.
 
 **Rationale:**

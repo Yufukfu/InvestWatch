@@ -40,6 +40,7 @@ export function fakeGh(over = {}) {
       return v ?? { html_url: n ? `https://github.com/${REPO}/pull/${n}#issuecomment-${calls.length}` : `https://github.com/${REPO}/issues/${900 + calls.length}` };
     }
     if (s.startsWith('issue list')) return structuredClone(routes['issue list'] ?? []);
+    if (s.startsWith('pr view') && s.includes('state,headRefOid')) return structuredClone(routes['pr state'] ?? { state: 'OPEN', headRefOid: routes['pr list mine']?.[0]?.headRefOid });
     if (s.startsWith('pr view')) return structuredClone(routes['pr view']);
     if (s === 'api user') key = 'api user';
     else if (s.startsWith('repo view')) key = 'repo view';

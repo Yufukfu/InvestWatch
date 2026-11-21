@@ -18,7 +18,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>umask 077 &amp;&amp; cd "$HOME/Projects/InvestWatch" &amp;&amp; node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2 &gt;&gt; "$HOME/Library/Logs/iw-watch.log" 2&gt;&amp;1</string>
+    <string>umask 077 &amp;&amp; cd "/ABSOLUTE/PATH/TO/YOUR/InvestWatch" &amp;&amp; node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2 &gt;&gt; "$HOME/Library/Logs/iw-watch.log" 2&gt;&amp;1</string>
   </array>
   <key>StartInterval</key>
   <integer>120</integer>

@@ -81,7 +81,7 @@ export function denyReadPaths({ home, stateDir, envFiles = [], configDir }) {
   ];
 }
 
-export function sandboxSettings({ denyRead = [] } = {}) {
+export function sandboxSettings({ denyRead = [], denyWrite = [] } = {}) {
   return {
     sandbox: {
       enabled: true,
@@ -89,12 +89,15 @@ export function sandboxSettings({ denyRead = [] } = {}) {
       allowUnsandboxedCommands: false,
       autoAllowBashIfSandboxed: false,
       network: { allowedDomains: [] },
-      filesystem: { denyRead },
+      filesystem: { denyRead, denyWrite },
     },
   };
 }
 
-export function claudeArgs({ kind, pr, baseRef, budgetUsd = 2, model, denyRead = [] }) {
+// The sandbox already refuses writes to .claude/ and .git/config (probed); .github/ and the agent files are added
+const writeProtected = (cwd) => (cwd ? ['.github', '.claude', '.mcp.json', 'CLAUDE.md', '.gitmodules', '.gitattributes'].map((p) => path.join(cwd, p)) : []);
+
+export function claudeArgs({ kind, pr, baseRef, budgetUsd = 2, model, denyRead = [], cwd }) {
   return [
     '-p',
     '--permission-mode', 'dontAsk',
@@ -104,7 +107,7 @@ export function claudeArgs({ kind, pr, baseRef, budgetUsd = 2, model, denyRead =
     '--setting-sources', 'project',
     '--strict-mcp-config',
     // CLI settings outrank project settings, so the branch cannot switch the sandbox off
-    '--settings', JSON.stringify(sandboxSettings({ denyRead })),
+    '--settings', JSON.stringify(sandboxSettings({ denyRead, denyWrite: writeProtected(cwd) })),
     '--output-format', 'stream-json', '--verbose',
     '--max-budget-usd', String(budgetUsd),
     ...(model ? ['--model', model] : []),

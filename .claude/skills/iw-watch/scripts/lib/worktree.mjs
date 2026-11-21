@@ -42,11 +42,14 @@ export function prepareClone({ git = realGit, fs = realFs, mainRoot, item }) {
 function populate({ git, fs, mainRoot, item, dir, url, own }) {
   git(['-c', 'core.commitGraph=false', 'clone', '--quiet', '--reference', mainRoot, '--dissociate', '--no-tags', '--branch', own ? item.headRef : item.baseRef, '--', url, dir]);
   let head;
+  let baseSha;
   if (own) {
     git(['-C', dir, 'fetch', '--quiet', 'origin', `+refs/heads/${item.baseRef}:refs/remotes/origin/${item.baseRef}`]);
     head = git(['-C', dir, 'rev-parse', 'HEAD']);
+    // shas, not refs: a sandboxed session can rewrite .git/refs (probed), so the push check diffs against these
+    baseSha = git(['-C', dir, 'rev-parse', `refs/remotes/origin/${item.baseRef}`]);
     if (item.headSha && head !== item.headSha) throw new NeedsHuman(`the branch moved since the scan (${head.slice(0, 12)}, scanned ${String(item.headSha).slice(0, 12)}); the next run picks up the new head`);
-    const touched = protectedPaths(git(['-C', dir, 'diff', '--name-only', `origin/${item.baseRef}...HEAD`]));
+    const touched = protectedPaths(git(['-C', dir, ...NAMES, `origin/${item.baseRef}...HEAD`]));
     if (touched.length) throw new NeedsHuman(`the branch changes ${touched.slice(0, 3).join(', ')}: settings, hooks or agent instructions; an agent does not run on it, over to you`);
     // a symlink could point the Read tool outside the clone (the sandbox bounds Bash, not Read)
     const links = git(['-C', dir, 'diff', '--raw', '--no-renames', `origin/${item.baseRef}...HEAD`]).split('\n').filter((l) => / 120000 [0-9a-f]+ [0-9a-f]+ [AMT]\t/.test(l));
@@ -63,25 +66,37 @@ function populate({ git, fs, mainRoot, item, dir, url, own }) {
   }
   fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
   fs.appendFileSync(path.join(dir, '.git', 'info', 'exclude'), '\n.iw-watch/\n');
-  return { dir, head };
+  return { dir, head, baseSha };
 }
 
 export const prRef = (pr) => `refs/iw/pr-${Number(pr)}`;
 
 // What loads as settings, hooks or agent instructions, or changes CI: never touched by an unattended run
 // Case-insensitive: macOS checks `.Claude/` out as `.claude/`. A branch .npmrc would steer the runner's npm ci.
-const PROTECTED = /^(\.claude\/|\.github\/|\.mcp\.json$|\.iw-watch\/)|(^|\/)(CLAUDE\.md|\.npmrc|\.yarnrc(\.yml)?)$/i;
-export const protectedPaths = (nameOnly) => String(nameOnly || '').split('\n').map((s) => s.trim()).filter((f) => f && PROTECTED.test(f));
+const PROTECTED = /^(\.claude\/|\.github\/|\.mcp\.json$|\.iw-watch\/|\.gitmodules$)|(^|\/)(CLAUDE\.md|CLAUDE\.local\.md|\.npmrc|\.yarnrc(\.yml)?|\.gitattributes)$/i;
+// Fed by `git diff --name-only -z --no-renames`: NUL-separated, so a non-ASCII path is not quoted, and a rename
+// lists its source too (a rename out of .claude/ is a change to .claude/) (Adam, PR #48)
+export const NAMES = ['diff', '--name-only', '-z', '--no-renames'];
+export const protectedPaths = (nameOnly) => String(nameOnly || '').split(/[\0\n]/).filter((f) => f && PROTECTED.test(f));
 
 /**
  * Protected paths the agent changed, checked before the runner pushes: they differ from the PR branch AND from
  * the base. A merge brings the base's own .claude/ changes, which differ only from the branch.
  */
-export function newCommitPaths({ git = realGit, dir, headRef, baseRef }) {
-  const vsBranch = protectedPaths(git(['-C', dir, 'diff', '--name-only', `refs/remotes/origin/${headRef}`, 'HEAD']));
-  if (!baseRef) return vsBranch;
-  const vsBase = new Set(protectedPaths(git(['-C', dir, 'diff', '--name-only', `refs/remotes/origin/${baseRef}`, 'HEAD'])));
+export function newCommitPaths({ git = realGit, dir, headSha, baseSha }) {
+  const vsBranch = protectedPaths(git(['-C', dir, ...NAMES, headSha, 'HEAD']));
+  if (!baseSha) return vsBranch;
+  const vsBase = new Set(protectedPaths(git(['-C', dir, ...NAMES, baseSha, 'HEAD'])));
   return vsBranch.filter((f) => vsBase.has(f));
+}
+
+/** What the push would carry beyond the PR head: the text diff and messages to scan, and binary files to refuse */
+export function pushedContent({ git = realGit, dir, headSha }) {
+  const numstat = git(['-C', dir, 'diff', '--numstat', '-z', '--no-renames', headSha, 'HEAD']);
+  const binary = numstat.split('\0').filter((l) => /^-\t-\t/.test(l)).map((l) => l.slice(4));
+  const text = git(['-C', dir, 'diff', '--no-renames', '--no-ext-diff', '--no-textconv', headSha, 'HEAD'], { maxBuffer: 16 * 1024 * 1024 });
+  const messages = git(['-C', dir, 'log', '--format=%B', `${headSha}..HEAD`]);
+  return { binary, text: `${text}\n${messages}` };
 }
 
 /** The runner pushes, not the session: never force, only to the PR's own branch name */
@@ -143,8 +158,8 @@ export function startMerge({ git, dir, baseRef }) {
   try {
     git(['-C', dir, 'merge', '--no-ff', '--no-commit', '--no-edit', `origin/${baseRef}`]);
   } catch { /* conflicts: git exits 1 and leaves them in the index */ }
-  const files = git(['-C', dir, 'diff', '--name-only', '--diff-filter=U']).split('\n').filter(Boolean);
-  const bad = protectedPaths(files.join('\n'));
+  const files = git(['-C', dir, ...NAMES, '--diff-filter=U']).split('\0').filter(Boolean);
+  const bad = protectedPaths(files.join('\0'));
   if (bad.length) {
     try { git(['-C', dir, 'merge', '--abort']); } catch { /* nothing to abort */ }
     return { refused: `the merge with ${baseRef} conflicts in ${bad.slice(0, 3).join(', ')}: settings, hooks or agent instructions, over to you`, files };
@@ -155,7 +170,7 @@ export function startMerge({ git, dir, baseRef }) {
 
 /** After the session: every conflict resolved and staged, no markers left; then the runner commits the merge */
 export function finishMerge({ fs = realFs, git, dir, files, headRef, baseRef }) {
-  const unmerged = git(['-C', dir, 'diff', '--name-only', '--diff-filter=U']).split('\n').filter(Boolean);
+  const unmerged = git(['-C', dir, ...NAMES, '--diff-filter=U']).split('\0').filter(Boolean);
   if (unmerged.length) return `${unmerged.length} file(s) still have unresolved conflicts: ${unmerged.slice(0, 3).join(', ')}`;
   const marked = (files || []).filter((f) => { try { return MARKER_LINE.test(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return false; } });
   if (marked.length) return `conflict markers are left in ${marked.slice(0, 3).join(', ')}`;
