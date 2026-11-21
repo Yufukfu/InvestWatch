@@ -9,7 +9,9 @@ const row = (over: Partial<FindingRow> = {}): FindingRow => ({
   title: 'Obietnica zysku',
   platform: 'instagram',
   score: 0.5,
+  riskLevel: 'medium',
   status: 'in_review',
+  detectedAt: '2026-11-21T15:00:00Z',
   ...over,
 });
 
