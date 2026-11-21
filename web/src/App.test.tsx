@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
@@ -23,13 +23,26 @@ describe('App (against contract mocks)', () => {
     renderApp();
     expect(await screen.findByText(findings.items[0].title)).toBeInTheDocument();
     expect(await screen.findByText('System działa')).toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(findings.items.length + 1);
+    // Scoped: the trend section has its own data table.
+    const table = document.querySelector<HTMLElement>('table.findings');
+    expect(table).not.toBeNull();
+    expect(within(table!).getAllByRole('row')).toHaveLength(findings.items.length + 1);
   });
 
   it('renders the summary counts next to the findings', async () => {
     renderApp();
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
     expect(region).toHaveTextContent(`${summary.total}Wszystkie zgłoszenia`);
+  });
+
+  it('renders the trend section (lazy-loaded) between summary and findings', async () => {
+    renderApp();
+    const trend = await screen.findByRole('region', { name: 'Trend zgłoszeń' }, { timeout: 4000 });
+    const summaryRegion = await screen.findByRole('region', { name: 'Podsumowanie' });
+    expect(summaryRegion.compareDocumentPosition(trend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const findingsTable = document.querySelector('table.findings');
+    expect(findingsTable).not.toBeNull();
+    expect(trend.compareDocumentPosition(findingsTable!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders markup in scraped text literally, never as HTML', async () => {
