@@ -10,7 +10,7 @@ The dashboard must show alerts in real time ([`web/CLAUDE.md`](../../web/CLAUDE.
 
 ## Options considered
 
-1. **`socket.io-client` 4.8.4** (MIT, published 2026-09-25). It speaks the Socket.IO v5 / Engine.IO v4 protocol that python-socketio 5.x serves (the handshake seen in the browser run is `/socket.io/?EIO=4`). Its dependencies are `engine.io-client`, `socket.io-parser`, `@socket.io/component-emitter` and `debug`. `npm audit` reported 0 vulnerabilities after the install. Measured with `vite build`: the main chunk grew from 107.2 to 121.5 kB gzip.
+1. **`socket.io-client` 4.8.4** (MIT, published 2026-09-25). It speaks the Socket.IO v5 / Engine.IO v4 protocol that python-socketio 5.x serves (the handshake seen in the browser run is `/socket.io/?EIO=4`). Its direct dependencies are `engine.io-client`, `socket.io-parser`, `@socket.io/component-emitter` and `debug`. `engine.io-client` pulls in `engine.io-parser`, `ws` and `xmlhttprequest-ssl` (all in `web/package-lock.json`; the lock records MIT for `engine.io-parser` and `ws` and has no licence field for `xmlhttprequest-ssl`, to check at the next install). `npm audit` reported 0 vulnerabilities after the install. Measured with `vite build` in the PR #40 review: the main chunk grew from 107.2 to 121.67 kB gzip (an earlier build gave 121.5 kB).
 2. **The browser's own `WebSocket`.** No dependency, but it would have to implement the Engine.IO handshake, pings, the packet encoding and namespace join by hand. Against a server that expects those, that means reimplementing the client library, with its reconnection rules, inside `web/`.
 3. **Server-Sent Events.** Simple in the browser, but the api and the mock server would need a new endpoint and a contract change, and contracts are frozen ([ADR 0301](0301-contracts-v1.md)).
 
@@ -18,7 +18,7 @@ The dashboard must show alerts in real time ([`web/CLAUDE.md`](../../web/CLAUDE.
 
 Option 1: `socket.io-client`. It is imported in one place only, `web/src/features/alerts/data/socket.ts`, and the app opens exactly one connection, owned by `useRealtime`.
 
-Rationale: it is the protocol both servers already speak (python-socketio 5.18.1, with `EIO=4` observed in the live run against the mock). Option 2 would mean maintaining a protocol client. Option 3 needs a server and contract change. The cost is about 14 kB gzip, measured above.
+Rationale: it is the protocol both servers already speak (python-socketio 5.18.1, with `EIO=4` observed in the live run against the mock). Option 2 would mean maintaining a protocol client. Option 3 needs a server and contract change. The cost is about 14.5 kB gzip, measured above.
 
 ## Consequences
 
