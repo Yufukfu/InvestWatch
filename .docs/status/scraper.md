@@ -8,6 +8,7 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - `scraper-v1` (fetch, parse, politeness, guards) is merged (PR #19).
 - `scraper-ingest` (database sink, `documents`, `iw:documents`, republish sweep) is implemented against Damian's `0001_initial`, in review (PR #22) and archived in that PR.
 - `scraper-orchestration` (queue, run lock, concurrency cap, events, scan requests, scheduler, health, `run_source`, the `worker` and `scheduler` commands) is implemented and tested end to end on real Redis, PostgreSQL and MinIO; the opt-in live KNF smoke run passed once (2026-11-21). The PR is next.
+- `scraper-stack` deploys the scraper in the one-command stack (`scraper/compose.yaml`: `worker`, `scheduler`, `seed`; root include line; `scraper/tests/stack.sh`; ADR 0106; `seed` rejects an invalid cron). Implemented and checked locally (12 config + 10 run scenarios, 13 mutations caught); PR next.
 - `content-hash-definition` (issue #31): the `content_hash` definition (NFC) is written into integration-plan §3 and ADR 0105, pinned by scraper tests; no scraper code changed. Analytics (Damian) still has to read the stored hash instead of recomputing it with NFKC (proposal in the issue).
 - ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
@@ -16,11 +17,12 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 ## Active OpenSpec changes
 
 - `scraper-source-discovery` (`python -m iw_scraper.discover`: inactive candidate sources from stored links, ADR 0108; implemented, in review);
-- `scraper-orchestration` (PR #38 merged; its review fixes are in PR #49); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
-- `scraper-v2-sources` (PR #43)
+- `scraper-stack` (PR #52); `scraper-orchestration`, `scraper-author-provenance`, `scraper-v2-sources` and `content-hash-definition` are merged (PRs #38, #49, #41, #43, #44)
 
 ## Blockers and open decisions
 
+- Kacper must OK the one-line `scraper/compose.yaml` entry in the root `compose.yaml` `include:`.
+- `scraper-v3-render` task 3.2 plans to create the same `scraper/compose.yaml` with `stop_grace_period: 45s`: amend it to add only `renderer`, the `render` network and the worker's renderer settings, keeping 60 s (ADR 0106).
 - The first social platform (ADR 0103, criteria only) is decided in `scraper-v2`.
 - Wiring (`Ingestor`, `sweep`, `Storage.check_bucket`, the job-error sink) is done in `scraper-orchestration` (`app.py`).
 - Two redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`) and `ingest.errors.redact` (full). Keep the full one and drop the other when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).

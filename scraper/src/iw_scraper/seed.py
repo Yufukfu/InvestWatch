@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 
 import asyncpg
 from croniter import croniter
+from croniter import croniter
 
 from iw_scraper.config import contracts_dir
 
@@ -199,8 +200,13 @@ async def seed_all(pool: asyncpg.Pool, entries: list[SeedEntry], *, cron: str | 
 
 
 def cron_from(argv: list[str]) -> str | None:
-    """The optional first argument of the command line."""
-    return argv[1] if len(argv) > 1 else None
+    """The optional first argument of the command line; an invalid cron ends the process before any write
+    (the scheduler would otherwise skip the source with a logged warning on every tick)."""
+    if len(argv) < 2:
+        return None
+    if not croniter.is_valid(argv[1]):
+        raise SystemExit(f"invalid cron: {argv[1]!r}")
+    return argv[1]
 
 
 async def main() -> None:

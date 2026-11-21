@@ -1,12 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import findings from './test/fixtures/findings.json';
 import summary from './test/fixtures/summary.json';
 import { server } from './test/setup';
 import { makeStore } from './test/store';
+
+vi.mock('socket.io-client', async () => (await import('./test/inertSocket')).inertSocketModule);
 
 // A fresh store per test so RTK Query cache does not leak between scenarios.
 function renderApp() {
