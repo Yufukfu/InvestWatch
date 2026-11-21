@@ -27,7 +27,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | 1 | Size, worktree, branch | `iw-implement` | branch prefix = module |
 | 2 | Explore (only if scope is foggy) | `/openspec-explore` | none |
 | 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
-| 4 | Implement, per task group | `/openspec-apply-change` + `iw-commit-cycle` | failing test first; `iw-reviewer` per task group or before a push |
+| 4 | Implement, per task group | `/openspec-apply-change` + `iw-commit-cycle` | failing test first, mutation check per task group; `iw-reviewer` per task group or before a push |
 | 5 | Closing tasks (generated into every `tasks.md`) | `iw-docs-update`, `iw-ai-log`, `iw-pr-review` | docs-check clean, review findings verified |
 | 6 | Archive, as the last commit of the branch | `/openspec-archive-change` | specs updated |
 | 7 | Push and PR | human | fresh go-ahead every time (also `permissions.ask`) |
@@ -36,7 +36,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 ## Deterministic guards (`git-guard.js`, tested)
 
-Denies force push, any push to `main` (including `HEAD` and full refs), `--all`/`--mirror`, `reset --hard`, whole-tree checkout, amending a pushed commit, and a `git add` chained in front of a commit; on commit denies a staged `.env`, `console.log` in non-test JS/TS, and service code with no active OpenSpec change. It reads the staged diff at command start, so stage and commit in separate calls. Its escapes are plain text an agent can write: it catches mistakes, not a determined agent, so any use of an `IW_*` escape is reported in the PR body.
+Denies force push, any push to `main` (including `HEAD` and full refs), `--all`/`--mirror`, `reset --hard`, whole-tree checkout, amending a pushed commit, and a `git add` chained in front of a commit; on commit denies a staged `.env`, `console.log` in non-test JS/TS, service code with no active OpenSpec change, and (from Sat 14:30) any change to `contracts/schemas`, `contracts/mocks` or `contracts/openapi.yaml` (escape `IW_CONTRACT_CHANGE=1`, only with the whole team's agreement and a version bump). It reads the staged diff at command start, so stage and commit in separate calls. Its escapes are plain text an agent can write: it catches mistakes, not a determined agent, so any use of an `IW_*` escape is reported in the PR body.
 
 ## Findings triage
 
@@ -48,7 +48,7 @@ Three people, three modules, a worktree per change, ownership by directory (`scr
 
 ## Not adopted from Neopadel (on purpose)
 
-Mutation testing, the LLM-judge hook, receipt gates, retro and memory audits, Monday sync. Revisit after the hackathon if the process continues.
+Mutation-testing tooling (only the manual mutate-and-restore check in `iw-commit-cycle` is adopted), the LLM-judge hook, receipt gates, retro and memory audits, Monday sync. Revisit after the hackathon if the process continues.
 
 ## Kill switch
 

@@ -1,12 +1,14 @@
 # Architecture decision records
 
-One file per decision: `NNNN-short-title.md`, copied from `0000-template.md`. Numbers come from the owner's range so parallel PRs never collide: A `01xx`, B `02xx`, C `03xx`. ADRs are written by a human; agents may draft Context, Options and evidence, never the decision or its rationale. Never auto-merge an ADR. An accepted ADR is not edited: a new ADR supersedes it and links the old one. Write one when a choice is hard to reverse or a teammate will ask "why".
+One file per decision: `NNNN-short-title.md`, copied from `0000-template.md`. Numbers come from the owner's range so parallel PRs never collide: A `01xx`, B `02xx`, C `03xx`. ADRs are written by agents in the same PR as the change they record, with the decision and a rationale that cites evidence; each is committed with `Status: accepted` and takes effect when the human approves and merges the PR; the Status column below shows it. Never auto-merge an ADR. An accepted ADR is not edited: a new ADR supersedes it and links the old one. Write one when a choice is hard to reverse or a teammate will ask "why".
 
 Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
 | ADR | Decision | Status |
 |---|---|---|
-| none yet | | |
+| [0101](0101-scraper-fetch-client.md) | Scraper fetch client | proposed (agent draft, no decision) |
+| [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | proposed (agent draft, no decision) |
+| [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
