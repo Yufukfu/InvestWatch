@@ -26,7 +26,8 @@ from typing import Any
 import redis
 
 from . import logging_setup
-from .config import ConfigError, Settings, WorkerSettings, uses_seed_registry
+from .config import ConfigError, LlmSettings, Settings, WorkerSettings, uses_seed_registry
+from .llm import build_judge
 from .events import Publisher, RedisPublisher
 from .health import start_health_server
 from .pipeline import analyze
@@ -72,7 +73,9 @@ class Worker:
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         sleep: Callable[[float], None] | None = None,
         jitter: Callable[[], float] = lambda: random.uniform(0, 0.5),
+        judge: Any = None,
     ) -> None:
+        self._judge = judge  # an LlmJudge or None (rules-only); the only extra I/O analyze() may do
         self._redis = client
         self._store = store
         self._publisher = publisher
@@ -225,7 +228,8 @@ class Worker:
             self._unexpected(message_id, document_id, started, exc)
             return
         try:
-            findings = analyze(doc, registry=self._registry, catalogue=self._catalogue, now=self._now())
+            findings = analyze(doc, registry=self._registry, catalogue=self._catalogue, now=self._now(),
+                               judge=self._judge)
             saved = self._store.save_findings(doc, findings) if findings else []
         except (StoreUnavailable, StoreMisconfigured):
             raise
@@ -286,6 +290,9 @@ def main(env: Mapping[str, str] | None = None) -> int:
     try:
         worker_settings = WorkerSettings.from_env(env)
         settings = Settings.from_env(env)
+        llm_settings = LlmSettings.from_env(env, claim_min_idle_ms=worker_settings.claim_min_idle_ms)
+        # Mode only: never the URL (it could carry a host the operator considers private) or the key.
+        log.info("llm configured", extra={"llm_mode": llm_settings.mode, "llm_model": llm_settings.model or None})
         registry = Registry.from_csv(settings.registry_csv)
         if uses_seed_registry(settings):
             log.warning("bundled fictional registry in use: R1 and high-risk alerts for real firms are not "
@@ -306,6 +313,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         log.error("worker not started", extra={"reason": "config_error", "error": "REDIS_URL is malformed"})
         return 2
     worker = Worker(client, store, RedisPublisher(client), registry=registry, catalogue=catalogue,
+                    judge=build_judge(llm_settings),
                     config=WorkerConfig(consumer=worker_settings.consumer,
                                         block_ms=worker_settings.stream_block_ms,
                                         claim_min_idle_ms=worker_settings.claim_min_idle_ms,

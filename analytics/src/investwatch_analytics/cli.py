@@ -23,7 +23,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import logging_setup
-from .config import Settings
+from .config import ConfigError, LlmSettings, Settings
+from .llm import build_judge
 from .models import ScrapedDocument
 from .pipeline import analyze
 from .registry import Registry, RegistryError
@@ -35,6 +36,7 @@ log = logging.getLogger("investwatch_analytics.cli")
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="investwatch_analytics.cli", description=__doc__.splitlines()[0])
     parser.add_argument("file", type=Path, help="JSON file with one ScrapedDocument or a list of them")
+    parser.add_argument("--no-llm", action="store_true", help="rules-only, even when LLM_BASE_URL is set")
     args = parser.parse_args(argv)
     settings = Settings.from_env()
     try:
@@ -44,6 +46,12 @@ def main(argv: list[str] | None = None) -> int:
         log.error("invalid configuration", extra={"error": f"LOG_LEVEL: {exc}"})
         return 2
 
+    try:
+        llm_settings = LlmSettings.from_env()
+    except ConfigError as exc:
+        log.error("invalid configuration", extra={"error": str(exc)})
+        return 2
+    judge = None if args.no_llm else build_judge(llm_settings)  # no Redis here: the CLI never caches
     try:
         registry = Registry.from_csv(settings.registry_csv)
         catalogue = Catalogue.load()
@@ -65,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     failed = 0
     for doc in docs:
         try:
-            findings.extend(f.to_contract() for f in analyze(doc, registry=registry, catalogue=catalogue))
+            findings.extend(f.to_contract() for f in analyze(doc, registry=registry, catalogue=catalogue,
+                                                             judge=judge))
         except Exception as exc:  # one bad document must not cost the batch; a bug still shows in the exit code
             failed += 1
             # Type only: exception messages can carry scraped text.
