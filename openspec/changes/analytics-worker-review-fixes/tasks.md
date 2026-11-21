@@ -24,6 +24,7 @@
 - [x] 5.1 Failing tests: splitting `"." + 50 000 spaces`, `". " + 40 000 spaces + "abc"`, an `S.A. Ab` chain, an `ok. 1` chain and a newline + spaces run under 1 s; M2 analysis of 50 000 digits under 3 s; footnote markers with spaces, legal forms and `ok.` cases split as before; a `12,5 %` claim is still R3 (old code: 4-130 s per case)
 - [x] 5.2 `preprocessing._BOUNDARY` with possessive `\s++` and a `\s{0,3}` marker gap, abbreviation checks on a 16-character window; R3 claim and exclusion percent patterns `(?<!\d)\d++(?:[.,]\d++)?`; R1-R3 and registry regexes timed on 11 hostile inputs at 20k and 40k characters (all linear after the fix; 1 MB worst case 0.9-17 s); old and new splitter identical on 20 009 texts
 - [x] 5.3 Mutation check; `mutations: 10 tried, 8 caught, 2 equivalent` (possessive whitespace and the bounded marker gap each keep the boundary linear alone; reverting both is caught)
+- [x] 5.4 R3 percent patterns aligned verbatim with `analytics-llm-p0` commit 9660ab4 (`(?<!\d)\d+(?:[.,]\d+)?`, its header comment) so the stage-2 merge is clean; test: each R3 claim and claim-exclude pattern on 20 000 digits under 2 s (was ~25 s); `mutations: 2 tried, 2 caught`
 
 ## 6. Size cap on the uncompressed payload (second review)
 

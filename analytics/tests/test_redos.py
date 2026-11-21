@@ -67,3 +67,14 @@ def test_percent_claim_still_found():
     [f] = analyze(doc, registry=registry, catalogue=Catalogue.load(), now=NOW)
     [r3] = [r for r in f.rules if r.rule_id == "R3"]
     assert r3.result == "fail" and "12,5 %" in (r3.evidence or "")
+
+
+def test_r3_claim_patterns_alone_are_linear_on_a_digit_run():
+    """Each R3 claim and claim-exclude pattern on 20 000 digits: was ~25 s (quadratic), must stay under 2 s."""
+    import re
+
+    params = Catalogue.load().get("R3").params
+    digits = "1" * 20_000
+    for pattern in params["claim_patterns"] + params["claim_exclude_patterns"]:
+        compiled = re.compile(pattern, re.IGNORECASE)
+        assert elapsed(lambda: list(compiled.finditer(digits))) < 2.0, pattern
