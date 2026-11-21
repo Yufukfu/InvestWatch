@@ -6,7 +6,7 @@ Hackathon system (HackNation, UKNF challenge) that finds risky investment conten
 
 Business logic, contracts and decisions live in the docs, not in `CLAUDE.md` files, which stay short and point here. Read in this order before changing anything, and open only what your task needs:
 
-1. [`.docs/STATUS.md`](.docs/STATUS.md): where we are, what is blocked.
+1. [`.docs/STATUS.md`](.docs/STATUS.md): milestones and team-wide blockers, then the file of your domain in [`.docs/status/`](.docs/status/) (`scraper`, `dashboard`, `platform`): where we are, what is blocked.
 2. [`.docs/INDEX.md`](.docs/INDEX.md): "How do I…?" router from a task to the exact doc and section.
 3. [`.docs/integration-plan.md`](.docs/integration-plan.md): architecture (§1), contracts `ScrapedDocument` (§3) and `Finding` (§4), REST (§5), events (§6), conventions (§7), milestones (§8).
 4. Your service's `CLAUDE.md` (table below), then its plan, for example [`.docs/analytics-plan.md`](.docs/analytics-plan.md).
@@ -49,7 +49,7 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 - No `console.log` in committed JS/TS (hook-enforced); Python uses the logger, not `print`; JSON logs to stdout.
 - Stage and commit in separate tool calls. Never use an `IW_*` escape flag without telling the human.
 - Every dependency is scanned (`pip-audit` / `npm audit`) before merge.
-- Before any PR is opened, docs and specs are already updated in the same PR: the OpenSpec change and its deltas (archived as the last commit), the affected docs, ADRs, your `.docs/STATUS.md` row, the AI log row, and `docs-check` clean. Never open a PR with these "to follow".
+- Before any PR is opened, docs and specs are already updated in the same PR: the OpenSpec change and its deltas (archived as the last commit), the affected docs, ADRs, your own domain file in `.docs/status/` (only yours; `.docs/STATUS.md` only when a milestone or a team-wide decision changes), the AI log row, and `docs-check` clean. Never open a PR with these "to follow".
 - Verify every reviewer finding against the code before acting.
 - ADRs in `.docs/decisions/` are written by agents, in the same PR as the change they record, or in an earlier docs-only PR when the decision steers work still to come (the implementing PR then links the ADR): context, options with evidence, the decision and a rationale that cites that evidence (never an invented "why"). Committed with `Status: accepted`, effective when the human approves and merges the PR (a rejected ADR is changed or removed in review).
 
