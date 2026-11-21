@@ -14,6 +14,7 @@ A document gives at most one finding per module ([`modules/router.py`](src/inves
 | Who publishes | Registry | Module |
 |---|---|---|
 | a registered firm (its domain, its profile host or its handle; any platform) | — | M2 for that firm |
+| a foreign firm without a Polish branch (`foreign_no_branch`), its own material | — | nothing (`out_of_scope_m2_foreign_no_branch`): M2 is for firms registered in Poland, including Polish branches |
 | `firm_own` source | firm named or page on a firm domain | M2 |
 | `firm_own` source | no firm | M3 if advisory signals, else nothing (`no_signals`) |
 | a third party | firm named in the text or linked | M1 (a foreign firm without a Polish branch only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
