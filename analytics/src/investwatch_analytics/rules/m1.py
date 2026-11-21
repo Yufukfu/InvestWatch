@@ -15,7 +15,18 @@ from ..registry import http_host
 from .engine import Context, Rule, compile_patterns, metadata_fields, register
 
 
-class MetadataRule(Rule):
+#: Longest evidence quote on an M1/M3 signal; a prefix of a verbatim quote is still verbatim.
+EVIDENCE_MAX = 300
+
+
+class SignalRule(Rule):
+    """An M1/M3 signal: its evidence is cut to EVIDENCE_MAX, so a 2 MB sentence never lands in a finding."""
+
+    def result(self, result, evidence, explanation):
+        return super().result(result, evidence[:EVIDENCE_MAX] if evidence else evidence, explanation)
+
+
+class MetadataRule(SignalRule):
     """A signal whose evidence may quote the author, a link href or the page URL."""
 
     def evidence_fields(self, ctx: Context) -> list[str]:
@@ -138,7 +149,7 @@ class S13PartnershipLabel(MetadataRule):
 
 
 @register
-class S14CallToAction(Rule):
+class S14CallToAction(SignalRule):
     rule_id = "S1.4"
 
     def ask_llm(self, ctx: Context, result: RuleResult) -> bool:
@@ -152,7 +163,7 @@ class S14CallToAction(Rule):
 
 
 @register
-class S15Promotional(Rule):
+class S15Promotional(SignalRule):
     rule_id = "S1.5"
 
     def evaluate(self, ctx: Context) -> RuleResult:

@@ -14,10 +14,10 @@ from ..models import RuleResult
 from ..modules.advertiser import is_social, page_host
 from ..registry import http_host
 from .engine import Context, Rule, compile_patterns, register
-from .m1 import MetadataRule, first_hit, poland_marker
+from .m1 import MetadataRule, SignalRule, first_hit, poland_marker
 
 
-class PhraseRule(Rule):
+class PhraseRule(SignalRule):
     """`fail` (or `uncertain` for a candidate) on the first phrase of `phrase_patterns`, else `pass`."""
 
     hit_result = "fail"
@@ -35,7 +35,7 @@ class PhraseRule(Rule):
         return [s.text for s in ctx.pre.sentences if any(p.search(s.text) for p in patterns)]
 
 
-class WindowRule(Rule):
+class WindowRule(SignalRule):
     """Sentences with a buy/sell/hold form (negations removed first) and a noun within ±`window` sentences."""
 
     @cached_property

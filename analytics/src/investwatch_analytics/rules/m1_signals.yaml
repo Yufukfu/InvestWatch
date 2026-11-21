@@ -103,7 +103,9 @@ rules:
     # Same detection as S3.6 in m3_signals.yaml (design decision 5); a test keeps the two copies equal.
     params:
       currency_patterns:
-        - '\d[\d\s.,]*\s?(?:(?:tys|mln|mld)\.?\s?)?(?:zł(?:ot\w*)?|zl|PLN)(?!\w)'
+        # Bounded number part (at most 25 characters, starting where a number starts): an unbounded
+        # `[\d\s.,]*` backtracked quadratically on long digit-and-space runs (ReDoS, whole-branch review).
+        - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:(?:tys|mln|mld)\.?\s?)?(?:zł(?:ot\w*)?|zl|PLN)(?!\w)'
         - '(?<!\w)PLN\s?\d'
       phone_patterns:
         - '\+48[\s-]?\d{2,3}[\s-]?\d{2,3}[\s-]?\d{2,3}'

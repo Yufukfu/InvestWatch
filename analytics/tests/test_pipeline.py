@@ -169,6 +169,16 @@ def test_malformed_link_routes_to_m3(registry, catalogue):
     assert f.module == "M3"
 
 
+def test_social_domain_in_registry_never_routes_by_page_host(catalogue):
+    from investwatch_analytics.modules.router import route
+    from investwatch_analytics.registry import Firm
+
+    firm = Firm(id="facc6bd1-c728-5348-90a4-011b0972fea9", name="Alfa Inwestycje", type="brokerage_house",
+                country="PL", aliases=(), domains=("instagram.com",), source_url=None)
+    doc = ScrapedDocument.model_validate(make_doc(**SOCIAL, text="Doradztwo inwestycyjne, abonament 99 zł/mies."))
+    assert route(doc, Registry([firm])).module == "M3"
+
+
 def test_firm_own_ignores_link_hosts(registry, catalogue):
     raw = make_doc(text="Beta Kapitał zaprasza na piknik.",
                    links=[{"href": "https://alfa-inwestycje.example.com/"}])

@@ -11,7 +11,8 @@ from investwatch_analytics.models import Link, ScrapedDocument
 from investwatch_analytics.modules.advertiser import (
     MAX_LEN,
     build_advertiser,
-    normalize_handle,
+    firm_key,
+    handle_key,
     page_host,
     publisher_firm,
 )
@@ -78,10 +79,17 @@ def test_backslash_profile_url_is_not_the_firm(registry):
 # ---- publisher identity ------------------------------------------------------------------------
 
 
-def test_normalize_handle():
-    assert normalize_handle("@Alfa_Inwestycje") == "alfainwestycje"
-    assert normalize_handle("Bank Przykładowy") == "bankprzykladowy"
-    assert normalize_handle("@@--") == ""
+def test_handle_and_firm_keys():
+    assert handle_key("@AlfaInwestycje") == "alfainwestycje" and handle_key(" @alfa_inwestycje ") == "alfa_inwestycje"
+    assert firm_key("Bank Przykładowy") == "bankprzykladowy" and firm_key("Alfa Inwestycje DM") == "alfainwestycjedm"
+    for bad in ("@@--", "@", "", None, "@alfa inwestycje", "@ａｌｆａ", "@alfa\u200binwestycje", "@аlfa"):
+        assert handle_key(bad) is None, bad
+
+
+@pytest.mark.parametrize("handle", ["@alfa.inwestycje", "@alfa_inwestycje_", "@alfa_inwestycje",
+                                    "@ＡｌｆａＩｎｗｅｓｔｙｃｊｅ", "@alfa\u200binwestycje", "@𝐀𝐥𝐟𝐚𝐈𝐧𝐰𝐞𝐬𝐭𝐲𝐜𝐣𝐞"])
+def test_impersonator_handles_are_not_the_firm(registry, handle):
+    assert publisher_firm(doc(text="Alfa Inwestycje", author={"handle": handle}), registry) is None
 
 
 def test_publisher_by_handle(registry):
@@ -90,7 +98,7 @@ def test_publisher_by_handle(registry):
 
 
 def test_publisher_by_handle_of_alias(registry):
-    d = doc(text="x", author={"handle": "@alfa_inwestycje_dm"})
+    d = doc(text="x", author={"handle": "@AlfaInwestycjeDM"})
     assert publisher_firm(d, registry).id == ALFA
 
 

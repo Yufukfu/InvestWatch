@@ -3,7 +3,7 @@
 Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M1–M3, LLM integration.
 
 - **Owner:** Damian
-- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`); semantic signals (S1.5, S3.3, S3.4) stay `uncertain` until it lands.
+- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`): S1.5 is always `uncertain`, and S3.3/S3.4 are `uncertain` when the rules find a candidate phrase, `pass` otherwise, until it lands.
 - **Registry:** [`registry/seed.csv`](registry/seed.csv) holds three fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is treated as outside the registry.
 
 ## Modules and routing
@@ -79,7 +79,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a test-
 
 ## Where things are
 
-- `src/investwatch_analytics/pipeline.py`: `analyze(doc, *, registry, catalogue, now)` → findings. Pure, no I/O.
+- `src/investwatch_analytics/pipeline.py`: `analyze(doc, *, registry, catalogue, now, signals=None)` → findings (`signals`: the M1/M3 catalogues, shipped ones by default). Pure, no I/O.
 - `src/investwatch_analytics/rules/m2_rules.yaml`: all 18 UKNF rules (name, severity, legal basis, dictionaries). Only entries with `implemented: true` run.
 - `src/investwatch_analytics/rules/m2.py`: R1 firm identification, R2 ad labeling, R3 risk information next to return claims.
 - `src/investwatch_analytics/rules/m1.py`, `rules/m3.py`: the M1/M3 signal classes; `modules/m1.py`, `modules/m3.py`: the M1/M3 findings; `modules/advertiser.py`: publisher identity and `advertiser`; `rules/scoring.py`: the sigmoid score.

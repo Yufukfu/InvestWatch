@@ -12,27 +12,30 @@ import unicodedata
 from urllib.parse import urlsplit
 
 from ..models import AdvertiserRef, ScrapedDocument, _absolute_http_url
-from ..registry import Firm, Registry, _normalize_domain, http_host
+from ..registry import SOCIAL_HOSTS, Firm, Registry, http_host, is_social  # noqa: F401  (re-exported)
 
 MAX_LEN = 200  # analytics-worker follow-up #8: scraped strings on the finding are cut
-#: Platform hosts: a page or profile here is the platform's, never a firm's own domain.
-SOCIAL_HOSTS = (
-    "instagram.com", "facebook.com", "fb.com", "tiktok.com", "youtube.com", "youtu.be", "x.com",
-    "twitter.com", "t.me", "telegram.me", "linkedin.com", "threads.net",
-)
-_NON_ALNUM = re.compile(r"[\W_]+", re.UNICODE)
+#: A handle as platforms allow it: ASCII letters, digits, "." and "_". Anything else (fullwidth letters,
+#: zero-width characters, homoglyphs) is never taken as a firm's own account.
+_HANDLE = re.compile(r"[a-z0-9._]+")
+_SPACE = re.compile(r"\s+")
 
 
-def normalize_handle(value: str) -> str:
-    """'@Alfa_Inwestycje' -> 'alfainwestycje'; diacritics folded ('ł' -> 'l'), every non-alphanumeric removed."""
-    folded = unicodedata.normalize("NFKD", value.lower().replace("ł", "l"))
+def handle_key(handle: str | None) -> str | None:
+    """'@AlfaInwestycje' -> 'alfainwestycje'; None for anything that is not a plain ASCII handle.
+
+    Separators are kept, so the impersonator variants 'alfa.inwestycje' and 'alfa_inwestycje_' never equal
+    the firm key 'alfainwestycje' (whole-branch security review).
+    """
+    key = (handle or "").strip().removeprefix("@").lower()
+    return key if _HANDLE.fullmatch(key) else None
+
+
+def firm_key(name: str) -> str:
+    """'Bank Przykładowy' -> 'bankprzykladowy': lowercase, diacritics folded ('ł' -> 'l'), whitespace removed."""
+    folded = unicodedata.normalize("NFKD", name.lower().replace("ł", "l"))
     folded = "".join(c for c in folded if not unicodedata.combining(c))
-    return _NON_ALNUM.sub("", folded)
-
-
-def is_social(host: str) -> bool:
-    host = _normalize_domain(host)
-    return any(host == s or host.endswith("." + s) for s in SOCIAL_HOSTS)
+    return _SPACE.sub("", folded)
 
 
 def page_host(url: str) -> str:
@@ -48,11 +51,11 @@ def _has_author(doc: ScrapedDocument) -> bool:
 
 
 def _firm_by_handle(handle: str | None, registry: Registry) -> Firm | None:
-    key = normalize_handle(handle or "")
-    if not key:
+    key = handle_key(handle)
+    if key is None:
         return None
     for firm in registry.firms:
-        if key in {normalize_handle(n) for n in (firm.name, firm.core, *firm.aliases)}:
+        if key in {firm_key(n) for n in (firm.name, firm.core, *firm.aliases)}:
             return firm
     return None
 

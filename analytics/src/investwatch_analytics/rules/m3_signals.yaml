@@ -109,8 +109,9 @@ rules:
         - '(?<!\w)sygnał\w*\s+premium(?!\w)'
         - '(?<!\w)VIP(?!\w)'
         - '(?<!\w)płatn\w*\s+grup\w*'
-        - '\d[\d\s.,]*\s?(?:zł|PLN)\s?/\s?mies\w*'
-        - '\d[\d\s.,]*\s?(?:zł|PLN)\s+miesięcznie(?!\w)'
+        # Bounded number part, as in S3.6 (ReDoS, whole-branch review).
+        - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:zł|PLN)\s?/\s?mies\w*'
+        - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:zł|PLN)\s+miesięcznie(?!\w)'
 
   - id: S3.6
     name: Kierowanie do Polski
@@ -120,7 +121,7 @@ rules:
     implemented: true
     params:
       currency_patterns:
-        - '\d[\d\s.,]*\s?(?:(?:tys|mln|mld)\.?\s?)?(?:zł(?:ot\w*)?|zl|PLN)(?!\w)'
+        - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:(?:tys|mln|mld)\.?\s?)?(?:zł(?:ot\w*)?|zl|PLN)(?!\w)'
         - '(?<!\w)PLN\s?\d'
       phone_patterns:
         - '\+48[\s-]?\d{2,3}[\s-]?\d{2,3}[\s-]?\d{2,3}'

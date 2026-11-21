@@ -35,6 +35,11 @@ _LEGAL_FORMS = re.compile(
     re.IGNORECASE,
 )
 _WORD = re.compile(r"\w+", re.UNICODE)
+#: Platform hosts: a page, profile or link there is the platform's, never a firm's own domain.
+SOCIAL_HOSTS = (
+    "instagram.com", "facebook.com", "fb.com", "tiktok.com", "youtube.com", "youtu.be", "x.com",
+    "twitter.com", "t.me", "telegram.me", "linkedin.com", "threads.net",
+)
 _PUNCT = re.compile(r"[^\w\s\-–]+")
 
 
@@ -142,8 +147,6 @@ class Registry:
 
         Malformed and non-http(s) hrefs are skipped, never raised.
         """
-        from .modules.advertiser import is_social  # platform hosts never belong to a firm
-
         for link in links:
             host = http_host(link.href)
             if host and not is_social(host) and (firm := self.firm_on_host(host)) is not None:
@@ -157,7 +160,7 @@ class Registry:
         # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
         segments = [[w.lower() for w in _WORD.findall(seg)] for seg in _PUNCT.split(text)]
         for firm in self.firms:
-            on_domain = any(host == d or host.endswith("." + d) for d in firm.domains)
+            on_domain = not is_social(host) and any(host == d or host.endswith("." + d) for d in firm.domains)
             if m := self._find(firm, text):
                 # Rank by the firm's earliest mention in any form; quote its longest form.
                 pos = min(h.start() for p in self._patterns[firm.id] if (h := p.search(text)))
@@ -181,6 +184,11 @@ def _best_fuzzy(core: str, words: list[str]) -> float:
     target = " ".join(target_words)
     grams = (" ".join(words[i:i + n]) for i in range(len(words) - n + 1))
     return max((fuzz.ratio(target, g) for g in grams), default=0.0)
+
+
+def is_social(host: str) -> bool:
+    host = _normalize_domain(host)
+    return any(host == s or host.endswith("." + s) for s in SOCIAL_HOSTS)
 
 
 def http_host(url: str) -> str | None:
