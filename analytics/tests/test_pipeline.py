@@ -102,6 +102,13 @@ def test_violating_landing_page(registry, catalogue):
     assert "Oznaczenie reklamy" in f.title and "Informacja o ryzyku" in f.summary
 
 
+def test_finding_is_logged_at_info(registry, catalogue, caplog):
+    with caplog.at_level(logging.INFO):
+        [f] = run(make_doc(text=ALFA_TEXT), registry, catalogue)
+    rec = next(r for r in caplog.records if r.getMessage() == "finding built")
+    assert rec.finding_module == "M2" and rec.score == f.score
+
+
 def test_finding_url_is_document_url_not_canonical(registry, catalogue):
     raw = make_doc(text=ALFA_TEXT, url="https://a.example.com/x?ref=1", canonical_url="https://a.example.com/x")
     [f] = run(raw, registry, catalogue)

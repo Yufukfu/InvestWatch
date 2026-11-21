@@ -32,9 +32,9 @@
 
 ## 6. CLI
 
-- [ ] 6.1 Failing test: the CLI on `contracts/mocks/documents.json` writes a JSON list of findings that passes `contracts/validate.py finding`
-- [ ] 6.2 `cli.py` (`python -m investwatch_analytics.cli <file>`, accepts an object or a list); tests green; `pip-audit -r analytics/requirements.txt` clean
-- [ ] 6.3 Mutation check; `mutations: N tried, N caught`
+- [x] 6.1 Failing test: the CLI on `contracts/mocks/documents.json` writes a JSON list of findings that passes `contracts/validate.py finding`
+- [x] 6.2 `cli.py` (`python -m investwatch_analytics.cli <file>`, accepts an object or a list); tests green; `pip-audit -r analytics/requirements.txt` clean
+- [x] 6.3 Mutation check; `mutations: 7 tried, 7 caught` (includes the `module` log-key fix found by the CLI test; `pip-audit`: no known vulnerabilities)
 
 ## 7. Closing
 

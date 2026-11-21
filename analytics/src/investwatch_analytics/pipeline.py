@@ -40,5 +40,5 @@ def analyze(
     ctx = Context(doc=doc, pre=pre, firm_match=registry.match(doc.text, doc.url), registry=registry)
     findings = [m2.build_finding(ctx, catalogue, now=now, new_id=new_id) for module in modules if module == "M2"]
     for f in findings:
-        log.info("finding built", extra={"document_id": doc.id, "module": f.module, "score": f.score})
+        log.info("finding built", extra={"document_id": doc.id, "finding_module": f.module, "score": f.score})
     return findings
