@@ -157,6 +157,7 @@ rules:
         - '\bosiągn(?:ął|ęła|ęło|ęli|ęły|ęliśmy)\b'
         - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
         - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+        - '\bda(?:ł|ła|ło|li|ły)\b'
         - '\bwzr[oó]s(?:ł|ła|ło|ły|li)\b'
         - '\bhistoryczn\w*'
         - '\b(?:w|przez|za)\s+ostatni\w*\s+(?:\d+\s+)?(?:lat\w*|rok\w*|miesi\w*|kwarta\w*)'
@@ -178,7 +179,7 @@ rules:
         - '\bzarabiaj\w*'
         - '\bmożesz\b'
         - '\bnawet\b'
-        - '\bważn\w*'
+        - '\bważn\w*\s+do\b'
         - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers

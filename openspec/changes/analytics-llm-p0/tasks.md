@@ -12,7 +12,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 - [x] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`, no risk block `not_applicable` with `brak informacji o ryzyku`, only desktop/mobile/tablet evaluated, footnote-only past-performance disclaimer gives R6 `fail`); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
 - [x] 2.2 `EvidenceLocator` in `models.py`; risk-block detection reusing R3's warning patterns via a YAML anchor; R6 class, `hiding_regions` param; worst viewport wins; tests green
-- [x] 2.3 Mutation check; `mutations: 19 tried, 19 caught` (two survivors on the first run closed with tests: no-blocks explanation, hidden plus unknown position)
+- [x] 2.3 Mutation check; `mutations: 19 tried, 19 caught` (two survivors on the first run closed with tests: no-blocks explanation, hidden plus unknown position); review fixes (follow-ups R11-R13): `mutations: 6 tried, 6 caught`
 
 ## 3. R4 risk font size (~45 min)
 

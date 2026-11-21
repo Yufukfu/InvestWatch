@@ -423,3 +423,47 @@ def test_r4_min_ratio_one_is_allowed(tmp_path):
     p = tmp_path / "rules.yaml"
     p.write_text(src.read_text(encoding="utf-8").replace("min_ratio: 0.75", "min_ratio: 1"), encoding="utf-8")
     assert Catalogue.load(p).get("R4").params["min_ratio"] == 1
+
+
+# ---- group 2 review fixes ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("text", [
+    "Inwestuj od 2000 zł i odbierz 8% w skali roku.",
+    "Zacznij z 2000 zł, oprocentowanie 6%.",
+    "Lokata za 2000 PLN: 5% w skali roku.",
+])
+def test_r14_amount_after_preposition_is_not_a_year(text, registry, catalogue):
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "not_applicable"
+
+
+def test_r14_vazne_heading_does_not_hide_past_performance(registry, catalogue):
+    text = "Ważne: fundusz dał 12% w 2024 r."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+def test_r14_offer_valid_until_is_future(registry, catalogue):
+    text = "Oferta ważna do 2026 roku: 7%."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "not_applicable"
+
+
+def test_r6_evidence_is_the_warning_sentence_not_the_whole_block(registry, catalogue):
+    footer = "Alfa Inwestycje DM S.A., ul. Prosta 1, Warszawa. Inwestowanie wiąże się z ryzykiem utraty kapitału."
+    text = f"Zysk 8% rocznie. {footer}"
+    blocks = [block("Zysk 8% rocznie."), block(footer, region="footer", in_view=False)]
+    res = run(text, registry, catalogue, blocks=blocks)
+    assert res["R6"].evidence == "Inwestowanie wiąże się z ryzykiem utraty kapitału."
+    assert res["R4"].evidence == "Inwestowanie wiąże się z ryzykiem utraty kapitału."
+
+
+def test_r14_vazne_heading_with_year_only(registry, catalogue):
+    text = "Ważne: portfel +12% w 2024 r."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+def test_r6_quote_comes_from_inside_the_block(registry, catalogue):
+    footer = "Alfa Inwestycje DM S.A., Warszawa. Inwestowanie wiąże się z ryzykiem utraty kapitału."
+    text = f"Ryzyko jest po naszej stronie. Zysk 8% rocznie. {footer}"
+    blocks = [block("Zysk 8% rocznie."), block(footer, region="footer", in_view=False)]
+    r = run(text, registry, catalogue, blocks=blocks)["R6"]
+    assert r.evidence == "Inwestowanie wiąże się z ryzykiem utraty kapitału."

@@ -127,9 +127,9 @@ class R3RiskNextToReturns(Rule):
 
 
 # A year only in a year context ("w 2025", "za 2024 r.", "2023 roku"), so amounts ("2000 zł") and
-# dates ("do 31.12.2026") are not years.
+# dates ("do 31.12.2026") are not years; an amount after a preposition ("od 2000 zł") is not either.
 _YEAR = re.compile(
-    r"\b(?:w|we|za|od|z)\s+(?:roku\s+)?((?:19|20)\d{2})(?!\d)|(?<![\d.])((?:19|20)\d{2})\s*(?:r\.|rok\w*)",
+    r"\b(?:w|we|za|od|z)\s+(?:roku\s+)?((?:19|20)\d{2})(?!\d)(?!\s*(?:zł|pln|eur|usd|€|\$|tys))|(?<![\d.])((?:19|20)\d{2})\s*(?:r\.|rok\w*)",
     re.IGNORECASE,
 )
 
@@ -233,6 +233,17 @@ class _RiskWarnings(Rule):
     def is_footnote(self, text: str) -> bool:
         return text.lstrip("( ").startswith(self._risk["footnote"])
 
+    def warning_quote(self, ctx: Context, b: Block) -> str | None:
+        """The first warning sentence inside the block as it appears in the text, else the located block text."""
+        span = locate(ctx.doc.text, b.text)
+        if span is None:
+            return None
+        start = ctx.doc.text.find(span)
+        end = start + len(span)
+        inside = (s for s in ctx.pre.sentences if s.start >= start and s.end <= end and self.is_warning(s.text))
+        first = next(inside, None)
+        return first.text if first is not None else span
+
     def no_risk_result(self, ctx: Context) -> RuleResult:
         """not_applicable when there is no risk block; R3 carries a missing warning (ZASÓB, counted once)."""
         in_text = any(self.is_warning(s.text) for s in ctx.pre.sentences)
@@ -279,7 +290,7 @@ class R6HiddenRisk(_RiskWarnings):
             "uncertain": f"Ostrzeżenie o ryzyku w stopce, sekcji prawnej lub przypisie; brak danych, czy jest widoczne bez przewijania ({b.viewport}).",
             "pass": "Ostrzeżenie o ryzyku jest wyeksponowane poza stopką i przypisami lub widoczne bez przewijania.",
         }[result]
-        return self.result(result, locate(ctx.doc.text, b.text), why, locator_for(b))
+        return self.result(result, self.warning_quote(ctx, b), why, locator_for(b))
 
 
 def weighted_median(values: list[tuple[float, float]]) -> float:
@@ -339,11 +350,11 @@ class R4RiskFontSize(_RiskWarnings):
         sizes = f"{_px(b.font_size_px)} px przy przeważającej czcionce {_px(dominant)} px ({_pl(ratio)}×, {b.viewport})"
         if ratio < min_ratio:
             return self.result(
-                "fail", locate(ctx.doc.text, b.text),
+                "fail", self.warning_quote(ctx, b),
                 f"Ostrzeżenie o ryzyku zbyt małą czcionką: {sizes}; wymagane co najmniej {_pl(min_ratio)}×.",
                 locator_for(b),
             )
         return self.result(
-            "pass", locate(ctx.doc.text, b.text),
+            "pass", self.warning_quote(ctx, b),
             f"Czcionka ostrzeżenia proporcjonalna do treści: {sizes}.", locator_for(b),
         )
