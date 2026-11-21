@@ -19,8 +19,22 @@ def normalise_text(text: str) -> str:
     return " ".join(unicodedata.normalize("NFC", text).split())
 
 
-def content_hash(text: str) -> str:
-    return hashlib.sha256(normalise_text(text).encode("utf-8")).hexdigest()
+def content_hash(text: str, identity: str | None = None) -> str:
+    """sha256 of the normalised text; for a post, of `identity`, a line feed and the text (see `document_identity`)."""
+    prefix = f"{identity}\n" if identity else ""
+    return hashlib.sha256((prefix + normalise_text(text)).encode("utf-8")).hexdigest()
+
+
+def document_identity(doc: dict) -> str | None:
+    """What a social document is hashed with: its `canonical_url`, else its `url`. None for a web page.
+
+    Social posts live at one permalink each, so identical text at two permalinks is two documents; the canonical
+    URL (no share or tracking parameters) keeps a rescrape of one post from becoming a second row.
+    """
+    if doc.get("platform") == "web":
+        return None
+    identity = doc.get("canonical_url") or doc.get("url")
+    return identity if isinstance(identity, str) else None
 
 
 def parse_timestamp(value: str) -> datetime:
@@ -61,5 +75,5 @@ def build_document(
     if author is not None:
         doc["author"] = author
     if isinstance(doc.get("text"), str):
-        doc["content_hash"] = content_hash(doc["text"])
+        doc["content_hash"] = content_hash(doc["text"], document_identity(doc))
     return doc

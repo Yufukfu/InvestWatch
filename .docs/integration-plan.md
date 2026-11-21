@@ -45,7 +45,7 @@ Decisions from the team sync:
 ```
 
 Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
-`postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then `scraper`, `scheduler`, `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
+`postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then the scraper's `worker`, `scheduler` and one-shot `seed` (the `scraper` box in the diagram above), `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
 Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
@@ -71,7 +71,7 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 {
   "id": "uuid",
   "source_id": "uuid",                  // row in the sources table
-  "platform": "web|facebook|instagram|tiktok|youtube|x|forum|other",
+  "platform": "web|facebook|instagram|tiktok|youtube|x|forum|other", // Telegram posts are `other` until a `telegram` value joins the enum (contract v2); `scrape_meta.network` = "telegram" marks them
   "source_kind": "firm_own|third_party|unknown", // published by the firm itself (M2) or by someone else (M1/M3)
   "url": "https://...",
   "canonical_url": "https://...",
@@ -81,7 +81,7 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
   "lang": "pl | null",                  // optional – analytics detects it anyway
   "title": "string | null",
   "text": "clean text of the whole material",
-  "content_hash": "sha256 of normalized text", // deduplication
+  "content_hash": "sha256 of normalized text", // deduplication; exact definition below
   "author": {                           // for social media / blogs
     "name": "string | null",
     "handle": "@nick | null",
@@ -118,6 +118,9 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 Machine-readable versions of all contracts in this document (JSON Schema, OpenAPI, mocks): [`contracts/`](../contracts/README.md).
 
 Minimum required for analytics to work: `id, platform, url, fetched_at, text, source_kind`.
+
+`content_hash` is the lowercase hex sha256 of the UTF-8 bytes of the normalised `text`: Unicode **NFC**, then every run of whitespace (whitespace is the set of characters for which Python's `str.isspace()` is true (and `str.split()` splits on): Unicode White_Space plus U+001C to U+001F, 29 characters in all (U+0009 to U+000D, U+001C to U+001F, U+0020, U+0085, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000); U+200B and U+FEFF are not whitespace) collapsed to one space, leading and trailing whitespace removed, case kept. Compatibility characters (ligature `ﬁ`, superscript `²`, full-width digits) are not folded, so NFKC is not part of the definition. The scraper computes and stores it (unique per `source_id`, used for dedup); consumers read the stored value or must reproduce this exact function, never their own matching normalisation ([ADR 0105](decisions/0105-content-hash-normalisation.md)). For a post (`platform` is not `web`) the hashed input is the `canonical_url` (else the `url`), a line feed, then that normalised text, so the same text at two permalinks stays two documents (`scraper-v2-social`, issue 34); the value is still a sha256 hex string.
+
 `author` is optional and is set only by a platform collector from the platform's own account fields (for example the channel handle the platform renders), never from claims the post's writer controls on a page (`<meta>`, `rel=author`, embedded JSON), because analytics' publisher match (`analytics-m1-m3`, PR #35) routes on `author.handle` / `author.profile_url`, and on the host of `url`, which must stay the guarded fetch URL, never a value from markup. No `web` source sets it today; absent means unknown, not "third party". Per-platform provenance: [`scraper/README.md`](../scraper/README.md), "Author provenance".
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 

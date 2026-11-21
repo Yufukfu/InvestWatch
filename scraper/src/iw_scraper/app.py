@@ -14,10 +14,13 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import asyncpg
-from arq.connections import ArqRedis, RedisSettings, create_pool
+from arq.connections import ArqRedis, RedisSettings
 
-from iw_scraper.collect import Collector
-from iw_scraper.config import fetch_settings, proxy_settings, rate_limit_settings, render_settings, target_settings
+from iw_scraper.collect import Collector, Stages
+from iw_scraper.config import (
+    DEFAULT_SOCIAL_MAX_POSTS, fetch_settings, proxy_settings, rate_limit_settings, render_settings,
+    social_max_posts, target_settings,
+)
 from iw_scraper.domaingate import DomainGate
 from iw_scraper.health import check_redis, serve_health
 from iw_scraper.ingest.errors import record_error as store_job_error
@@ -25,7 +28,7 @@ from iw_scraper.ingest.pipeline import Ingestor
 from iw_scraper.ingest.publisher import sweep
 from iw_scraper.ingest.storage import Storage
 from iw_scraper.guards import DomainHealth
-from iw_scraper.jobs import QueueSettings
+from iw_scraper.jobs import QueueSettings, create_queue_pool
 from iw_scraper.logs import configure_logging
 from iw_scraper.pgstore import PgSourceStore
 from iw_scraper.proxy import ProxyRotator
@@ -33,7 +36,7 @@ from iw_scraper.ratelimit import DomainLimiter
 from iw_scraper.rendering import DomainPause, PageRenderer, RenderBudget, http_renderer
 from iw_scraper.scan_requests import ScanRequestConsumer, consumer_name
 from iw_scraper.scheduler import Scheduler
-from iw_scraper.supervise import CONNECTION_ERRORS
+from iw_scraper.supervise import CONNECTION_ERRORS, JOB_CONNECTION_ERRORS
 from iw_scraper.targets import AddressGuard, UrlGuard
 from iw_scraper.types import JobError
 from iw_scraper.worker import RunnerSettings, run_consumer, run_worker
@@ -43,6 +46,13 @@ logger = logging.getLogger(__name__)
 # a lost PostgreSQL connection is retried like a lost Redis one; anything else is a bug and ends the process
 RETRY_ON = (
     *CONNECTION_ERRORS,
+    asyncpg.exceptions.PostgresConnectionError,
+    asyncpg.exceptions.CannotConnectNowError,
+    asyncpg.InterfaceError,
+)
+# what one job requeues itself on: lost connections only, no bare OSError (a full disk is not coming back)
+JOB_RETRY_ON = (
+    *JOB_CONNECTION_ERRORS,
     asyncpg.exceptions.PostgresConnectionError,
     asyncpg.exceptions.CannotConnectNowError,
     asyncpg.InterfaceError,
@@ -90,12 +100,14 @@ def assemble(
     timeout: float,
     max_bytes: int,
     renderer: PageRenderer | None = None,
+    max_posts: int = DEFAULT_SOCIAL_MAX_POSTS,
+    stages: Stages | None = None,
 ) -> Runtime:
     store = PgSourceStore(pool)
     collector = Collector(
         store, Ingestor(pool, storage, redis),
         urls=urls, addresses=addresses, rotator=rotator, limiter=limiter, timeout=timeout, max_bytes=max_bytes,
-        renderer=renderer,
+        renderer=renderer, social_max_posts=max_posts, stages=stages or Stages(),
     )
     return Runtime(pool, storage, redis, store, collector)
 
@@ -132,7 +144,7 @@ async def runtime(redis_url: str):
             secure=os.environ.get("MINIO_SECURE", "false").lower() == "true",
         )
         await storage.check_bucket()
-        redis = await create_pool(RedisSettings.from_dsn(redis_url))
+        redis = await create_queue_pool(RedisSettings.from_dsn(redis_url))
         try:
             proxies, mode, cooldown = proxy_settings()
             ports, internal_hosts, extra_hosts = target_settings()
@@ -145,7 +157,7 @@ async def runtime(redis_url: str):
                 urls=allowed_urls(store, extra_hosts, ports),
                 addresses=AddressGuard(internal_hosts=internal_hosts),
                 rotator=ProxyRotator(proxies, mode, cooldown),
-                limiter=limiter, timeout=timeout, max_bytes=max_bytes,
+                limiter=limiter, timeout=timeout, max_bytes=max_bytes, max_posts=social_max_posts(),
                 renderer=page_renderer(redis, limiter, ports),
             )
         finally:
@@ -184,7 +196,7 @@ async def run_worker_process(stop: asyncio.Event) -> None:
         try:
             await _run_together(
                 stop,
-                run_worker(ctx, queue, runner, stop=stop, retry_on=RETRY_ON),
+                run_worker(ctx, queue, runner, stop=stop, retry_on=RETRY_ON, job_retry_on=JOB_RETRY_ON),
                 run_consumer(consumer, runner, stop=stop, retry_on=RETRY_ON),
             )
         finally:

@@ -2,6 +2,7 @@
 
 import hashlib
 import uuid
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -155,3 +156,86 @@ def test_a_non_web_url_scheme_is_schema_invalid(source, field, value):
     error = check_document(build(source) | {field: value})  # set after the build: a page cannot supply `author`
     assert error is not None and error.reason is Reason.SCHEMA_INVALID
     assert "http or https" in error.detail
+
+
+# The one definition of `content_hash` (ADR 0105, `.docs/integration-plan.md` §3): NFC, whitespace collapsed and trimmed,
+# case kept, UTF-8, sha256 hex. The hashes are literals, never computed with the code under test; the stored value feeds the
+# unique dedup index on `documents`, so a change here would turn every stored hash into a miss.
+@pytest.mark.parametrize(
+    "text,folded,expected",
+    [
+        ("ﬁnanse", "finanse", "940eee0cfc77cf748d13d9ebbb2530ff252c93ff9fffdd3114f8b10329e8093a"),  # ligature fi
+        ("m²", "m2", "09c2e207e28b877591a6d65a2e78637bea09fa49d68def18c0419b18ff47ae89"),  # superscript two
+        ("１２３%", "123%", "359a698d899b204c2eab19f1b13a75f203816dd695e6620386819c67b1b62369"),  # full-width digits
+    ],
+)
+def test_compatibility_characters_are_kept_not_folded(text, folded, expected):
+    assert normalise_text(text) == text
+    assert content_hash(text) == expected
+    assert content_hash(text) != content_hash(folded)
+
+
+def test_decomposed_and_composed_text_hash_to_the_literal():
+    assert content_hash("é") == "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"
+    assert content_hash("é") == "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"
+
+
+def test_unicode_whitespace_collapses_to_one_space():
+    assert normalise_text(" a 　\t b ") == "a b"
+    assert content_hash(" a 　b ") == "c8687a08aa5d6ed2044328fa6a697ab8e96dc34291e8c2034ae8c38e6fcc6d65"
+
+
+# Literal sha256 values, computed outside the code under test:
+#   web:   sha256("Zysk do 20%")
+#   other: sha256("<permalink>\nZysk do 20%")
+WEB_HASH = "35864f838dfec0cd765ac334f77c5250f3283ccedbb2e7df3eaccf16e32ccf23"
+POST_1_HASH = "d4cbae09d5fa394917285424922a9888128ab9073b047d1aef3257bc2ac28952"
+POST_2_HASH = "f45585b336868db3cfb0649746979c159430a3262b22a1caf93ddca562c23b5a"
+
+
+def post_page(url: str, canonical_url: str | None = "") -> dict:
+    page = {"url": url, "text": "Zysk do 20%", "html": "<div>x</div>"}
+    if canonical_url != "":
+        page["canonical_url"] = canonical_url
+    return page
+
+
+def test_web_page_hash_is_the_text_alone(source):
+    doc = build(source, post_page("https://t.me/h/1", "https://t.me/h/1"))
+
+    assert doc["platform"] == "web"
+    assert doc["content_hash"] == WEB_HASH
+
+
+def test_same_text_at_two_permalinks_has_two_hashes(source):
+    social = replace(source, platform="other")
+
+    first = build(social, post_page("https://t.me/h/1", "https://t.me/h/1"))
+    second = build(social, post_page("https://t.me/h/2", "https://t.me/h/2"))
+
+    assert first["content_hash"] == POST_1_HASH
+    assert second["content_hash"] == POST_2_HASH
+
+
+def test_same_post_collected_again_has_the_same_hash(source):
+    social = replace(source, platform="other")
+
+    assert (
+        build(social, post_page("https://t.me/h/1", "https://t.me/h/1"))["content_hash"]
+        == build(social, post_page("https://t.me/h/1", "https://t.me/h/1"))["content_hash"]
+    )
+
+
+def test_a_tracking_parameter_on_the_url_does_not_change_the_hash(source):
+    social = replace(source, platform="other")
+
+    doc = build(social, post_page("https://t.me/h/1?single", "https://t.me/h/1"))
+
+    assert doc["content_hash"] == POST_1_HASH
+
+
+def test_without_a_canonical_url_the_url_is_hashed(source):
+    social = replace(source, platform="other")
+
+    assert build(social, post_page("https://t.me/h/1", None))["content_hash"] == POST_1_HASH
+    assert build(social, post_page("https://t.me/h/1"))["content_hash"] == POST_1_HASH

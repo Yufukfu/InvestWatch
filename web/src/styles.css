@@ -45,7 +45,7 @@ main > * { min-width: 0; }
 /* Panels */
 .panel, .trend { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
 .trend { margin: 0; }
-.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .panel-header h2, .trend-header h2 { margin: 0; font-size: 19px; }
 
 /* Health badge */
@@ -190,3 +190,41 @@ button.link:hover { color: #1e40af; }
 .save-error p { margin: 0; }
 .table-scroll[aria-busy='true'] { opacity: 0.6; transition: opacity 0.15s; }
 .btn[aria-disabled='true'] { opacity: 0.55; cursor: not-allowed; }
+
+/* Live connection and high-risk toasts */
+.header-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.live { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 15px; font-weight: 600; background: #1e293b; color: #e2e8f0; }
+.live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+.live-live::before { background: #4ade80; box-shadow: 0 0 0 3px rgb(74 222 128 / 25%); }
+.live-offline { background: #7f1d1d; color: #fee2e2; }
+.live-offline::before { background: #fca5a5; }
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: grid; gap: 10px; width: min(380px, calc(100vw - 32px)); }
+/* Inside the detail dialog the toasts are in its flow, above the content, not floating over the Save button. */
+.detail .toasts { position: static; width: auto; margin: 12px 0 0; }
+.toast { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-left: 5px solid #b91c1c; border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 8px 24px rgb(15 23 42 / 20%); animation: toast-in 0.2s ease-out; }
+.toast p { margin: 0; }
+.toast-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toast-title { margin: 6px 0 10px !important; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 520px) { .toast:nth-of-type(n + 3) { display: none; } }
+.toast-actions { display: flex; gap: 8px; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.toast-meta { color: var(--muted); }
+
+/* Calibration panel */
+.segmented { display: flex; gap: 4px; flex-wrap: wrap; }
+.segmented button { font: inherit; padding: 4px 12px; border: 1px solid #6b7280; border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; }
+.segmented button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.threshold-row { display: grid; grid-template-columns: auto minmax(160px, 1fr) auto auto; align-items: center; gap: 12px; margin: 12px 0; }
+.threshold-row label { font-weight: 600; }
+.threshold-row input[type='range'] { accent-color: var(--accent); min-height: 0; padding: 0; border: 0; }
+.threshold-selected { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) { .threshold-row { grid-template-columns: 1fr auto; } .threshold-row input[type='range'] { grid-column: 1 / -1; } }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+.metric { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
+.metric-label { color: var(--muted); font-weight: 600; }
+.metric-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.metric-before { color: var(--muted); }
+.calibration-plot { width: 100%; }
+.calibration-save { margin-top: 16px; display: grid; gap: 10px; }
+.warning { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--risk-medium-bg); color: var(--risk-medium-fg); font-weight: 600; }

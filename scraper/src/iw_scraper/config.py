@@ -159,3 +159,17 @@ def render_settings(*, attempt_timeout: float) -> RenderSettings:
             f"({timeout:g}) plus {ATTEMPT_ROOM_SECONDS:g} seconds while SCRAPER_RENDER_ENABLED is true"
         )
     return RenderSettings(enabled, max_per_hour, url, timeout)
+
+
+DEFAULT_SOCIAL_MAX_POSTS = 40
+
+
+def social_max_posts() -> int:
+    """`SOCIAL_MAX_POSTS`: how many posts of a social channel one run reads at most (twenty a page)."""
+    try:
+        value = int(os.environ.get("SOCIAL_MAX_POSTS", DEFAULT_SOCIAL_MAX_POSTS))
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise ValueError("SOCIAL_MAX_POSTS must be a whole number of posts, at least 1")
+    return value

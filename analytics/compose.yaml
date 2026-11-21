@@ -4,7 +4,9 @@
 # Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml up analytics
 services:
   analytics:
-    build: .
+    # ../analytics, not `.`: with several -f files Compose resolves paths from the first file's directory (infra/ in
+    # the command above); from analytics/ (root include) it is the same directory. api-migrate uses `..` likewise.
+    build: ../analytics
     image: investwatch/analytics:${IW_VERSION:-dev}
     restart: unless-stopped
     environment:
@@ -28,6 +30,11 @@ services:
       api-migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      # Makes `up --wait` check the one-shot for completion, as it does for api-migrate. A service nobody depends on is
+      # checked for "running or healthy", and a finished one-shot fails that ("no healthcheck configured" while it
+      # runs, "exited (0)" once done). required: false still starts the worker if the evaluation fails; --wait then
+      # exits 1 with "didn't complete successfully". Delays the worker only by the evaluation run (seconds).
+      analytics-eval: { condition: service_completed_successfully, required: false }
     # data only: Postgres and Redis, internal, no route out. The worker makes no outbound call yet; analytics-llm-p0
     # adds egress together with the hosted LLM client (ADR 0304).
     networks: [data]
@@ -43,8 +50,9 @@ services:
   # calibration panel has a curve after a plain `docker compose up`. Rules-only and deterministic; it writes a module's
   # run only when the gold set, the pipeline version or the results changed, so restarts add nothing.
   # Manual re-run: docker compose run --rm analytics-eval  (or: python analytics/eval/run.py --db).
+  # No `build:` here: `analytics` builds the shared image (like api-migrate/api). Two services building one tag run
+  # two parallel exports, and with the containerd image store one fails "image ... already exists", aborting `up --build`.
   analytics-eval:
-    build: .
     image: investwatch/analytics:${IW_VERSION:-dev}
     command: ["python", "-m", "investwatch_analytics.evaluation", "--db"]
     restart: "no"
@@ -56,7 +64,8 @@ services:
       postgres: { condition: service_healthy }
     # data only: Postgres. No Redis, no egress (no LLM in the default run).
     networks: [data]
-    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none.
+    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none. `up --wait` checks this service
+    # for completion because `analytics` depends on it (see there), so it does not need a healthcheck.
     healthcheck:
       disable: true
     read_only: true

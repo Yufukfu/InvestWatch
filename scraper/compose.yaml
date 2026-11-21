@@ -1,0 +1,126 @@
+# scraper/ deployment unit (owner Adam). Included from the root compose.yaml next to infra/compose.yaml, which owns
+# postgres, redis, minio-init and the data and egress networks, and api/compose.yaml, whose one-shot api-migrate
+# creates the tables. None of them is declared here.
+# Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f scraper/compose.yaml up worker scheduler
+# Order: api-migrate -> seed (registers the KNF source with a cron) -> worker and scheduler. One image, three roles.
+# Checked by scraper/tests/stack.sh (spec scraper-deployment, ADR 0106).
+
+# One image, built once by `worker` only: three services that each build and export the same tag race on Docker's
+# containerd image store ("image ... already exists"). seed and scheduler reuse the image compose builds first.
+# The page renderer (ADR 0107) is its own file, checked by scraper/tests/renderer_stack.sh; the worker joins its
+# internal `render` network below.
+include:
+  - compose.renderer.yaml
+
+x-scraper-image: &scraper-image
+  image: investwatch/scraper:${IW_VERSION:-dev}
+
+# Hardening shared by every role. /tmp is the one writable path: every fetch spools its body to a temp file, at most
+# FETCH_MAX_BYTES (5 MiB) times SCRAPER_MAX_JOBS (10) at once, well under the 128m tmpfs; tmpfs counts toward the
+# memory limit.
+x-scraper-hardening: &hardening
+  read_only: true
+  tmpfs: ["/tmp:size=128m"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+# Credentials: the app roles from the root .env, no default, no admin value. worker and scheduler share the runtime
+# wiring (app.py), which opens Postgres, Redis and MinIO before starting.
+x-scraper-credentials: &credentials
+  DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-iw-app}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (scripts/init-env.sh)}
+  MINIO_BUCKET: ${MINIO_BUCKET:-iw-raw}
+  MINIO_SECURE: ${MINIO_SECURE:-false}  # plain HTTP on the internal network
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  # SIGTERM: finish running jobs for this long, then requeue (up to 10 s more). stop_grace_period below must exceed it.
+  SCRAPER_SHUTDOWN_DEADLINE: ${SCRAPER_SHUTDOWN_DEADLINE:-30}
+
+services:
+  # One-shot: registers the KNF source with a schedule, idempotent by URL, rerun on every `up`.
+  # Without the cron argument schedule_cron stays NULL and the scheduler skips the source.
+  seed:
+    <<: [*scraper-image, *hardening]
+    command: ["python", "-m", "iw_scraper.seed", "${SCRAPER_SEED_CRON:-0 */6 * * *}"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+    networks: [data]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+  # Collectors: arq worker, scan-request consumer and GET /health on SCRAPER_HEALTH_PORT (inside data only, no host
+  # port). Scale with `--scale worker=N`: the queue, run lock and domain limits are shared through Redis.
+  worker:
+    <<: [*scraper-image, *hardening]
+    build:
+      context: ..
+      dockerfile: scraper/Dockerfile
+      target: runtime
+    command: ["python", "-m", "iw_scraper", "worker"]
+    restart: unless-stopped
+    # 30 s deadline + 10 s requeue (worker.CLOSE_TIMEOUT) + margin: a stop never ends in SIGKILL.
+    stop_grace_period: 60s
+    environment:
+      <<: *credentials
+      SCRAPER_HEALTH_PORT: ${SCRAPER_HEALTH_PORT:-8080}
+      # Operator settings, defaults as in scraper/.env.example. PROXY_LIST may hold credentials: root .env only.
+      PROXY_LIST: ${PROXY_LIST:-}
+      PROXY_ROTATION: ${PROXY_ROTATION:-per_request}
+      PROXY_COOLDOWN_SECONDS: ${PROXY_COOLDOWN_SECONDS:-90}
+      DOMAIN_MIN_INTERVAL_SECONDS: ${DOMAIN_MIN_INTERVAL_SECONDS:-5}
+      FETCH_TIMEOUT_SECONDS: ${FETCH_TIMEOUT_SECONDS:-20}
+      FETCH_MAX_BYTES: ${FETCH_MAX_BYTES:-5242880}
+      ALLOWED_PORTS: ${ALLOWED_PORTS:-80,443}
+      COMPOSE_INTERNAL_HOSTS: ${COMPOSE_INTERNAL_HOSTS:-}
+      FETCH_EXTRA_HOSTS: ${FETCH_EXTRA_HOSTS:-}
+      # Page rendering, off by default. With it on, an attempt must outlast a render (RENDER_TIMEOUT_SECONDS + 60 s).
+      SCRAPER_RENDER_ENABLED: ${SCRAPER_RENDER_ENABLED:-false}
+      SCRAPER_RENDER_MAX_PER_HOUR: ${SCRAPER_RENDER_MAX_PER_HOUR:-20}
+      SCRAPER_ATTEMPT_TIMEOUT: ${SCRAPER_ATTEMPT_TIMEOUT:-180}
+      RENDERER_URL: http://renderer:8080
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-90}
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      seed: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # data reaches Postgres, Redis and MinIO; egress is the route to the scraped sites; render is the private link to
+    # the renderer.
+    networks: [data, egress, render]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${SCRAPER_HEALTH_PORT:-8080}/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 768M }
+
+  # Enqueues due sources and runs the republish sweep. Exactly one: a second only wastes ticks. It fetches nothing,
+  # so it has no route out. Serves no /health: stack.sh asserts it stays running without restarts.
+  scheduler:
+    <<: [*scraper-image, *hardening]
+    command: ["python", "-m", "iw_scraper", "scheduler"]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      <<: *credentials
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      seed: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [data]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }

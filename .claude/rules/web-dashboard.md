@@ -43,6 +43,7 @@ Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../..
 - The slider previews by choosing points of `GET /calibration`; precision, recall and FP/FN come from those points and are not recalculated in the browser.
 - `PUT /settings/thresholds` runs only on an explicit save ("Zapisz"). It recomputes `risk_level` for every finding and changes the threshold that analytics uses for `finding.high_risk` (ADR 0305), so it is a global write, not a preview.
 - The generated `putSettingsThresholds` invalidates only the `settings` tag. Override it (`enhanceEndpoints`) so a successful PUT also invalidates `findings`, `stats` and `calibration`.
+- A status change (`PATCH /findings/{id}` or `finding.updated`) also invalidates `calibration`: analyst labels (`confirmed` / `false_positive`) feed the curve (integration-plan §5).
 
 ## Status changes
 

@@ -7,4 +7,4 @@ include:
   - web/compose.yaml
   - api/compose.yaml
   - analytics/compose.yaml
-  - scraper/compose.renderer.yaml
+  - scraper/compose.yaml

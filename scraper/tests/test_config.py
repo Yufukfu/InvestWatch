@@ -57,3 +57,44 @@ def test_the_url_variable_is_not_overridden_by_a_prefixed_one(monkeypatch):
     monkeypatch.setenv("SCRAPER_REDIS_URL", "redis://ignored:6379/0")
 
     assert RunnerSettings.from_env().redis_url == "redis://real:6379/0"
+
+
+def test_the_requeue_cap_is_configurable(monkeypatch):
+    monkeypatch.setenv("SCRAPER_MAX_REQUEUES", "7")
+
+    assert QueueSettings.from_env().max_requeues == 7
+
+
+def test_the_queue_defaults_match_the_web_collection_spec(monkeypatch):
+    for name in ("SCRAPER_FAILURE_THRESHOLD", "SCRAPER_DOMAIN_COOLDOWN", "SCRAPER_MAX_RETRY_AFTER"):
+        monkeypatch.delenv(name, raising=False)
+
+    settings = QueueSettings.from_env()
+
+    assert (settings.failure_threshold, settings.domain_cooldown, settings.max_retry_after) == (5, 600.0, 300.0)
+
+
+def test_social_max_posts_defaults_to_two_pages(monkeypatch):
+    from iw_scraper.config import social_max_posts
+
+    monkeypatch.delenv("SOCIAL_MAX_POSTS", raising=False)
+
+    assert social_max_posts() == 40
+
+
+def test_social_max_posts_is_read_as_a_whole_number(monkeypatch):
+    from iw_scraper.config import social_max_posts
+
+    monkeypatch.setenv("SOCIAL_MAX_POSTS", "60")
+
+    assert social_max_posts() == 60
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "many", "2.5", ""])
+def test_social_max_posts_refuses_anything_else(monkeypatch, value):
+    from iw_scraper.config import social_max_posts
+
+    monkeypatch.setenv("SOCIAL_MAX_POSTS", value)
+
+    with pytest.raises(ValueError, match="SOCIAL_MAX_POSTS"):
+        social_max_posts()

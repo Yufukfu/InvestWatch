@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { useUrlSearch } from './useUrlSearch';
+import { pushSearch, setSearchParam, useUrlSearch } from './useUrlSearch';
 
 describe('useUrlSearch', () => {
   it('reads the current search and pushes a new one', () => {
@@ -40,5 +40,36 @@ describe('useUrlSearch', () => {
     act(() => result.current[1]('?q=a&module=M1'));
     expect(window.history.length).toBe(start + 1);
     expect(result.current[0]).toBe('?q=a&module=M1');
+  });
+
+  it('setSearchParam keeps the other parameters and writes commas unescaped', () => {
+    window.history.replaceState(null, '', '/?module=M1&status=new,in_review');
+    setSearchParam('finding', 'abc');
+    expect(window.location.search).toBe('?module=M1&status=new,in_review&finding=abc');
+  });
+
+  it('setSearchParam replaces the value in place', () => {
+    window.history.replaceState(null, '', '/?finding=a&module=M1');
+    setSearchParam('finding', 'b');
+    expect(window.location.search).toBe('?finding=b&module=M1');
+  });
+
+  it('pushSearch keeps the path and the hash, and does nothing when the search is unchanged', () => {
+    window.history.replaceState(null, '', '/dash#top?x=1');
+    const start = window.history.length;
+    pushSearch('?module=M2');
+    expect(window.location.pathname).toBe('/dash');
+    expect(window.location.hash).toBe('#top?x=1');
+    expect(window.location.search).toBe('?module=M2');
+    expect(window.history.length).toBe(start + 1);
+    pushSearch('?module=M2');
+    expect(window.history.length).toBe(start + 1);
+  });
+
+  it('pushSearch notifies subscribers of a write made outside React', () => {
+    window.history.replaceState(null, '', '/');
+    const { result } = renderHook(() => useUrlSearch());
+    act(() => pushSearch('?finding=z', { replace: true }));
+    expect(result.current[0]).toBe('?finding=z');
   });
 });

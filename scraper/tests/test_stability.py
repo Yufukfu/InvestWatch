@@ -1,16 +1,18 @@
 import asyncio
 import os
 
+import asyncpg
 import pytest
 from arq.jobs import JobStatus
 
 from conftest import Recorder, fast_settings
-from iw_scraper.jobs import AttemptResult
+from iw_scraper.app import JOB_RETRY_ON
+from iw_scraper.jobs import QUEUE_NAME, AttemptResult
 from iw_scraper.worker import RunnerSettings, run_worker
 
 SRC = "88888888-8888-4888-8888-888888888888"
 DOMAIN = "example.test"
-LOCK_KEY = f"iw:lock:{SRC}"
+LOCK_KEY = f"iw:scraper:lock:{SRC}"
 
 
 @pytest.fixture
@@ -18,7 +20,7 @@ async def start_runner(store):
     """Run the supervised worker like the process does; tests stop it through the `stop` event."""
     running: list[tuple[asyncio.Task, asyncio.Event]] = []
 
-    def start(run_source, *, deadline=5.0, max_jobs=10, url=None, queue=None):
+    def start(run_source, *, deadline=5.0, max_jobs=10, url=None, queue=None, retry_on=None):
         stop = asyncio.Event()
         ctx = {"run_source": run_source, "record_error": Recorder().record_error, "sources": store}
         runner = RunnerSettings(
@@ -29,7 +31,8 @@ async def start_runner(store):
             reconnect_cap=0.5,
             poll_delay=0.02,
         )
-        task = asyncio.create_task(run_worker(ctx, queue or fast_settings(), runner, stop=stop))
+        extra = {} if retry_on is None else {"job_retry_on": retry_on}
+        task = asyncio.create_task(run_worker(ctx, queue or fast_settings(), runner, stop=stop, **extra))
         running.append((task, stop))
         return task, stop
 
@@ -124,7 +127,7 @@ async def test_a_job_that_times_out_through_all_its_retries_frees_its_lock_and_s
 
     assert await job.result(timeout=10, poll_delay=0.05) == "failed"
     assert await redis.exists(LOCK_KEY) == 0
-    assert await redis.zcard(f"iw:sem:{DOMAIN}") == 0
+    assert await redis.zcard(f"iw:scraper:sem:{DOMAIN}") == 0
 
 
 async def test_the_worker_survives_a_redis_outage_and_resumes_when_it_returns(redis, start_runner, proxy):
@@ -220,13 +223,13 @@ async def test_the_consumer_loop_handles_requests_until_stopped(redis, store):
     await asyncio.sleep(0.3)
     await redis.xadd("iw:scan-requests", {"source_id": SRC, "requested_at": "2026-11-21T10:00:00Z"})
     for _ in range(100):
-        if await redis.zcard("arq:queue"):
+        if await redis.zcard(QUEUE_NAME):
             break
         await asyncio.sleep(0.05)
     stop.set()
     await asyncio.wait_for(task, 5)
 
-    assert await redis.zcard("arq:queue") == 1
+    assert await redis.zcard(QUEUE_NAME) == 1
 
 
 async def test_closing_a_worker_whose_redis_is_a_black_hole_gives_up_after_the_close_timeout(monkeypatch):
@@ -247,3 +250,23 @@ async def test_closing_a_worker_whose_redis_is_a_black_hole_gives_up_after_the_c
     worker.tasks["job"].cancel()
 
     assert asyncio.get_running_loop().time() - started < 1
+
+
+async def test_the_process_worker_requeues_a_job_whose_postgres_connection_dropped(redis, start_runner, store):
+    real_get, failures = store.get, []
+
+    async def flaky_get(source_id):
+        if not failures:
+            failures.append(1)
+            raise asyncpg.ConnectionDoesNotExistError("connection was closed")
+        return await real_get(source_id)
+
+    store.get = flaky_get
+
+    async def run_source(source_id, started=None):
+        return AttemptResult(documents=1)
+
+    start_runner(run_source, retry_on=JOB_RETRY_ON)
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"

@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useGetFindingsQuery, type Finding } from '../../../api/generated';
 import type { FindingFilters, FindingRow } from '../model';
 import { parseFilters, parseSelected, serializeUrl, toQueryArg, withFilter } from './findingsUrl';
-import { useUrlSearch } from './useUrlSearch';
+import { useUrlSearch } from '../../../url/useUrlSearch';
 
 // The generated DTO stops here. `module` and `status` are assigned from the generated unions, so a
 // contract change that adds a value fails to compile in this file instead of leaking into components.
