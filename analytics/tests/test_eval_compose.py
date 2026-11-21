@@ -19,6 +19,17 @@ def test_service_uses_the_analytics_image():
     assert SERVICE["image"] == COMPOSE["services"]["analytics"]["image"]
 
 
+def test_only_the_worker_builds_the_shared_image():
+    # Two `build:` sections on one tag race at export ("image ... already exists" with the containerd store).
+    assert "build" in COMPOSE["services"]["analytics"]
+    assert "build" not in SERVICE
+
+
+def test_worker_build_context_does_not_depend_on_the_first_compose_file():
+    # `-f infra/compose.yaml -f ... -f analytics/compose.yaml` resolves paths from infra/; `.` would point there.
+    assert COMPOSE["services"]["analytics"]["build"] == "../analytics"
+
+
 def test_service_runs_the_evaluation_with_db_rules_only():
     assert SERVICE["command"] == ["python", "-m", "investwatch_analytics.evaluation", "--db"]
     assert not any(k.startswith("LLM_") for k in SERVICE.get("environment", {}))
