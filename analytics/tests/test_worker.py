@@ -1,4 +1,4 @@
-"""document-stream-worker scenarios (openspec/changes/analytics-worker/specs/document-stream-worker/spec.md).
+"""document-stream-worker scenarios (openspec/specs/document-stream-worker/spec.md).
 
 fakeredis + InMemoryStore + NoopPublisher; one test against real Redis runs with TEST_REDIS_URL.
 """

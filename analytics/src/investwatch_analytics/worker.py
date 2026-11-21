@@ -4,7 +4,7 @@ Per message: load the document, run the pure pipeline, save all findings in one 
 and only then XACK (`.docs/integration-plan.md` §2, points 3-5). A redelivery is safe because the store upserts on
 `(document_id, module)` and an `updated` finding publishes nothing. Poison messages are acked with a reason so they
 never block the stream; an outage of Redis or Postgres is retried with capped backoff and never acked.
-Spec: openspec/changes/analytics-worker/specs/document-stream-worker/spec.md.
+Spec: openspec/specs/document-stream-worker/spec.md.
 
 Run: `python -m investwatch_analytics.worker` (env: see `config.WorkerSettings` and `analytics/.env.example`).
 """

@@ -1,4 +1,4 @@
-"""finding-events scenarios (openspec/changes/analytics-worker/specs/finding-events/spec.md), on fakeredis."""
+"""finding-events scenarios (openspec/specs/finding-events/spec.md), on fakeredis."""
 
 from __future__ import annotations
 

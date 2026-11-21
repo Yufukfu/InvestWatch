@@ -1,4 +1,4 @@
-"""finding-storage scenarios (openspec/changes/analytics-worker/specs/finding-storage/spec.md).
+"""finding-storage scenarios (openspec/specs/finding-storage/spec.md).
 
 The suite runs on every store backend in STORE_BACKENDS. The Postgres backend needs TEST_DATABASE_URL (a
 throwaway server; the URL's role must be allowed to CREATE DATABASE) and is skipped without it. Each test

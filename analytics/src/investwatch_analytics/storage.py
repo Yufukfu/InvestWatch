@@ -3,7 +3,7 @@
 Tables come from the API's Alembic migrations (ADR 0303, change `api-db-schema`); this module only reads and
 writes rows. A finding is identified by `(document_id, module)`: saving the same document again updates its
 finding in place and never touches `id`, `detected_at`, `status` or `note` (analysts own the last two).
-Spec: openspec/changes/analytics-worker/specs/finding-storage/spec.md.
+Spec: openspec/specs/finding-storage/spec.md.
 """
 
 from __future__ import annotations

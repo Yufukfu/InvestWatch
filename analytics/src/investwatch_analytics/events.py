@@ -5,7 +5,7 @@ above the module threshold. The threshold is read from Redis `iw:settings:thresh
 never cached (ADR 0305). A finding reported `updated` publishes nothing. Analytics never computes `risk_level`.
 Events are at most once: a publish failure is logged with the finding ids and never raised, because the
 findings are already committed.
-Spec: openspec/changes/analytics-worker/specs/finding-events/spec.md.
+Spec: openspec/specs/finding-events/spec.md.
 """
 
 from __future__ import annotations
