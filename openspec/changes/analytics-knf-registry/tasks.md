@@ -44,5 +44,5 @@ Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip 
 
 ## 7. Closing
 
-- [ ] 7.1 Apply the iw-docs-update skill: `analytics/registry/README.md` (the three files, KNF attribution and link, the snapshot date, curated domains and `verified_by_human`, refresh command), `analytics/README.md` (`REGISTRY_CSV` default), `.docs/analytics-plan.md` §3 (CSV instead of a table, the seed as fixture), ADR 0311 linked from the code comments, your own domain file in `.docs/status/` only if the coordinator asks; add the iw-ai-log row; run docs-check
+- [x] 7.1 Apply the iw-docs-update skill: `analytics/registry/README.md` (the three files, KNF attribution and link, the snapshot date, curated domains and `verified_by_human`, refresh command), `analytics/README.md` (`REGISTRY_CSV` default), `.docs/analytics-plan.md` §3 (CSV instead of a table, the seed as fixture), ADR 0311 linked from the code comments, your own domain file in `.docs/status/` only if the coordinator asks; add the iw-ai-log row; run docs-check. Done: registry README (files, KNF source, snapshot date, curated domains, refresh), analytics README, plan §3, INDEX row, AI log row; `.docs/status/` left to the coordinator as asked
 - [ ] 7.2 Run the iw-pr-review skill and fix real findings
