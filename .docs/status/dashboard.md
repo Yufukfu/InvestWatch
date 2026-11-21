@@ -14,7 +14,7 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 
 ## Active OpenSpec changes
 
-- `findings-explorer` (this PR); next: Socket.IO alerts, calibration panel
+- none (`findings-explorer` archived, in this PR); next: Socket.IO alerts, calibration panel
 
 ## Blockers and open decisions
 
