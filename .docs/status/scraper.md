@@ -17,6 +17,7 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 
 ## Active OpenSpec changes
 
+- `scraper-source-discovery` (`python -m iw_scraper.discover`: inactive candidate sources from stored links, ADR 0108; implemented, in review);
 - `scraper-stack` (PR #52); `scraper-orchestration`, `scraper-author-provenance`, `scraper-v2-sources` and `content-hash-definition` are merged (PRs #38, #49, #41, #43, #44)
 - `scraper-effectiveness-report` (PR #57)
 
