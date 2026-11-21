@@ -33,5 +33,5 @@
 ## 6. Closing
 
 - [x] 6.1 Run against the contract mock server (`docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts`, run on :8000, `npm run dev`): filters, detail, status change work and the browser console is clean.
-- [ ] 6.2 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `docs-check` clean) and add the `iw-ai-log` row.
+- [x] 6.2 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `docs-check` clean) and add the `iw-ai-log` row.
 - [ ] 6.3 Run the `iw-pr-review` skill and fix real findings.
