@@ -6,7 +6,7 @@
 
 | I want to… | Open |
 |---|---|
-| See where we are and what is blocked | [STATUS.md](STATUS.md) |
+| See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then your domain: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
 | Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
 | Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
 | Store, dedup and announce a document (DB, MinIO, `iw:documents`, republish sweep) | [../scraper/CLAUDE.md](../scraper/CLAUDE.md) (Ingest), [decisions/0104-ingest-order-and-republish-sweep.md](decisions/0104-ingest-order-and-republish-sweep.md) |
