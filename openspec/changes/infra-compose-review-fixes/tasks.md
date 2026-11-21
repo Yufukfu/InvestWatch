@@ -10,7 +10,7 @@
 
 - [x] 2.1 Failing tests: `only_gateway_published` requires the gateway to publish a port; `anonymous_denied` sets the bucket public with root, reruns `minio-init`, then expects 403
 - [x] 2.2 Replace every `sed -i` with a portable helper and `timeout` with a fallback that works without it; no behaviour change on Linux or Git Bash
-- [x] 2.3 Mutation check (remove `mc anonymous set none` from `infra/minio/init.sh`; drop the gateway's `ports:`); mutations: 3 tried, 3 caught (no `anonymous set none`, gateway without `ports:`, `sedi` that never moves its temp file). Both strengthened checks passed on the real infra first, so the red proof is these mutants
+- [x] 2.3 Mutation check (remove `mc anonymous set none` from `infra/minio/init.sh`; drop the gateway's `ports:`); mutations: 3 tried, 3 caught (no `anonymous set none`, gateway without `ports:`, `sedi` that never moves its temp file). Both strengthened checks passed on the real infra first, so the red proof is these mutants. Reviewer follow-up: the CRLF fixture used GNU-only `sed 's/$//'`; now `awk` plus a byte-count guard (Git Bash's grep drops CR); mutations: 2 tried, 2 caught (no CR strip in `init-env.sh`, fixture written without CR)
 
 ## 3. Docs and ADRs
 

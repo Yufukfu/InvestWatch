@@ -151,7 +151,10 @@ init_env_relative_to_caller() {
 }
 init_env_crlf() { # a CRLF .env.example (Windows autocrlf) still gets every secret filled
   local r="$TMP/crlf" v val; mkdir -p "$r/scripts"
-  cp "$ROOT/scripts/init-env.sh" "$r/scripts/"; sed 's/$/\r/' "$ROOT/.env.example" >"$r/.env.example"
+  # awk, not `sed 's/$/\r/'`: BSD sed (macOS) writes a literal "r" there.
+  cp "$ROOT/scripts/init-env.sh" "$r/scripts/"; awk '{ printf "%s\r\n", $0 }' "$ROOT/.env.example" >"$r/.env.example"
+  # Count bytes: Git Bash's grep and awk drop the CR when they read text.
+  [ "$(tr -dc '\r' <"$r/.env.example" | wc -c | tr -d ' ')" -gt 0 ] || { echo "fixture has no CRLF"; return 1; }
   "$r/scripts/init-env.sh" "$r/out.env" >/dev/null || return 1
   for v in "${SECRETS[@]}"; do
     val=$(grep -E "^$v=" "$r/out.env" | cut -d= -f2- | tr -d '\r')
