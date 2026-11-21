@@ -9,6 +9,8 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0101](0101-scraper-fetch-client.md) | Scraper fetch client | proposed (agent draft, no decision) |
 | [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | proposed (agent draft, no decision) |
 | [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research) |
+| [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted |
+| [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
