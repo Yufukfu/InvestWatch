@@ -7,11 +7,11 @@
 
 ## 2. Read endpoints
 
-- [ ] 2.1 Write failing tests for every read path in `contracts/openapi.yaml`: status codes, response bodies validated against the referenced schemas, 404 for unknown ids, 422 for malformed ids and missing `module`
-- [ ] 2.2 Write failing tests for findings filters (`module`, comma-separated `status`, `platform`, `source_id`, `risk_level`, `score_min`, dates, `q`), `sort`, pagination and the empty result
-- [ ] 2.3 Implement `GET /api/findings` and `GET /api/findings/{id}` (finding + document + `screenshot_urls`)
-- [ ] 2.4 Implement `GET /api/stats/summary`, `GET /api/stats/trend`, `GET /api/calibration`, `GET /api/settings/thresholds`, `GET /api/sources`, `GET /api/health`, and the PNG placeholder for `GET /api/documents/{id}/screenshot/{viewport}`
-- [ ] 2.5 Add CORS for the configured origins and a test for the `Access-Control-Allow-Origin` header
+- [x] 2.1 Write failing tests for every read path in `contracts/openapi.yaml`: status codes, response bodies validated against the referenced schemas, 404 for unknown ids, 422 for malformed ids and missing `module`
+- [x] 2.2 Write failing tests for findings filters (`module`, comma-separated `status`, `platform`, `source_id`, `risk_level`, `score_min`, dates, `q`), `sort`, pagination and the empty result
+- [x] 2.3 Implement `GET /api/findings` and `GET /api/findings/{id}` (finding + document + `screenshot_urls`)
+- [x] 2.4 Implement `GET /api/stats/summary`, `GET /api/stats/trend`, `GET /api/calibration`, `GET /api/settings/thresholds`, `GET /api/sources`, `GET /api/health`, and the PNG placeholder for `GET /api/documents/{id}/screenshot/{viewport}`
+- [x] 2.5 Add CORS for the configured origins and a test for the `Access-Control-Allow-Origin` header
 
 ## 3. Write endpoints
 

@@ -119,6 +119,37 @@ class Store:
         self.calibration: dict[str, dict] = data.calibration
         self.health: dict = data.health
         self.events: list[dict] = data.events
+        self.added_ids: set[str] = set()
+
+    def add_finding(self, finding: dict) -> None:
+        """Add a finding created at runtime (replay); it also counts in the trend."""
+        self.findings[finding["id"]] = finding
+        self.added_ids.add(finding["id"])
+
+    def trend_points(self, risk_level_filter: str | None = None) -> list[dict]:
+        """Hourly points: the mock trend plus findings added at runtime.
+
+        With a risk-level filter the mock background counts cannot be split by risk, so the points
+        are recomputed from the findings themselves over the same hourly buckets.
+        """
+        base = [dict(p) for p in self.trend["points"]]
+        if risk_level_filter:
+            for p in base:
+                for m in MODULES:
+                    p[m] = 0
+            counted = [f for f in self.findings.values() if self.risk_level_of(f) == risk_level_filter]
+        else:
+            counted = [self.findings[i] for i in self.added_ids if i in self.findings]
+
+        by_hour = {p["t"]: p for p in base}
+        for f in counted:
+            hour = f["detected_at"][:13] + ":00:00Z"
+            point = by_hour.get(hour)
+            if point is None:
+                point = by_hour[hour] = {"t": hour, **{m: 0 for m in MODULES}}
+                base.append(point)
+            point[f["module"]] += 1
+        return sorted(base, key=lambda p: p["t"])
 
     def risk_level_of(self, finding: dict) -> str:
         return risk_level(finding["score"], self.thresholds[finding["module"]])
