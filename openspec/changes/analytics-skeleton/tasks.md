@@ -14,9 +14,9 @@
 
 ## 3. Firm registry
 
-- [ ] 3.1 Failing tests for the registry scenarios (name without legal form, domain, no match, missing/malformed CSV)
-- [ ] 3.2 `registry.py` and `analytics/registry/seed.csv` with the three fictional mock firms; tests green
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 Failing tests for the registry scenarios (name without legal form, domain, no match, missing/malformed CSV)
+- [x] 3.2 `registry.py` and `analytics/registry/seed.csv` with the three fictional mock firms; tests green
+- [x] 3.3 Mutation check; `mutations: 18 tried, 17 caught` (1 equivalent: `elif` -> `if` only adds a lower-confidence candidate for the same firm, which never wins; the short-name fuzzy guard was removed as unreachable at ratio >= 88)
 
 ## 4. Rule engine and R1-R3
 
