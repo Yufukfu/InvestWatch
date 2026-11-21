@@ -29,9 +29,9 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 
 ## 5. Domain overlay and owner-routed issues
 
-- [ ] 5.1 Write the failing tests `domain.test.mjs`: `--author`, `--domain scraper`, `--domain mine`, unknown directory exits non-zero before fetching, CODEOWNERS read from the default branch even when a PR edits it, the owner-routed issue prompt names the owner and the path and the duplicate rule
-- [ ] 5.2 Implement the filters in `lib/scan.mjs` and the issue branch in `lib/prompt.mjs`; verify the tests pass
-- [ ] 5.3 Mutation check: the path-prefix match, `mine` expansion, default-branch read, the duplicate rule in the prompt. `mutations: _ tried, _ caught`
+- [x] 5.1 Write the failing tests `domain.test.mjs`: `--author`, `--domain scraper`, `--domain mine`, unknown directory exits non-zero before fetching, CODEOWNERS read from the default branch even when a PR edits it, the owner-routed issue prompt names the owner and the path and the duplicate rule
+- [x] 5.2 Implement the filters in `lib/scan.mjs` and the issue branch in `lib/prompt.mjs`; verify the tests pass
+- [x] 5.3 Mutation check: the path-prefix match, `mine` expansion, default-branch read, the duplicate rule in the prompt. `mutations: 15 tried, 15 caught`
 
 ## 6. Skill, schedule example and CI
 

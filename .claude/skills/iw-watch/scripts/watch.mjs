@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { makeGh, GhError } from './lib/gh.mjs';
-import { scan } from './lib/scan.mjs';
+import { scan, domainFilter, DomainError } from './lib/scan.mjs';
 import { stateDir, loadState, saveState, ack, dropClosed, acquireLock, releaseLock, refreshLock, recordSession } from './lib/state.mjs';
 import { loadCodeowners, ownerOf } from './lib/codeowners.mjs';
 import { buildPrompt, safeBranch } from './lib/prompt.mjs';
@@ -60,7 +60,6 @@ export function parseArgs(argv) {
   }
   if (o.author && !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(o.author)) throw new UsageError('--author must be a GitHub login');
   if (cmd === 'ack' && !o.ids.length) throw new UsageError('ack needs at least one item id');
-  if (o.domains.length) throw new UsageError('--domain is not implemented yet');
   if (cmd === 'scan' && (o.dryRun || o.limit !== null || o.model)) throw new UsageError('--dry-run, --limit and --model apply to run only');
   if (cmd !== 'ack' && !o.mine && !o.reviewRequested && !o.author && !o.domains.length) {
     throw new UsageError('say what to watch: --mine, --review-requested, --author <login> or --domain <dir>');
@@ -128,17 +127,31 @@ function printItems(deps, items, json) {
 export const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '?');
 
 function scanState(deps, ctx, o, state) {
-  const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode: { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author }, state, maxRounds: o.maxRounds, warn: (m) => deps.stderr(`${m}\n`) });
+  const mode = { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author, domainFilter: ctx.domainFilter };
+  const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode, state, maxRounds: o.maxRounds, warn: (m) => deps.stderr(`${m}\n`) });
   if (r.open) dropClosed(state, r.open);
   return r;
 }
 
-function owners(deps, mainRoot, ctx, files) {
+/** CODEOWNERS of origin/<default branch> in the main clone (fetched first), so a PR cannot reroute itself */
+function codeowners(deps, ctx) {
+  const mainRoot = deps.mainRoot || findMainRoot({ git: deps.git });
   const git = (args) => deps.git(['-C', mainRoot, ...args]);
   try { git(['fetch', '--quiet', 'origin', ctx.defaultBranch]); } catch { /* offline: use what we have */ }
+  return loadCodeowners({ git, ref: `origin/${ctx.defaultBranch}` });
+}
+
+function owners(deps, ctx, files) {
   let rules = null;
-  try { rules = loadCodeowners({ git, ref: `origin/${ctx.defaultBranch}` }); } catch (e) { deps.stderr(`iw-watch: CODEOWNERS ignored: ${e.message}\n`); }
+  try { rules = codeowners(deps, ctx); } catch (e) { deps.stderr(`iw-watch: CODEOWNERS ignored: ${e.message}\n`); }
   return files.slice(0, 200).map((p) => ({ path: p, owners: rules ? ownerOf(rules, p) : [] }));
+}
+
+function withDomains(deps, ctx, o) {
+  if (!o.domains.length) return ctx;
+  const rules = codeowners(deps, ctx);
+  if (!rules) throw new DomainError(`--domain needs .github/CODEOWNERS on origin/${ctx.defaultBranch}`);
+  return { ...ctx, domainFilter: domainFilter(rules, o.domains, ctx.me) };
 }
 
 /** One item, one headless session. Returns the notice to emit. The item is acknowledged in every case but a crash. */
@@ -160,7 +173,7 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   }
   recordSession(state, it.pr);
   saveState(sdir, state); // a crash during the session still counts the round
-  const prompt = buildPrompt({ item: it, me: ctx.me, owners: owners(deps, mainRoot, ctx, it.files), dryRun: o.dryRun });
+  const prompt = buildPrompt({ item: it, me: ctx.me, owners: owners({ ...deps, mainRoot }, ctx, it.files), dryRun: o.dryRun });
   const args = claudeArgs({ kind: it.kind, pr: it.pr, headRef: it.headRef, dryRun: o.dryRun, budgetUsd: o.budgetUsd, model: o.model });
   const res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
   const copied = collectDrafts({ dir: clone.dir, to: draftDir });
@@ -224,7 +237,7 @@ export async function main(argv, deps = defaultDeps()) {
   deps = { ...defaultDeps(), ...deps };
   try {
     if (o.cmd === 'run' && !deps.claudeAvailable()) return runCmd(deps, null, o);
-    const ctx = context(deps);
+    const ctx = withDomains(deps, context(deps), o);
     if (o.cmd === 'ack') {
       withState(deps, ctx.repo, (state) => { for (const id of o.ids) ack(state, id); });
       deps.stdout(`iw-watch: acknowledged ${o.ids.join(', ')}\n`);
@@ -241,7 +254,7 @@ export async function main(argv, deps = defaultDeps()) {
       deps.stderr(`iw-watch: ${e.kind}: ${e.message}\n`);
       return 2;
     }
-    if (/not an item id|not pending/.test(e.message)) {
+    if (e instanceof DomainError || /not an item id|not pending/.test(e.message)) {
       deps.stderr(`iw-watch: ${e.message}\n`);
       return 64;
     }

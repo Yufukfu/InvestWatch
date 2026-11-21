@@ -3,6 +3,42 @@
 // the caller saves the state only when the whole scan succeeded.
 import { itemId, digest, setPending, isHandled } from './state.mjs';
 import { countRounds, capReached } from './rounds.mjs';
+import { ownedDirs } from './codeowners.mjs';
+
+export class DomainError extends Error {}
+
+const norm = (p) => p.replace(/^\/+|\/+$/g, '');
+
+/**
+ * `--domain <dir>` and `--domain mine` -> files => boolean, from CODEOWNERS rules of the default branch.
+ * A domain is a CODEOWNERS pattern (`scraper`, `/scraper/` and `scraper/` name the same one); an unknown one
+ * is an error, so a typo does not silently watch nothing.
+ */
+export function domainFilter(rules, domains, me) {
+  const wanted = new Set();
+  for (const d of domains) {
+    if (d === 'mine') {
+      const own = ownedDirs(rules, me).map(norm);
+      if (!own.length) throw new DomainError(`--domain mine: @${me} owns no directory in CODEOWNERS`);
+      own.forEach((p) => wanted.add(p));
+    } else if (rules.some((r) => norm(r.pattern) === norm(d))) {
+      wanted.add(norm(d));
+    } else {
+      throw new DomainError(`--domain ${d}: no CODEOWNERS entry for that directory (known: ${rules.map((r) => norm(r.pattern)).join(', ')})`);
+    }
+  }
+  const res = rules.filter((r) => wanted.has(norm(r.pattern))).map((r) => r.re);
+  return (files) => files.some((f) => res.some((re) => re.test(f.replace(/^\.?\//, ''))));
+}
+
+const GH_FILES_LIMIT = 100;
+
+/** gh pr list --json files stops at 100 files; a list that long may be cut, so ask the API for all of them */
+function filesOf(gh, repo, pr) {
+  const files = (pr.files || []).map((f) => f.path);
+  if (files.length < GH_FILES_LIMIT) return files;
+  return (gh(['api', '--paginate', `repos/${repo}/pulls/${Number(pr.number)}/files?per_page=100`]) || []).map((f) => f.filename);
+}
 
 export const PR_FIELDS = 'number,title,url,isDraft,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files';
 export const LIST_LIMIT = 100;
@@ -122,7 +158,13 @@ export function scan({ gh, repo, me, mode, state, maxRounds = 3, warn = () => {}
   const openList = gh(['pr', 'list', '--state', 'open', '--limit', String(OPEN_LIMIT), '--json', 'number']) || [];
   const open = openList.length >= OPEN_LIMIT ? null : new Set(openList.map((p) => p.number));
   const st = (n) => state.prs[n] || {};
-  const keep = (pr) => (!mode.author || lc(pr.author?.login) === lc(mode.author)) && (!mode.domainFilter || mode.domainFilter((pr.files || []).map((f) => f.path)));
+  const keep = (pr) => {
+    if (mode.author && lc(pr.author?.login) !== lc(mode.author)) return false;
+    if (!mode.domainFilter) return true;
+    const files = filesOf(gh, repo, pr);
+    pr.files = files.map((p) => ({ path: p }));
+    return mode.domainFilter(files);
+  };
   const items = [];
   const done = new Set();
   if (mode.mine) {

@@ -29,12 +29,17 @@ function ownership(owners, me) {
   return owners.map((o) => `- ${o.path}: ${o.owners.length ? o.owners.map((x) => `@${x}`).join(', ') : 'no owner'}${o.owners.some((x) => x.toLowerCase() === me.toLowerCase()) ? ' (you)' : ''}`).join('\n');
 }
 
-function issueProcedure(dryRun) {
+function issueProcedure(dryRun, me) {
+  const routing = [
+    `A path with no owner: do not open an issue for it; list it under "Needs @${me}" in your reply.`,
+    'A team owner (@org/team) cannot be assigned: open the issue without --assignee and mention the team in the first line of the body.',
+  ];
   if (dryRun) {
-    return 'If you find a defect in a path owned by someone else, do not edit that path. Write the issue to `.iw-watch/issue-<n>.md` (line 1 `# <title>`, line 2 `assignee: <login>`, then the body with the evidence) and do not open it.';
+    return ['If you find a defect in a path owned by someone else, do not edit that path. Write the issue to `.iw-watch/issue-<n>.md` (line 1 `# <title>`, line 2 `assignee: <login>`, then the body with the evidence) and do not open it.', ...routing].join('\n');
   }
   return [
     'If you find a defect in a path owned by someone else (see Ownership), do not edit that path. Report it to its owner instead:',
+    ...routing,
     '1. Look for a duplicate: `gh issue list --state open --search "<title> in:title" --json number,title`. Titles match when equal ignoring case and spaces.',
     '2. Duplicate found: write the new evidence to `.iw-watch/issue-comment.md` and run `gh issue comment <number> --body-file .iw-watch/issue-comment.md`.',
     '3. Otherwise write `.iw-watch/issue.md` (what is wrong, the evidence: command, input, actual and expected output, the path) and run `gh issue create --title "<title>" --assignee <owner login> --body-file .iw-watch/issue.md`.',
@@ -90,7 +95,7 @@ export function buildPrompt({ item, me, owners = [], dryRun = false, nonce }) {
     '3. Never use, set or write an `IW_*` escape flag or environment variable. If a hook denies a commit or a push, fix the cause or stop and report it.',
     `4. End every comment and issue body you write with the line ${MARKER} (it counts rounds across machines). Write bodies to files under \`.iw-watch/\` and pass them with --body-file. Never commit \`.iw-watch/\`.`,
     '5. Post at most one PR comment in this session.',
-    `6. ${issueProcedure(dryRun)}`,
+    `6. ${issueProcedure(dryRun, me)}`,
     '',
     '## Ownership (CODEOWNERS on the default branch)',
     ownership(owners, me),
