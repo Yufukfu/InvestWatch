@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 
 _EXTRA_KEYS = ("method", "path", "status", "event", "duration_ms", "reason")
 # user:password@ in any URL, and the bound parameters SQLAlchemy appends to DBAPI errors (row data).
-# Greedy up to the last "@" of the token, so an unencoded "/" or "@" in a password is still covered
-# (at worst the host is masked too).
-_URL_CREDENTIALS = re.compile(r"(?P<scheme>[a-z][a-z0-9+.-]*://)[^\s@]*@", re.IGNORECASE)
+# Greedy up to the last "@" of the whitespace-free token (\S* backtracks to it), so an unencoded "/" or
+# "@" in a password is still covered (at worst an "@" in the path masks the host too).
+_URL_CREDENTIALS = re.compile(r"(?P<scheme>[a-z][a-z0-9+.-]*://)\S*@", re.IGNORECASE)
 _SQL_PARAMETERS = re.compile(r"\[parameters: .*?\](?=\s*(\(|\[|$))", re.DOTALL)
 
 

@@ -6,9 +6,9 @@
 
 ## 2. Redaction
 
-- [ ] 2.1 Test: `postgresql://iw_admin:p@ss@word@postgres:5432/db` leaves no part of the password in the whole message
-- [ ] 2.2 `_URL_CREDENTIALS` matches up to the last `@` of the token
-- [ ] 2.3 Mutation check
+- [x] 2.1 Test: `postgresql://iw_admin:p@ss@word@postgres:5432/db` leaves no part of the password in the whole message
+- [x] 2.2 `_URL_CREDENTIALS` matches up to the last `@` of the token
+- [x] 2.3 Mutation check — mutations: 3 tried, 3 caught
 
 ## 3. Tests that can fail
 

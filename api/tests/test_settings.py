@@ -73,8 +73,13 @@ def test_url_credentials_are_redacted_in_message_and_exception():
 @pytest.mark.parametrize("password", ["pa/ss", "p@ss@word", "a:b/c@d"])
 def test_unencoded_special_characters_in_password_are_redacted(password):
     entry = _formatted(f"connect postgresql://iw_admin:{password}@postgres:5432/db failed")
-    assert password not in entry["msg"]
-    assert password.split("@")[-1] not in entry["msg"].split("***@")[0]
+    # The whole message: user, every fragment of the password, host and the rest are checked exactly.
+    assert entry["msg"] == "connect postgresql://***@postgres:5432/db failed"
+
+
+def test_two_urls_in_one_line_are_both_redacted():
+    entry = _formatted("from postgresql://u:p@ss@a:5432/x to redis://:h@nter@redis:6379/0")
+    assert entry["msg"] == "from postgresql://***@a:5432/x to redis://***@redis:6379/0"
 
 
 def test_sql_parameters_are_redacted():
