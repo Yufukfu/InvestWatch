@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or a blocker appears; agents read it at session start. Edit only your own module's row (limits merge conflicts); the owner of a milestone edits its row.
+Last updated: 2026-11-21 (Sat) by Damian. Update this file when a milestone moves or a blocker appears; agents read it at session start. Edit only your own module's row (limits merge conflicts); the owner of a milestone edits its row.
 
 ## Milestones (from `integration-plan.md` §8)
 
@@ -19,7 +19,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 |---|---|---|---|
 | scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
 | dashboard | B | n/a | none yet |
-| analytics, api, contracts | C | plans written; contracts draft v1 in `contracts/`; mock server for `web/` in `contracts/mock-server/` (REST `http://localhost:8000/api`, Socket.IO `/events`) ready for review | `mock-server` (branch `contracts/mock-server`) |
+| analytics, api, contracts | Damian | plans written; contracts v1 in `contracts/`; ADRs 0301-0305, see `.docs/decisions/README.md`; mock server for `web/` in `contracts/mock-server/` (REST `http://localhost:8000/api`, Socket.IO `/events`) in review | `mock-server` (branch `contracts/mock-server`) |
 
 ## Blockers and open decisions
 

@@ -1,10 +1,10 @@
 # contracts (owner C)
 
-JSON Schemas, the OpenAPI spec and mock responses for contracts v1: **draft, proposed by C, to be confirmed by A and B**. The file map, the mock-to-endpoint table and the validation commands are in [`README.md`](README.md); rationale and the full field lists are in [`.docs/integration-plan.md`](../.docs/integration-plan.md) §3-§6. Don't restate them here.
+JSON Schemas, the OpenAPI spec and mock responses for contracts v1: frozen core plus provisional optional fields, per [ADR 0301](../.docs/decisions/0301-contracts-v1.md). The file map, the mock-to-endpoint table and the validation commands are in [`README.md`](README.md); rationale and the full field lists are in [`.docs/integration-plan.md`](../.docs/integration-plan.md) §3-§6. Don't restate them here.
 
 ## Rules that are easy to get wrong
 
-- Contracts are frozen after Sat 14:30. A change needs the whole team, a version bump and an OpenSpec change that names it.
+- Contracts are frozen after Sat 14:30. A change needs the whole team, a version bump and an OpenSpec change that names it. Exception until Integration #1 (Sat 17:00): non-required properties and optional query parameters are provisional; change them with `IW_CONTRACT_CHANGE=1`, no bump, in a PR reviewed by their consumers (Adam for documents and sources, Kacper for the REST API), with regenerated mocks and `validate.py` passing ([ADR 0301](../.docs/decisions/0301-contracts-v1.md)).
 - A schema change updates, in the same PR: the schema, `openapi.yaml` if an endpoint changes, the mocks, `.docs/integration-plan.md`, and the tests of every consumer. Regenerate mocks with `python contracts/mocks/generate_mocks.py` (deterministic) instead of hand-editing them.
 - Producers validate their output before inserting: the scraper checks documents with `python contracts/validate.py document <file>` (first `pip install -r contracts/requirements.txt`).
 - Minimum viable `ScrapedDocument` is `id, platform, url, fetched_at, text, source_kind`. Missing `blocks` or screenshots mean "not applicable", never "pass".

@@ -10,9 +10,9 @@ Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modu
 - Rules before LLM. Anything checkable deterministically (regex, dictionaries, block metadata) runs without a model.
 - Every LLM result needs an evidence quote that is verified as a substring of the document; otherwise the result is `uncertain`, not `fail`.
 - Degrade, don't fail: if the LLM endpoint is down the pipeline runs rules-only and records `model.llm = null`.
-- Store the raw `score` (0-1); the threshold is applied in `api`, never here.
+- Store the raw `score` (0-1) on the finding; never compute `risk_level` (the `api` does). The only threshold use here: read Redis `iw:settings:thresholds` (no cache) when creating a finding and publish `finding.high_risk` if `score` is at or above the module threshold ([ADR 0305](../.docs/decisions/0305-threshold-storage.md)).
 - Scraped text is untrusted: put it in a delimited block, tell the model to ignore instructions inside it, limit its length.
-- LLM: Gemma through an Ollama-compatible HTTP API, configured by env (`LLM_BASE_URL`, `LLM_MODEL`); no paid APIs.
+- LLM: an OpenAI-compatible chat completions API configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`). A hosted provider is allowed (mentor exception); local Ollama `/v1` with `gemma3:4b` must keep working as the swap target, so no provider-specific SDK or features ([ADR 0304](../.docs/decisions/0304-llm-serving.md)).
 
 ## Stack and done
 
