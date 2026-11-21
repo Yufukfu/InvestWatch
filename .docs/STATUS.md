@@ -17,7 +17,7 @@ Last updated: 2026-11-21 (Sat) by Damian. Update this file when a milestone move
 
 | Module | Owner | State | Active OpenSpec changes |
 |---|---|---|---|
-| scraper | A | `scraper-v1` (fetch, parse, politeness, guards) implemented and reviewed, in PR; `scraper-ingest` (database sink, `documents`, `iw:documents`) and `scraper-orchestration` (queue, schedule, scan requests, the run that joins the pieces) not started; ADRs 0101 and 0102 accepted on merge, 0103 criteria only | `scraper-v1` (applied) |
+| scraper | A | `scraper-v1` (fetch, parse, politeness, guards) implemented and reviewed, in PR; `scraper-ingest` (database sink, `documents`, `iw:documents`) and `scraper-orchestration` (queue, schedule, scan requests, the run that joins the pieces) not started; ADRs 0101 and 0102 accepted on merge, 0103 criteria only | none (`scraper-v1` archived) |
 | dashboard | B | n/a | none yet |
 | analytics, api, contracts | Damian | plans written; contracts v1 in `contracts/`; ADRs 0301-0305 in PR #3, see `.docs/decisions/README.md` | none yet |
 
