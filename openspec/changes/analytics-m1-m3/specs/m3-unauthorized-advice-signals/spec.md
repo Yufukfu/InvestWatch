@@ -8,7 +8,7 @@ Each M3 signal result SHALL be `fail` when the signal is present, `pass` when ab
 - **THEN** S3.3 and S3.4 are `uncertain` with evidence quoted from the text, and no S3.7 result is listed
 
 ### Requirement: S3.1 entity not in the registry
-S3.1 SHALL be `fail` for every M3 document (routing guarantees no registry match), quoting `author.handle`, else `author.name`, else the page host from `url`.
+S3.1 SHALL be `fail` for every M3 finding (routing sends a publisher that is a registry firm to M2, so the entity behind an M3 offer is never in the registry), quoting `author.handle`, else `author.name`, else the page host from `url`.
 
 #### Scenario: Handle as evidence
 - **WHEN** the mock document `cdbf5306…` is analyzed
@@ -30,7 +30,7 @@ S3.2 SHALL be `fail` when the text has a term from its PL/EN dictionary (`family
 - **THEN** S3.2 is `pass`
 
 ### Requirement: S3.3 personalization
-S3.3 SHALL find candidates from its dictionary (`dopasujemy … do Twojej sytuacji`, `konsultacja 1:1` in any inflection, `profil inwestycyjny`, `ankieta`, `indywidualnie dobierzemy`). It carries an `llm:` block and is sent to the LLM whenever it applies.
+S3.3 SHALL find candidates from its dictionary (`dopasujemy … do Twojej sytuacji`, `konsultacja 1:1` in any inflection, `profil inwestycyjny`, `ankieta`, `indywidualnie dobierzemy`, `szyty na miarę`). It carries an `llm:` block and is sent to the LLM whenever it applies.
 
 #### Scenario: Personal consultation
 - **WHEN** the mock document `007bbcee…` is analyzed without a judge
@@ -41,7 +41,7 @@ S3.3 SHALL find candidates from its dictionary (`dopasujemy … do Twojej sytuac
 - **THEN** S3.3 is `pass`
 
 ### Requirement: S3.4 recommendation of specific instruments
-S3.4 SHALL find a candidate when a buy, sell or hold expression (`kup`, `kupno`, `sprzedaj`, `sprzedaż`, `trzymaj`, `rekomendujemy`, `polecam kupić`, `co kupić`) occurs within one sentence of an instrument noun from Art. 2-3 of the Act on Trading in Financial Instruments (`akcje`, `obligacje`, `ETF`, `CFD`, `opcje`, `kontrakty terminowe`, `certyfikaty`, `jednostki funduszy`), quoting the sentence with the expression. A negated expression (`nie udzielamy rekomendacji`, `nie polecamy kupna`) SHALL NOT be a candidate. Crypto-assets SHALL NOT count as instruments (starting product rule, design Open Question 6). It carries an `llm:` block and is sent to the LLM whenever it applies.
+S3.4 SHALL find a candidate when a recommending buy, sell or hold form (`kup`, `kupuj`, `kupno`, `sprzedaj`, `sprzedaż`, `trzymaj`, `rekomendujemy`, `rekomenduję`, `polecam kupić`, `co kupić`, `co sprzedać`) occurs within one sentence of an instrument noun from Art. 2-3 of the Act on Trading in Financial Instruments (`akcje`, `obligacje`, `ETF`, `CFD`, `opcje`, `kontrakty terminowe`, `futures`, `certyfikaty`, `jednostki funduszy`), quoting the sentence with the expression. First-person past forms (`kupiłam`, `sprzedałem`) and negated expressions (`nie udzielamy rekomendacji`, `nie polecamy kupna`) SHALL NOT be candidates. Plain crypto-assets (`bitcoin`, `BTC`, `ethereum`, `ETH`, `kryptowaluty`) SHALL NOT count as instruments; crypto CFDs, futures and options SHALL count, because the derivative noun matches whatever the underlying (Art. 2 lit. h/i). It carries an `llm:` block and is sent to the LLM whenever it applies.
 
 #### Scenario: Buy and sell recommendation
 - **WHEN** the mock document `007bbcee…` is analyzed without a judge
@@ -55,9 +55,17 @@ S3.4 SHALL find a candidate when a buy, sell or hold expression (`kup`, `kupno`,
 - **WHEN** the mock document `72acbb3b…` is analyzed without a judge
 - **THEN** S3.4 is `pass`
 
-#### Scenario: Crypto only
+#### Scenario: Personal story is not a recommendation
+- **WHEN** the mock document `182e5a42…` (`kupiłam pierwszy ETF`) is evaluated by S3.4
+- **THEN** S3.4 is `pass`
+
+#### Scenario: Plain crypto only
 - **WHEN** the text is `Kupuj bitcoina teraz, sprzedaj na szczycie.`
 - **THEN** S3.4 is `pass`
+
+#### Scenario: Crypto derivative
+- **WHEN** the text is `Kupuj CFD na bitcoina, zanim wystrzeli.`
+- **THEN** S3.4 is `uncertain` with that sentence as evidence
 
 ### Requirement: S3.5 paid model
 S3.5 SHALL be `fail` when the text has paid-model vocabulary (`abonament`, `subskrypcja`, `sygnały premium`, `VIP`, `płatna grupa`) or a monthly price (`<amount> zł/mies`, `PLN miesięcznie`), quoting it, and `pass` otherwise.
@@ -89,12 +97,35 @@ S3.6 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone num
 - **WHEN** an English page on a `.com` host with no PLN or `+48` is analyzed
 - **THEN** S3.6 is `pass`
 
+### Requirement: S3.8 crypto-asset recommendations outside Art. 2
+S3.8 SHALL be `fail` when an S3.4 buy, sell or hold form occurs within one sentence of a plain crypto-asset word (`bitcoin`, `BTC`, `ethereum`, `ETH`, `kryptowaluty`, `altcoiny`) and no Art. 2-3 instrument noun is within that window, quoting the sentence, and `pass` otherwise. Its severity is low and its explanation SHALL say the assets are outside Art. 2 ("poza art. 2"). It counts as an advisory signal for routing but SHALL NOT lift the gate.
+
+#### Scenario: Crypto signal group
+- **WHEN** an unregistered Polish post says `Kupuj bitcoina teraz, sprzedaj na szczycie. Grupa VIP 99 zł/mies.`
+- **THEN** an M3 finding is returned with S3.8 `fail`, S3.4 `pass`, a score of at most 0.4, and a summary saying the assets are outside Art. 2
+
+#### Scenario: Crypto derivative is not S3.8
+- **WHEN** the text is `Kupuj CFD na bitcoina, zanim wystrzeli.`
+- **THEN** S3.8 is `pass`
+
 ### Requirement: M3 score and hard gate
-The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m3_signals.yaml` (`x` as for M1), rounded to 3 decimals. When neither S3.3 nor S3.4 is `fail` or `uncertain`, the score SHALL be at most 0.4 and the summary SHALL say it was capped. An `uncertain` S3.3 or S3.4 lifts the gate (starting product rule, design Open Question 3).
+The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m3_signals.yaml` (`x` as for M1), rounded to 3 decimals, ranking the Art. 76 elements: personalization together with a recommendation of instruments strongest, a recommendation of instruments alone strong, personalization alone weak, general education low. When S3.4 is neither `fail` nor `uncertain`, the score SHALL be at most 0.4 and the summary SHALL say it was capped. An `uncertain` S3.4 lifts the gate; S3.3 alone SHALL NOT.
 
 #### Scenario: Personalized paid recommendations
 - **WHEN** the mock document `007bbcee…` is analyzed without a judge
 - **THEN** the score is at least 0.7 (the M3 default threshold)
+
+#### Scenario: Instrument recommendation alone is strong
+- **WHEN** a page by an unregistered Polish entity has S3.4 `fail` (from a fake judge) and S3.2, S3.3 and S3.5 `pass`
+- **THEN** the score is at least 0.7
+
+#### Scenario: Personalization alone is weak
+- **WHEN** a page has S3.3 `fail` and S3.4 `pass`
+- **THEN** the score is at most 0.4 and the summary mentions the cap
+
+#### Scenario: Both elements are strongest
+- **WHEN** the same page has S3.3 and S3.4 both `fail`
+- **THEN** its score is higher than with S3.4 `fail` alone
 
 #### Scenario: Educational article is capped
 - **WHEN** the mock document `72acbb3b…` is analyzed
@@ -108,8 +139,23 @@ The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m
 - **WHEN** the mock document `cdbf5306…` is analyzed without a judge
 - **THEN** the score is above 0.4 and below the score with a judge that confirms S3.4
 
+### Requirement: M3 alongside M1
+When a document is routed to M1 and S3.3 or S3.4 is `fail` or `uncertain`, analytics SHALL also emit an M3 finding against the publisher if the sentence holding that evidence does not name the matched registry firm (its name, core name or alias), because the offer is then the publisher's own. When every such sentence names the firm, the offer is the firm's and analytics SHALL emit no M3 finding. The M3 finding SHALL have `firm: null` and the publisher as `advertiser`.
+
+#### Scenario: Finfluencer's own buy calls
+- **WHEN** a Polish `third_party` post by `@trader_ola` says `Konto mam w EuroTrade Markets.` and `Moja grupa: co tydzień mówię, co kupić z akcji WIG20.`
+- **THEN** an M1 finding for EuroTrade and an M3 finding with advertiser handle `@trader_ola` and `firm: null` are returned
+
+#### Scenario: The firm's own offer
+- **WHEN** a Polish `third_party` post says `Alfa Inwestycje DM rekomenduje kupno obligacji skarbowych.`
+- **THEN** only an M1 finding is returned
+
+#### Scenario: Ad without advisory content
+- **WHEN** the mock documents `3c41441c…` and `182e5a42…` are analyzed
+- **THEN** each returns only an M1 finding
+
 ### Requirement: M3 finding assembly
-The M3 finding SHALL have `module` M3, `firm` null, the `advertiser` (`in_registry` false, `on_warning_list` null), the M3 signal results, the raw `score`, a Polish title that names the advertiser, a Polish summary listing present and uncertain signals, `status` new, `url` and `platform` from the document, `content_excerpt` of at most 500 characters, and `model.llm` null in rules-only mode. It SHALL validate against `contracts/schemas/finding.schema.json` v1.
+The M3 finding SHALL carry the challenge's M3 output: entity data in `advertiser` (`in_registry` false, `on_warning_list` null), the offer content in `content_excerpt` (at most 500 characters) and the location in `url` and `platform`. It SHALL also have `module` M3, `firm` null, the M3 signal results, the raw `score`, a Polish title that names the advertiser, a Polish summary listing present and uncertain signals and any cap or S3.8 note, `status` new, and `model.llm` null in rules-only mode. It SHALL validate against `contracts/schemas/finding.schema.json` v1.
 
 #### Scenario: Family office finding
 - **WHEN** the mock document `007bbcee…` is analyzed

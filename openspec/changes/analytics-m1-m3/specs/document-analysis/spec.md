@@ -1,19 +1,37 @@
 ## MODIFIED Requirements
 
 ### Requirement: Routing to modules
-Analytics SHALL run M2 for documents with `source_kind` `firm_own`, whether or not the registry matches a firm. It SHALL run M1 for `third_party` and `unknown` documents when the registry matches a firm (by text, page host or link host), and M3 when it does not. Each document SHALL go to exactly one module. An M3 document whose advisory signals S3.2, S3.3, S3.4 and S3.5 are all `pass` SHALL produce no finding and log the reason `no_signals` (starting product rule, design Open Question 1). The reason `module_not_implemented` SHALL no longer be logged for `third_party` or `unknown` documents.
+Analytics SHALL route by publisher identity and registry result, not by `source_kind` alone (design decisions 1-2). The publisher is a registry firm when the author's `profile_url` host or a non-social page host is one of the firm's `website_domains` (equal or subdomain), or the normalized author handle equals a normalized name, core name or alias of the firm. Analytics SHALL run:
+- M2 for the publisher firm when the publisher is a registry firm, whatever the `source_kind`;
+- M2 for a `firm_own` document that the registry matches by text or page host;
+- M1 for a `third_party` or `unknown` document whose publisher is not a registry firm and that mentions a registry firm by text or link host, unless it does not target Poland (S1.7 `pass`), in which case it SHALL produce no finding and log the reason `not_targeting_poland`;
+- M3 for a document whose publisher is not a registry firm and that the registry does not match, including an unmatched `firm_own` document, which SHALL never go to M2;
+- M3 in addition to M1 when the M1 document carries an S3.3 or S3.4 candidate attributed to the publisher (requirement "M3 alongside M1" in `m3-unauthorized-advice-signals`).
+An M3-only document whose advisory signals S3.2, S3.3, S3.4, S3.5 and S3.8 are all `pass` SHALL produce no finding and log the reason `no_signals`. A document SHALL produce at most one finding per module. The reason `module_not_implemented` SHALL no longer be logged.
 
 #### Scenario: Firm's own page
-- **WHEN** a `firm_own` document is analyzed
+- **WHEN** a `firm_own` document on a registered firm's domain is analyzed
 - **THEN** exactly one M2 finding is returned
 
 #### Scenario: Firm's own page without a registry match
-- **WHEN** a `firm_own` document matches no registry firm
-- **THEN** exactly one M2 finding is returned and no M3 finding
+- **WHEN** a `firm_own` document matches no registry firm and has advisory vocabulary
+- **THEN** exactly one M3 finding is returned and no M2 finding
+
+#### Scenario: Unmatched own page without advisory signals
+- **WHEN** a `firm_own` document matches no registry firm and has no advisory signal
+- **THEN** no finding is returned and the log names the reason `no_signals`
+
+#### Scenario: Firm's own social account
+- **WHEN** a `third_party` Instagram post names Alfa Inwestycje and its author has handle `@alfainwestycje`
+- **THEN** exactly one M2 finding for the Alfa firm is returned and no M1 finding
 
 #### Scenario: Third-party post about a registered firm
 - **WHEN** the mock document `3c41441c…` (`third_party`, names EuroTrade) is analyzed
 - **THEN** exactly one finding is returned, with `module` M1
+
+#### Scenario: Third-party post not aimed at Poland
+- **WHEN** an English post on a `.com` host names EuroTrade and has no PLN amount, `+48` number or Polish text
+- **THEN** no finding is returned and the log names the reason `not_targeting_poland`
 
 #### Scenario: Unknown-source page of an unregistered entity
 - **WHEN** the mock document `007bbcee…` (`unknown`, no registry firm) is analyzed
@@ -26,6 +44,29 @@ Analytics SHALL run M2 for documents with `source_kind` `firm_own`, whether or n
 #### Scenario: Empty text is still skipped before routing
 - **WHEN** a `third_party` document has whitespace-only `text`
 - **THEN** no finding is returned and the log names the reason `empty_text`
+
+### Requirement: M2 finding assembly
+The M2 finding SHALL list only the results of implemented rules. It SHALL carry the raw `score` (never `risk_level`), the matched firm (or `null`), a Polish title and summary, `status: new`, the `url` and `platform` copied from the document, `content_excerpt` of at most 500 characters, and `model.llm = null`. The score SHALL be `Σ(weight·fail) / Σ(weight·applicable)` with weights high 3, medium 2, low 1, where `uncertain` counts as half a fail and `not_applicable` is excluded. The score is 0 when no rule applies. The summary SHALL name as checked only the rules that applied, and name `not_applicable` rules separately. Because routing sends only registered firms to M2, the pipeline SHALL NOT produce an M2 finding with `firm: null`; the builder itself SHALL still accept a context without a firm match and then report `firm: null` and R1 `fail`.
+
+#### Scenario: Violating landing page
+- **WHEN** the mock document `m2-alfa-landing` (id `a3c88321-…`) is analyzed
+- **THEN** the finding has R1 `pass`, R2 `fail`, R3 `fail` and a score above 0.5
+
+#### Scenario: Compliant material
+- **WHEN** the mock document `m2-bank-ok` (id `5030107e-…`) is analyzed
+- **THEN** no rule result is `fail` and the score is 0
+
+#### Scenario: Builder without a firm match
+- **WHEN** the M2 builder is called directly with a context that has no firm match
+- **THEN** the finding has `firm: null` and R1 `fail`
+
+#### Scenario: Firm matched by domain only
+- **WHEN** a `firm_own` page on the Alfa domain does not name the firm in its text
+- **THEN** the M2 finding has the Alfa firm and R1 `fail`
+
+#### Scenario: Rule that does not apply
+- **WHEN** R3 is `not_applicable`
+- **THEN** the summary does not list R3 among the checked rules and says it does not apply
 
 ## ADDED Requirements
 
@@ -49,7 +90,7 @@ Analytics SHALL load the M1 and M3 signal catalogues from `rules/m1_signals.yaml
 
 #### Scenario: Catalogues load
 - **WHEN** both catalogues are loaded
-- **THEN** M1 holds S1.1-S1.6 all implemented, and M3 holds S3.1-S3.7 with exactly S3.7 not implemented
+- **THEN** M1 holds S1.1-S1.7 all implemented, and M3 holds S3.1-S3.8 with exactly S3.7 not implemented
 
 #### Scenario: Malformed signal catalogue
 - **WHEN** an entry has id `S3.2` in the M1 file, or a weight `high`, or the root has no `bias`
@@ -83,7 +124,7 @@ Every signal result with non-null `evidence` SHALL quote a verbatim substring of
 - **THEN** the result is `uncertain` and its evidence is null
 
 ### Requirement: Advertiser on M1 and M3 findings
-M1 and M3 findings SHALL carry `advertiser` in the `Finding` v1 shape (`.docs/integration-plan.md` §4). `name` SHALL be `author.name`, else `author.handle`, else the page host. `handle` and `profile_url` SHALL come from `author`; a `profile_url` that is not an absolute http(s) URL SHALL become null without failing the finding. `website` SHALL be the page origin when the document has no author. Strings SHALL be trimmed and cut to 200 characters. `in_registry` SHALL be true only when the author's profile host, a non-social page host or the normalized handle belongs to a registry firm. `on_warning_list` SHALL be null while S3.7 is not implemented. M2 findings SHALL keep `advertiser` null.
+M1 and M3 findings SHALL carry `advertiser` in the `Finding` v1 shape (`.docs/integration-plan.md` §4). `name` SHALL be `author.name`, else `author.handle`, else the page host. `handle` and `profile_url` SHALL come from `author`; a `profile_url` that is not an absolute http(s) URL SHALL become null without failing the finding. `website` SHALL be the page origin when the document has no author. Strings SHALL be trimmed and cut to 200 characters. `in_registry` SHALL be the publisher identity of the routing requirement, so it is false on every M1 and M3 finding. `on_warning_list` SHALL be null while S3.7 is not implemented. M2 findings SHALL keep `advertiser` null.
 
 #### Scenario: Finfluencer advertiser
 - **WHEN** the mock document `3c41441c…` is analyzed
@@ -118,7 +159,7 @@ M1 and M3 SHALL run their signals through the shared `run_rules` with the judge 
 
 #### Scenario: Deterministic signal is never asked
 - **WHEN** the mock document `3c41441c…` is analyzed with a fake judge that records its checks
-- **THEN** the checks hold S1.5 only (S1.4 is a rules `fail`), and S1.2 stays `fail` with `method` `rule`
+- **THEN** the M1 checks hold S1.5 only (S1.4 is a rules `fail`), and S1.2 stays `fail` with `method` `rule`
 
 #### Scenario: Call to action found by the LLM
 - **WHEN** a post has no call-to-action phrase and a fake judge returns S1.4 `fail` with a verified quote

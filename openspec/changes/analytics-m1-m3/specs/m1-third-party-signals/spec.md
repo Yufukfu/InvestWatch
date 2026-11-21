@@ -1,14 +1,14 @@
 ## ADDED Requirements
 
 ### Requirement: M1 signal semantics
-Each M1 signal result SHALL be `fail` when the signal is present, `pass` when it is absent, `uncertain` when a rule found a candidate only the LLM can confirm, and `not_applicable` when the document lacks the inputs to judge it (design decision 3). S1.5 (promotional vs neutral or educational content) has no rule part: without a merged judge verdict it SHALL be `uncertain` with null evidence and an explanation that it needs the language model, and the summary SHALL name it as not checked.
+M1 SHALL inventory ads of registered investment firms published by third parties or private persons (design decisions 4-5). Each M1 signal result SHALL be `fail` when the signal is present, `pass` when it is absent, `uncertain` when a rule found a candidate only the LLM can confirm, and `not_applicable` when the document lacks the inputs to judge it. S1.5 (promotional vs neutral or educational content) has no rule part: without a merged judge verdict it SHALL be `uncertain` with null evidence and an explanation that it needs the language model, and the summary SHALL name it as not checked.
 
 #### Scenario: Rules-only S1.5
 - **WHEN** the mock document `3c41441c…` is analyzed without a judge
-- **THEN** `rules` holds S1.1-S1.6, S1.5 is `uncertain` with null evidence, and the summary names S1.5 as not checked
+- **THEN** `rules` holds S1.1-S1.7, S1.5 is `uncertain` with null evidence, and the summary names S1.5 as not checked
 
 ### Requirement: S1.1 mention of a registered firm
-S1.1 SHALL be `fail` with the quote of the matched name or alias when the firm was matched by name, `fail` quoting the href when matched by link host, `fail` quoting the page host from `url` when matched by page domain, and `uncertain` with null evidence when matched only fuzzily.
+S1.1 SHALL be `fail` with the quote of the matched name or alias when the firm was matched by name, `fail` quoting the href when matched by link host, and `uncertain` with null evidence when matched only fuzzily.
 
 #### Scenario: Name in the caption
 - **WHEN** the mock document `3c41441c…` is analyzed
@@ -19,7 +19,7 @@ S1.1 SHALL be `fail` with the quote of the matched name or alias when the firm w
 - **THEN** S1.1 is `fail` with evidence `Alfa Inwestycje DM`
 
 #### Scenario: Fuzzy-only match
-- **WHEN** a `third_party` post mentions `Alfa Inwestycji` and nothing else of the firm
+- **WHEN** a Polish `third_party` post mentions `Alfa Inwestycji` and nothing else of the firm
 - **THEN** S1.1 is `uncertain` with null evidence
 
 ### Requirement: S1.2 affiliate link or promo code
@@ -42,7 +42,7 @@ S1.2 SHALL be `fail` when a link's query string has a referral key (`ref`, `aff`
 - **THEN** S1.2 is `pass`
 
 ### Requirement: S1.3 partnership label
-S1.3 SHALL be `fail` when the text has a partnership label from its dictionary (`#reklama`, `#ad`, `#współpraca`, `#sponsored`, `współpraca reklamowa`, `płatna współpraca`, `materiał sponsorowany`, `sponsorowany`, `partner`) or a link's `rel` contains `sponsored`, quoting the label or the href. A label negated on the same line SHALL NOT count, as for R2; a hashtag is never negated. Otherwise S1.3 SHALL be `pass`. A present label raises the M1 score (starting product rule, design Open Question 2).
+S1.3 SHALL record whether a partnership label is present: `fail` when the text has a label from its dictionary (`#reklama`, `#ad`, `#współpraca`, `#sponsored`, `współpraca reklamowa`, `płatna współpraca`, `materiał sponsorowany`, `sponsorowany`, `partner`) or a link's `rel` contains `sponsored`, quoting the label or the href; `pass` otherwise. A label negated on the same line SHALL NOT count, as for R2; a hashtag is never negated. A present label SHALL raise the M1 score; a missing label SHALL NOT lower it (it contributes nothing).
 
 #### Scenario: Hashtag label
 - **WHEN** the mock document `182e5a42…` is analyzed
@@ -60,6 +60,10 @@ S1.3 SHALL be `fail` when the text has a partnership label from its dictionary (
 - **WHEN** the text has no label and a link has `rel` `nofollow sponsored`
 - **THEN** S1.3 is `fail`
 
+#### Scenario: Missing label does not lower the score
+- **WHEN** S1.3 is `pass` on a post
+- **THEN** the M1 score equals σ of the bias plus the other signals' terms alone, and adding `#współpraca` to the same post raises it
+
 ### Requirement: S1.4 call to action
 S1.4 SHALL be `fail` when the text has a call-to-action phrase from its dictionary (imperatives such as `otwórz konto`, `załóż konto`, `zarejestruj się`, `odbierz bonus`, `link w bio`, `kliknij`, `dołącz`, `skorzystaj z kodu`), quoting it, and `pass` otherwise. Only a `pass` is sent to the LLM (LLM seam requirement).
 
@@ -72,38 +76,49 @@ S1.4 SHALL be `fail` when the text has a call-to-action phrase from its dictiona
 - **THEN** S1.4 is `pass`
 
 ### Requirement: S1.6 author other than the firm
-S1.6 SHALL be `pass` when the author's profile host or the page host is a domain of the matched firm, or the normalized author handle equals a normalized name, core or alias of the firm. It SHALL be `fail` otherwise, quoting `author.handle`, else `author.name`, else the page host from `url`. It SHALL be `not_applicable` when there is no author and the page host is a social platform.
+S1.6 SHALL be `fail` on every M1 finding that has an author or a non-social page host, quoting `author.handle`, else `author.name`, else the page host from `url` (a publisher that is the firm is routed to M2, never to M1). It SHALL be `not_applicable` when there is no author and the page host is a social platform.
 
 #### Scenario: Finfluencer handle
 - **WHEN** the mock document `3c41441c…` is analyzed
 - **THEN** S1.6 is `fail` with evidence `@inwestor_jan` from `author.handle`
 
-#### Scenario: Firm's own account marked third-party
-- **WHEN** a `third_party` post names Alfa Inwestycje and its author has handle `@alfa_inwestycje`
-- **THEN** S1.6 is `pass`
-
 #### Scenario: Social post without author
-- **WHEN** an Instagram `third_party` post names a firm and has no `author`
+- **WHEN** a Polish Instagram `third_party` post names a firm and has no `author`
 - **THEN** S1.6 is `not_applicable`
 
-### Requirement: M1 score
-The M1 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m1_signals.yaml`, `x = 1` for `fail`, `0.5` for `uncertain`, `0` otherwise, rounded to 3 decimals and always in 0-1.
+### Requirement: S1.7 targeting readers in Poland
+S1.7 SHALL be `fail` when the text has a `zł`/`PLN` amount or a `+48` phone number (quoting it), else when the page host ends in `.pl` (quoting the host from `url`), else when the language guess is `pl` (null evidence, explanation says Polish language); otherwise `pass`. An M1 candidate with S1.7 `pass` SHALL produce no finding (routing requirement, reason `not_targeting_poland`), so Polish-language ads of foreign firms are kept and foreign-language ads with no Polish marker are not.
 
-#### Scenario: Affiliate post scores high
+#### Scenario: Złoty amount
+- **WHEN** the mock document `3c41441c…` is analyzed
+- **THEN** S1.7 is `fail` with evidence containing `zł`
+
+#### Scenario: Polish language only
+- **WHEN** the mock document `182e5a42…` is analyzed
+- **THEN** S1.7 is `fail` with null evidence
+
+### Requirement: M1 score
+The M1 score SHALL express how certain it is that the document is a third-party ad of the matched registered firm. It SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m1_signals.yaml`, `x = 1` for `fail`, `0.5` for `uncertain`, `0` otherwise, rounded to 3 decimals and always in 0-1.
+
+#### Scenario: Affiliate post
 - **WHEN** the mock document `3c41441c…` is analyzed without a judge
 - **THEN** the score is at least 0.6 (the M1 default threshold)
 
-#### Scenario: Labeled cooperation scores lower
-- **WHEN** the mock documents `182e5a42…` and `3c41441c…` are analyzed without a judge
-- **THEN** the score of `182e5a42…` is lower than that of `3c41441c…`
+#### Scenario: Labeled cooperation
+- **WHEN** the mock document `182e5a42…` is analyzed without a judge
+- **THEN** the score is at least 0.6
+
+#### Scenario: Bare mention
+- **WHEN** a Polish third-party post only names Alfa Inwestycje, with no link, label or call to action
+- **THEN** a finding is returned with a score below 0.6
 
 #### Scenario: Formula
 - **WHEN** a catalogue has bias −1 and one signal of weight 2 that is `uncertain`
 - **THEN** the score is σ(0) = 0.5
 
 ### Requirement: M1 finding assembly
-The M1 finding SHALL have `module` M1, the matched `firm` (`authorized` true), the `advertiser`, the M1 signal results, the raw `score`, a Polish title that names the advertiser and the firm, a Polish summary listing present, uncertain and unchecked signals, `status` new, `url` and `platform` from the document, `content_excerpt` of at most 500 characters, and `model.llm` null in rules-only mode. It SHALL validate against `contracts/schemas/finding.schema.json` v1.
+The M1 finding SHALL be an inventory entry: `module` M1, the matched `firm` (firm data, `authorized` true), the `advertiser` (advertiser data), the M1 signal results, `content_excerpt` of at most 500 characters (ad content), `url` and `platform` from the document (location), the raw `score`, a Polish title that names the advertiser and the firm, a Polish summary that says whether a partnership label is present and lists present, uncertain and unchecked signals, `status` new, and `model.llm` null in rules-only mode. A re-scan of the same document SHALL update this finding through the worker's upsert, not add another. It SHALL validate against `contracts/schemas/finding.schema.json` v1.
 
 #### Scenario: Finfluencer finding
 - **WHEN** the mock document `3c41441c…` is analyzed
-- **THEN** the finding names `@inwestor_jan` or `Jan Inwestor` and `EuroTrade` in its title, has `firm.registry_id` `2d7456b6-…` and passes `python contracts/validate.py finding`
+- **THEN** the finding names `@inwestor_jan` or `Jan Inwestor` and `EuroTrade` in its title, has `firm.registry_id` `2d7456b6-…`, its summary says no partnership label was found, and it passes `python contracts/validate.py finding`
