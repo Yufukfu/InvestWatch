@@ -1,0 +1,17 @@
+# Test-only (infra/tests/smoke.sh): a stand-in module that joins the stack exactly as infra/README.md
+# tells a real module to. Used as an extra -f next to infra/compose.yaml; never part of the stack.
+services:
+  module:
+    image: public.ecr.aws/docker/library/alpine:3.22
+    command: ["sleep", "3600"]
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379/0
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-iw-app}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?}
+      MINIO_BUCKET: ${MINIO_BUCKET:-iw-raw}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    networks: [data]

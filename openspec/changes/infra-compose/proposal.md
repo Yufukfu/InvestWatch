@@ -6,10 +6,10 @@ Every service is blocked on shared infrastructure that does not run yet. `main` 
 
 ## What Changes
 
-- Add `redis` to `infra/compose.yaml`: Redis 8 with AOF persistence (ADR 0305 needs thresholds to survive a restart), `noeviction` so stream entries are never dropped, a required password, a healthcheck and a named volume. It is reachable only on the internal network `iw-data`.
+- Add `redis` to `infra/compose.yaml`: Redis 8 with AOF persistence (ADR 0305 needs thresholds to survive a restart), `noeviction` so stream entries are never dropped, a required password, a healthcheck and a named volume. It is reachable only on the internal network `data`.
 - Add object storage with bucket `iw-raw` to `infra/compose.yaml`. The service is named `minio`, and a one-shot `minio-init` creates the private bucket and a least-privilege app user limited to it. The official MinIO community images can no longer be pulled, so the image source is decided in a new ADR 0306 written by this change (see `design.md`).
 - Add an optional `ollama` service serving `gemma3:4b` behind the compose profile `llm`, plus a one-shot `ollama-pull`. A plain `docker compose up` starts neither and downloads no weights (ADR 0304).
-- Add a non-internal network `iw-egress` for services that need outbound internet: the scraper, analytics (hosted LLM) and the `ollama-pull` step. `iw-data` stays internal, and only the gateway publishes host ports (ADR 0202).
+- Add a non-internal network `egress` (Docker name `<project>_egress`) for services that need outbound internet: the scraper, analytics (hosted LLM) and the `ollama-pull` step. `data` stays internal, and only the gateway publishes host ports (ADR 0202).
 - Make network names project-scoped, so two stacks with different `COMPOSE_PROJECT_NAME` and gateway ports (parallel worktrees, `iw-implement` step 3) never share a network or a DNS name. This is a small edit to `infra/compose.yaml` and `web/compose.yaml`, owned by Kacper.
 - Extend the root `.env.example` and `scripts/init-env.sh` with the Redis and object-storage secrets and the client variables `REDIS_URL` and `MINIO_*` (`.docs/integration-plan.md` §7). Compose refuses to start without the secrets (`${VAR:?}`), as it already does for Postgres.
 - An opt-in override `infra/compose.dev-ports.yaml` publishes Postgres, Redis and the object store on `127.0.0.1` only. It is for running a module or its tests on the host before that module has a container.

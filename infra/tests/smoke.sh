@@ -280,9 +280,89 @@ group_networks() {
   check "dev ports answer on loopback" dev_ports_reachable
 }
 
+no_llm_without_profile() {
+  local p=$1 all vols
+  all=$(dc "$p" ps -a --format '{{.Service}}'); echo "services: $(echo $all)"
+  case " $(echo $all) " in *" ollama "*|*" ollama-pull "*) echo "llm service started without the profile"; return 1 ;; esac
+  vols=$(docker volume ls -q --filter "label=com.docker.compose.project=$p"); echo "volumes: $(echo $vols)"
+  case " $(echo $vols) " in *ollama*) echo "ollama volume created without the profile"; return 1 ;; esac
+}
+llm_defined_in_profile() { # the services exist, but only under --profile llm
+  local plain prof
+  plain=$(dc "$1" config --services); prof=$(dc "$1" --profile llm config --services)
+  case " $(echo $plain) " in *" ollama "*|*" ollama-pull "*) echo "ollama in the default profile"; return 1 ;; esac
+  case " $(echo $prof) " in *" ollama "*) ;; *) echo "no ollama under --profile llm"; return 1 ;; esac
+  case " $(echo $prof) " in *" ollama-pull "*) ;; *) echo "no ollama-pull under --profile llm"; return 1 ;; esac
+}
+llm_pull_completes() { # `up --wait` returns while the one-shot still runs: wait for it to exit
+  local c st
+  dcx "$1" "$PROBE_FILE" --profile llm wait ollama-pull >/dev/null || { echo "ollama-pull exited non-zero"; return 1; }
+  c=$(dcx "$1" "$PROBE_FILE" --profile llm ps -aq ollama-pull)
+  st=$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$c"); echo "ollama-pull: $st"; [ "$st" = "exited 0" ]
+}
+llm_serves_model() { # /v1/models on ollama:11434 lists the model, from a container on the data network
+  local out; out=$(dcx "$1" "$PROBE_FILE" exec -T probe-data wget -q -T 10 -O - http://ollama:11434/v1/models)
+  echo "$out" | head -c 300; echo; case $out in *'"gemma3:4b"'*) ;; *) return 1 ;; esac
+}
+llm_no_host_port() {
+  local ports; ports=$(docker ps --filter "label=com.docker.compose.project=$1" --filter "label=com.docker.compose.service=ollama" --format '{{.Ports}}')
+  echo "ollama ports: $ports"; case $ports in *'->'*) return 1 ;; esac
+}
+pull_fail_isolated() { # a failed pull (an unknown model stands in for an unreachable registry) leaves the rest healthy
+  local p=$1 code
+  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_MODEL=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
+  code=$?; echo "ollama-pull exit: $code"; [ "$code" -ne 0 ] || return 1
+  dcx "$p" "$PROBE_FILE" ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" {print; bad=1} END {exit bad}'
+}
+
+group_llm() {
+  local p="iw-smoke-l-$RUN_ID"
+  check "plain up starts no LLM service and creates no ollama volume" upx "$p" 18449 18086 "$PROBE_FILE" postgres redis probe-data
+  check "nothing LLM-related after a plain up" no_llm_without_profile "$p"
+  check "ollama and ollama-pull exist only under --profile llm" llm_defined_in_profile "$p"
+  if [ "${SMOKE_LLM:-0}" != 1 ]; then log "SKIP  model download (set SMOKE_LLM=1; pulls gemma3:4b, several GB)"; return 0; fi
+  check "--profile llm pulls and serves the model" dcx "$p" "$PROBE_FILE" --profile llm up -d --wait --wait-timeout 1500 ollama ollama-pull
+  check "ollama-pull runs to completion and exits 0" llm_pull_completes "$p"
+  check "GET /v1/models lists gemma3:4b from the data network" llm_serves_model "$p"
+  check "ollama publishes no host port" llm_no_host_port "$p"
+  check "a failed pull leaves the other services healthy" pull_fail_isolated "$p"
+}
+
+MODULE_FILE="$ROOT/infra/tests/compose.module.yaml"
+# ts <container> StartedAt|FinishedAt, fraction padded to 9 digits so string comparison is time order
+# (Docker trims trailing zeros: "...01.4Z" would otherwise sort after "...01.45Z").
+ts() {
+  local t frac; t=$(docker inspect -f "{{.State.$2}}" "$1"); t=${t%Z}
+  case $t in *.*) frac=${t#*.} ;; *) frac= ;; esac
+  printf '%s.%s\n' "${t%%.*}" "$(printf '%-9s' "$frac" | tr ' ' 0)"
+}
+module_waits() {
+  local p=$1 m i
+  dcx "$p" "$MODULE_FILE" up -d --wait --wait-timeout 180 module || return 1
+  m=$(dcx "$p" "$MODULE_FILE" ps -q module); i=$(dcx "$p" "$MODULE_FILE" ps -aq minio-init)
+  echo "minio-init finished $(ts "$i" FinishedAt), module started $(ts "$m" StartedAt)"
+  [[ "$(ts "$m" StartedAt)" > "$(ts "$i" FinishedAt)" ]] || return 1
+  # The module reaches every dependency with the documented env.
+  dcx "$p" "$MODULE_FILE" exec -T module sh -c 'nc -z -w 5 redis 6379 && nc -z -w 5 postgres 5432 && nc -z -w 5 minio 9000'
+}
+init_failure_blocks_module() {
+  local p=$1 st
+  sed -i 's|^MINIO_BUCKET=.*|MINIO_BUCKET=Invalid_Bucket|' "$TMP/$p.env" # uppercase: mc mb refuses it
+  if dcx "$p" "$MODULE_FILE" up -d --wait --wait-timeout 120 module >/dev/null 2>&1; then echo "up succeeded"; return 1; fi
+  st=$(docker inspect -f '{{.State.Status}}' "$(dcx "$p" "$MODULE_FILE" ps -aq module)" 2>/dev/null || echo absent)
+  echo "module after failed minio-init: $st"; [ "$st" != running ]
+}
+
+group_join() {
+  local p="iw-smoke-j-$RUN_ID" f="iw-smoke-f-$RUN_ID"
+  PROJECTS+=("$p" "$f"); new_env "$p" 18450 18087 >/dev/null; new_env "$f" 18451 18088 >/dev/null
+  check "module starts only after postgres/redis healthy and minio-init done, and reaches them" module_waits "$p"
+  check "a failed minio-init blocks the module" init_failure_blocks_module "$f"
+}
+
 # ---------------------------------------------------------------- main
 
-GROUPS_ALL=(parallel env redis minio networks)
+GROUPS_ALL=(parallel env redis minio networks llm join)
 [ $# -gt 0 ] && SELECTED=("$@") || SELECTED=("${GROUPS_ALL[@]}")
 docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1 || docker pull -q "$PROBE_IMAGE" >/dev/null
 for g in "${SELECTED[@]}"; do log "== $g"; "group_$g"; done

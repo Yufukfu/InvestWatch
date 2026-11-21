@@ -30,21 +30,21 @@ Before group 1: Damian approves ADR 0306 and the open questions in `design.md` a
 
 - [x] 5.1 Failing tests (probes from the test-only `infra/tests/compose.probe.yaml`; dev ports in the smoke test are 25432/26379/29000, not the defaults): in the default stack only `gateway` publishes ports; a container on `iw-data` only cannot reach a public address; with `infra/compose.dev-ports.yaml` the three data ports listen on `127.0.0.1` only
 - [x] 5.2 Add network `egress` (not internal) to `infra/compose.yaml` and the opt-in `infra/compose.dev-ports.yaml` per design decision 7; the three isolation scenarios pass
-- [x] 5.3 Mutation check (bind a dev port to `0.0.0.0`, then mark `data` non-internal; each must be caught); mutations: 4 tried, 4 caught (`data` not internal, dev port on all interfaces, redis publishing a host port, plus the group 4 review fix: Redis behind a pipe is not PID 1). One more mutant, a host port on a data-only service, was equivalent: Docker publishes nothing for a container on an internal network only
+- [x] 5.3 Mutation check (bind a dev port to `0.0.0.0`, then mark `data` non-internal; each must be caught); mutations: 4 tried, 4 caught (`data` not internal, dev port on all interfaces, redis publishing a host port while also on `egress`, plus the group 4 review fix: Redis behind a pipe is not PID 1). One more mutant, a host port on a data-only service, was equivalent: Docker publishes nothing for a container on an internal network only
 
 ## 6. Local LLM profile
 
-- [ ] 6.1 Failing tests: without `--profile llm` neither `ollama` nor `ollama-pull` exists and no `ollama_models` volume is created; with the profile `GET /v1/models` lists `gemma3:4b`; with egress blocked `ollama-pull` exits non-zero and the other services stay healthy (the profile test is opt-in, `SMOKE_LLM=1`, because it downloads several GB)
-- [ ] 6.2 Add `ollama` and `ollama-pull` behind profile `llm` per design decision 4 (pinned tag, `iw-data` + `egress`, volume `ollama_models`, no host port); the three profile scenarios pass
-- [ ] 6.3 Mutation check (remove `profiles: [llm]` from `ollama-pull`, the plain-up check must fail); record `mutations: N tried, N caught`
+- [x] 6.1 Failing tests (verified with `SMOKE_LLM=1`: gemma3:4b pulled and listed on `/v1/models`; an unknown model stands in for an unreachable registry): without `--profile llm` neither `ollama` nor `ollama-pull` exists and no `ollama_models` volume is created; with the profile `GET /v1/models` lists `gemma3:4b`; with egress blocked `ollama-pull` exits non-zero and the other services stay healthy (the profile test is opt-in, `SMOKE_LLM=1`, because it downloads several GB)
+- [x] 6.2 Add `ollama` and `ollama-pull` behind profile `llm` per design decision 4 (pinned tag, `iw-data` + `egress`, volume `ollama_models`, no host port); the three profile scenarios pass
+- [x] 6.3 Mutation check (remove `profiles: [llm]` from `ollama-pull`, the plain-up check must fail); mutations: 2 tried, 2 caught (no profile on `ollama-pull`, no profile on `ollama`). The first `SMOKE_LLM=1` run exposed a test bug: `up --wait` returns while the one-shot is still pulling, so the test now waits for `ollama-pull` to exit
 
 ## 7. Joining contract
 
-- [ ] 7.1 Failing test: a throwaway module service in a test-only compose file under `infra/tests/` with the documented `depends_on` starts only after `postgres`/`redis` are healthy and `minio-init` exited 0, and is not started when `minio-init` is forced to fail
-- [ ] 7.2 Write the joining contract in `infra/README.md` (networks per need, `depends_on` conditions, env names, running a module alone with `-p` and `--env-file`, parallel worktree ports, dev-ports override, `--profile llm` and pre-pulling) and the rules in `infra/CLAUDE.md`; both joining scenarios pass
-- [ ] 7.3 Mutation check (change `service_completed_successfully` to `service_started`, the failure-blocks-dependants check must fail); record `mutations: N tried, N caught`
+- [x] 7.1 Failing test: a throwaway module service in a test-only compose file under `infra/tests/` (`compose.module.yaml`; it passed at once, because groups 3-4 already provide the conditions, so the red proof is the mutation check in 7.3) with the documented `depends_on` starts only after `postgres`/`redis` are healthy and `minio-init` exited 0, and is not started when `minio-init` is forced to fail
+- [x] 7.2 Write the joining contract in `infra/README.md` (networks per need, `depends_on` conditions, env names, running a module alone with `-p` and `--env-file`, parallel worktree ports, dev-ports override, `--profile llm` and pre-pulling) and the rules in `infra/CLAUDE.md`; both joining scenarios pass
+- [x] 7.3 Mutation check (change `service_completed_successfully` to `service_started`, the failure-blocks-dependants check must fail); mutations: 2 tried, 2 caught (`service_started` for `minio-init`, `minio-init` swallowing a failed `mb`)
 
 ## 8. Closing
 
-- [ ] 8.1 Apply the iw-docs-update skill: ADR 0306 final digests, `.docs/decisions/README.md` row, root `README.md` Quick Start (LLM profile), `.docs/integration-plan.md` §1 (include-based `compose.yaml`, object-store note), `.docs/INDEX.md` if a route changes, Damian's own row in `.docs/STATUS.md`; `docs-check` passes; add the iw-ai-log row
+- [x] 8.1 Apply the iw-docs-update skill (Damian's `.docs/STATUS.md` row is left to the coordinating session, as instructed, to avoid merge conflicts): ADR 0306 final digests, `.docs/decisions/README.md` row, root `README.md` Quick Start (LLM profile), `.docs/integration-plan.md` §1 (include-based `compose.yaml`, object-store note), `.docs/INDEX.md` if a route changes, Damian's own row in `.docs/STATUS.md`; `docs-check` passes; add the iw-ai-log row
 - [ ] 8.2 Run the iw-pr-review skill and fix real findings

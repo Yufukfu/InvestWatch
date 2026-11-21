@@ -1,7 +1,8 @@
 # Opt-in, for running a module or its tests on the host before it has a container:
 #   docker compose -f compose.yaml -f infra/compose.dev-ports.yaml up -d
 # Publishes Postgres, Redis and the object store on 127.0.0.1 only (never 0.0.0.0). A container on an
-# internal network cannot publish ports, so these services also join the non-internal devhost network.
+# internal network cannot publish ports, so these services also join the non-internal devhost network,
+# which also gives them outbound internet while the override is loaded. Local development only.
 # Never part of a plain `docker compose up`. Connect with the app credentials from .env, e.g.
 #   postgresql://iw_app:<POSTGRES_APP_PASSWORD>@127.0.0.1:15432/investwatch
 #   redis://:<REDIS_PASSWORD>@127.0.0.1:16379/0    http://127.0.0.1:19000 (MINIO_ACCESS_KEY/SECRET_KEY)

@@ -124,6 +124,43 @@ services:
       resources:
         limits: { cpus: "0.5", memory: 128M }
 
+  # Local LLM fallback (ADR 0304): only with `docker compose --profile llm up`, so a plain `up` downloads
+  # no weights. Analytics reaches it on iw-data: LLM_BASE_URL=http://ollama:11434/v1. Pulling the model
+  # needs the internet, hence egress. Docker Hub is the only registry serving this image (rate-limited:
+  # pre-pull before a demo with `docker compose --profile llm up ollama-pull`).
+  ollama:
+    image: &ollama-image docker.io/ollama/ollama@sha256:ccc42bcd3d5fcf7ab0d532b300382154e1a4da56fc666bdb313b78ebdd912754
+    profiles: [llm]
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    networks: [data, egress]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    deploy:
+      resources:
+        limits: { cpus: "4.0", memory: 6G }
+
+  # One-shot: pulls OLLAMA_MODEL into the ollama volume through the server, then exits.
+  ollama-pull:
+    image: *ollama-image
+    profiles: [llm]
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c", "exec ollama pull \"$$OLLAMA_MODEL\""]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
+    depends_on:
+      ollama: { condition: service_healthy }
+    networks: [data]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
   gateway:
     image: public.ecr.aws/docker/library/caddy:2-alpine
     restart: unless-stopped
@@ -151,6 +188,7 @@ volumes:
   pgdata:
   redisdata:
   miniodata:
+  ollama_models:
   caddy_data:
   caddy_config:
 

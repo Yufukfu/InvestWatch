@@ -1,16 +1,16 @@
 # Spec Delta
 
 ## Purpose
-The shared services every module needs (Redis, object storage, an optional local LLM), started by one `docker compose up` next to Postgres and the gateway from [ADR 0202](../../../../../.docs/decisions/0202-deployment-topology.md), isolated per stack, and joined by modules through a fixed contract. Names and payloads on Redis and in `iw-raw` are those of `.docs/integration-plan.md` §2 and §6 and ADR 0305. They are not restated here.
+The shared services every module needs (Redis, object storage, an optional local LLM), started by one `docker compose up` next to Postgres and the gateway from [ADR 0202](../../../../../.docs/decisions/0202-deployment-topology.md), isolated per stack, and joined by modules through a fixed contract. Network keys are `data`, `edge` and `egress`; Docker names them `<project>_data`, `<project>_edge` and `<project>_egress`. Names and payloads on Redis and in `iw-raw` are those of `.docs/integration-plan.md` §2 and §6 and ADR 0305. They are not restated here.
 
 ## ADDED Requirements
 
 ### Requirement: Redis service
-The stack SHALL run a `redis` service that requires a password, persists data with AOF to a named volume, uses `maxmemory-policy noeviction`, reports healthy only when it answers an authenticated `PING`, and is attached only to the internal network `iw-data`.
+The stack SHALL run a `redis` service that requires a password, persists data with AOF to a named volume, uses `maxmemory-policy noeviction`, reports healthy only when it answers an authenticated `PING`, and is attached only to the internal network `data`.
 
 #### Scenario: Healthy and authenticated
 - **WHEN** `docker compose up` has finished and `redis` is healthy
-- **THEN** an authenticated `PING` from a container on `iw-data` returns `PONG`, and an unauthenticated command returns `NOAUTH`
+- **THEN** an authenticated `PING` from a container on `data` returns `PONG`, and an unauthenticated command returns `NOAUTH`
 
 #### Scenario: Thresholds survive a restart
 - **WHEN** a value is written to `iw:settings:thresholds` and `redis` is restarted with `docker compose restart redis`
@@ -55,7 +55,7 @@ Every infrastructure password and key SHALL come from the untracked root `.env`,
 - **THEN** every secret variable in `.env` has a value of at least 32 characters and `docker compose config` succeeds
 
 ### Requirement: Optional local LLM behind a profile
-The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls `gemma3:4b`, both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `iw-data` at `http://ollama:11434/v1`, keep the weights in a named volume, and publish no host port.
+The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls `gemma3:4b`, both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `data` at `http://ollama:11434/v1`, keep the weights in a named volume, and publish no host port.
 
 #### Scenario: Plain up downloads no weights
 - **WHEN** `docker compose up -d` runs without `--profile llm`
@@ -63,21 +63,21 @@ The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pul
 
 #### Scenario: Profile serves gemma3:4b
 - **WHEN** `docker compose --profile llm up -d` has finished and `ollama-pull` has exited 0
-- **THEN** `GET http://ollama:11434/v1/models` from a container on `iw-data` lists `gemma3:4b`
+- **THEN** `GET http://ollama:11434/v1/models` from a container on `data` lists `gemma3:4b`
 
 #### Scenario: Pull fails without network
 - **WHEN** the `llm` profile starts and the model registry cannot be reached
 - **THEN** `ollama-pull` exits non-zero, and every service outside the profile stays healthy
 
 ### Requirement: Network isolation
-Only the gateway SHALL publish host ports in the default stack. `redis`, `minio`, `postgres` and `ollama` SHALL be on `iw-data`, which stays `internal`. Outbound internet SHALL be available only to services that join the non-internal network `iw-egress`. The opt-in file `infra/compose.dev-ports.yaml` SHALL be the only way to publish Postgres, Redis or the object store on the host, and it SHALL bind to `127.0.0.1` only.
+Only the gateway SHALL publish host ports in the default stack. `redis`, `minio`, `postgres` and `ollama` SHALL be on `data`, which stays `internal`. Outbound internet SHALL be available only to services on a non-internal network. Those are `egress`, which a module joins for internet access, and `edge`, which carries the gateway's published ports and so cannot be internal; a module joins `edge` only to be routed. The opt-in dev-ports override also gives `postgres`, `redis` and `minio` internet, because they join its non-internal `devhost` network to publish. The opt-in file `infra/compose.dev-ports.yaml` SHALL be the only way to publish Postgres, Redis or the object store on the host, and it SHALL bind to `127.0.0.1` only.
 
 #### Scenario: Default stack publishes only the gateway
 - **WHEN** `docker compose up -d` has finished
 - **THEN** `docker compose ps --format json` shows published ports only for `gateway`
 
 #### Scenario: Data services have no internet
-- **WHEN** a container attached only to `iw-data` tries to open a TCP connection to a public address
+- **WHEN** a container attached only to `data` tries to open a TCP connection to a public address
 - **THEN** the connection fails
 
 #### Scenario: Dev ports bind to loopback
@@ -96,7 +96,7 @@ Network names and volumes SHALL be scoped to the compose project, so two stacks 
 - **THEN** it gets only the address of its own stack's `redis`
 
 ### Requirement: Module joining contract
-A module SHALL join the stack by adding its own `<module>/compose.yaml` to the root `include:`, attaching to the networks it needs (`iw-data` for Postgres, Redis, object store and Ollama; `iw-edge` to be routed by the gateway; `iw-egress` for internet), and waiting on `postgres` and `redis` with `condition: service_healthy` and on `minio-init` with `condition: service_completed_successfully`. A module's compose file SHALL take infrastructure secrets only from variables defined in the root `.env.example`.
+A module SHALL join the stack by adding its own `<module>/compose.yaml` to the root `include:`, attaching to the networks it needs (`data` for Postgres, Redis, object store and Ollama; `edge` to be routed by the gateway; `egress` for internet), and waiting on `postgres` and `redis` with `condition: service_healthy` and on `minio-init` with `condition: service_completed_successfully`. A module's compose file SHALL take infrastructure secrets only from variables defined in the root `.env.example`.
 
 #### Scenario: Module waits for infrastructure
 - **WHEN** a module service declares the documented `depends_on` conditions and the stack starts from empty volumes
