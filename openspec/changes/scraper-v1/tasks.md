@@ -12,10 +12,10 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 ## 2. Skeleton, parser, site registry, error model
 
 - [x] 2.1 Failing test, then `scraper/` package with pinned deps on Python 3.12, a pytest setup and a Dockerfile whose context includes `contracts/` and that downloads the pinned `tls-client` 1.18.1 release asset for the image's platform by tag (not through the `noble-tls` updater), verifies its sha256, writes the `.version` file and fails the build otherwise, on a Debian/Ubuntu base, and the tests run on Python 3.12 there; `pytest scraper` runs green in the image (shared sync commit incl. `types.py`; image builds, 10 tests green; mutations: 6 tried, 6 caught)
-- [ ] 2.2 Save the real KNF warnings page as a fixture (`scraper/tests/fixtures/`), plus article, no-title, windows-1250, empty and malformed fixtures; failing tests, then the parser (title with `<h1>` fallback, `canonical_url`, link filtering); the parse scenarios pass
-- [ ] 2.3 Failing tests, then the host-keyed parser registry with the generic parser as default; the registry scenarios pass
-- [ ] 2.4 Failing tests, then typed `JobError` with the closed reason set, an in-memory sink, the JSON logger and redaction of `user:pass@` URLs; the closed-set and string-level no-credentials tests pass
-- [ ] 2.5 Mutation check; `mutations:`
+- [x] 2.2 Save the real KNF warnings page as a fixture (`scraper/tests/fixtures/`), plus article, no-title, windows-1250, empty and malformed fixtures; failing tests, then the parser (title with `<h1>` fallback, `canonical_url`, link filtering); the parse scenarios pass
+- [x] 2.3 Failing tests, then the host-keyed parser registry with the generic parser as default; the registry scenarios pass
+- [x] 2.4 Failing tests, then typed `JobError` with the closed reason set, an in-memory sink, the JSON logger and redaction of `user:pass@` URLs; the closed-set and string-level no-credentials tests pass
+- [x] 2.5 Mutation check; `mutations: 24 tried, 24 caught`
 
 ## 3. Fetch layer (single attempt)
 
