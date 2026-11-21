@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { SectionBoundary } from './SectionBoundary';
+import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
@@ -16,7 +17,10 @@ export function App() {
             <h1>InvestWatch</h1>
             <span className="brand-sub">Monitoring ryzykownych treści inwestycyjnych</span>
           </div>
-          <HealthPage />
+          <div className="header-status">
+            <AlertsPage />
+            <HealthPage />
+          </div>
         </div>
       </header>
       <div className="app">

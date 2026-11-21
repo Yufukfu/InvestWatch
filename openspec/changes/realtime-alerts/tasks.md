@@ -8,9 +8,9 @@
 
 ## 2. Toasts and connection badge
 
-- [ ] 2.1 Failing component tests: badge texts, toast content as text, `Pokaż` and `Zamknij`, 4-toast limit newest first, dedupe by id, auto-hide after 20 s (fake timers), live region does not take focus.
-- [ ] 2.2 Implement `LiveBadge`, `AlertToasts`, `AlertsPage`; mount in `App.tsx`; style. Tests pass.
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`.
+- [x] 2.1 Failing component tests: badge texts, toast content as text, `Pokaż` and `Zamknij`, 4-toast limit newest first, dedupe by id, auto-hide after 20 s (fake timers), live region does not take focus.
+- [x] 2.2 Implement `LiveBadge`, `AlertToasts`, `AlertsPage`; mount in `App.tsx`; style. Tests pass.
+- [x] 2.3 Mutation check; mutations: 8 tried, 8 caught (one survivor: empty meta span; meta line rewritten and cases added)
 
 ## 3. Closing
 
