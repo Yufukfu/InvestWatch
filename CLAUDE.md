@@ -27,20 +27,24 @@ Three modules, three owners. The repository layout is defined by B; confirm befo
 | `dashboard/` | B | frontend, alerts, calibration panel | [`dashboard/CLAUDE.md`](dashboard/CLAUDE.md) |
 | `contracts/` | C | JSON Schema and mocks, frozen v1 | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
 
-## Process in one screen
+## Process in one line
 
-Spec, then test, then code, then review, one PR per OpenSpec change (details: [`.claude/SDLC.md`](.claude/SDLC.md), review bar: [`.claude/CODE_REVIEW.md`](.claude/CODE_REVIEW.md)).
+OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-propose` (human approves) → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (`iw-docs-update`, `iw-ai-log`, `iw-pr-review`) → `/openspec-archive-change` as the last commit → the human pushes. Stages, gates and who owns which fact: [`.claude/SDLC.md`](.claude/SDLC.md). Review criteria: [`.claude/CODE_REVIEW.md`](.claude/CODE_REVIEW.md). The reviewer agent `iw-reviewer` and the hook are in `.claude/`.
 
-1. `iw-implement`: worktree + branch + `/openspec-propose`. Human approves the spec.
-2. `/openspec-apply-change`; each commit goes through `iw-commit-cycle` (tdd-guide, code-reviewer on a pinned range, verify findings).
-3. `iw-pr-review` before the PR; human go-ahead to push; then `/openspec-archive-change`, `iw-docs-update`, `iw-ai-log`.
+## Setup (once per teammate)
+
+- **Node >= 22.20** on PATH (the hook and OpenSpec need it) and git with symlink support: the OpenSpec skills are symlinks (Windows: `git config --global core.symlinks true`, or use WSL).
+- **OpenSpec CLI**, pinned like CI: `npm i -g @fission-ai/openspec@2.1.1`, then `openspec --version`. Optional telemetry opt-out: `OPENSPEC_TELEMETRY=0`. The OpenSpec skills call this command and fail without it.
+- **Claude Code opened inside the repo or a worktree** so `.claude/` loads (skills, the `iw-reviewer` agent, the git hook, push permissions). The ECC plugin is optional; nothing here depends on it.
+- `gh` logged in. Per-module tooling is in that module's `CLAUDE.md`.
 
 ## Hard rules
 
 - No push, PR or merge without a fresh explicit go-ahead from the human. No `--force`, no amending a pushed commit, nothing straight to `main`.
 - Contracts are frozen after Sat 14:30. Changing one needs the whole team and a version bump.
 - Secrets only in untracked `.env` (`.env.example` is tracked). Never print proxy credentials or keys.
-- No `console.log` / `print` debug output in committed code; JSON logs to stdout.
+- No `console.log` in committed JS/TS (hook-enforced); Python uses the logger, not `print`; JSON logs to stdout.
+- Stage and commit in separate tool calls. Never use an `IW_*` escape flag without telling the human.
 - Every dependency is scanned (`pip-audit` / `npm audit`) before merge.
 - Verify every reviewer finding against the code before acting.
 - ADRs in `doc/decisions/` are written by a human; agents may draft options, not the decision.
@@ -48,5 +52,5 @@ Spec, then test, then code, then review, one PR per OpenSpec change (details: [`
 ## Conventions
 
 - Language: English for code, specs, ADRs, docs and `.claude/`; user-facing dashboard texts in Polish (team decision, [`doc/ai-workflow.md`](doc/ai-workflow.md)).
-- Commits: Conventional Commits, terse subject. Branches: `scraper/*`, `analytics/*`, `dashboard/*`, `chore/*`. Worktrees live in `../InvestWatch-worktrees/`.
+- Commits: Conventional Commits, terse subject. Branches: `scraper/*`, `analytics/*`, `api/*`, `dashboard/*`, `contracts/*`, `chore/*`. Worktrees live in `../InvestWatch-worktrees/`.
 - Time is UTC ISO-8601, ids are UUID v4, config is env-only.

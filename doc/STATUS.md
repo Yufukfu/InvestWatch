@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or a blocker appears; agents read it at session start.
+Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or a blocker appears; agents read it at session start. Edit only your own module's row (limits merge conflicts); the owner of a milestone edits its row.
 
 ## Milestones (from `integration-plan.md` §8)
 

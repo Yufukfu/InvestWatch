@@ -1,5 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr ready:*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -8,7 +16,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/git-guard.js",
-            "description": "Deny force/main pushes, reset --hard, amending a pushed commit; on commit deny staged .env, console.log in code, and service code with no active OpenSpec change"
+            "description": "Deny force/main pushes, reset --hard, amending a pushed commit, git add chained before commit; on commit deny staged .env, console.log in JS/TS, and service code with no active OpenSpec change"
           }
         ]
       }

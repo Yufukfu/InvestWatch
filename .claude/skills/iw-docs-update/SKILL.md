@@ -1,6 +1,6 @@
 ---
 name: iw-docs-update
-description: Use before any commit or PR that changes behaviour, a contract, a service's config or run steps, or a decision, and after every merge. Says which doc to update for which change, how ADRs are drafted, and runs the deterministic docs-check. Not for editing openspec/specs by hand (archive does that).
+description: Use as the closing task of every OpenSpec change (generated into tasks.md), and before any commit that changes behaviour, a contract, a service's config or run steps, or a decision. Says which doc to update for which change, how ADRs are drafted, and runs the deterministic docs-check. Not for editing openspec/specs by hand (archive does that).
 ---
 
 # iw-docs-update
@@ -15,10 +15,20 @@ Docs hold the logic; `CLAUDE.md` files stay short and point at them. Update docs
 | A service's run steps, env vars or definition of done | that service's `CLAUDE.md`, `.env.example`, and the README Quick Start once it exists |
 | A new service directory | its own `CLAUDE.md`, a row in the root `CLAUDE.md` services table, a row in `doc/INDEX.md` |
 | System behaviour | the OpenSpec change (`/openspec-archive-change` merges it into `openspec/specs/`). Never hand-edit `openspec/specs/`. |
-| A milestone moved, a blocker appeared or cleared | `doc/STATUS.md` |
+| A milestone moved, a blocker appeared or cleared | `doc/STATUS.md`: edit only your own module's row (limits merge conflicts) |
 | The process, a skill or a hook | `.claude/SDLC.md` or `.claude/CODE_REVIEW.md`, and `doc/ai-workflow.md` |
 | A hard-to-reverse choice | an ADR (below) |
-| A merged PR or milestone | one row in the Log table of `doc/ai-workflow.md` (`iw-ai-log`) |
+| A change closing, or a milestone | one row in the Log table of `doc/ai-workflow.md` (`iw-ai-log`) |
+
+## Closing a change (the closing tasks in `tasks.md`)
+
+Everything lands in the same PR, before archiving, because nothing goes straight to `main` and there is no "after merge" step:
+
+1. Update docs per the table above, your own `doc/STATUS.md` row (state and active changes), and any ADR drafts.
+2. Add the log row with `iw-ai-log`.
+3. Run `docs-check` (below) and fix each finding at its source.
+
+Then `iw-pr-review`, then `/openspec-archive-change` as the last commit (see `openspec/config.yaml`).
 
 ## Writing rules
 
@@ -29,7 +39,7 @@ Docs hold the logic; `CLAUDE.md` files stay short and point at them. Update docs
 
 ## ADRs
 
-1. Copy `doc/decisions/0000-template.md` to the next number, `NNNN-short-title.md`.
+1. Copy `doc/decisions/0000-template.md` to the next free number in your range (A `01xx`, B `02xx`, C `03xx`, so three people never pick the same number), named `NNNN-short-title.md`.
 2. An agent may fill Context, Options and Evidence (benchmarks, the real API read from the installed package, links). Set `Status: proposed`. Leave **Decision** and its rationale for the human to write; never invent a "why".
 3. Add the file to the table in `doc/decisions/README.md` (the checker fails otherwise) and remove it from the candidate list.
 4. After the human accepts it, do not edit it. A later decision supersedes it with a new ADR that links the old one.

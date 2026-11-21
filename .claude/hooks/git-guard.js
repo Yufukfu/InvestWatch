@@ -9,9 +9,14 @@
  *    (b) adds a console.log call to non-test JS/TS code (the jury checks for it),
  *    (c) touches service code while no OpenSpec change is active (spec first).
  *
+ *  - `git add` chained in front of `git commit` in one command (the staged diff is not visible yet).
+ *
  * Escapes: put IW_ALLOW_GIT=1 (destructive git) or IW_SKIP_SPEC=1 (spec rule) in the command.
+ * The escapes are plain text an agent can write itself: this guard catches mistakes, it is not a
+ * security boundary. Their use should be reported to the human.
  * Limits: quoted strings and heredocs are stripped before matching; `git commit -a` is checked
- * against `git diff HEAD`, other implicit staging (`git add x && git commit`) is not seen.
+ * against `git diff HEAD`; `git commit <paths>` stages those paths and is not seen. Pushes are
+ * additionally gated by `permissions.ask` in .claude/settings.json.
  */
 'use strict';
 
@@ -46,12 +51,21 @@ function parseGit(segment) {
 
 const isForce = (a) => a === '-f' || a === '--force' || a.startsWith('--force-with-lease') || a === '--force-if-includes';
 
+// The branch a refspec writes to: `HEAD` means the current branch, `refs/heads/` is stripped,
+// `src:dst` uses dst.
+function pushTarget(refspec, branch) {
+  const spec = refspec.replace(/^\+/, '');
+  const dst = spec.includes(':') ? spec.split(':').pop() : spec;
+  return dst === 'HEAD' ? branch : dst.replace(/^refs\/heads\//, '');
+}
+
 function checkPush(args, branch) {
   const flags = args.filter((a) => a.startsWith('-'));
   const positional = args.filter((a) => !a.startsWith('-'));
   if (flags.some(isForce) || positional.some((a) => a.startsWith('+'))) return 'force push';
+  if (flags.includes('--all') || flags.includes('--mirror')) return 'push of every branch (includes main)';
   const refspecs = positional.slice(1);
-  if (refspecs.some((r) => PROTECTED.includes(r.split(':').pop()))) return 'push to main';
+  if (refspecs.some((r) => PROTECTED.includes(pushTarget(r, branch)))) return 'push to main';
   if (refspecs.length === 0 && PROTECTED.includes(branch)) return `push while on ${branch}`;
   return null;
 }
@@ -103,8 +117,12 @@ function evaluate(command, deps) {
       if (why) return `Blocked: ${why}. Needs an explicit user decision. Escape: IW_ALLOW_GIT=1.`;
     }
   }
-  const commit = gits.find((g) => g.sub === 'commit');
-  if (!commit) return null;
+  const commitAt = gits.findIndex((g) => g.sub === 'commit');
+  if (commitAt === -1) return null;
+  if (gits.slice(0, commitAt).some((g) => g.sub === 'add')) {
+    return 'Run `git add` in a separate call before `git commit`: the guard reads the staged diff when the command starts, so an add chained in front of the commit is not checked.';
+  }
+  const commit = gits[commitAt];
   const all = commit.args.some((a) => /^-[a-zA-Z]*a/.test(a) && !a.startsWith('--')) || commit.args.includes('--all');
   return commitReason(deps.staged(all), deps.activeChanges(), /IW_SKIP_SPEC=1/.test(command));
 }

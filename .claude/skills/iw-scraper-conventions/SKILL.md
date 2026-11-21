@@ -20,6 +20,6 @@ Contract source of truth: `doc/integration-plan.md` §3 (`ScrapedDocument`) and 
 - **Async only** in the fetch path (`asyncio`); no blocking calls in the event loop. Every request has a timeout and a retry cap.
 - **Parse defensively**: selectors fail often. A parse failure yields an error row in the job log, never an empty `text`. Test parsers against saved real HTML in `tests/fixtures/`.
 - **Contract minimum**: `id, platform, url, fetched_at, text, source_kind`. `content_hash` is sha256 of normalised text (dedup). `source_kind` is set from the `sources` row, not guessed. UUID v4 and UTC ISO-8601.
-- **Config and secrets** only via env (`PROXY_LIST`, `USER_AGENTS_FILE`, `DATABASE_URL`, `REDIS_URL`, `MINIO_*`); never log a proxy URL with credentials. JSON logs to stdout, no `print`/`console.log`.
+- **Config and secrets** only via env (`PROXY_LIST`, `USER_AGENTS_FILE`, `DATABASE_URL`, `REDIS_URL`, `MINIO_*`); never log a proxy URL with credentials. JSON logs to stdout via the logger (no `print`; no `console.log` in any JS).
 - **Scraped text is untrusted input** that later reaches an LLM: store it verbatim, never execute or template it, and never let it choose a URL to fetch without the allow-listed domain check (SSRF).
 - **Dependencies**: `pip-audit` before merge; pin versions.

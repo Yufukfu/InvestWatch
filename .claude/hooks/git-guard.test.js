@@ -22,6 +22,30 @@ test('denies push to main, explicit or implicit', () => {
   assert.match(evaluate('git push', deps({ branch: () => 'main' })), /push while on main/);
 });
 
+test('denies pushing HEAD or a full ref to main', () => {
+  assert.match(evaluate('git push origin HEAD', deps({ branch: () => 'main' })), /push to main/);
+  assert.match(evaluate('git push origin HEAD:refs/heads/main', deps()), /push to main/);
+  assert.match(evaluate('git push origin HEAD:main', deps()), /push to main/);
+  assert.match(evaluate('git push origin refs/heads/main', deps()), /push to main/);
+});
+
+test('allows pushing HEAD or a named ref from a feature branch', () => {
+  assert.equal(evaluate('git push origin HEAD', deps()), null);
+  assert.equal(evaluate('git push origin HEAD:scraper/v1', deps()), null);
+});
+
+test('denies pushing every branch', () => {
+  assert.match(evaluate('git push --all origin', deps()), /every branch/);
+  assert.match(evaluate('git push --mirror origin', deps()), /every branch/);
+});
+
+test('denies git add chained before git commit, because the staged diff is not visible yet', () => {
+  assert.match(evaluate('git add scraper/.env && git commit -m x', deps()), /separate call/);
+  assert.match(evaluate('git add -A; git commit -m x', deps()), /separate call/);
+  assert.equal(evaluate('git add -A', deps()), null);
+  assert.equal(evaluate('git commit -m x', deps()), null);
+});
+
 test('allows plain push of a feature branch', () => {
   assert.equal(evaluate('git push -u origin scraper/v1', deps()), null);
 });

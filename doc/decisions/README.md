@@ -1,6 +1,6 @@
 # Architecture decision records
 
-One file per decision: `NNNN-short-title.md`, copied from `0000-template.md`. ADRs are written by a human; agents may draft Context, Options and evidence, never the decision or its rationale. Never auto-merge an ADR. An accepted ADR is not edited: a new ADR supersedes it and links the old one. Write one when a choice is hard to reverse or a teammate will ask "why".
+One file per decision: `NNNN-short-title.md`, copied from `0000-template.md`. Numbers come from the owner's range so parallel PRs never collide: A `01xx`, B `02xx`, C `03xx`. ADRs are written by a human; agents may draft Context, Options and evidence, never the decision or its rationale. Never auto-merge an ADR. An accepted ADR is not edited: a new ADR supersedes it and links the old one. Write one when a choice is hard to reverse or a teammate will ask "why".
 
 Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
