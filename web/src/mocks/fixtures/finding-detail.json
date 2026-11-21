@@ -1,0 +1,258 @@
+{
+  "id": "94f686c6-70c3-5ec9-9b6f-c97032c380c6",
+  "document_id": "a3c88321-15bf-56e4-8d59-05a9033308c6",
+  "module": "M2",
+  "score": 0.86,
+  "risk_level": "high",
+  "status": "new",
+  "title": "Obietnica 18% zysku z ostrzeżeniem o ryzyku ukrytym w stopce",
+  "summary": "Materiał eksponuje stopę zwrotu 18% i powołuje się na nadzór KNF jako gwarancję bezpieczeństwa. Ostrzeżenie o ryzyku jest w stopce, czcionką 9 px w jasnoszarym kolorze.",
+  "firm": {
+    "name": "Alfa Inwestycje Dom Maklerski S.A.",
+    "registry_id": "facc6bd1-c728-5348-90a4-011b0972fea9",
+    "registry_type": "brokerage_house",
+    "authorized": true,
+    "match_confidence": 0.95
+  },
+  "advertiser": null,
+  "rules": [
+    {
+      "rule_id": "R1",
+      "name": "Identyfikacja firmy",
+      "result": "pass",
+      "severity": "medium",
+      "evidence": "Konto Premium Alfa Inwestycje",
+      "evidence_locator": null,
+      "explanation": "Nazwa firmy jest podana.",
+      "legal_basis": "art. 44 ust. 2 lit. a rozp. del. 2017/565",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R2",
+      "name": "Oznaczenie reklamy",
+      "result": "fail",
+      "severity": "medium",
+      "evidence": null,
+      "evidence_locator": null,
+      "explanation": "Brak oznaczenia materiału jako reklamy.",
+      "legal_basis": "art. 24 ust. 3 MiFID II",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R3",
+      "name": "Informacja o ryzyku",
+      "result": "fail",
+      "severity": "high",
+      "evidence": "Zarabiaj nawet do 18% rocznie na portfelu ETF!",
+      "evidence_locator": null,
+      "explanation": "Obietnica zysku bez ostrzeżenia o ryzyku w bezpośrednim sąsiedztwie.",
+      "legal_basis": "art. 44 ust. 2 lit. b rozp. del. 2017/565",
+      "method": "hybrid"
+    },
+    {
+      "rule_id": "R4",
+      "name": "Rozmiar czcionki ryzyka",
+      "result": "fail",
+      "severity": "medium",
+      "evidence": "*Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+      "evidence_locator": null,
+      "explanation": "Ostrzeżenie 9 px przy przeważającej czcionce 20 px (0,45×).",
+      "legal_basis": "art. 44 ust. 2 lit. c rozp. del. 2017/565",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R5",
+      "name": "Ekspozycja i kontrast ryzyka",
+      "result": "fail",
+      "severity": "medium",
+      "evidence": null,
+      "evidence_locator": null,
+      "explanation": "Kontrast ostrzeżenia 1,9:1 (wymagane min. 4,5:1).",
+      "legal_basis": "art. 44 ust. 2 lit. c i e rozp. del. 2017/565",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R6",
+      "name": "Zakrywanie / ukrywanie ryzyka",
+      "result": "fail",
+      "severity": "high",
+      "evidence": null,
+      "evidence_locator": null,
+      "explanation": "Ostrzeżenie wyłącznie w stopce, niewidoczne bez przewijania.",
+      "legal_basis": "art. 44 ust. 2 lit. e rozp. del. 2017/565",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R8",
+      "name": "Responsywność",
+      "result": "fail",
+      "severity": "low",
+      "evidence": null,
+      "evidence_locator": null,
+      "explanation": "Na telefonie ostrzeżenie ma 8 px i jest ucięte.",
+      "legal_basis": "art. 44 ust. 2 lit. g rozp. del. 2017/565",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R10",
+      "name": "Spójność językowa",
+      "result": "pass",
+      "severity": "low",
+      "evidence": null,
+      "evidence_locator": null,
+      "explanation": null,
+      "legal_basis": "art. 44 ust. 2 lit. f rozp. del. 2017/565",
+      "method": "rule"
+    },
+    {
+      "rule_id": "R17",
+      "name": "Zakaz sugerowania aprobaty organu nadzoru",
+      "result": "fail",
+      "severity": "high",
+      "evidence": "Działamy pod nadzorem KNF – Twoje środki są bezpieczne.",
+      "evidence_locator": null,
+      "explanation": "Odwołanie do KNF sugeruje aprobatę produktu.",
+      "legal_basis": "art. 44 ust. 8 rozp. del. 2017/565",
+      "method": "llm"
+    },
+    {
+      "rule_id": "R18",
+      "name": "Nadzór jako argument bezpieczeństwa",
+      "result": "fail",
+      "severity": "high",
+      "evidence": "Działamy pod nadzorem KNF – Twoje środki są bezpieczne.",
+      "evidence_locator": null,
+      "explanation": "Nadzór KNF użyty jako argument bezpieczeństwa inwestycji.",
+      "legal_basis": "art. 44 ust. 8 rozp. del. 2017/565",
+      "method": "llm"
+    }
+  ],
+  "content_excerpt": "Konto Premium Alfa Inwestycje. Zarabiaj nawet do 18% rocznie na portfelu ETF! Dołącz do 50 000 zadowolonych inwestorów. Działamy pod nadzorem KNF – Twoje środki są bezpieczne. Otwórz konto w 5 minut. ",
+  "url": "https://alfa-inwestycje.example.com/konto-premium",
+  "platform": "web",
+  "note": null,
+  "detected_at": "2026-11-21T15:00:40Z",
+  "updated_at": "2026-11-21T15:00:40Z",
+  "model": {
+    "pipeline_version": "0.1.0-mock",
+    "llm": "gemma3:4b",
+    "embedder": "bge-m3"
+  },
+  "document": {
+    "id": "a3c88321-15bf-56e4-8d59-05a9033308c6",
+    "source_id": "e05d8699-90e0-5042-a040-ab67dae7299a",
+    "platform": "web",
+    "source_kind": "firm_own",
+    "url": "https://alfa-inwestycje.example.com/konto-premium",
+    "canonical_url": "https://alfa-inwestycje.example.com/konto-premium",
+    "fetched_at": "2026-11-21T15:00:00Z",
+    "published_at": "2026-11-21T12:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": "Konto Premium – zarabiaj do 18% rocznie",
+    "text": "Konto Premium Alfa Inwestycje. Zarabiaj nawet do 18% rocznie na portfelu ETF! Dołącz do 50 000 zadowolonych inwestorów. Działamy pod nadzorem KNF – Twoje środki są bezpieczne. Otwórz konto w 5 minut. *Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+    "content_hash": "5fe280ed0c47eeaa68f0b28db6ce78de46ff55a58288334c8c14c74b4111d291",
+    "author": null,
+    "links": [],
+    "media": [],
+    "html_object_key": "html/a3c88321-15bf-56e4-8d59-05a9033308c6.html",
+    "screenshots": {
+      "desktop": "shot/a3c88321-15bf-56e4-8d59-05a9033308c6/desktop.png",
+      "tablet": "shot/a3c88321-15bf-56e4-8d59-05a9033308c6/tablet.png",
+      "mobile": "shot/a3c88321-15bf-56e4-8d59-05a9033308c6/mobile.png"
+    },
+    "blocks": [
+      {
+        "viewport": "desktop",
+        "text": "Zarabiaj nawet do 18% rocznie na portfelu ETF!",
+        "tag": "h1",
+        "font_size_px": 44,
+        "font_weight": 700,
+        "color": "#111111",
+        "background_color": "#ffffff",
+        "bbox": [
+          80,
+          120,
+          900,
+          60
+        ],
+        "visible": true,
+        "in_viewport_on_load": true,
+        "requires_interaction": false,
+        "region": "main",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "desktop",
+        "text": "Działamy pod nadzorem KNF – Twoje środki są bezpieczne.",
+        "tag": "p",
+        "font_size_px": 20,
+        "font_weight": 400,
+        "color": "#222222",
+        "background_color": "#ffffff",
+        "bbox": [
+          80,
+          200,
+          700,
+          28
+        ],
+        "visible": true,
+        "in_viewport_on_load": true,
+        "requires_interaction": false,
+        "region": "main",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "desktop",
+        "text": "*Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+        "tag": "small",
+        "font_size_px": 9,
+        "font_weight": 400,
+        "color": "#bbbbbb",
+        "background_color": "#ffffff",
+        "bbox": [
+          80,
+          2400,
+          600,
+          12
+        ],
+        "visible": true,
+        "in_viewport_on_load": false,
+        "requires_interaction": false,
+        "region": "footer",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "mobile",
+        "text": "*Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+        "tag": "small",
+        "font_size_px": 8,
+        "font_weight": 400,
+        "color": "#bbbbbb",
+        "background_color": "#ffffff",
+        "bbox": [
+          16,
+          3900,
+          340,
+          30
+        ],
+        "visible": true,
+        "in_viewport_on_load": false,
+        "requires_interaction": false,
+        "region": "footer",
+        "overflow_clipped": true
+      }
+    ],
+    "scrape_meta": {
+      "scraper": "playwright",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  "screenshot_urls": {
+    "desktop": "/api/documents/a3c88321-15bf-56e4-8d59-05a9033308c6/screenshot/desktop",
+    "tablet": "/api/documents/a3c88321-15bf-56e4-8d59-05a9033308c6/screenshot/tablet",
+    "mobile": "/api/documents/a3c88321-15bf-56e4-8d59-05a9033308c6/screenshot/mobile"
+  }
+}
