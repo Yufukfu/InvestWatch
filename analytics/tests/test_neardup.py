@@ -7,6 +7,7 @@ import random
 import time
 
 import fakeredis
+import numpy as np
 import pytest
 import redis
 
@@ -15,8 +16,8 @@ from investwatch_analytics.neardup import NearDupIndex, build_index, shingles, s
 from investwatch_analytics.preprocessing import normalize
 
 S = NearDupSettings()
-#: First four values of signature({"zysk 20 procent co miesiac"}, 128) from a reference run (datasketch 2.0.0).
-GOLDEN = [1098134003, 4137659716, 4183501174, 1815336871]
+#: First four values of signature({"zysk 20 procent co miesiac"}, 128) from a reference run (own MinHash, datasketch legacy scheme).
+GOLDEN = [4014907321, 914172111, 3847086680, 3911499164]
 A, B, C, D = (f"{i}{i}{i}{i}{i}{i}{i}{i}-0000-4000-8000-000000000000" for i in range(1, 5))
 
 _WORDS = ("zysk inwestycja rynek akcje kurs portfel ryzyko dywidenda fundusz bank kredyt lokata waluta "
@@ -148,8 +149,8 @@ def est(a: str, b: str) -> float:
 
 def test_best_group_wins(idx):
     base = text(400)
-    far = edit(base, 50, 30, seed=1)      # J(base, far) ~0.84
-    near = edit(base, 300, 15, seed=2)    # J(base, near) ~0.91; J(far, near) < 0.8
+    far = edit(base, 50, 16, seed=1)      # J(base, far) ~0.84
+    near = edit(base, 300, 8, seed=2)     # J(base, near) ~0.94; J(far, near) < 0.8
     assert est(far, near) < 0.8 <= est(base, far) < est(base, near)  # preconditions of this test
     assert idx.observe(A, far, "a").group_id == A
     assert idx.observe(B, near, "b").group_id == B
@@ -230,8 +231,8 @@ def test_similarity_exactly_at_threshold_counts(r):
 
 def test_copy_of_a_copy_joins_the_first_original(idx):
     base = text(400)
-    b = edit(base, 50, 25, seed=3)     # J(base, b) ~0.86
-    c = edit(b, 300, 25, seed=4)       # J(b, c) ~0.86, J(base, c) < 0.8
+    b = edit(base, 50, 10, seed=3)     # J(base, b) ~0.87
+    c = edit(b, 300, 17, seed=4)       # J(b, c) ~0.84, J(base, c) < 0.8
     assert est(base, c) < 0.8 <= min(est(base, b), est(b, c))  # preconditions
     idx.observe(A, base, "a")
     assert idx.observe(B, b, "b").group_id == A
@@ -241,8 +242,8 @@ def test_copy_of_a_copy_joins_the_first_original(idx):
 
 def test_redelivery_keeps_its_group_after_a_better_match_appears(idx):
     base = text(400)
-    far = edit(base, 50, 30, seed=1)
-    near = edit(base, 300, 15, seed=2)
+    far = edit(base, 50, 16, seed=1)
+    near = edit(base, 300, 8, seed=2)
     idx.observe(A, far, "a")
     idx.observe(B, near, "b")
     idx.observe(C, base, "c")           # joins B
@@ -319,4 +320,73 @@ def test_url_is_capped(idx, r):
 def test_bucket_key_matches_a_golden_value():
     """Little-endian bucket hashing: containers on any architecture share the buckets."""
     sig = signature({"zysk 20 procent co miesiac"}, 128)
-    assert NearDupIndex(None, S)._bucket_keys(sig)[0] == "iw:neardup:v1:b:0:d747c2017afa4d1c"
+    assert NearDupIndex(None, S)._bucket_keys(sig)[0] == "iw:neardup:v1:b:0:6ce369440142b111"
+
+
+def test_estimate_tracks_true_jaccard():
+    """Our MinHash estimates Jaccard like any MinHash: within about 3 standard errors at 128 permutations."""
+    shared = {f"s{i}" for i in range(600)}
+    a = shared | {f"a{i}" for i in range(200)}
+    b = shared | {f"b{i}" for i in range(200)}          # true Jaccard 600/1000 = 0.6
+    estimate = float((signature(a, 128) == signature(b, 128)).mean())
+    assert abs(estimate - 0.6) < 0.13
+    assert float((signature(a, 128) == signature(a, 128)).mean()) == 1.0
+
+
+def test_no_scipy_or_datasketch_at_runtime():
+    import subprocess
+    import sys
+
+    code = "import sys, investwatch_analytics.neardup; print('scipy' in sys.modules or 'datasketch' in sys.modules)"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.strip()
+    assert out == "False"
+
+
+def test_union_property_across_chunks():
+    """MinHash of a union is the element-wise minimum of the parts, also for sets larger than one chunk."""
+    a = {f"a{i}" for i in range(3000)}
+    b = {f"b{i}" for i in range(3500)}
+    assert (signature(a | b, 128) == np.minimum(signature(a, 128), signature(b, 128))).all()
+
+
+def test_chunk_boundary_row_counts():
+    """The element holding permutation 0's minimum sits on the last row of the first chunk: it must count."""
+    from investwatch_analytics.neardup import _CHUNK
+
+    others = {f"!{i:05d}" for i in range(_CHUNK - 1)}          # sort before any "w…" item
+    floor = int(signature(others, 128)[0])
+    winner = next(f"w{i}" for i in range(200_000) if int(signature({f"w{i}"}, 128)[0]) < floor)
+    full = others | {winner}
+    assert sorted(full).index(winner) == _CHUNK - 1
+    assert int(signature(full, 128)[0]) == int(signature({winner}, 128)[0]) < floor
+
+
+def test_best_similarity_wins_over_most_shared_buckets(r):
+    """X shares 28 buckets with J 0.875; Y shares 20 buckets with J 0.906: Y is the best match."""
+    from investwatch_analytics.neardup import _encode
+
+    idx = NearDupIndex(r, S)
+    t = text()
+    q = signature(shingles(t, S.max_chars), S.num_perm)
+
+    def variant(full_bands, partial_bands):
+        sig = q.copy()
+        for band in range(S.bands):
+            lo = band * S.rows
+            if band in full_bands:
+                continue
+            if band in partial_bands:
+                sig[lo] ^= 1                       # 3 of 4 rows equal: no shared bucket
+            else:
+                sig[lo:lo + S.rows] ^= 1           # whole band differs
+        return sig
+
+    x = variant(set(range(28)), set())             # 112/128 equal
+    y = variant(set(range(20)), set(range(20, 32)))  # 80 + 36 = 116/128 equal
+    for doc, sig in ((C, x), (D, y)):
+        for key in idx._bucket_keys(sig):
+            r.sadd(key, doc)
+        r.hset(f"iw:neardup:v1:meta:{doc}", mapping={"sig": _encode(sig), "url": doc})
+        r.set(f"iw:neardup:v1:doc:{doc}", doc)
+    res = idx.observe(A, t, "a")
+    assert res.group_id == D and abs(res.similarity - 116 / 128) < 1e-9

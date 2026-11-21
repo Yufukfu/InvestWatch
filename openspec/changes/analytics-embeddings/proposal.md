@@ -32,13 +32,13 @@ Centroid similarity in the gate is a **stretch item**, the first thing cut. Impl
   - `firm_own` documents bypass the gate, because M2 covers only material "publikowanych bezpośrednio przez" firms and must judge every firm page. `third_party` and `unknown` are gated, and what passes flows to M1/M3.
   - A dropped document is logged with reason `off_topic` and its gate figures, and is counted in Redis. It is never a silent loss.
 - **Near-duplicate detection** (plan §2 step 1):
-  - MinHash with `datasketch` over word 5-shingles of the normalized text, plus our own LSH banding in Redis (ADR 0314).
+  - MinHash (datasketch's classic scheme, as a small numpy implementation of our own) over word 5-shingles of the normalized text, plus our own LSH banding in Redis (ADR 0314).
   - A near-dup is **still analyzed and still gets its own finding**: each publication is separate evidence for UKNF, and the `Finding` contract cannot change.
   - The group is recorded in Redis (`iw:neardup:v1:…`: a document maps to its group, the group to its members and URLs), is logged, and the finding `summary` gets one Polish sentence that names the original's URL. The near-dup's own `url` stays on its finding (M1 needs "dokładną lokalizację (URL)").
   - **No repeat alert:** a near-dup still publishes `finding.created`, but not a second `finding.high_risk` for the same group and module. The first alert claims the group with an atomic Redis `SET NX`, and a Redis error fails open. This modifies `finding-events` ("Which events per stored finding"): the documents ask for "usuwanie duplikatów" and real-time high-risk alerts, and repeat alerts would spam the live demo.
   - This prepares the URL-level grouping follow-up from Kacper's #26 review and issue #33, without changing a contract.
 - **Wiring.** `analyze(..., judge=None, embedder=None, neardup=None)` stays pure apart from the injected objects. The worker builds both from env with its Redis client. The CLI builds the embedder without a cache and has no near-dup index, and `--no-embed` forces embeddings off. `analytics/compose.yaml` passes `EMBED_*` and `GATE_*`.
-- **Dependencies:** `datasketch` (MIT, pulls `numpy` and `scipy`). `httpx` already comes with `analytics-llm-p0`. Both are scanned with `pip-audit`.
+- **Dependencies:** `numpy` only (`httpx` already comes with `analytics-llm-p0`). `datasketch` was planned but imports scipy (about 115 MB) at runtime, so the MinHash is our own numpy code (design §8). Scanned with `pip-audit`.
 - **ADRs:** 0313 (embeddings model and serving) and 0314 (topic gate and near-dup strategy).
 
 ### Asks for infra (Kacper owns `infra/`; this change does not edit it)

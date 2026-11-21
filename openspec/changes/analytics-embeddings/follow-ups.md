@@ -37,3 +37,4 @@
 | R31 | review group 8a | the claim TTL is a constant, not `NEARDUP_TTL_S` | `fix-here` in group 9: the worker passes `alert_ttl_s=NEARDUP_TTL_S` (task 9.1) |
 | R32 | review group 8a | no-groups tests did not prove Redis is untouched | `fix-here` |
 | R33 | review group 8a, PLAUSIBLE | one scam template naming different impersonated firms forms one group, so only the first firm alerts | `docs`: design §5 names it; per-firm claims would need the firm in the key, a product call for Damian |
+| R34 | coordinator | scipy is heavy for the image: does datasketch need it at runtime? | `fix-here`: yes (package `__init__` imports `lsh.py` -> `scipy.integrate`), so datasketch is replaced by our own numpy MinHash; about -115 MB |

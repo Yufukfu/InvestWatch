@@ -84,7 +84,7 @@ When a document vector is available, a document with no dictionary hit SHALL sti
 - **THEN** loading fails at start-up with an error naming the class
 
 ### Requirement: Near-duplicate detection
-Analytics SHALL detect near-duplicates with MinHash (`datasketch`, `NEARDUP_NUM_PERM` permutations) over word 5-shingles of the normalized, lowercased text, cut to `NEARDUP_MAX_CHARS`, and an LSH index of `NEARDUP_BANDS` bands in Redis. A band candidate SHALL count only if its estimated Jaccard similarity is at least `NEARDUP_THRESHOLD`. A document SHALL never match its own id. Texts with fewer than 5 words SHALL skip detection.
+Analytics SHALL detect near-duplicates with MinHash (`NEARDUP_NUM_PERM` permutations, deterministic in every process) over word 5-shingles of the normalized, lowercased text, cut to `NEARDUP_MAX_CHARS`, and an LSH index of `NEARDUP_BANDS` bands in Redis. A band candidate SHALL count only if its estimated Jaccard similarity is at least `NEARDUP_THRESHOLD`. A document SHALL never match its own id. Texts with fewer than 5 words SHALL skip detection.
 
 #### Scenario: Repost with a changed handle
 - **WHEN** two `third_party` posts share the same 300-word text except for the author handle and one emoji

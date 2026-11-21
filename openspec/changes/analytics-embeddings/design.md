@@ -127,7 +127,7 @@ The rejected option of an LLM gate costs one call per document for a yes/no that
 
 ### 5. Near-duplicates (ADR 0314)
 
-**Technique.** `datasketch.MinHash`, 128 permutations, over word 5-shingles of `strip_diacritics(normalized.lower())`, cut to 50k characters (bounded cost: about 8k shingles, one numpy pass). We keep our own LSH in Redis: 32 bands of 4 rows, bucket key `iw:neardup:v1:b:{band}:{sha1(band rows)[:16]}` → a set of document ids. The signature (128 × little-endian uint32, base64) and the url (capped at 2048 characters) are stored in the hash `iw:neardup:v1:meta:{document_id}`. Buckets are read with `SRANDMEMBER` (at most 64 ids) and stop growing at 256 ids, so a flood of identical spam costs O(1) per copy and its full buckets expire.
+**Technique.** MinHash with 128 permutations (our own numpy code, decision 8), over word 5-shingles of `strip_diacritics(normalized.lower())`, cut to 50k characters (bounded cost: about 8k shingles, one numpy pass). We keep our own LSH in Redis: 32 bands of 4 rows, bucket key `iw:neardup:v1:b:{band}:{sha1(band rows)[:16]}` → a set of document ids. The signature (128 × little-endian uint32, base64) and the url (capped at 2048 characters) are stored in the hash `iw:neardup:v1:meta:{document_id}`. Buckets are read with `SRANDMEMBER` (at most 64 ids) and stop growing at 256 ids, so a flood of identical spam costs O(1) per copy and its full buckets expire.
 - Candidates from any band are verified by the Jaccard estimate (the share of equal signature values) ≥ 0.8.
 - With 32×4 bands, a pair at Jaccard 0.8 is caught with probability 1-(1-0.8⁴)³² ≈ 0.99999.
 - Candidate verification removes the extra false candidates the low band threshold lets in.
@@ -193,9 +193,8 @@ Groups are not merged transitively. A document that matches two groups joins the
 
 ### 8. Dependencies
 
-- `datasketch==2.0.0` (MIT; requires `numpy>=1.11` and `scipy>=1.0.0`, read from PyPI metadata on 2026-11-21). `numpy` is also used for the vectors. `scipy` is pulled only by `datasketch` (the LSH parameter optimizer, which we don't use). It adds about 40 MB to the image.
-  - The alternative is about 30 lines of our own numpy MinHash, which drops `scipy`. It is kept as a cut option (cut plan 4).
-  - The plan names `datasketch`, and the jury reviews the libraries.
+- **No `datasketch`: our own numpy MinHash** (decided during apply, at the coordinator's request to check scipy). `datasketch` 2.0.0 is MIT and `pip-audit` was clean, but `import datasketch` loads scipy at runtime even for `MinHash` alone: the package `__init__` imports `lsh.py`, which imports `scipy.integrate` (checked: `'scipy' in sys.modules` after `from datasketch import MinHash`). Measured installed sizes (the analytics venv, 2026-11-22): scipy 115 MB, numpy 34 MB, datasketch 0.8 MB. Dropping datasketch removes about 115 MB from the image; numpy stays (also used for the vectors), so the image grows by numpy's ~34 MB only.
+  - The implementation is about 25 lines in `neardup.py`: universal hashing `((a·sha1_32(x) + b) mod (2^61−1)) & (2^32−1)` with `RandomState(1)` permutations, which is datasketch's `legacy` scheme value for value (checked against `datasketch` 2.0.0 with `scheme="legacy"` before removing it). Tests pin a golden signature and bucket key, the union property, a chunk-boundary row and the estimate against a known Jaccard, and a subprocess test asserts neither scipy nor datasketch is imported.
 - `pip-audit` runs on the new pins.
 
 ## Risks / Trade-offs
@@ -215,7 +214,6 @@ The approved scope is groups 1-4 and 6-9, about 5.5 h of agent work plus closing
 0. **Group 5 (centroid similarity), stretch.** It is not started unless time is left after group 9. If it is cut, its requirement "Similarity rescue in the topic gate (stretch)" is removed from the `document-analysis` delta before archive.
 1. **The gate counter and the near-dup summary sentence (part of group 8; the alert suppression in group 8 stays).** The logs still carry the decision.
 2. **Group 3 (cache and breaker).** Keep `EMBED_TIMEOUT_S` at 2 without the breaker.
-3. **`datasketch` → own numpy MinHash** if `pip-audit` is not clean (Damian's condition) or the image size objects.
 
 Never cut: real embeddings (groups 2 and 7) and near-dup (group 6), which together are the minimum the challenge text asks for ("usuwanie duplikatów", "embeddingów"); degradation to `model.embedder = null`; the `off_topic` log reason; the `firm_own` bypass; the alert suppression; and the loopback guard.
 
@@ -226,7 +224,7 @@ Answered by the coordinating session on Damian's approval, checked against `doc/
 1. **Near-dup and alerts.** A near-dup still gets its finding and `finding.created`, but no second `finding.high_risk` for the same group and module. Its summary names the original, and its own URL stays on the finding. Reason: the documents ask for "usuwanie duplikatów" and real-time high-risk alerts, and repeat alerts would spam the live demo. This is the `finding-events` delta and decision 5.5.
 2. **`unknown` source kind** is gated like `third_party`. Documents that pass flow to M1/M3. M2 covers only material "publikowanych bezpośrednio przez" firms.
 3. **Near-dup sentence in `summary`:** on.
-4. **`datasketch`:** kept if `pip-audit` is clean, otherwise our own numpy MinHash (cut plan 3).
+4. **`datasketch`:** kept if `pip-audit` is clean, otherwise our own numpy MinHash. Superseded during apply: the coordinator asked to avoid scipy, which datasketch imports at runtime, so the MinHash is our own (decision 8).
 5. **Gate threshold 0.45:** kept until the gold set from `analytics-eval-calibration` is calibrated. It applies only to the stretch similarity rescue.
 
 ## Open Questions

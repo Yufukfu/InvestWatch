@@ -1,6 +1,6 @@
 """Near-duplicate detection and groups in Redis (analytics-embeddings; ADR 0314; plan §2 step 1).
 
-MinHash (`datasketch`) over word 5-shingles of the normalized, lowercased, diacritic-stripped text, and our
+MinHash (our own numpy implementation, below) over word 5-shingles of the normalized, lowercased, diacritic-stripped text, and our
 own LSH banding in Redis: `bands` buckets of `rows` signature values each. A candidate from any shared bucket
 counts only if its Jaccard estimate (share of equal signature values) is at least `threshold`.
 
@@ -21,12 +21,13 @@ import base64
 import hashlib
 import logging
 import re
+import struct
 from collections import Counter
+from functools import lru_cache
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from datasketch import MinHash
 
 from .config import NearDupSettings
 from .gate import strip_diacritics
@@ -50,10 +51,37 @@ def shingles(normalized_text: str, max_chars: int) -> set[str]:
     return {" ".join(words[i:i + SHINGLE_WORDS]) for i in range(len(words) - SHINGLE_WORDS + 1)}
 
 
+# MinHash with universal hashing: h_i(x) = ((a_i * sha1_32(x) + b_i) mod (2^61 - 1)) & (2^32 - 1), the
+# signature is the per-permutation minimum. This is datasketch's "legacy" scheme value for value (checked
+# against datasketch 2.0.0 with scheme="legacy"); written here because importing datasketch loads scipy
+# (about 115 MB) through its LSH module, and only numpy is needed (design §8).
+_PRIME = np.uint64((1 << 61) - 1)
+_MAX32 = np.uint64((1 << 32) - 1)
+_CHUNK = 2048  # rows per step: bounds the (chunk x num_perm) uint64 work array to 2 MB at 128 permutations
+
+
+@lru_cache(maxsize=4)
+def _permutations(num_perm: int, seed: int = 1) -> tuple[np.ndarray, np.ndarray]:
+    gen = np.random.RandomState(seed)  # fixed seed: every process and container gets the same permutations
+    ab = np.array([(gen.randint(1, _PRIME, dtype=np.uint64), gen.randint(0, _PRIME, dtype=np.uint64))
+                   for _ in range(num_perm)], dtype=np.uint64).T
+    return ab[0], ab[1]
+
+
+def _hash32(item: str) -> int:
+    return struct.unpack("<I", hashlib.sha1(item.encode("utf-8", "surrogatepass")).digest()[:4])[0]
+
+
 def signature(items: set[str], num_perm: int) -> np.ndarray:
-    m = MinHash(num_perm=num_perm, seed=1)
-    m.update_batch([s.encode("utf-8", "surrogatepass") for s in sorted(items)])
-    return m.hashvalues.astype(np.uint32)
+    a, b = _permutations(num_perm)
+    out = np.full(num_perm, _MAX32, dtype=np.uint64)
+    hashes = np.array([_hash32(s) for s in sorted(items)], dtype=np.uint64)
+    for start in range(0, len(hashes), _CHUNK):
+        hv = hashes[start:start + _CHUNK].reshape(-1, 1)
+        # uint64 products wrap modulo 2^64 by design (the universal-hash construction tolerates it).
+        phv = np.bitwise_and((hv * a + b) % _PRIME, _MAX32)
+        out = np.minimum(out, phv.min(axis=0))
+    return out.astype(np.uint32)
 
 
 def _encode(sig: np.ndarray) -> str:

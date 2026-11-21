@@ -26,7 +26,7 @@ Gate:
 3. **A classifier with a negative centroid, or the LLM as gate.** Either can drop on-topic text by comparison. The LLM costs one call per document for a yes/no question, and plan §1 says rules before the LLM.
 
 Near-dup:
-4. **MinHash (`datasketch`) with our own LSH banding in Redis.** Jaccard over word shingles handles reposts with small edits and partial overlap. It needs no embedder and can be tested with `fakeredis`. `datasketch`'s own `MinHashLSH` Redis storage opens its own connection from host and port config, so it cannot use the worker's client or `fakeredis`.
+4. **MinHash (the `datasketch` algorithm) with our own LSH banding in Redis.** Jaccard over word shingles handles reposts with small edits and partial overlap. It needs no embedder and can be tested with `fakeredis`. `datasketch`'s own `MinHashLSH` Redis storage opens its own connection from host and port config, so it cannot use the worker's client or `fakeredis`.
 5. **SimHash.** A smaller index, but weaker on short posts and on partial overlap.
 6. **Embedding cosine.** It needs a vector index (pgvector would mean a schema change, Redis Stack a new image), and it does not work with the embedder off.
 
@@ -53,7 +53,7 @@ Rationale from the evidence above:
 ## Consequences
 
 - With M1/M3 live, off-topic third-party posts no longer produce findings. The log and the counter make each drop visible.
-- `datasketch` adds `numpy` and `scipy` to the image. Our own numpy MinHash is the fallback if that is a problem.
+- No `datasketch` at runtime: `import datasketch` loads scipy (about 115 MB installed) through its LSH module, so the MinHash is our own numpy code implementing datasketch's legacy scheme value for value (checked against datasketch 2.0.0 before removing it). Only numpy is added to the image.
 - Near-dup groups do not merge transitively. A document joins its best-matching group, which is an accepted error.
 - Exposing groups in the API or UI is a follow-up (issue #33, the URL-level grouping item). A nullable `group_id` in a later contract version is one path.
 - A near-dup does not fire a second `finding.high_risk` for the same group and module (Damian's decision). The first alert claims `iw:neardup:v1:alerted:{group}:{module}` with `SET NX`, and a Redis error fails open. The challenge asks for "usuwanie duplikatów" and real-time high-risk alerts, and a repeat alert per copy would spam the live demo. `finding.created` and the copy's own URL stay. This modifies the `finding-events` spec.
