@@ -79,6 +79,7 @@ MAX_EXPLANATION_CHARS = 500
 #: Worst first: the merged verdict per check is the worst across chunks (ADR 0310).
 SEVERITY = {"fail": 3, "uncertain": 2, "pass": 1, "not_applicable": 0}
 UNCONFIRMED = "Nie udało się potwierdzić cytatu w treści dokumentu; wymaga weryfikacji."
+NO_EXPLANATION = "Model nie podał uzasadnienia."
 
 
 class _Item(BaseModel):
@@ -109,13 +110,18 @@ def verify_quote(chunk: str, quote: str | None) -> str | None:
     if q in chunk:
         return q
     m = re.search(r"\s+".join(map(re.escape, q.split())), chunk)
-    return m.group(0) if m else None
+    # A match far longer than the quote spans a huge whitespace run: not the passage the model quoted.
+    if m is None or len(m.group(0)) > 2 * MAX_QUOTE_CHARS:
+        return None
+    return m.group(0)
 
 
 def _verdict(item: _Item, chunk: str) -> LlmVerdict:
-    quote = verify_quote(chunk, item.evidence_quote)
-    explanation = _clean(item.explanation)
-    if item.evidence_quote is not None and quote is None:
+    # Small models often send "" for "no quote": a blank quote is no quote, not an unverifiable one.
+    given = item.evidence_quote if item.evidence_quote is not None and item.evidence_quote.strip() else None
+    quote = verify_quote(chunk, given)
+    explanation = _clean(item.explanation) or NO_EXPLANATION
+    if given is not None and quote is None:
         return LlmVerdict(item.rule_id, "uncertain", None, UNCONFIRMED)
     if item.result in ("fail", "uncertain") and quote is None:
         return LlmVerdict(item.rule_id, "uncertain", None, UNCONFIRMED)

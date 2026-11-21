@@ -244,7 +244,7 @@ def run_rules(
         if res.evidence is not None and res.evidence not in ctx.doc.text:
             # Safety net (analytics/CLAUDE.md): an unverifiable quote never supports a verdict.
             res = res.model_copy(update={"result": "uncertain", "evidence": None, "explanation": UNVERIFIED})
-        if judge is not None and rule.ask_llm(ctx, res):
+        if judge is not None and spec.llm is not None and rule.ask_llm(ctx, res):
             deferred.append((len(out), spec))
         out.append(res)
     if deferred:
@@ -263,7 +263,7 @@ def _refine(
 ) -> list[RuleResult]:
     from ..llm.judge import SemanticCheck
 
-    checks = [SemanticCheck(spec.id, spec.llm["question"]) for _, spec in deferred]  # type: ignore[index]
+    checks = [SemanticCheck(spec.id, spec.llm["question"]) for _, spec in deferred if spec.llm is not None]
     outcome = judge.judge(module=module, module_context=module_context, text=ctx.doc.text,
                           content_hash=ctx.pre.content_hash, sentences=ctx.pre.sentences, checks=checks)
     out = list(out)
@@ -274,6 +274,8 @@ def _refine(
         before = out[index]
         update = {"result": verdict.result, "evidence": verdict.evidence, "explanation": verdict.explanation,
                   "method": "hybrid" if before.evidence is not None else "llm"}
+        if verdict.evidence != before.evidence:
+            update["evidence_locator"] = None  # the locator pointed at the rules-only quote
         if verdict.evidence is not None and verdict.evidence not in ctx.doc.text:
             # Defence in depth: the judge already verified the quote; never trust it blindly.
             update.update({"result": "uncertain", "evidence": None, "explanation": UNVERIFIED})

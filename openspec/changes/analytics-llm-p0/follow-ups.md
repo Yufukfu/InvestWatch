@@ -121,3 +121,18 @@ Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14
 | R48 | review group 6 | `split_chunks` had no guard for `chunk_chars < 1` and built every slice of a huge sentence before the cap | `fix-here` |
 | R49 | review group 6 | Two checks with the same rule id kept input order | `fix-here`: sorted by (rule id, question, allowed); the engine also never sends a rule id twice (group 8) |
 | R50 | review group 6, declined | Whether a 4B Gemma obeys "ignore instructions"; a random-nonce delimiter instead of the fixed tag | `wont-fix`: the defence is that only deferred checks reach the model and quotes are verified; the spec fixes the tag |
+
+## Review findings, groups 7 and 8 (focus: security)
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R51 | review group 7 | `re.escape`, `strip()` and the exact-match branch of `verify_quote` were not pinned by tests (3 surviving mutants against the recorded 18/18) | `fix-here`: tests for metacharacters, padding (padding no longer bypasses the 8-char minimum), exact match preferred over a near-variant |
+| R52 | review group 7 | The whitespace-insensitive fallback could return evidence far longer than the quote (a huge whitespace run) | `fix-here`: a match over 2 × 400 chars is rejected |
+| R53 | review group 7 | An explanation of only control characters became `""` | `fix-here`: fixed Polish fallback text |
+| R54 | review group 7 | Small models send `""` for "no quote", which turned every `pass` into `uncertain` | `fix-here`: a blank quote is no quote |
+| R55 | review group 7, for the web layer | `explanation` keeps HTML, Markdown and URLs; `evidence` is verbatim document text and may carry bidi/control characters | `new-item` (Kacper): HTML-escape both, never render as Markdown/HTML, no auto-linking; render evidence with `dir="auto"` / `<bdi>` |
+| R56 | review group 8 | A rule-class `ask_llm` override that skips `super()` could defer a rule without an `llm:` block and crash `_refine` | `fix-here`: the engine checks `spec.llm is not None` itself |
+| R57 | review group 8 | A merged verdict kept the rules-only `evidence_locator` | `fix-here`: cleared when the evidence changes |
+| R58 | review group 8 | Task 8.1 "S-ids accepted for non-M2 catalogues" is not in this branch's loader | `docs`: provided by #35 (`_ID_PREFIX`); this branch's tests build S-id catalogues directly |
+| R59 | review group 8, for the #35 merge | `RuleSpec` gains `llm` here and `weight` in #35, and #35's loader passes `weight` by position | `fix-here` at the merge: pass `weight=` and `llm=` by keyword; default `run_rules(module=catalogue.module)` once #35's `Catalogue.module` exists |
+| R60 | review group 8, declined | With `when: always`, an M3 LLM verdict can open or close #35's M3 gates, and the M3 call runs before those gates | `new-item`: product and cost decision for M3 (Damian) |

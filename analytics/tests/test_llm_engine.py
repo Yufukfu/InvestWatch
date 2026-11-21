@@ -300,3 +300,44 @@ def test_not_applicable_from_evaluate_is_never_sent_even_with_always(registry):
     judge = FakeJudge()
     run_rules(Catalogue([spec]), ctx_for("Tekst.", registry), judge=judge, module="M1")
     assert judge.calls == []
+
+
+# ---- group 8 review fixes ----------------------------------------------------------------------------
+
+
+@register
+class _OverrideWithoutSuper(Rule):
+    """An ask_llm override that skips super() (like a future signal class) must not crash without `llm:`."""
+
+    rule_id = "S1.97"
+
+    def ask_llm(self, ctx, result):
+        return True
+
+    def evaluate(self, ctx):
+        return self.result("pass", None, "x")
+
+
+def test_override_without_llm_block_is_not_sent(registry):
+    spec = RuleSpec("S1.97", "x", "low", None, True, {})
+    judge = FakeJudge()
+    [r] = run_rules(Catalogue([spec]), ctx_for("Tekst.", registry), judge=judge, module="M1")
+    assert judge.calls == [] and r.result == "pass"
+
+
+@register
+class _VisualWithLocator(Rule):
+    rule_id = "S3.98"
+
+    def evaluate(self, ctx):
+        from investwatch_analytics.models import EvidenceLocator
+
+        return self.result("uncertain", "Tekst bloku.", "x", EvidenceLocator(viewport="desktop", bbox=[1, 2, 3, 4]))
+
+
+def test_merge_clears_a_stale_locator(registry):
+    spec = RuleSpec("S3.98", "x", "low", None, True, {}, llm={"question": "Q?", "when": "uncertain"})
+    judge = FakeJudge(LlmVerdict("S3.98", "fail", "Inny fragment tekstu.", "y"))
+    ctx = ctx_for("Tekst bloku. Inny fragment tekstu.", registry)
+    [r] = run_rules(Catalogue([spec]), ctx, judge=judge, module="M3")
+    assert r.evidence == "Inny fragment tekstu." and r.evidence_locator is None

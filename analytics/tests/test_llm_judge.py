@@ -231,3 +231,51 @@ def test_judge_never_raises_on_unexpected_content(stub_llm):
     stub_llm.script.append(Reply(content=json.dumps({"results": [None, 1, [], {"rule_id": None}]})))
     out = ask(judge_for(stub_llm.base_url))
     assert out.verdicts == {} and out.status == "ok" and out.model is None  # no verdict used, so no model to report
+
+
+# ---- group 7 review fixes ----------------------------------------------------------------------------
+
+
+def test_fallback_escapes_regex_metacharacters(stub_llm):
+    text = "Zarabiaj do  zysk (18%)\n+ [ETF] rocznie."
+    stub_llm.script.append(Reply.results(item(quote="zysk (18%) + [ETF]")))
+    v = ask(judge_for(stub_llm.base_url), text=text).verdicts["R17"]
+    assert v.result == "fail" and v.evidence == "zysk (18%)\n+ [ETF]"
+
+
+@pytest.mark.parametrize("quote", ["   ", "", "\n\t"])
+def test_blank_quote_counts_as_no_quote(stub_llm, quote):
+    stub_llm.script.append(Reply.results(item("R18", "pass", quote, "Brak powiązania.")))
+    v = ask(judge_for(stub_llm.base_url), checks=(R18,)).verdicts["R18"]
+    assert v.result == "pass" and v.evidence is None
+
+
+def test_padded_quote_is_stripped(stub_llm):
+    stub_llm.script.append(Reply.results(item(quote=f"  {KNF}  ")))
+    assert ask(judge_for(stub_llm.base_url)).verdicts["R17"].evidence == KNF
+
+
+def test_exact_match_is_preferred_over_the_fallback(stub_llm):
+    text = f"Działamy pod  nadzorem KNF – Twoje środki są bezpieczne. {KNF}"  # the near-variant comes first
+    stub_llm.script.append(Reply.results(item(quote=KNF)))
+    v = ask(judge_for(stub_llm.base_url), text=text).verdicts["R17"]
+    assert v.evidence == KNF
+
+
+def test_fallback_match_far_longer_than_the_quote_is_rejected(stub_llm):
+    text = "Działamy pod" + " " * 5000 + "nadzorem KNF."
+    stub_llm.script.append(Reply.results(item(quote="Działamy pod nadzorem KNF")))
+    v = ask(judge_for(stub_llm.base_url), text=text).verdicts["R17"]
+    assert v.result == "uncertain" and v.evidence is None
+
+
+def test_empty_explanation_after_cleaning_gets_a_fixed_text(stub_llm):
+    stub_llm.script.append(Reply.results(item(explanation="\x00‮")))
+    v = ask(judge_for(stub_llm.base_url)).verdicts["R17"]
+    assert v.result == "fail" and v.explanation.strip()
+
+
+def test_padding_does_not_bypass_the_minimum_length(stub_llm):
+    stub_llm.script.append(Reply.results(item(quote="  KNF   ")))  # 8 chars only with the padding
+    v = ask(judge_for(stub_llm.base_url)).verdicts["R17"]
+    assert v.result == "uncertain" and v.evidence is None
