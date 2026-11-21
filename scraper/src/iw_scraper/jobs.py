@@ -131,8 +131,8 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
         return "skipped"
 
     health = DomainHealth(redis, domain, threshold=cfg.failure_threshold, cooldown=cfg.domain_cooldown)
-    if (paused_for := await health.paused_for()) > 0:
-        await _requeue(lock, cfg, paused_for)
+    if (wait := await health.wait_for()) > 0:
+        await _requeue(lock, cfg, wait)
     semaphore = LeaseSemaphore(redis, domain, cfg.domain_concurrency)
     lease_id = f"{job_id}:{ctx['job_try']}"
     if not await semaphore.acquire(lease_id, cfg.lease_ttl):
@@ -146,6 +146,8 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
 
     result = await _attempt(ctx["run_source"], source_id, announce_start, lock, semaphore, lease_id, cfg)
 
+    if result.retry_after:  # any status: a 429 or a 503 tells every worker to leave the domain alone
+        await health.defer(min(result.retry_after, cfg.max_retry_after))
     if result.deferral:
         await _requeue(lock, cfg, max(0.0, (result.deferral.until - datetime.now(UTC)).total_seconds()))
     attempts_key = f"{KEY_PREFIX}attempts:{job_id}"

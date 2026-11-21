@@ -6,10 +6,12 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from conftest import Recorder, fast_settings
+from iw_scraper.guards import DomainHealth
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.types import Deferral, JobError, Reason
 
 SRC = "11111111-1111-4111-8111-111111111111"
+OTHER = "22222222-2222-4222-8222-222222222222"
 DOMAIN = "example.test"
 
 
@@ -202,3 +204,69 @@ async def test_jobs_and_results_are_stored_as_json(redis, start_worker):
 
     assert outcome == "ok"
     assert json.loads(await redis.get("arq:result:job-1"))["r"] == "ok"
+
+
+def first_call_fails(result, calls):
+    """run_source that answers `result` to its first call and a success afterwards, logging (source, time)."""
+    state = {"first": True}
+
+    async def run_source(source_id, started=None):
+        calls.append((source_id, time.monotonic()))
+        if state["first"]:
+            state["first"] = False
+            return result
+        return AttemptResult(documents=1)
+
+    return run_source
+
+
+async def other_source_job(redis, job_id="job-2"):
+    job = await redis.enqueue_job("execute_job", OTHER, DOMAIN, _job_id=job_id)
+    return await job.result(timeout=10, poll_delay=0.05)
+
+
+async def test_a_429_with_retry_after_keeps_other_sources_off_the_domain_until_it_ends(redis, start_worker):
+    calls = []
+    run = first_call_fails(fail(Reason.BLOCKED, 429, retry_after=0.8), calls)
+
+    outcome, _ = await run_one(redis, start_worker, run, fast_settings())
+    assert outcome == "failed"  # a block is not retried
+    assert await other_source_job(redis) == "ok"
+
+    assert [source for source, _ in calls] == [SRC, OTHER]
+    assert calls[1][1] - calls[0][1] >= 0.75
+
+
+async def test_a_503_retry_after_defers_the_whole_domain_and_not_only_the_failing_job(redis, start_worker):
+    calls = []
+    run = first_call_fails(fail(Reason.HTTP_ERROR, 503, retry_after=0.8), calls)
+    start_worker(run, Recorder(), fast_settings(max_tries=3))
+
+    first = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
+    await asyncio.sleep(0.2)  # the first attempt has failed and its job waits for its retry
+    second = await redis.enqueue_job("execute_job", OTHER, DOMAIN, _job_id="job-2")
+    assert await second.result(timeout=10, poll_delay=0.05) == "ok"
+    assert await first.result(timeout=10, poll_delay=0.05) == "ok"
+
+    other_started = next(at for source, at in calls if source == OTHER)
+    assert other_started - calls[0][1] >= 0.75
+
+
+async def test_a_retry_after_beyond_the_cap_defers_the_domain_for_the_cap_only(redis, start_worker):
+    calls = []
+    run = first_call_fails(fail(Reason.BLOCKED, 429, retry_after=86400), calls)
+
+    await run_one(redis, start_worker, run, fast_settings(max_retry_after=0.5))
+
+    assert 0 < await redis.pttl(f"iw:scraper:domain:{DOMAIN}:deferred") <= 500
+    assert await other_source_job(redis) == "ok"
+    assert calls[1][1] - calls[0][1] < 5
+
+
+async def test_a_shorter_deferral_does_not_shorten_a_longer_one(redis):
+    health = DomainHealth(redis, DOMAIN, threshold=5, cooldown=1.0)
+
+    await health.defer(2.0)
+    await health.defer(0.1)
+
+    assert await health.deferred_for() > 1.5
