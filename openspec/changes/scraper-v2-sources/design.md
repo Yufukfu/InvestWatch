@@ -24,39 +24,38 @@
 3. **Never overwrite.** Matches the KNF seed and the dashboard-owns-edits rule, so a deactivated or retimed source stays that way after a re-seed. The cost: changing a cron in the file does not reach a database that already has the row; that is a dashboard edit or a manual delete.
 4. **TOML read with the stdlib `tomllib`, not YAML.** Python 3.12 only, comments are allowed (each entry carries why it is there), and no new dependency to pin and `pip-audit`. The proposal's wording "YAML" was an example.
 5. **Validation reuses what exists.** The cron check uses the same `croniter` the scheduler uses (`scraper-orchestration`); the enum values come from the contract `source` schema loaded from `CONTRACTS_DIR`, so a new value there cannot drift from the seed rules.
-6. **`render` lives in the file only.** `sources` has no column and the contract is closed, so the flag is a field of the loaded `SeedEntry` (`render: bool = False`) that `scraper-v3-render` imports. `scraper-v3-render` decides how a running worker learns the flag (for example by matching the source URL against the loaded seeds); this change only guarantees the field exists and is optional.
+6. **No render flag in the seed.** `sources` has no column and the contract is closed, so a flag could only live in this file. `scraper-v3-render` decides by rule instead (`source_kind = firm_own` and `M2` targeted), because R4-R8 and R13 only apply to firms' own marketing pages. The five XTB and mBank M2 rows below are therefore its demo set with no field here. Alternative: a `render` field in `SeedEntry`, rejected as per-source behaviour that would need a contract change to reach the dashboard later.
 7. **Final URLs only, checked by an opt-in live test.** The research saw redirects (`/pl/oferta` to `/pl/forex`, `/conotoxia/` to `/brokerzy-2/`, an old EY path); a seeded redirect would put a hop through the guards on every run and break the `canonical_url` dedup assumption. The live check (`@pytest.mark.scraper_live`, outside CI, same marker as orchestration's smoke test) needs a human go-ahead because it makes real requests (8 hosts, one request per entry).
 8. **No `FETCH_EXTRA_HOSTS` entries.** `for_sources` already allows each source's own host, so the vetted list needs none. Hosts: `www.xtb.com`, `www.mbank.pl`, `moneteo.com`, `comparic.pl`, `takeprofitapp.com`, `www.ey.com`, `grantthornton.pl`, `icobench.com`.
 9. **The vetted list** (cron is UTC; XTB entries are staggered by minute so one domain's concurrency cap of 2 and the 5 s request interval are not hit at once):
 
-   | Name | Kind | Modules | Cron | render |
-   |---|---|---|---|---|
-   | XTB IKE | firm_own | M2 | `0 6 * * *` | yes |
-   | XTB IKZE | firm_own | M2 | `10 6 * * *` | no |
-   | XTB forex (CFD) | firm_own | M2 | `20 6 * * *` | no |
-   | mBank IKE promo 2024 (frozen campaign page) | firm_own | M2 | `0 6 * * 1` | no |
-   | mBank IKE eMakler | firm_own | M2 | `0 6 * * *` | yes |
-   | Moneteo broker ranking | third_party | M1 | `0 7 * * *` | no |
-   | Moneteo XTB review | third_party | M1 | `10 7 * * *` | no |
-   | Comparic broker ranking | third_party | M1 | `0 7 * * *` | no |
-   | Take Profit broker guide | third_party | M1 | `0 7 * * 1` | no |
-   | EY family office (negative control) | third_party | M3 | `0 8 * * 1` | no |
-   | Grant Thornton family office (negative control) | third_party | M3 | `0 8 * * 1` | no |
-   | icobench Telegram signal groups list | third_party | M1, M3 | `0 8 * * 1` | no |
+   | Name | Kind | Modules | Cron |
+   |---|---|---|---|
+   | XTB IKE | firm_own | M2 | `0 6 * * *` |
+   | XTB IKZE | firm_own | M2 | `10 6 * * *` |
+   | XTB forex (CFD) | firm_own | M2 | `20 6 * * *` |
+   | mBank IKE promo 2024 (frozen campaign page) | firm_own | M2 | `0 6 * * 1` |
+   | mBank IKE eMakler | firm_own | M2 | `0 6 * * *` |
+   | Moneteo broker ranking | third_party | M1 | `0 7 * * *` |
+   | Moneteo XTB review | third_party | M1 | `10 7 * * *` |
+   | Comparic broker ranking | third_party | M1 | `0 7 * * *` |
+   | Take Profit broker guide | third_party | M1 | `0 7 * * 1` |
+   | EY family office (negative control) | unknown | M3 | `0 8 * * 1` |
+   | Grant Thornton family office (negative control) | unknown | M3 | `0 8 * * 1` |
+   | icobench Telegram signal groups list | unknown | M1, M3 | `0 8 * * 1` |
 
-   URLs are the exact ones from the research report (to be copied into the file in task 1.2 and checked by task 3.2). Do not use `mbank.pl/.../gielda/` (JS-rendered, 2.6k chars of text). Every row says "candidate that matches a signal"; none is a finding about the named business.
+   URLs are the exact ones from the research report (to be copied into the file in task 1.2 and checked by task 2.2). Do not use `mbank.pl/.../gielda/` (JS-rendered, 2.6k chars of text). Every row says "candidate that matches a signal"; none is a finding about the named business.
 
 ## Risks / Trade-offs
 
 - **Page drift:** rankings change monthly (Moneteo) and campaign pages disappear; the live check finds it, the fix is a seed edit plus a manual row change. The mBank 2024 promo page and a weekly cadence reduce the chance during the demo window.
 - **Daily cron versus the demo:** a daily schedule shows nothing new in a few hours; the dashboard's manual scan (`POST /api/scans`) is how the demo triggers a run. A shorter demo cadence is a dashboard edit, not a file change.
 - **Real businesses as test inputs:** the file and the docs never label a named business as violating anything. Controls are named as controls.
-- **M3 is weak** until a human picks real positives from the KNF warnings list (open question 1); two negative controls and a loosely matching list page are what exists.
-- **Source kind of unregistered entities:** the contract has no value for "own page of an entity that is not a registered firm", so EY and Grant Thornton are `third_party`; Damian may want a different value (open question 2).
+- **M3 positives live elsewhere:** this file holds two negative controls and a loosely matching list page; the demo's M3 positives are the Telegram paid-signal channels seeded by `scraper-v2-social`. Naming a business from the KNF warnings list stays an optional, human-only follow-up.
+- **`unknown` for M3 pages:** the scraper cannot determine registry status, so it does not claim `third_party` or `firm_own` for those pages; analytics routes M3 by registry mismatch. `unknown` is in the contract enum, the `source` schema and the `ck_sources_source_kind` check, so no contract or migration change is needed.
 - **Advisory lock** is a constant key shared with nothing else in the scraper; if another writer uses the same key the runs would serialise, which is harmless.
 
 ## Open Questions
 
-1. Which 1-2 entities from the KNF public warnings list (`knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne`, 669 entries at research time) are the M3 positives, and do they have a public page that is fetchable? A human chooses (never an agent) and records the name and URL here. Blocks task 1.4 only.
-2. Is `third_party` acceptable for M3 pages of entities that are not registered firms, or does Damian want another `source_kind`? (A new value is a contract change; if not wanted, nothing changes.)
-3. Should the demo database use a shorter cadence for a few sources (a dashboard edit after seeding), or is manual scan enough?
+1. Optional follow-up, not blocking: which entity (if any) from the KNF public warnings list (`knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne`) does a human want added as a named M3 positive, and does it have a fetchable public page? A human chooses (never an agent) and records the name and URL here.
+2. Should the demo database use a shorter cadence for a few sources (a dashboard edit after seeding), or is manual scan enough?

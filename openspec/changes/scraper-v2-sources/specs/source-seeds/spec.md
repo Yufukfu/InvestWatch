@@ -6,7 +6,7 @@ The vetted set of web sources the scraper starts with for modules M1, M2 and M3,
 ## ADDED Requirements
 
 ### Requirement: Seed file is validated before any write
-The seed command SHALL read the entries from the tracked seed file and validate all of them before inserting any. An entry is valid only when `platform` is `web`, `source_kind` is `firm_own` or `third_party`, `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host, `schedule_cron` is a valid five-field cron expression or null, and no other entry has the same URL. A single invalid entry SHALL abort the run with a message naming the entry, and no row SHALL be written.
+The seed command SHALL read the entries from the tracked seed file and validate all of them before inserting any. An entry is valid only when `platform` is `web`, `source_kind` is `firm_own`, `third_party` or `unknown` (the contract's closed set), `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host, `schedule_cron` is a valid five-field cron expression or null, and no other entry has the same URL. A single invalid entry SHALL abort the run with a message naming the entry, and no row SHALL be written.
 
 #### Scenario: Valid file
 - **WHEN** every entry satisfies the rules
@@ -48,7 +48,7 @@ The seed command SHALL insert an entry only when no `sources` row has the same U
 - **THEN** the command exits non-zero with a message that does not contain the connection string or credentials
 
 ### Requirement: Every module has a real source
-The seed file SHALL contain at least one active entry for each of `M1`, `M2` and `M3`, and every entry SHALL carry the `source_kind` that matches who publishes the page: `firm_own` for a page published by a firm registered with the KNF, `third_party` for any other publisher. Entries whose only purpose is a negative control SHALL say so in their name or a comment in the seed file.
+The seed file SHALL contain at least one active entry for each of `M1`, `M2` and `M3`, and every entry SHALL carry the `source_kind` that matches what the scraper can know about who publishes the page: `firm_own` for a page published by a firm registered with the KNF, `third_party` for a page that promotes or compares registered firms (an affiliate, ranking or review page), and `unknown` for a page of an entity whose registry status the scraper does not determine (the M3 candidates). Analytics, not the seed, decides from the registry whether such an entity is authorised. Entries whose only purpose is a negative control SHALL say so in their name or a comment in the seed file.
 
 #### Scenario: Module coverage
 - **WHEN** the seed file is loaded
@@ -57,6 +57,10 @@ The seed file SHALL contain at least one active entry for each of `M1`, `M2` and
 #### Scenario: Registered firm's own page
 - **WHEN** an entry points at a page published by a KNF-registered firm
 - **THEN** its `source_kind` is `firm_own` and its modules include `M2`
+
+#### Scenario: Entity of unknown registry status
+- **WHEN** an entry targets `M3` and points at a page of an entity whose registry status the seed does not claim
+- **THEN** its `source_kind` is `unknown` and the entry is accepted by validation
 
 ### Requirement: Seed URLs are final URLs
 An entry's URL SHALL be the URL the site serves directly, not one that redirects to another URL. The opt-in live check SHALL fetch every entry's URL once through the production fetch path and fail for an entry whose final URL differs from its URL, whose status is not 200, or whose text is empty. The live check SHALL be deselected by default and outside CI, and SHALL make at most one request per entry.
@@ -84,20 +88,9 @@ Every seeded host SHALL be allowed because it is the host of a collectable sourc
 - **WHEN** a seeded page redirects to a host that no source row names
 - **THEN** the guard refuses the hop and the job records a job error instead of a document
 
-### Requirement: Optional render marker is read, not stored
-An entry MAY carry `render = true` to mark a page that needs `blocks` and screenshots. The seed loader SHALL expose the flag to other code, the seed command SHALL NOT write it to `sources`, and an entry without it SHALL behave as `render = false`.
+### Requirement: Named M3 positives are added only by a human
+The seed file SHALL NOT name a business as an M3 positive case (an entity suspected of unauthorised investment advice) unless a human has chosen it, for example from the KNF public warnings list, and recorded the choice in the change. Without such a choice the seed file SHALL still pass validation and cover `M3` with its negative controls and list pages. M3 positives that are not named businesses, such as Telegram signal channels, belong to `scraper-v2-social`.
 
-#### Scenario: Render flag exposed
-- **WHEN** the loader reads an entry with `render = true`
-- **THEN** the loaded entry reports `render = true` and the inserted row has no extra column or value for it
-
-#### Scenario: Flag absent
-- **WHEN** an entry has no `render` key
-- **THEN** the loaded entry reports `render = false`
-
-### Requirement: Real positives for M3 are chosen by a human
-The seed file SHALL NOT contain an M3 positive case (a page of an entity suspected of unauthorised investment advice) until a human has chosen it from the KNF public warnings list and recorded the choice in the change. Until then M3 is covered by negative controls only, and the seed command SHALL still pass validation.
-
-#### Scenario: No positive chosen yet
-- **WHEN** the seed file has M3 entries that are all marked as negative controls
-- **THEN** validation passes and the run reports the M3 positives as pending
+#### Scenario: No named positive chosen
+- **WHEN** the seed file has M3 entries that are all negative controls or list pages
+- **THEN** validation passes and no entry names a business as a suspected violator

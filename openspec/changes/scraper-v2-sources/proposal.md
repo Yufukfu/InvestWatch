@@ -6,12 +6,12 @@ Integration #2 (Sat 22:00) needs at least one real source per module (M1, M2, M3
 
 ## What Changes
 
-- A tracked seed file `scraper/seeds/sources.toml` with the vetted web sources for M1, M2 and M3 (name, URL, `source_kind`, `target_modules`, `schedule_cron`, optional `render`).
+- A tracked seed file `scraper/seeds/sources.toml` with the vetted web sources for M1, M2 and M3 (name, URL, `source_kind`, `target_modules`, `schedule_cron`).
 - An idempotent seed command that inserts the entries into `sources`, keyed by URL, and never overwrites a row (the dashboard owns later edits). It extends the `seed.py` that `scraper-orchestration` task 3.5 adds for the KNF row instead of adding a second script.
 - Validation of the file before any write: platform `web` only, closed `source_kind` and module sets, https URLs, valid 5-field cron, unique URLs.
 - An opt-in live check (marker `scraper_live`) that fetches each seeded URL once and fails on a redirect to another URL, a non-200 status or an empty text, so a stale seed is found before the demo.
-- An optional per-entry `render` flag, read by `scraper-v3-render`, for the two pages that need `blocks` and screenshots (XTB IKE, mBank IKE). It is not stored in `sources`.
-- M3 gets two negative controls now and its real positives later: a human picks 1-2 entries from the KNF public warnings list, which stays an open question.
+- No render flag: `scraper-v3-render` renders by rule (`source_kind = firm_own` and `M2` targeted), so the five XTB and mBank M2 rows are its demo set without any field here.
+- M3 pages (the EY and Grant Thornton family-office pages as negative controls, the icobench signal-group list) use `source_kind = unknown`, which the contract enum already has: the scraper cannot know registry status and analytics routes M3 by registry mismatch. The demo's M3 positives come from `scraper-v2-social` (Telegram paid-signal channels) plus the icobench list. Naming a business from the KNF public warnings list is an optional follow-up that a human decides.
 
 Out of scope: the KNF registry parsers (`registry_firms`, `registry_warnings`; Damian's), Playwright and `blocks`/screenshots (`scraper-v3-render`), social sources (`scraper-v2-social`), dashboard source editing, any change to the `sources` table or `source` contract.
 
