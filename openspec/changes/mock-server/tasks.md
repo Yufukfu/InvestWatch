@@ -20,9 +20,9 @@
 
 ## 4. Socket.IO events
 
-- [ ] 4.1 Write failing tests with a Socket.IO test client on `/events`: `finding.updated` after a PATCH, `scan.started` then `scan.finished` after a scan, `finding.created` (+ `finding.high_risk` when above threshold) after `POST /__mock/emit`, every payload valid against `events.schema.json`, and no events from replay when it is disabled
-- [ ] 4.2 Mount python-socketio with namespace `/events` next to the FastAPI app and emit events from the write endpoints
-- [ ] 4.3 Implement the replay background task (clone a mock finding with a new UUID and current timestamps, add it to the store, emit) and `POST /__mock/emit`; make sure a client disconnect does not stop it
+- [x] 4.1 Write failing tests with a Socket.IO test client on `/events`: `finding.updated` after a PATCH, `scan.started` then `scan.finished` after a scan, `finding.created` (+ `finding.high_risk` when above threshold) after `POST /__mock/emit`, every payload valid against `events.schema.json`, and no events from replay when it is disabled
+- [x] 4.2 Mount python-socketio with namespace `/events` next to the FastAPI app and emit events from the write endpoints
+- [x] 4.3 Implement the replay background task (clone a mock finding with a new UUID and current timestamps, add it to the store, emit) and `POST /__mock/emit`; make sure a client disconnect does not stop it
 
 ## 5. Packaging and run instructions
 

@@ -213,7 +213,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return view
 
     @api.patch("/api/findings/{finding_id}")
-    def patch_finding(finding_id: UUID, patch: Annotated[FindingPatch, Body()]):
+    async def patch_finding(finding_id: UUID, patch: Annotated[FindingPatch, Body()]):
         finding = get_finding_or_404(finding_id)
         for key, value in patch.model_dump(exclude_unset=True).items():
             if key == "status" and value is None:
@@ -320,7 +320,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return source
 
     @api.post("/api/scans", status_code=202)
-    def request_scan(body: ScanRequest):
+    async def request_scan(body: ScanRequest):
         source_id = str(body.source_id)
         if source_id not in store.sources:
             raise HTTPException(404, f"source {source_id} not found")
@@ -345,8 +345,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         store.reset()
         return {"reset": True}
 
+    @api.post("/__mock/emit")
+    async def mock_emit():
+        replay_once = api.state.replay_once
+        if replay_once is None:
+            raise HTTPException(503, "events are not mounted (use events.create_asgi_app)")
+        return replay_once()
+
     # Event hooks; replaced with Socket.IO emitters when the app is mounted (events.py).
+    # Handlers that call them are async, so the hooks run on the event loop.
     api.state.notify = lambda event_type, data: None
     api.state.start_scan = lambda source_id: None
+    api.state.replay_once = None
 
     return api
