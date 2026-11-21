@@ -15,9 +15,11 @@ if [ -e "$out" ] || [ -L "$out" ]; then
 fi
 gen() { openssl rand -hex 24; }
 umask 077
-tmp="$out.tmp.$$"
+tmp=$(mktemp "$out.XXXXXX")
 trap 'rm -f "$tmp"' EXIT
+cr=$(printf '\r')
 while IFS= read -r line || [ -n "$line" ]; do
+  line=${line%"$cr"}  # a CRLF checkout of .env.example must still match the secret lines
   case $line in
     \#*) printf '%s\n' "$line" ;;
     *_PASSWORD=|*_SECRET_KEY=)

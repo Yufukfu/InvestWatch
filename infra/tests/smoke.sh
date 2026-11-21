@@ -115,6 +115,15 @@ init_env_relative_to_caller() {
   (cd "$d" && "$ROOT/scripts/init-env.sh" "$name") || return 1
   [ -f "$d/$name" ] && [ ! -e "$ROOT/$name" ] || { rm -f "$ROOT/$name"; echo "written to the repo root"; return 1; }
 }
+init_env_crlf() { # a CRLF .env.example (Windows autocrlf) still gets every secret filled
+  local r="$TMP/crlf" v val; mkdir -p "$r/scripts"
+  cp "$ROOT/scripts/init-env.sh" "$r/scripts/"; sed 's/$/\r/' "$ROOT/.env.example" >"$r/.env.example"
+  "$r/scripts/init-env.sh" "$r/out.env" >/dev/null || return 1
+  for v in "${SECRETS[@]}"; do
+    val=$(grep -E "^$v=" "$r/out.env" | cut -d= -f2- | tr -d '\r')
+    [ ${#val} -ge 32 ] || { echo "$v has ${#val} chars"; return 1; }
+  done
+}
 # requires_secret <VAR> [compose file]: compose config fails, naming VAR, when VAR is empty.
 requires_secret() {
   local v=$1 file=${2:-$ROOT/compose.yaml} f="$TMP/req-$1.env"
@@ -129,12 +138,46 @@ group_env() {
   check "init-env fills every secret with 32+ chars and compose config accepts it" generated_env_complete
   check "init-env never overwrites an existing file" init_env_no_overwrite
   check "init-env resolves a relative path from the caller's directory" init_env_relative_to_caller
+  check "init-env fills secrets from a CRLF .env.example" init_env_crlf
   check "missing POSTGRES_APP_PASSWORD is named" requires_secret POSTGRES_APP_PASSWORD
+}
+
+# rcli <project> [args...]: redis-cli inside the redis container, authenticated from its own env.
+rcli() { local p=$1; shift; dc "$p" exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli "$@"' rcli "$@"; }
+redis_auth() {
+  local got; got=$(rcli "$1" ping); echo "auth ping: $got"; [ "$got" = PONG ] || return 1
+  got=$(dc "$1" exec -T redis redis-cli ping 2>&1 || true); echo "no-auth ping: $got"
+  echo "$got" | grep -q NOAUTH
+}
+redis_config() {
+  local aof pol
+  aof=$(rcli "$1" config get appendonly | tail -n 1); pol=$(rcli "$1" config get maxmemory-policy | tail -n 1)
+  echo "appendonly=$aof maxmemory-policy=$pol"; [ "$aof" = yes ] && [ "$pol" = noeviction ]
+}
+redis_persists() {
+  local v='{"M1":0.6,"M2":0.5,"M3":0.7}' got
+  rcli "$1" set iw:settings:thresholds "$v" >/dev/null
+  dc "$1" restart redis >/dev/null 2>&1 && dc "$1" up -d --wait --wait-timeout 60 redis >/dev/null 2>&1
+  got=$(rcli "$1" get iw:settings:thresholds); echo "after restart: $got"; [ "$got" = "$v" ]
+}
+only_on_data() { # only_on_data <project> <service>
+  local nets; nets=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(dc "$1" ps -q "$2")")
+  echo "$2 networks: $nets"; [ "$nets" = "$1_data " ]
+}
+
+group_redis() {
+  local p="iw-smoke-r-$RUN_ID"
+  check "missing REDIS_PASSWORD is named" requires_secret REDIS_PASSWORD
+  check "redis starts healthy" up "$p" 18445 18082 redis
+  check "authenticated PING is PONG, unauthenticated is NOAUTH" redis_auth "$p"
+  check "AOF on and noeviction" redis_config "$p"
+  check "iw:settings:thresholds survives a restart" redis_persists "$p"
+  check "redis is only on the internal data network" only_on_data "$p" redis
 }
 
 # ---------------------------------------------------------------- main
 
-GROUPS_ALL=(parallel env)
+GROUPS_ALL=(parallel env redis)
 [ $# -gt 0 ] && SELECTED=("$@") || SELECTED=("${GROUPS_ALL[@]}")
 docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1 || docker pull -q "$PROBE_IMAGE" >/dev/null
 for g in "${SELECTED[@]}"; do log "== $g"; "group_$g"; done
