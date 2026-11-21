@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import socket
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -54,6 +55,27 @@ def registry_provenance(registry_csv: Path) -> dict | None:
 
 class ConfigError(ValueError):
     """A missing or malformed environment variable; the message names it."""
+
+
+#: Supervisor and official-register hosts: never an M1 advertiser, an M2 firm or an M3 publisher (change
+#: analytics-post-integration-fixes). `doc/` names only knf.gov.pl; `gov.pl` covers uknf.gov.pl and every ministry.
+DEFAULT_OFFICIAL_SOURCE_DOMAINS = ("knf.gov.pl", "uknf.gov.pl", "gov.pl")
+_DOMAIN = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")
+
+
+def official_source_domains(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
+    """`OFFICIAL_SOURCE_DOMAINS` (comma-separated bare domains) replaces the default; empty or unset = the default."""
+    env = os.environ if env is None else env
+    raw = (env.get("OFFICIAL_SOURCE_DOMAINS") or "").strip()
+    if not raw:
+        return DEFAULT_OFFICIAL_SOURCE_DOMAINS
+    out = []
+    for item in raw.split(","):
+        domain = item.strip().lower().rstrip(".")
+        if not _DOMAIN.fullmatch(domain):
+            raise ConfigError(f"OFFICIAL_SOURCE_DOMAINS entries must be bare domains like knf.gov.pl, got {item.strip()!r}")
+        out.append(domain)
+    return tuple(out)
 
 
 def _required(env: Mapping[str, str], key: str) -> str:
