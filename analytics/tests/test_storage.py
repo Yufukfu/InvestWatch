@@ -434,3 +434,27 @@ def test_postgres_dropped_connections_are_forgotten():
         with pytest.raises(StoreUnavailable):
             store.load_document(DOC_ID)
     assert store._all == []
+
+
+def test_postgres_absent_json_values_are_sql_null(pg_url):
+    backend = PostgresBackend(pg_url)
+    backend.seed(columns())
+    bare = finding().model_copy(update={"firm": None, "model": None})
+    backend.store.save_findings(load(backend), [bare])
+    import psycopg
+
+    with psycopg.connect(pg_url) as conn:
+        row = conn.execute(
+            "SELECT firm IS NULL, advertiser IS NULL, model IS NULL FROM findings WHERE document_id = %s", (DOC_ID,)
+        ).fetchone()
+    assert row == (True, True, True)  # SQL NULL, not the JSON value 'null' (api README)
+    backend.close()
+
+
+def test_postgres_empty_text_cannot_be_stored(pg_url):
+    import psycopg
+
+    backend = PostgresBackend(pg_url)
+    with pytest.raises(psycopg.errors.CheckViolation):  # revision 0003 mirrored
+        backend.seed(columns(text=""))
+    backend.close()

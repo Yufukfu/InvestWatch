@@ -12,15 +12,15 @@ The change `analytics-skeleton` gives analytics a pure `analyze(doc, *, registry
 - Add a minimal `/health` endpoint (stdlib HTTP) reporting Redis and Postgres reachability, as `.docs/integration-plan.md` §7 asks of every service.
 - Add `analytics/Dockerfile` (`python:3.13-slim` from the `public.ecr.aws` mirror, non-root user, HEALTHCHECK). Add `analytics/compose.yaml`, which the root `include:` picks up once `infra-compose` provides Redis. Add the worker's env vars to `analytics/.env.example`.
 - Out of scope: the pipeline itself (rules, registry, M2 assembly; `analytics-skeleton`), the LLM layer and its Redis cache, modules M1/M3, the real KNF loader, the gold set, and calibration. Also out of scope: creating any table. Migrations belong to `api/` per ADR 0303. Redis, MinIO and the Postgres roles belong to `infra-compose` and `infra/`. Also out of scope: a dead-letter stream and an event outbox (design, resolved questions).
-- Owner: module C (`analytics/`).
+- Owner: Damian (`analytics/`).
 - Contracts: reads the `documents` table (`ScrapedDocument` v1, integration point 1) and consumes the `document_message` stream envelope (point 3). Writes the `findings` table (`Finding` v1, point 4) and publishes the `event` envelope with types `finding.created` and `finding.high_risk` (point 5). Reads the Redis key `iw:settings:thresholds` written by the API (ADR 0305). It changes none of these shapes and no REST route.
 
 ## Dependencies and assumptions to reconcile
 
 - **`analytics-skeleton` (parent change, not merged):** this change calls `analyze()` and the `ScrapedDocument` and `Finding` models, and loads the registry and catalogue the way that change does. It is applied only after `analytics-skeleton` is merged, and the branch is rebased on it.
-- **`api-v1` / `api-db-schema` (sibling, Alembic, ADR 0303):** provides `documents` and `findings`. Reconciled in task 2.1 against `api/api-db-schema` at `73680fa` (design §"Table shape"): the upsert key `uq_findings_document_module (document_id, module)`, the replaced-field list, and the `iw_app` grants. The threshold key format (a JSON string written by the API) is agreed by the coordinator. `analytics/tests/sql/schema.sql` mirrors the migration for tests only.
+- **`api-v1` / `api-db-schema` (sibling, Alembic, ADR 0303):** provides `documents` and `findings`. Reconciled in task 2.1 against `origin/api/api-db-schema` at `7af51ab` (design §"Table shape"): the upsert key `uq_findings_document_module (document_id, module)`, the replaced-field list, and the `iw_app` grants. The threshold key format (a JSON string written by the API) is agreed by the coordinator. `analytics/tests/sql/schema.sql` mirrors the migration for tests only.
 - **`infra-compose` (sibling):** provides Redis (with AOF, ADR 0305), MinIO, the `iw-data` network the worker joins, and the `REDIS_URL` / `DATABASE_URL` values. The items marked **[reconcile-infra]** in `design.md` must match before task group 5 starts.
-- **`scraper-v1` (A):** publishes to `iw:documents` only after the row is committed. Delivery is at least once, so analytics deduplicates by `document_id`.
+- **`scraper-v1` (Adam):** publishes to `iw:documents` only after the row is committed. Delivery is at least once, so analytics deduplicates by `document_id`.
 
 ## Capabilities
 
@@ -35,5 +35,5 @@ The change `analytics-skeleton` gives analytics a pure `analyze(doc, *, registry
 
 - New code under `analytics/` only: `src/investwatch_analytics/{storage,events,worker,health}.py`, `Dockerfile`, `compose.yaml`, `.dockerignore`, additions to `config.py` and `.env.example`, `tests/`.
 - Dependencies: `psycopg[binary]` 3 and `redis` (redis-py). Dev: `fakeredis` for the unit tests. `analytics/tests/sql/schema.sql` (a test-only mirror of the API migration). Integration tests run against real Postgres and Redis when `TEST_DATABASE_URL` / `TEST_REDIS_URL` are set and are skipped otherwise. All pinned and checked with `pip-audit`.
-- Root `compose.yaml`: one `include:` line for `analytics/compose.yaml`. The root file is B's, so the line is announced in the team chat (infra rule: one line per module).
+- Root `compose.yaml`: one `include:` line for `analytics/compose.yaml`. The root file is Kacper's, so the line is announced in the team chat (infra rule: one line per module).
 - Docs: `analytics/README.md` (run and env), `analytics/CLAUDE.md` if a rule turns out to be easy to get wrong, the analytics row of `.docs/STATUS.md`, an AI log row.

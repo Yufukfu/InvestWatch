@@ -1,6 +1,6 @@
 # Tasks
 
-Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this branch is rebased on `origin/main`. Groups 1 and 3 need no infra. Group 2 is reconciled with `api-db-schema` at `api/api-db-schema` `73680fa`. Group 5 waits for `infra-compose`.
+Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this branch is rebased on `origin/main`. Groups 1 and 3 need no infra. Group 2 is reconciled with `api-db-schema` at `origin/api/api-db-schema` `7af51ab` (PR #15). Group 5 waits for `infra-compose`.
 
 ## 1. Config and store interface with the in-memory store
 

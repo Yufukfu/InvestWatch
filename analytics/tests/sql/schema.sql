@@ -1,9 +1,14 @@
 -- TEST-ONLY FIXTURE. Never run in compose or against a shared database.
 --
 -- Mirrors the tables analytics touches from the API's Alembic migrations (change `api-db-schema`,
--- branch `api/api-db-schema` at 73680fa, identical to `api/api-v1` 1be0451): `api/migrations/versions/0001_initial.py` (sources, documents, findings)
--- and the findings indexes of `0002_query_indexes.py`. Column names, types, nullability, defaults,
--- constraint names and checks are copied as they are. job_errors and calibration_points are left out.
+-- `origin/api/api-db-schema` at 7af51ab, PR #15): `api/migrations/versions/0001_initial.py` (sources,
+-- documents, findings), the findings indexes of `0002_query_indexes.py` and the `documents.text` check of
+-- `0003_documents_text_not_empty.py`. Column names, types, nullability, defaults and checks are copied as
+-- they are. job_errors and calibration_points are left out.
+-- Constraint names: the API's naming convention double-prefixes the 0001 CHECK names in a real database
+-- (`ck_findings_ck_findings_status`); this file keeps the names as written in 0001. Analytics depends on no
+-- constraint name except the upsert target `uq_findings_document_module`, which is the same in both.
+-- A missing firm / advertiser / model is SQL NULL, never JSON 'null' (api README).
 -- The migrations in api/ are the source of truth (ADR 0303): when they change, update this file and
 -- re-run the Postgres store tests (TEST_DATABASE_URL).
 
@@ -53,7 +58,8 @@ CREATE TABLE documents (
     CONSTRAINT ck_documents_http_status CHECK (http_status BETWEEN 100 AND 599),
     CONSTRAINT ck_documents_lang CHECK (lang ~ '^[a-z]{2}$'),
     CONSTRAINT ck_documents_content_hash CHECK (content_hash ~ '^[a-f0-9]{64}$'),
-    CONSTRAINT ck_documents_payload_object CHECK (jsonb_typeof(payload) = 'object')
+    CONSTRAINT ck_documents_payload_object CHECK (jsonb_typeof(payload) = 'object'),
+    CONSTRAINT ck_documents_text_not_empty CHECK (text <> '')  -- revision 0003
 );
 CREATE UNIQUE INDEX uq_documents_source_hash ON documents (source_id, content_hash) NULLS NOT DISTINCT
     WHERE content_hash IS NOT NULL;
