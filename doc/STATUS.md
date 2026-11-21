@@ -28,3 +28,5 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 - Repository layout is defined by B (team decision). `scraper/` and the service list in `.claude/hooks/git-guard.js` (`SERVICE_DIRS`) are assumptions to confirm with B.
 - Contracts v1 still to be confirmed by A and B; rendering metadata (`blocks`, screenshots) still to be discussed with A.
 - Social media: one platform first; which one is open.
+- Hand-in README (Quick Start, hardware requirements, per-service config; no filler) has no owner yet.
+- `doc/security-audit.md` is promised by `integration-plan.md` §7 and not created yet; created at the first `pip-audit` / `npm audit` run.

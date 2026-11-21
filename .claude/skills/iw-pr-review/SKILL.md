@@ -11,7 +11,8 @@ Per-commit review already ran (`iw-commit-cycle`). This is the last pass over th
 2. **Deterministic first, all green**:
    - the module's tests, lint and type check, run after the last code edit;
    - `openspec validate --all --strict`;
-   - `node --test ".claude/hooks/*.test.js"` if hooks changed;
+   - `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` (paths, ADR index, service CLAUDE.md files), and `iw-docs-update` has been applied;
+   - `node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs"` if hooks or the checker changed;
    - dependency scan for the touched module: `pip-audit` (Python) or `npm audit` (Node);
    - `git grep -nE "console\.log|print\(" -- <module>` has no debug leftovers, and no `.env` or key material is tracked;
    - `docker compose up` still starts the stack when a service or its Dockerfile changed (merge rule in `doc/integration-plan.md` §7).

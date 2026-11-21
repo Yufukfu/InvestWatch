@@ -1,17 +1,31 @@
 # Documentation index
 
-Agents: start at `CLAUDE.md`, then this map. Docs are in English; user-facing dashboard texts are Polish.
+"How do I…?" router: find your task, open only that file and section. Business logic lives in these docs and in `openspec/`, not in `CLAUDE.md` files. Docs are in English; user-facing dashboard texts are Polish.
 
-| File | What it is | Owner |
-|---|---|---|
-| `STATUS.md` | Current milestone, per-module state, blockers. Update on every milestone move. | all |
-| `integration-plan.md` | Architecture, contracts v1, REST, events, milestones | C |
-| `analytics-plan.md` | Analytics module plan | C |
-| `ai-workflow.md` | AI process (tools, context, controls) and the append-only AI work log table, the jury evidence | all |
-| `decisions/` | ADRs: why we chose X. Human-authored. | all |
-| `../openspec/specs/` | What the system does now | owner of module |
-| `../openspec/changes/` | Changes in flight | author |
-| `../.claude/SDLC.md`, `CODE_REVIEW.md` | Process and review bar | all |
-| UKNF materials (`*.pdf`, `*.docx`) | Challenge description, rules R1-R18 | read-only |
+## How do I…
 
-Rule: don't duplicate. Link to the owning file. A doc claim that matters gets checked against the code before it is relied on.
+| I want to… | Open |
+|---|---|
+| See where we are and what is blocked | [STATUS.md](STATUS.md) |
+| Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
+| Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
+| Produce or consume a finding | [integration-plan.md](integration-plan.md) §4, then [../analytics/CLAUDE.md](../analytics/CLAUDE.md) |
+| Build or call the REST API | [integration-plan.md](integration-plan.md) §5, then [../api/CLAUDE.md](../api/CLAUDE.md) |
+| Handle real-time events and alerts | [integration-plan.md](integration-plan.md) §6, then [../dashboard/CLAUDE.md](../dashboard/CLAUDE.md) |
+| Follow shared conventions (env vars, logs, migrations, branches) | [integration-plan.md](integration-plan.md) §7 |
+| Check milestones and deadlines | [integration-plan.md](integration-plan.md) §8 |
+| Work on the analytics pipeline, rules R1-R18, LLM layer or calibration | [analytics-plan.md](analytics-plan.md) §2, §5, §7, §8 |
+| Read the UKNF challenge and the 18 rules | the UKNF `*.pdf` and `*.docx` files in this folder (read-only) |
+| Change a contract (needs the whole team) | [../contracts/CLAUDE.md](../contracts/CLAUDE.md) |
+| Find out why we chose X, or record a decision | [decisions/README.md](decisions/README.md) |
+| See what the system does now, or what is in flight | [../openspec/specs/](../openspec/specs/), [../openspec/changes/](../openspec/changes/) |
+| Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
+| Update docs after a change | [../.claude/skills/iw-docs-update/SKILL.md](../.claude/skills/iw-docs-update/SKILL.md) |
+| Log AI usage for the jury | [ai-workflow.md](ai-workflow.md) |
+
+## Rules
+
+- Don't duplicate. Link to the owning file and section.
+- A doc claim that matters gets checked against the code before it is relied on.
+- A new service directory gets its own `CLAUDE.md`, a row in the root [`CLAUDE.md`](../CLAUDE.md) services table and a row here.
+- `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` checks paths, the ADR index and service `CLAUDE.md` files.

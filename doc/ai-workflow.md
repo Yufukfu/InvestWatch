@@ -20,7 +20,7 @@ This log documents how the team builds InvestWatch with AI assistants (evaluatio
 | Behaviour | `openspec/specs/`, `openspec/changes/` | what exists, what is changing |
 | Decisions | `decisions/` | why, so agents don't relitigate |
 | State | `STATUS.md` | milestone and blockers |
-| Skills | `.claude/skills/` | `iw-implement`, `iw-commit-cycle`, `iw-pr-review`, `iw-ai-log`, `iw-scraper-conventions`, plus the OpenSpec skills |
+| Skills | `.claude/skills/` | `iw-implement`, `iw-commit-cycle`, `iw-pr-review`, `iw-docs-update`, `iw-ai-log`, `iw-scraper-conventions`, plus the OpenSpec skills |
 
 All of it is committed, so the three of us run identical agents. The AI assistants are a development tool only: the product runs on local open-source models (Ollama).
 

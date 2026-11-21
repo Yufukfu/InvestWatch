@@ -9,7 +9,7 @@ Per commit, in this order:
 
 1. **Failing test first** (`ecc:tdd-guide`). Name the production change that would turn the test red. Run it and confirm it fails for the intended reason (not an import error). Fixtures and parsers: use saved real responses under `tests/fixtures/`, never live network in unit tests.
 2. **Implement** the minimum, run the test green, then the module's full suite plus lint and type check. Keep the command and result; a run before the last edit does not count.
-3. **Tick the task** in `openspec/changes/<slug>/tasks.md` and run `openspec validate <slug> --strict`.
+3. **Tick the task** in `openspec/changes/<slug>/tasks.md`, run `openspec validate <slug> --strict`, and `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` when you touched docs or added a service directory.
 4. **Commit** (Conventional Commit, terse subject, no body unless essential, no `Co-Authored-By`). The `git-guard` hook blocks `.env`, `console.log` and service code with no active change.
 5. **Review the commit** with `ecc:code-reviewer`. Pin the range: `BASE=$(git merge-base HEAD origin/main)`, the HEAD sha and the worktree path. Ask for plan compliance against the change's `proposal.md` and `specs/`: missing, extra, misunderstood. The reviewer reads and reports; it does not edit, commit or spawn agents. Anything it can't confirm from the diff goes in a "can't verify" list; anything it set aside as out of scope goes in a "declined to judge" list.
 6. **Verify every finding** against the code before acting. Fix the real ones in follow-up commits (never amend a pushed commit); reject false ones with a one-line evidence note. After 3 rounds on one commit, stop and ask the human.
