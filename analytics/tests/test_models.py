@@ -48,7 +48,7 @@ def test_firm_authorized_has_no_default():
         FirmRef(name="X", match_confidence=0.5)
 
 
-@pytest.mark.parametrize("url", ["example.com/x", "not a url", "ftp://example.com/x", "https://exa mple.com/x", "https:///x"])
+@pytest.mark.parametrize("url", ["example.com/x", "not a url", "ftp://example.com/x", "https://exa mple.com/x", "https:///x", "https://exa\nmple.com/x", "https://example.com/\tx"])
 def test_document_url_must_be_absolute_http(url):
     with pytest.raises(ValidationError):
         ScrapedDocument.model_validate(make_doc(url=url))

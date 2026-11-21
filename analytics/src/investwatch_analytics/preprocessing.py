@@ -14,10 +14,12 @@ from dataclasses import dataclass, field
 _WS = re.compile(r"\s+")
 
 # A boundary: sentence-final punctuation, then whitespace, then something that starts a sentence.
-_BOUNDARY = re.compile(r"(?<=[.!?…])\s+(?=[\"'„«(\[*¹²³]?[A-ZĄĆĘŁŃÓŚŹŻ0-9])|\n\s*\n")
+_BOUNDARY = re.compile(
+    r"(?:(?<=[.!?…])|(?<=[.!?…][”\"»)]))\s+(?=[\"'„«(\[*¹²³]?[A-ZĄĆĘŁŃÓŚŹŻ0-9#])|\n\s*\n"
+)
 # Tokens that end with a period but do not end a sentence.
 _ABBREV = re.compile(
-    r"(?:\b(?:S\.A|s\.a|sp|Sp|z o\.o|o\.o|np|tj|tzn|tzw|ok|ul|nr|Nr|dr|prof|itd|itp|m\.in|godz|zł|ust|lit|art|pkt|ww|im)\.)$"
+    r"(?:\b(?:S\.A|s\.a|sp|Sp|z o\.o|o\.o|np|tj|tzn|tzw|ok|ul|nr|Nr|dr|Dr|prof|Prof|tel|Tel|zob|wg|tys|mln|itd|itp|m\.in|godz|ust|lit|art|pkt|ww|im)\.)$"
 )
 
 _PL_CHARS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
@@ -61,7 +63,7 @@ def split_sentences(text: str) -> list[Sentence]:
     sentences: list[Sentence] = []
     start = 0
     for m in _BOUNDARY.finditer(text):
-        paragraph_break = "\n\n" in re.sub(r"[ \t]", "", m.group(0))
+        paragraph_break = "\n\n" in re.sub(r"[^\n]", "", m.group(0))
         if not paragraph_break and _ABBREV.search(text[start:m.start()]):
             continue
         _append(sentences, text, start, m.start())

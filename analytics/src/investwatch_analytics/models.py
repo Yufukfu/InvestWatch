@@ -26,7 +26,7 @@ RULE_ID_PATTERN = r"^(R([1-9]|1[0-8])|R12[ab]|S[13]\.[0-9]+)$"
 def _absolute_http_url(value: str) -> str:
     """Contract `format: uri`, narrowed to absolute http(s) URLs; the value is kept verbatim."""
     parts = urlsplit(value)
-    if parts.scheme not in ("http", "https") or not parts.hostname or " " in value:
+    if parts.scheme not in ("http", "https") or not parts.hostname or any(c.isspace() or ord(c) < 0x20 for c in value):
         raise ValueError("must be an absolute http(s) URL")
     return value
 

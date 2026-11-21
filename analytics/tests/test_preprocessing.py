@@ -45,6 +45,22 @@ def test_sentence_split_on_exclamation_question_and_footnote():
     assert [s.text for s in split_sentences(text)] == ["Zarabiaj 18%!", "Czy warto?", "*Ryzyko utraty kapitału."]
 
 
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Bonus 500 zł. Otwórz konto.", ["Bonus 500 zł.", "Otwórz konto."]),
+        ("Zadzwoń: tel. 22 555 00 00. Biuro czynne.", ["Zadzwoń: tel. 22 555 00 00.", "Biuro czynne."]),
+        ("Dr. Kowalski radzi. Prof. Nowak też.", ["Dr. Kowalski radzi.", "Prof. Nowak też."]),
+        ("„Zarabiaj 18%!” Tak mówią klienci.", ["„Zarabiaj 18%!”", "Tak mówią klienci."]),
+        ("Zarabiaj w bio! #forex #reklama", ["Zarabiaj w bio!", "#forex #reklama"]),
+        ("Konto 0 zł\r\n\r\nNowość!", ["Konto 0 zł", "Nowość!"]),
+        ("Kup np.\r\n\r\nAkcje.", ["Kup np.", "Akcje."]),
+    ],
+)
+def test_sentence_split_review_cases(text, expected):
+    assert [s.text for s in split_sentences(text)] == expected
+
+
 def test_sentence_split_keeps_legal_form_before_capital():
     assert len(split_sentences("Alfa Inwestycje S.A. Dom Maklerski oferuje konta.")) == 1
 
