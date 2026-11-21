@@ -1,0 +1,65 @@
+{
+  "items": [
+    {
+      "id": "e05d8699-90e0-5042-a040-ab67dae7299a",
+      "name": "Alfa Inwestycje DM – strona WWW",
+      "platform": "web",
+      "url": "https://alfa-inwestycje.example.com/",
+      "source_kind": "firm_own",
+      "target_modules": [
+        "M2"
+      ],
+      "schedule_cron": "0 */6 * * *",
+      "active": true,
+      "last_run_at": "2026-11-21T15:35:00Z",
+      "last_run_status": "ok",
+      "documents_count": 1
+    },
+    {
+      "id": "2ee83c3b-bcff-5c88-abfc-57272ca93f09",
+      "name": "EuroTrade Markets – promocje PL",
+      "platform": "web",
+      "url": "https://eurotrade-markets.example.com/pl/promocje",
+      "source_kind": "firm_own",
+      "target_modules": [
+        "M2"
+      ],
+      "schedule_cron": "0 */6 * * *",
+      "active": true,
+      "last_run_at": "2026-11-21T15:35:00Z",
+      "last_run_status": "ok",
+      "documents_count": 1
+    },
+    {
+      "id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+      "name": "Instagram – #inwestowanie #forex",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/explore/tags/inwestowanie/",
+      "source_kind": "third_party",
+      "target_modules": [
+        "M1",
+        "M3"
+      ],
+      "schedule_cron": "*/30 * * * *",
+      "active": true,
+      "last_run_at": "2026-11-21T15:35:00Z",
+      "last_run_status": "ok",
+      "documents_count": 4
+    },
+    {
+      "id": "0613f5c0-7837-58a1-a5ea-f8f2fffcb8f6",
+      "name": "Wyszukiwanie: 'family office' / 'wealth management'",
+      "platform": "web",
+      "url": "https://search.example.com/?q=family+office+warszawa",
+      "source_kind": "unknown",
+      "target_modules": [
+        "M3"
+      ],
+      "schedule_cron": "0 * * * *",
+      "active": true,
+      "last_run_at": "2026-11-21T15:35:00Z",
+      "last_run_status": "ok",
+      "documents_count": 2
+    }
+  ]
+}

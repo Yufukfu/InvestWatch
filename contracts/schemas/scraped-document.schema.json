@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investwatch.local/contracts/v1/scraped-document.schema.json",
+  "title": "ScrapedDocument",
+  "description": "A single piece of content collected by the scraper. Stored in the `documents` table (simple columns + JSONB payload). Produced by the scraper, consumed by analytics and the API.",
+  "type": "object",
+  "required": ["id", "platform", "source_kind", "url", "fetched_at", "text"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "#/$defs/uuid" },
+    "source_id": { "anyOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }], "description": "Row in the `sources` table; null for ad-hoc URLs." },
+    "platform": { "$ref": "#/$defs/platform" },
+    "source_kind": {
+      "type": "string",
+      "enum": ["firm_own", "third_party", "unknown"],
+      "description": "firm_own = published by the investment firm itself (M2); third_party = published by someone else (M1/M3)."
+    },
+    "url": { "type": "string", "format": "uri" },
+    "canonical_url": { "type": ["string", "null"], "format": "uri" },
+    "fetched_at": { "type": "string", "format": "date-time" },
+    "published_at": { "type": ["string", "null"], "format": "date-time" },
+    "http_status": { "type": ["integer", "null"], "minimum": 100, "maximum": 599 },
+    "lang": { "type": ["string", "null"], "description": "ISO 639-1 code if known; analytics detects it anyway.", "pattern": "^[a-z]{2}$" },
+    "title": { "type": ["string", "null"] },
+    "text": { "type": "string", "description": "Clean text of the whole material (no HTML)." },
+    "content_hash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$", "description": "sha256 of the normalized text, for deduplication." },
+    "author": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "handle": { "type": ["string", "null"] },
+        "profile_url": { "type": ["string", "null"], "format": "uri" },
+        "followers": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["href"],
+        "additionalProperties": false,
+        "properties": {
+          "href": { "type": "string" },
+          "text": { "type": ["string", "null"] },
+          "rel": { "type": ["string", "null"], "description": "Raw rel attribute, e.g. 'nofollow sponsored'." }
+        }
+      }
+    },
+    "media": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "object_key"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "enum": ["image", "video"] },
+          "object_key": { "type": "string", "description": "Key in the MinIO bucket `iw-raw`, e.g. media/{document_id}/0.jpg" },
+          "alt": { "type": ["string", "null"] },
+          "ocr_text": { "type": ["string", "null"], "description": "Filled by analytics if OCR is run." }
+        }
+      }
+    },
+    "html_object_key": { "type": ["string", "null"], "description": "html/{document_id}.html in MinIO." },
+    "screenshots": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "desktop": { "type": ["string", "null"] },
+        "tablet": { "type": ["string", "null"] },
+        "mobile": { "type": ["string", "null"] }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "description": "Rendered text blocks from Playwright. Needed only for the visual M2 rules (R4-R8, R13); empty for social media posts.",
+      "items": { "$ref": "#/$defs/block" }
+    },
+    "scrape_meta": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "scraper": { "type": "string", "enum": ["playwright", "httpx", "api", "manual"] },
+        "user_agent": { "type": ["string", "null"] },
+        "proxy": { "type": ["string", "null"], "description": "Proxy identifier, never credentials." },
+        "duration_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "platform": { "type": "string", "enum": ["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"] },
+    "block": {
+      "type": "object",
+      "required": ["viewport", "text", "font_size_px", "visible"],
+      "additionalProperties": false,
+      "properties": {
+        "viewport": { "type": "string", "enum": ["desktop", "tablet", "mobile"] },
+        "text": { "type": "string" },
+        "tag": { "type": ["string", "null"] },
+        "font_size_px": { "type": "number", "minimum": 0 },
+        "font_weight": { "type": ["integer", "null"], "minimum": 100, "maximum": 1000 },
+        "color": { "type": ["string", "null"], "pattern": "^#[0-9a-fA-F]{6}$" },
+        "background_color": { "type": ["string", "null"], "pattern": "^#[0-9a-fA-F]{6}$" },
+        "bbox": {
+          "type": ["array", "null"],
+          "description": "[x, y, width, height] in CSS pixels relative to the page.",
+          "items": { "type": "number" },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "visible": { "type": "boolean", "description": "Rendered and not hidden by display/visibility/opacity/zero size." },
+        "in_viewport_on_load": { "type": ["boolean", "null"], "description": "Visible without scrolling." },
+        "requires_interaction": { "type": ["boolean", "null"], "description": "Hidden behind <details>, accordion, tooltip, modal or a link." },
+        "region": { "type": ["string", "null"], "enum": ["main", "header", "footer", "legal", "aside", "overlay", null] },
+        "overflow_clipped": { "type": ["boolean", "null"], "description": "Text is cut off at this viewport." }
+      }
+    }
+  }
+}

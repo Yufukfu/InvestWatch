@@ -1,0 +1,370 @@
+openapi: 3.1.0
+info:
+  title: InvestWatch API
+  version: 1.0.0
+  description: |
+    REST API between the `api` service (owner: C) and the dashboard (owner: B).
+    Real-time events are delivered over Socket.IO (namespace `/events`), see `schemas/events.schema.json`.
+    Mock responses for every endpoint are in `mocks/`.
+servers:
+  - url: http://localhost:8000/api
+    description: Local docker-compose
+tags:
+  - name: findings
+  - name: stats
+  - name: calibration
+  - name: settings
+  - name: sources
+  - name: documents
+  - name: system
+
+paths:
+  /findings:
+    get:
+      tags: [findings]
+      summary: List findings
+      description: Sorted by `detected_at` descending unless `sort` is given. Each item includes the derived `risk_level`.
+      parameters:
+        - { name: module, in: query, schema: { type: string, enum: [M1, M2, M3] } }
+        - { name: status, in: query, description: Comma-separated list, schema: { type: string, example: "new,in_review" } }
+        - { name: platform, in: query, schema: { type: string } }
+        - { name: source_id, in: query, schema: { type: string, format: uuid } }
+        - { name: risk_level, in: query, schema: { type: string, enum: [high, medium, low] } }
+        - { name: score_min, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: date_from, in: query, schema: { type: string, format: date-time } }
+        - { name: date_to, in: query, schema: { type: string, format: date-time } }
+        - { name: q, in: query, description: Full-text search in title, excerpt, firm and advertiser, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [detected_at, -detected_at, score, -score], default: -detected_at } }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: Page of findings (mock `mocks/findings.json`)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, page_size]
+                properties:
+                  items: { type: array, items: { $ref: './schemas/finding.schema.json' } }
+                  total: { type: integer }
+                  page: { type: integer }
+                  page_size: { type: integer }
+
+  /findings/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      tags: [findings]
+      summary: Finding details with its document
+      responses:
+        '200':
+          description: Mock `mocks/finding-detail.json`
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/finding.schema.json'
+                type: object
+                properties:
+                  document:
+                    $ref: './schemas/scraped-document.schema.json'
+                  screenshot_urls:
+                    type: object
+                    description: API URLs for the screenshots, keyed by viewport
+                    additionalProperties: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [findings]
+      summary: Change status / add a note
+      description: Emits `finding.updated` over Socket.IO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [new, in_review, confirmed, false_positive, closed] }
+                note: { type: [string, 'null'] }
+      responses:
+        '200':
+          description: Updated finding
+          content:
+            application/json:
+              schema: { $ref: './schemas/finding.schema.json' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /stats/trend:
+    get:
+      tags: [stats]
+      summary: Number of findings over time per module
+      parameters:
+        - { name: module, in: query, schema: { type: string, enum: [M1, M2, M3] } }
+        - { name: bucket, in: query, schema: { type: string, enum: [hour, day], default: hour } }
+        - { name: risk_level, in: query, schema: { type: string, enum: [high, medium, low] } }
+        - { name: date_from, in: query, schema: { type: string, format: date-time } }
+        - { name: date_to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Mock `mocks/trend.json`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bucket, points]
+                properties:
+                  bucket: { type: string, enum: [hour, day] }
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required: [t, M1, M2, M3]
+                      properties:
+                        t: { type: string, format: date-time }
+                        M1: { type: integer }
+                        M2: { type: integer }
+                        M3: { type: integer }
+
+  /stats/summary:
+    get:
+      tags: [stats]
+      summary: Counters for the dashboard header
+      responses:
+        '200':
+          description: Mock `mocks/summary.json`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, by_module, by_status, by_platform, by_risk_level]
+                properties:
+                  total: { type: integer }
+                  by_module: { type: object, additionalProperties: { type: integer } }
+                  by_status: { type: object, additionalProperties: { type: integer } }
+                  by_platform: { type: object, additionalProperties: { type: integer } }
+                  by_risk_level: { type: object, additionalProperties: { type: integer } }
+                  last_scan_at: { type: [string, 'null'], format: date-time }
+
+  /calibration:
+    get:
+      tags: [calibration]
+      summary: Precision/recall curve for the threshold slider
+      description: Computed from analyst labels (confirmed / false_positive) and the gold set.
+      parameters:
+        - { name: module, in: query, required: true, schema: { type: string, enum: [M1, M2, M3] } }
+      responses:
+        '200':
+          description: Mock `mocks/calibration-M2.json`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [module, current_threshold, labeled_samples, points]
+                properties:
+                  module: { type: string, enum: [M1, M2, M3] }
+                  current_threshold: { type: number }
+                  labeled_samples: { type: integer }
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required: [threshold, tp, fp, fn, tn, precision, recall]
+                      properties:
+                        threshold: { type: number }
+                        tp: { type: integer }
+                        fp: { type: integer }
+                        fn: { type: integer }
+                        tn: { type: integer }
+                        precision: { type: number }
+                        recall: { type: number }
+                        f1: { type: number }
+
+  /settings/thresholds:
+    get:
+      tags: [settings]
+      summary: Current thresholds per module
+      responses:
+        '200':
+          description: Mock `mocks/thresholds.json`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Thresholds' }
+    put:
+      tags: [settings]
+      summary: Update thresholds (recomputes risk_level for all findings)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Thresholds' }
+      responses:
+        '200':
+          description: Saved thresholds
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Thresholds' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /sources:
+    get:
+      tags: [sources]
+      summary: List sources
+      responses:
+        '200':
+          description: Mock `mocks/sources.json`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: './schemas/source.schema.json' } }
+    post:
+      tags: [sources]
+      summary: Add a source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SourceInput' }
+      responses:
+        '201':
+          description: Created source
+          content:
+            application/json:
+              schema: { $ref: './schemas/source.schema.json' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /sources/{id}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    patch:
+      tags: [sources]
+      summary: Edit a source (e.g. toggle active, change schedule)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SourceInput' }
+      responses:
+        '200':
+          description: Updated source
+          content:
+            application/json:
+              schema: { $ref: './schemas/source.schema.json' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /scans:
+    post:
+      tags: [sources]
+      summary: Trigger a manual scan of a source
+      description: Pushes a message to Redis Stream `iw:scan-requests`. Progress arrives as `scan.started` / `scan.finished` events.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_id]
+              properties:
+                source_id: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Scan queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued: { type: boolean }
+                  source_id: { type: string, format: uuid }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /documents/{id}/screenshot/{viewport}:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - { name: viewport, in: path, required: true, schema: { type: string, enum: [desktop, tablet, mobile] } }
+    get:
+      tags: [documents]
+      summary: Screenshot image from MinIO
+      responses:
+        '200':
+          description: PNG image
+          content:
+            image/png: {}
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /health:
+    get:
+      tags: [system]
+      summary: Status of the API and its dependencies
+      responses:
+        '200':
+          description: Mock `mocks/health.json`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, services]
+                properties:
+                  status: { type: string, enum: [ok, degraded, down] }
+                  services:
+                    type: object
+                    additionalProperties: { type: string, enum: [ok, degraded, down] }
+
+components:
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    page_size:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+  schemas:
+    Thresholds:
+      type: object
+      required: [M1, M2, M3]
+      additionalProperties: false
+      properties:
+        M1: { type: number, minimum: 0, maximum: 1 }
+        M2: { type: number, minimum: 0, maximum: 1 }
+        M3: { type: number, minimum: 0, maximum: 1 }
+    SourceInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        platform: { type: string, enum: [web, facebook, instagram, tiktok, youtube, x, forum, other] }
+        url: { type: string, format: uri }
+        source_kind: { type: string, enum: [firm_own, third_party, unknown] }
+        target_modules: { type: array, items: { type: string, enum: [M1, M2, M3] }, minItems: 1 }
+        schedule_cron: { type: [string, 'null'] }
+        active: { type: boolean }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        details: {}
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
