@@ -40,4 +40,4 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 ## 6. Closing
 
 - [x] 6.1 Apply the iw-docs-update skill (your own `.docs/status/platform.md` `### analytics` line, ADRs) and add the iw-ai-log row
-- [ ] 6.2 Run the iw-pr-review skill and fix real findings
+- [x] 6.2 Run the iw-pr-review skill and fix real findings (one reviewer pass: the host fallback for a web author with only a profile URL, M1 texts naming the KNF register on demo data, the CLI's UTF-8 stdout on Windows, the ADR 0308 wording, the mock-difference row; `mutations: 4 tried, 4 caught`)

@@ -174,3 +174,16 @@ def test_cli_bad_signal_catalogue_exits_2(tmp_path, capsys, monkeypatch):
         assert capsys.readouterr().out == ""
     finally:
         pipeline.default_signal_catalogues.cache_clear()
+
+
+def test_cli_writes_utf8_whatever_the_console_code_page(tmp_path):
+    path = tmp_path / "doc.json"
+    path.write_text(json.dumps(make_doc(source_kind="third_party", platform="instagram",
+                                        url="https://www.instagram.com/p/E1/", author={"handle": "@ola"},
+                                        text="Konto w Alfa Inwestycje DM 🚀")), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "PYTHONUTF8")}
+    env["PYTHONIOENCODING"] = "cp1250"  # a Windows console code page that cannot encode the emoji
+    run = subprocess.run([sys.executable, "-m", "investwatch_analytics.cli", str(path)], capture_output=True, env=env,
+                         cwd=ROOT)
+    assert run.returncode == 0, run.stderr.decode("utf-8", "replace")
+    assert "🚀" in json.loads(run.stdout.decode("utf-8"))[0]["content_excerpt"]

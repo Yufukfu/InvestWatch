@@ -95,11 +95,12 @@ def _url_or_none(value: str | None) -> str | None:
 def build_advertiser(doc: ScrapedDocument, registry: Registry) -> AdvertiserRef:
     author = doc.author if _has_author(doc) else None
     host = page_host(doc.url)
-    # A platform page without an author says nothing about who advertises: the platform is not the advertiser.
-    own_site = author is None and not is_social(http_host(doc.url) or host)
+    # A platform page says nothing about who advertises: the platform is never the advertiser.
+    on_platform = is_social(http_host(doc.url) or host)
+    own_site = author is None and not on_platform
     return AdvertiserRef(
         name=_cut(author.name if author else None) or _cut(author.handle if author else None)
-        or (_cut(host) if own_site else None),
+        or (None if on_platform else _cut(host)),
         handle=_cut(author.handle) if author else None,
         profile_url=_url_or_none(author.profile_url) if author else None,
         website=_url_or_none(f"{urlsplit(doc.url).scheme}://{host}/") if own_site else None,

@@ -67,14 +67,14 @@ class S11FirmMention(MetadataRule):
     def evaluate(self, ctx: Context) -> RuleResult:
         match = ctx.firm_match
         if match is None:
-            return self.result("pass", None, "Materiał nie wymienia firmy z rejestru KNF.")
+            return self.result("pass", None, "Materiał nie wymienia firmy z załadowanego rejestru firm.")
         name = match.firm.name
         if match.method == "name":
-            return self.result("fail", match.evidence, f"Materiał wymienia firmę z rejestru KNF: {name}.")
+            return self.result("fail", match.evidence, f"Materiał wymienia firmę z załadowanego rejestru firm: {name}.")
         if match.method == "link":
-            return self.result("fail", match.evidence, f"Materiał zawiera link do domeny firmy z rejestru KNF: {name}.")
+            return self.result("fail", match.evidence, f"Materiał zawiera link do domeny firmy z załadowanego rejestru firm: {name}.")
         if match.method == "domain":
-            return self.result("fail", page_host(ctx.doc.url), f"Adres strony należy do firmy z rejestru KNF: {name}.")
+            return self.result("fail", page_host(ctx.doc.url), f"Adres strony należy do firmy z załadowanego rejestru firm: {name}.")
         return self.result("uncertain", None, f"Możliwa wzmianka o firmie {name} (dopasowanie przybliżone) – do weryfikacji.")
 
 

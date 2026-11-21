@@ -227,3 +227,10 @@ def test_social_host_without_author_gives_null_name_and_website(registry):
 def test_web_page_with_author_has_no_website(registry):
     a = build_advertiser(doc(platform="web", url="https://blog.example.com/a", text="x", author={"name": "Ola"}), registry)
     assert a.name == "Ola" and a.website is None
+
+
+def test_web_author_with_only_a_profile_url_keeps_the_host_name(registry):
+    d = doc(platform="web", url="https://blog.example.com/a", text="x",
+            author={"profile_url": "https://blog.example.com/o-mnie"})
+    a = build_advertiser(d, registry)
+    assert a.name == "blog.example.com" and a.website is None

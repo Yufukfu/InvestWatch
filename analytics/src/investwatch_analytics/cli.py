@@ -71,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
             failed += 1
             # Type only: exception messages can carry scraped text.
             log.error("analysis failed", extra={"document_id": doc.id, "error_type": type(exc).__name__})
+    # The findings JSON is UTF-8 whatever the console code page (cp1250 on Windows cannot encode an emoji).
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(json.dumps(findings, ensure_ascii=False, indent=2) + "\n")
     return 1 if failed else 0
 

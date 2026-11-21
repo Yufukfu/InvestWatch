@@ -405,3 +405,9 @@ def test_m1_excerpt_starts_at_the_earliest_evidence(registry, cat):
     text = "Konto w Alfa Inwestycje DM. " + "Opowieść o wakacjach i pogodzie nad morzem. " * 60 + "Link w bio!"
     f = finding(third_party(text=text), registry, cat)
     assert f.content_excerpt.startswith("Konto w Alfa Inwestycje DM")
+
+
+def test_m1_texts_name_the_loaded_registry(mock, registry, cat):
+    f = finding(mock(JAN), registry, cat)
+    assert "rejestru KNF" not in f.summary and "z załadowanego rejestru firm (dane demonstracyjne)" in f.summary
+    assert all("rejestru KNF" not in (r.explanation or "") for r in f.rules)

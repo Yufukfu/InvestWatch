@@ -43,7 +43,7 @@ def build_finding(
 ) -> Finding:
     rules = run_rules(catalogue, ctx)
     firm = firm_ref(ctx)
-    title, summary = _texts(rules, firm, advertiser)
+    title, summary = _texts(rules, firm, advertiser, " (dane demonstracyjne)" if ctx.registry.demo else "")
     return Finding(
         id=new_id(),
         document_id=ctx.doc.id,
@@ -64,7 +64,7 @@ def build_finding(
     )
 
 
-def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: AdvertiserRef) -> tuple[str, str]:
+def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: AdvertiserRef, demo: str = "") -> tuple[str, str]:
     by_id = {r.rule_id: r for r in rules}
     who = advertiser_label(advertiser)
     firm_name = firm.name if firm else "firmę z rejestru"
@@ -80,7 +80,7 @@ def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: Advertiser
     unchecked = [by_id[i] for i in LLM_ONLY if i in by_id and by_id[i].evidence is None and by_id[i].result == "uncertain"]
     found = [r for r in rules if r.result == "fail"]
     unsure = [r for r in rules if r.result == "uncertain" and r not in unchecked]
-    parts = [f"Materiał podmiotu trzeciego {who} dotyczy firmy z rejestru KNF: {firm_name}.", label_text]
+    parts = [f"Materiał podmiotu trzeciego {who} dotyczy firmy z załadowanego rejestru firm{demo}: {firm_name}.", label_text]
     if found:
         parts.append("Wykryte sygnały: " + "; ".join(f"{r.rule_id} {r.name}" for r in found) + ".")
     if unsure:
