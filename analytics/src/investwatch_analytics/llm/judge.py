@@ -70,7 +70,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError  # noqa: E402
 from ..config import LlmSettings  # noqa: E402
 from .chunking import Chunk, split_chunks  # noqa: E402
 from .client import ChatClient, LlmError, LlmMalformed, LlmUnavailable  # noqa: E402
-from .prompt import system_prompt, user_message  # noqa: E402
+from .prompt import prompt_version, system_prompt, user_message  # noqa: E402
+from .cache import LlmCache, cache_key  # noqa: E402
+import time  # noqa: E402
 
 log = logging.getLogger(__name__)
 MIN_QUOTE_CHARS = 8
@@ -155,10 +157,37 @@ def merge_chunks(per_chunk: list[dict[str, LlmVerdict]]) -> dict[str, LlmVerdict
 class HttpJudge:
     """`LlmJudge` over an OpenAI-compatible endpoint. Never raises: every failure is a `JudgeOutcome` status."""
 
-    def __init__(self, settings: LlmSettings, *, client: ChatClient | None = None):
+    def __init__(self, settings: LlmSettings, *, client: ChatClient | None = None, redis: Any = None,
+                 clock: Any = time.monotonic):
         self.settings = settings
         self.model_name = settings.model
         self._client = client or ChatClient(settings)
+        self._cache = LlmCache(redis, settings.cache_ttl_s) if redis is not None else None
+        self._clock = clock
+        self._deadline: float | None = None      # per-document budget (ADR 0310), set by begin_document()
+        self._failures = 0                      # consecutive unavailable outcomes (circuit breaker)
+        self._open_until: float | None = None
+
+    def begin_document(self) -> None:
+        """Start the per-document wall-clock budget; the pipeline calls this once per document."""
+        self._deadline = self._clock() + self.settings.doc_budget_s
+
+    def _breaker_open(self) -> bool:
+        if self._open_until is None:
+            return False
+        if self._clock() >= self._open_until:
+            self._open_until = None  # half-open: one call may try; a failure reopens at once
+            self._failures = self.settings.breaker_failures - 1
+            return False
+        return True
+
+    def _record(self, ok: bool) -> None:
+        if ok:
+            self._failures, self._open_until = 0, None
+            return
+        self._failures += 1
+        if self._failures >= self.settings.breaker_failures:
+            self._open_until = self._clock() + self.settings.breaker_cooldown_s
 
     def judge(
         self,
@@ -178,22 +207,53 @@ class HttpJudge:
         if truncated:
             log.info("llm input truncated", extra={"reason": "llm_truncated", "llm_module": module,
                                                    "chunks": len(chunks)})
+        version = prompt_version(system)
+        rule_ids = [c.rule_id for c in checks]
         per_chunk: list[dict[str, LlmVerdict]] = []
-        for chunk in chunks:
-            try:
-                content = self._ask(system, chunk)
-            except LlmError as exc:
-                log.warning("llm verdicts dropped", extra={"reason": exc.reason, "llm_module": module,
-                                                          "content_hash": content_hash})
-                status = "malformed" if isinstance(exc, LlmMalformed) else "unavailable"
-                return JudgeOutcome(status=status)
+        for index, chunk in enumerate(chunks):
+            key = cache_key(module=module, content_hash=content_hash, prompt_version=version,
+                            model=self.settings.model, chunk_index=index, chunk_count=len(chunks),
+                            chunk_span=(chunk.start, chunk.end), rule_ids=rule_ids)
+            content = self._cache.get(key) if self._cache is not None else None
+            if content is None:
+                outcome = self._call(system, chunk, module=module, content_hash=content_hash)
+                if isinstance(outcome, JudgeOutcome):
+                    return outcome
+                content = outcome
+                if self._cache is not None:
+                    self._cache.set(key, content)
             per_chunk.append(parse_results(content, chunk.text, checks))
         verdicts = merge_chunks(per_chunk)
         return JudgeOutcome(verdicts=verdicts, model=self.settings.model if verdicts else None, status="ok")
 
-    def _ask(self, system: str, chunk: Chunk) -> dict[str, Any]:
+    def _call(self, system: str, chunk: Chunk, *, module: str, content_hash: str) -> dict[str, Any] | JudgeOutcome:
+        """One request, inside the breaker and the document budget; a failure is a `JudgeOutcome`."""
+        if self._breaker_open():
+            return self._dropped("unavailable", "llm_breaker_open", module, content_hash)
+        timeout = self.settings.timeout_s
+        if self._deadline is not None:
+            remaining = self._deadline - self._clock()
+            if remaining <= 0:
+                return self._dropped("budget_exhausted", "llm_budget_exhausted", module, content_hash)
+            timeout = min(timeout, remaining)
         try:
-            return self._client.complete(system, user_message(chunk.text))
+            content = self._ask(system, chunk, timeout)
+        except LlmError as exc:
+            if isinstance(exc, LlmUnavailable):
+                self._record(ok=False)
+            return self._dropped("malformed" if isinstance(exc, LlmMalformed) else "unavailable", exc.reason,
+                                 module, content_hash)
+        self._record(ok=True)
+        return content
+
+    @staticmethod
+    def _dropped(status: str, reason: str, module: str, content_hash: str) -> JudgeOutcome:
+        log.warning("llm verdicts dropped", extra={"reason": reason, "llm_module": module, "content_hash": content_hash})
+        return JudgeOutcome(status=status)  # type: ignore[arg-type]
+
+    def _ask(self, system: str, chunk: Chunk, timeout: float | None = None) -> dict[str, Any]:
+        try:
+            return self._client.complete(system, user_message(chunk.text), timeout_s=timeout)
         except (LlmUnavailable, LlmMalformed):
             raise
         except Exception as exc:  # pragma: no cover - defensive: a judge must never break the document

@@ -314,7 +314,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         log.error("worker not started", extra={"reason": "config_error", "error": "REDIS_URL is malformed"})
         return 2
     worker = Worker(client, store, RedisPublisher(client), registry=registry, catalogue=catalogue,
-                    judge=build_judge(llm_settings),
+                    judge=build_judge(llm_settings, redis=client),
                     config=WorkerConfig(consumer=worker_settings.consumer,
                                         block_ms=worker_settings.stream_block_ms,
                                         claim_min_idle_ms=worker_settings.claim_min_idle_ms,

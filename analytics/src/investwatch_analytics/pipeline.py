@@ -59,6 +59,9 @@ def analyze(
 ) -> list[Finding]:
     """`judge` is the only I/O and is injected: None (the default) is rules-only."""
     now = now or datetime.now(timezone.utc)
+    begin = getattr(judge, "begin_document", None)
+    if begin is not None:
+        begin()  # the per-document LLM budget (ADR 0310) covers every module of this document
     pre = preprocess(doc.text)
     if pre.is_empty:
         _skipped(doc, "empty_text")

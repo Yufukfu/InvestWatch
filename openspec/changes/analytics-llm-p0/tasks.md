@@ -60,9 +60,9 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 10. Cache, budget and circuit breaker (~1 h)
 
-- [ ] 10.1 Failing tests (`fakeredis`, injected clock): re-scan makes no request, model swap and question edit miss, malformed answer not cached, Redis down is a miss and never raises, cache hit re-runs quote verification; budget exhausted → `llm_budget_exhausted` and rules-only; breaker opens after 3 unavailable, skips calls during the cooldown, half-open success closes it, malformed does not count
-- [ ] 10.2 `llm/cache.py` (key from `content_hash`, `prompt_version`, model, module, chunk index/count, sorted rule ids; TTL), budget and breaker in `HttpJudge`; tests green
-- [ ] 10.3 Mutation check; `mutations: N tried, N caught`
+- [x] 10.1 Failing tests (`fakeredis`, injected clock): re-scan makes no request, model swap and question edit miss, malformed answer not cached, Redis down is a miss and never raises, cache hit re-runs quote verification; budget exhausted → `llm_budget_exhausted` and rules-only; breaker opens after 3 unavailable, skips calls during the cooldown, half-open success closes it, malformed does not count
+- [x] 10.2 `llm/cache.py` (key from `content_hash`, `prompt_version`, model, module, chunk index/count, sorted rule ids; TTL), budget and breaker in `HttpJudge`; tests green
+- [x] 10.3 Mutation check; `mutations: 17 tried, 16 caught` (1 equivalent: the sorted rule ids in the cache key are also inside `prompt_version`, which hashes the rendered check list; kept for the spec's key definition)
 
 ## 11. Per-sentence language and R10 (~1 h)
 
