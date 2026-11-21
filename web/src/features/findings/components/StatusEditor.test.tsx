@@ -22,10 +22,10 @@ describe('StatusEditor', () => {
     const onSave = vi.fn();
     render(<StatusEditor {...base} onSave={onSave} />);
     const save = screen.getByRole('button', { name: 'Zapisz' });
-    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute('aria-disabled', 'true');
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'confirmed' } });
     fireEvent.change(screen.getByLabelText('Notatka'), { target: { value: 'Potwierdzone ręcznie' } });
-    expect(save).toBeEnabled();
+    expect(save).toHaveAttribute('aria-disabled', 'false');
     fireEvent.click(save);
     expect(onSave).toHaveBeenCalledWith({ status: 'confirmed', note: 'Potwierdzone ręcznie' });
   });
@@ -50,7 +50,7 @@ describe('StatusEditor', () => {
     render(<StatusEditor {...base} isSaving onSave={vi.fn()} />);
     expect(screen.getByLabelText('Status')).toBeDisabled();
     expect(screen.getByLabelText('Notatka')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Zapisywanie…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Zapisywanie…' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('shows the API error and the saved confirmation', () => {
@@ -77,6 +77,34 @@ describe('StatusEditor', () => {
     render(<StatusEditor {...base} onSave={onSave} />);
     fireEvent.submit(screen.getByRole('form', { name: 'Zmiana statusu' }));
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
+  });
+
+  it('ignores a submit while saving', () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<StatusEditor {...base} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'closed' } });
+    rerender(<StatusEditor {...base} isSaving onSave={onSave} />);
+    fireEvent.submit(screen.getByRole('form', { name: 'Zmiana statusu' }));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('new saved values reset the form in place: same nodes, focus kept, live region announced', () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<StatusEditor {...base} onSave={onSave} />);
+    const select = screen.getByLabelText('Status');
+    const save = screen.getByRole('button', { name: 'Zapisz' });
+    const live = screen.getByRole('status');
+    expect(live).toHaveTextContent(/^$/);
+    fireEvent.change(select, { target: { value: 'confirmed' } });
+    save.focus();
+    rerender(<StatusEditor {...base} status="confirmed" note="ok" saved onSave={onSave} />);
+    expect(screen.getByLabelText('Status')).toBe(select);
+    expect(select).toHaveValue('confirmed');
+    expect(screen.getByLabelText('Notatka')).toHaveValue('ok');
+    expect(screen.getByRole('button', { name: 'Zapisz' })).toBe(save);
+    expect(save).toHaveFocus();
+    expect(screen.getByRole('status')).toBe(live);
+    expect(live).toHaveTextContent('Zapisano.');
   });
 });

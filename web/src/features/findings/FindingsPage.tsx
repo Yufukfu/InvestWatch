@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { FindingDetailPanel } from './components/FindingDetailPanel';
 import { FindingsFilters } from './components/FindingsFilters';
 import { FindingsPager } from './components/FindingsPager';
@@ -11,9 +12,7 @@ function DetailContainer({ id, onClose }: { id: string; onClose: () => void }) {
   const d = useFindingDetail(id);
   const change = useStatusChange(id);
   const editor = d.detail && (
-    // key: once the API returns the saved values, the form restarts from them.
     <StatusEditor
-      key={`${d.detail.status}|${d.detail.note ?? ''}`}
       status={d.detail.status}
       note={d.detail.note}
       onSave={change.save}
@@ -61,13 +60,16 @@ export function FindingsPage() {
           onPageSize={(pageSize) => f.setFilters({ pageSize })}
         />
       )}
-      {f.selectedId && (
-        <>
-          <div className="detail-backdrop" aria-hidden="true" onClick={() => f.select(undefined)} />
-          {/* key: a new selection remounts the panel, so focus handling restarts per finding. */}
-          <DetailContainer key={f.selectedId} id={f.selectedId} onClose={() => f.select(undefined)} />
-        </>
-      )}
+      {f.selectedId &&
+        // Portal: the dialog sits outside the page, so the page can be made inert behind it.
+        createPortal(
+          <div className="detail-layer">
+            <div className="detail-backdrop" aria-hidden="true" onClick={() => f.select(undefined)} />
+            {/* key: a new selection remounts the panel, so focus handling restarts per finding. */}
+            <DetailContainer key={f.selectedId} id={f.selectedId} onClose={() => f.select(undefined)} />
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

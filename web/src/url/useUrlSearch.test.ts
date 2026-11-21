@@ -29,4 +29,16 @@ describe('useUrlSearch', () => {
     expect(window.location.search).toBe('');
     expect(result.current[0]).toBe('');
   });
+
+  it('replaces the history entry when asked, and pushes otherwise', () => {
+    window.history.replaceState(null, '', '/');
+    const { result } = renderHook(() => useUrlSearch());
+    const start = window.history.length;
+    act(() => result.current[1]('?q=a', { replace: true }));
+    expect(window.history.length).toBe(start);
+    expect(result.current[0]).toBe('?q=a');
+    act(() => result.current[1]('?q=a&module=M1'));
+    expect(window.history.length).toBe(start + 1);
+    expect(result.current[0]).toBe('?q=a&module=M1');
+  });
 });

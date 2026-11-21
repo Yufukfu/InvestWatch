@@ -36,11 +36,15 @@ export function useFindings(): FindingsState {
   const [search, push] = useUrlSearch();
   const filters = useMemo(() => parseFilters(search), [search]);
   const selectedId = useMemo(() => parseSelected(search), [search]);
-  // While a new filter loads the previous rows are not shown as current: `currentData` is undefined then.
-  const { currentData, isLoading, isFetching, isError } = useGetFindingsQuery(toQueryArg(filters));
+  // While the next page or filter loads, the last result stays (marked busy by the table), so the
+  // sort header or pager button that had focus is not unmounted. A failed request clears it.
+  const { data, isLoading, isFetching, isError } = useGetFindingsQuery(toQueryArg(filters));
 
   const setFilters = useCallback(
-    (patch: Partial<FindingFilters>) => push(serializeUrl(withFilter(filters, patch), selectedId)),
+    (patch: Partial<FindingFilters>) => {
+      const searchOnly = Object.keys(patch).length === 1 && 'q' in patch;
+      push(serializeUrl(withFilter(filters, patch), selectedId), { replace: searchOnly });
+    },
     [push, filters, selectedId],
   );
   const resetFilters = useCallback(
@@ -50,8 +54,8 @@ export function useFindings(): FindingsState {
   const select = useCallback((id: string | undefined) => push(serializeUrl(filters, id)), [push, filters]);
 
   return {
-    rows: isError ? undefined : currentData?.items.map(toRow),
-    total: isError ? undefined : currentData?.total,
+    rows: isError ? undefined : data?.items.map(toRow),
+    total: isError ? undefined : data?.total,
     filters,
     setFilters,
     resetFilters,

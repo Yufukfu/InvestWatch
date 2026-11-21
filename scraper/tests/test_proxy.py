@@ -405,3 +405,26 @@ def test_an_unterminated_quoted_url_is_scrubbed_to_the_end_of_the_message():
     detail = _transport_failure(TLSClientException(message), None).detail
 
     assert "token" not in detail and "x.test" not in detail
+
+
+def test_a_run_reports_a_deferral_up_front_only_when_every_proxy_is_cooling():
+    clock = Clock()
+    rot = rotator(URLS[:2], clock=clock, rng=First())
+    rot.penalize(choice_of(URLS[0]))
+    assert rot.start_run().deferral() is None  # one proxy is still usable
+    rot.penalize(choice_of(URLS[1]))
+
+    assert rot.start_run().deferral() == Deferral(until=START + timedelta(seconds=90))
+
+
+def test_a_run_without_proxies_never_defers():
+    assert rotator([]).start_run().deferral() is None
+
+
+def test_looking_for_a_deferral_does_not_use_up_the_rotation():
+    rot = rotator(URLS[:2], rng=First())
+    run = rot.start_run()
+
+    run.deferral()
+
+    assert run.pick().url == URLS[0]
