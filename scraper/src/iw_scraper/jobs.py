@@ -82,6 +82,15 @@ async def execute_job(ctx: dict, source_id: str, domain: str, requested: bool = 
             logger.exception("could not publish the failed finish of a crashed job")
         await lock.release()
         raise
+    except asyncio.CancelledError:
+        # shutdown: arq requeues the job under the same id, which re-enters its own lock; keep the lock so
+        # no other job for the source slips in meanwhile
+        cfg = ctx["settings"]
+        try:
+            await lock.extend(max(cfg.lease_ttl, cfg.attempt_timeout))
+        except (RedisError, OSError):
+            logger.warning("could not extend the run lock of a cancelled job", exc_info=True)
+        raise
     except BaseException:
         await lock.release()
         raise

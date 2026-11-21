@@ -19,12 +19,12 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 3. Stability, health and end to end
 
-- [ ] 3.1 Failing tests, then graceful SIGTERM (finish or requeue before a deadline), the job timeout releasing the lock, and reconnect with backoff; the stability scenarios pass
-- [ ] 3.2 Failing tests, then `GET /health` (200, or 503 naming the dependency) and single-line JSON logs on stdout; the operable scenarios pass
+- [x] 3.1 Failing tests, then graceful SIGTERM (finish or requeue before a deadline), the job timeout releasing the lock, and reconnect with backoff; the stability scenarios pass
+- [x] 3.2 Failing tests, then `GET /health` (200, or 503 naming the dependency) and single-line JSON logs on stdout; the operable scenarios pass
 - [ ] 3.3 Failing end-to-end test on docker compose with the saved KNF page behind a local stub server and one worker: a seeded source yields a schema-valid `documents` row, a MinIO object, an `iw:documents` entry and `scan.finished`, and a rerun adds nothing. Fix only what this test shows, within this change's specs
 - [ ] 3.4 Failing end-to-end test with two workers and two simultaneous scan requests for one source: exactly one `documents` row for an unchanged page, one `iw:documents` entry
 - [ ] 3.5 Opt-in live smoke test (marker `scraper_live`, deselected by default and outside CI) fetching the real KNF page once through the full stack, plus a seed script that inserts the KNF `sources` row
-- [ ] 3.6 Mutation check; `mutations:` (n/a for the end-to-end and smoke tests; list the guards 10.1-10.2 changed)
+- [x] 3.6 Mutation check; `mutations: 23 tried, 23 caught` (n/a for the end-to-end and smoke tests 3.3-3.5; guards of 3.1-3.2: supervisor, worker runner, cancel lock, health, log format; one mutant, the supervisor returning when its work returns, was confirmed by running its test by hand because the batch run mis-parsed the output)
 
 ## 4. Closing
 

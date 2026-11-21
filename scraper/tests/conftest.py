@@ -137,3 +137,62 @@ async def start_worker(store):
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
         await worker.close()
+
+
+class TcpProxy:
+    """A TCP forwarder in front of Redis that a test can switch off and on, to simulate an outage."""
+
+    def __init__(self, target_host: str, target_port: int) -> None:
+        self._target = (target_host, target_port)
+        self._server: asyncio.Server | None = None
+        self._writers: set[asyncio.StreamWriter] = set()
+        self.port = 0
+
+    @property
+    def url(self) -> str:
+        return f"redis://127.0.0.1:{self.port}/0"
+
+    async def start(self) -> None:
+        self._server = await asyncio.start_server(self._serve, "127.0.0.1", self.port)
+        self.port = self._server.sockets[0].getsockname()[1]
+
+    async def stop(self) -> None:
+        if self._server:
+            self._server.close()
+        for writer in list(self._writers):  # 3.12's wait_closed() waits for open connections
+            writer.close()
+        self._writers.clear()
+        if self._server:
+            await self._server.wait_closed()
+            self._server = None
+
+    async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            upstream_reader, upstream_writer = await asyncio.open_connection(*self._target)
+        except OSError:
+            writer.close()
+            return
+        self._writers.update({writer, upstream_writer})
+
+        async def pipe(source: asyncio.StreamReader, sink: asyncio.StreamWriter) -> None:
+            try:
+                while data := await source.read(65536):
+                    sink.write(data)
+                    await sink.drain()
+            except (ConnectionError, OSError):
+                pass
+            finally:
+                sink.close()
+
+        await asyncio.gather(pipe(reader, upstream_writer), pipe(upstream_reader, writer))
+
+
+@pytest.fixture
+async def proxy():
+    from urllib.parse import urlsplit
+
+    target = urlsplit(os.environ["REDIS_URL"])
+    forwarder = TcpProxy(target.hostname, target.port or 6379)
+    await forwarder.start()
+    yield forwarder
+    await forwarder.stop()
