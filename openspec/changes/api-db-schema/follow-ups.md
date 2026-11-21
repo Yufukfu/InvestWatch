@@ -27,3 +27,10 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 21 | review groups 3-4 | admin URL not percent-encoded; a hand-set password with `@:/#%` breaks it | docs (README; generated passwords are hex) |
 | 22 | review groups 3-4 | job_errors rows of a deleted source are orphaned (no FK) | wont-fix (no delete route for sources; retention is out of scope for the hackathon) |
 | 23 | review groups 3-4 | legacy builder (`DOCKER_BUILDKIT=0`) ignores `api/Dockerfile.dockerignore` and sends the whole root as context | wont-fix (compose v2 builds with BuildKit; nothing outside the explicit COPYs reaches the image) |
+| 24 | whole-branch review | URL redaction missed an unencoded `/` or `@` in a password | fix-here (greedy userinfo match, tests with `/`, `@`, `:`) |
+| 25 | whole-branch review | comment in 0001 still showed the untargeted `ON CONFLICT DO NOTHING` | fix-here (comment shows the targeted form) |
+| 26 | whole-branch review | AI log said 36 mutants; `tasks.md` lines add up to 46 | fix-here |
+| 27 | whole-branch review | tasks 3.2, 3.3 and 5.1 read as if the PR-body paste, Adam's hand-over and STATUS were done here | docs (task texts say who does them; STATUS row and blockers go to the coordinating session) |
+| 28 | whole-branch review | `documents.text` may be empty (the contract has no `minLength`) | wont-fix (the scraper never stores empty text on a parse failure, `scraper-v1` spec) |
+| 29 | whole-branch review | `findings.document_id ON DELETE CASCADE` would erase analyst status and notes if a document were deleted | wont-fix (no route deletes documents) |
+| 30 | whole-branch review | base image pinned by tag, pip without `--require-hashes`; uncaught `env.py` tracebacks bypass the JSON redactor (psycopg connect errors carry no password, row 13) | wont-fix (same as the repo's other images; hackathon scope) |

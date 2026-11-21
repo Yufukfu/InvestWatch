@@ -22,7 +22,7 @@ Lands before change `api-v1`: groups 1-3 unblock `scraper-v1` group 5 (Adam) and
 
 - [x] 3.1 Failing test, then `src/investwatch_api/db/mapping.py` (contract dict ↔ row): "Contract mock round-trips" passes for every item of `contracts/mocks/documents.json`, `findings.json` and `sources.json`, and each read-back passes `contracts/validate.py`
 - [x] 3.2 `api/Dockerfile` (python:3.13-slim, non-root, `CONTRACTS_DIR` set) and `api/compose.yaml` with the one-shot `api-migrate` service on `iw-data`, admin URL built from `POSTGRES_ADMIN_*`; with the root `include:` line coordinated with `infra-compose`, "Stack starts on an empty volume" and "Migration fails" are checked by hand (`docker compose up`, then a wrong admin password) and the output pasted in the PR body
-- [x] 3.3 Write the exact insert SQL for the scraper (targeted `ON CONFLICT ... DO NOTHING`, marker update, sweep query with grace) and for analytics (upsert) into `api/README.md`; tell Adam that `scraper-v1` task 1.4 is answered (sent through the coordinating session with the final columns)
+- [x] 3.3 Write the exact insert SQL for the scraper (targeted `ON CONFLICT ... DO NOTHING`, marker update, sweep query with grace) and for analytics (upsert) into `api/README.md`; tell Adam that `scraper-v1` task 1.4 is answered (sent to the scraper-ingest session on Damian's side; the coordinating session gets the final columns in the hand-over report)
 - [x] 3.4 Mutation check; mutations: 7 tried, 7 caught (mapping; Dockerfile and compose are config-only)
 
 ## 4. Query indexes
@@ -32,7 +32,7 @@ Lands before change `api-v1`: groups 1-3 unblock `scraper-v1` group 5 (Adam) and
 
 ## 5. Closing
 
-- [x] 5.1 Apply the `iw-docs-update` skill (`api/CLAUDE.md`, `api/README.md`, ADR 0307 and its row in `.docs/decisions/README.md`, the `api` row in the root `CLAUDE.md` services table and in `.docs/INDEX.md`, Damian's row in `.docs/STATUS.md`, the STATUS blocker about `api/` and the migration owner), run docs-check, run `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` and record it in `.docs/security-audit.md`, and add the `iw-ai-log` row (the `.docs/STATUS.md` row and blockers are left to the coordinating session, which owns STATUS edits for this batch; it gets the final columns in the hand-over report)
+- [x] 5.1 Apply the `iw-docs-update` skill (`api/CLAUDE.md`, `api/README.md`, ADR 0307 and its row in `.docs/decisions/README.md`, the `api` row in the root `CLAUDE.md` services table and in `.docs/INDEX.md`, Damian's row in `.docs/STATUS.md`, the STATUS blocker about `api/` and the migration owner), run docs-check, run `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` and record it in `.docs/security-audit.md`, and add the `iw-ai-log` row except Damian's `.docs/STATUS.md` row and its `api/` blockers, which the coordinating session edits for this batch (this session was told not to touch STATUS)
 - [ ] 5.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up

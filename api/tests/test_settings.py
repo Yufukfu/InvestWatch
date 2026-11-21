@@ -70,6 +70,13 @@ def test_url_credentials_are_redacted_in_message_and_exception():
     assert "postgresql://***@postgres:5432/db" in entry["msg"]
 
 
+@pytest.mark.parametrize("password", ["pa/ss", "p@ss@word", "a:b/c@d"])
+def test_unencoded_special_characters_in_password_are_redacted(password):
+    entry = _formatted(f"connect postgresql://iw_admin:{password}@postgres:5432/db failed")
+    assert password not in entry["msg"]
+    assert password.split("@")[-1] not in entry["msg"].split("***@")[0]
+
+
 def test_sql_parameters_are_redacted():
     entry = _formatted("x", RuntimeError("(psycopg.errors.CheckViolation) boom\n[SQL: INSERT ...]\n"
                                          "[parameters: {'note': 'private analyst note'}]\n(Background on this error)"))

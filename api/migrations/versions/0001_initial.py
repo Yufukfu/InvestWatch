@@ -83,7 +83,8 @@ def upgrade() -> None:
         sa.CheckConstraint("jsonb_typeof(payload) = 'object'", name="ck_documents_payload_object"),
     )
     # Dedup (ADR 0307): one row per (source, text); ad-hoc documents (no source) dedup too; rows without
-    # a hash never collide. The scraper inserts with ON CONFLICT DO NOTHING (no conflict target needed).
+    # a hash never collide. The scraper names this index as its conflict target:
+    # ON CONFLICT (source_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING (a bare DO NOTHING hides a reused id).
     op.create_index("uq_documents_source_hash", "documents", ["source_id", "content_hash"], unique=True,
                     postgresql_nulls_not_distinct=True, postgresql_where=sa.text("content_hash IS NOT NULL"))
     op.create_index("ix_documents_unpublished", "documents", ["created_at"],
