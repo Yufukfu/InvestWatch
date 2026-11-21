@@ -259,7 +259,9 @@ rules:
       # Stripped before matching: imperatives (a return claim, R3) and fee or tax percentages.
       forecast_exclude_patterns:
         - '\b(?:zarabiaj|zyskaj|pomnażaj|pomnóż|earn)\w*'
-        - '\b(?:prowizj|opłat|marż|podat|koszt)\w*\b.{0,60}?\d+(?:[.,]\d+)?\s?%'
+        # The percentage tied to the fee word (at most 4 words, none a return verb), so "po odliczeniu opłat
+        # fundusz będzie zarabiał 8%" keeps its forecast (group 3 review).
+        - '\b(?:prowizj|opłat|marż|podat|koszt)\w*\s+(?:(?!(?:zarab|zarob|zysk|wypracow|wypracu|przyni|osiąg)\w*)\w+\s+){0,4}\d+(?:[.,]\d+)?\s?%'
       figure_patterns: *pp_figure
       amount_patterns: *pp_amount
       figure_exclude_patterns: *return_figure_exclude
@@ -302,12 +304,13 @@ rules:
         - '\bpodleg\w*\s+(?:\w+\s+)?zmian\w*'
         - '\bsubject\s+to\s+change\b'
         - '\bmay\s+change\b'
-      # Generic subjects of a disclaimer ("Traktowanie podatkowe zależy…"), stripped together with the
-      # disclaimer parts: a disclaimer sentence is a tax reference only if a tax word is left after that.
+      # Generic tax words, stripped from a disclaimer sentence together with its two parts ("Traktowanie
+      # podatkowe / Opodatkowanie / Taxation zależy…"): such a sentence is a tax reference only through a concrete
+      # tax word left after that (`podatku Belki`, `IKE`, `IKZE`, `PIT`; group 2 and 3 reviews).
       tax_subject_patterns:
-        - '\b(?:traktowani|korzyś|korzyść|skutk|konsekwencj|zasad|przepis|rozliczeni)\w*\s+(?:\w+\s+)?podatkow\w*'
-        - '\bpodatkow\w*\s+(?:traktowani|skutk|konsekwencj|zasad|przepis|korzyś|korzyść)\w*'
-        - '\btax\s+treatment\b'
+        - '\bpodatkow\w*'
+        - '\bopodatkowan\w*'
+        - '\btax(?:ation|es)?\b(?:\s+treatment)?'
       tax_context_patterns:
         # Tax stems only: `podatny` ("susceptible") is common in risk warnings (group 2 review).
         - '\bpodat(?:ek|k|nik|nicz)\w*'

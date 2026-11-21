@@ -137,8 +137,13 @@ def test_r16_eurotrade_not_applicable(mock_documents, registry, catalogue):
 @pytest.mark.parametrize(
     "text", ["Kurs akcji jest podatny na wahania rynkowe.", "Fundusz jest podatny na zmiany kursów walut.",
              "Przepisy podatkowe mogą ulec zmianie.", "Korzyść podatkowa zależy od indywidualnej sytuacji klienta.",
-             "Korzyść zależy od indywidualnej sytuacji podatnika."],
-    ids=["podatny", "podatny-currency", "lone-change-part", "lone-individual-part", "taxpayer-in-the-part"],
+             "Korzyść zależy od indywidualnej sytuacji podatnika.",
+             "Opodatkowanie zależy od indywidualnej sytuacji klienta.",
+             "Kwestie podatkowe zależą od indywidualnej sytuacji klienta.",
+             "Zasady opodatkowania zależą od indywidualnej sytuacji klienta i mogą ulec zmianie.",
+             "Taxation depends on individual circumstances and may change."],
+    ids=["podatny", "podatny-currency", "lone-change-part", "lone-individual-part", "taxpayer-in-the-part",
+         "opodatkowanie", "kwestie-podatkowe", "zasady-opodatkowania", "taxation"],  # group 3 review
 )
 def test_r16_no_tax_reference_not_applicable(text, registry, catalogue):
     assert run(text, registry, catalogue)["R16"].result == "not_applicable"
@@ -240,6 +245,19 @@ def test_r15_not_applicable(text, registry, catalogue):
     r = run(text, registry, catalogue)["R15"]
     assert r.result == "not_applicable"
     assert r.evidence is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Po odliczeniu opłat fundusz będzie zarabiał 8% rocznie.",
+     "Prognozujemy, że po potrąceniu kosztów fundusz wypracuje 6% rocznie."],
+    ids=["fee-word-before-weak-forecast", "fee-word-before-strong-forecast"],
+)
+def test_r15_fee_word_does_not_hide_the_forecast(text, registry, catalogue):
+    # The fee-percentage exclude ties the figure to the fee word; it never blanks a return verb (group 3 review).
+    r = run(text, registry, catalogue)["R15"]
+    assert r.result == "fail"
+    assert r.evidence == text
 
 
 def test_r15_year_after_fetch_year_is_a_strong_marker(registry, catalogue):
