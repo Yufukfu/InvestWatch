@@ -121,7 +121,8 @@ Minimum required for analytics to work: `id, platform, url, fetched_at, text, so
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
 Table `sources` (managed by the scraper, editable from the dashboard):
-`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at`.
+`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at, last_run_status (ok|partial|failed|running)`.
+The scraper writes only `last_run_at` and `last_run_status`. `documents_count` in the `Source` contract ([`source.schema.json`](../contracts/schemas/source.schema.json)) is not a column: the API counts the source's `documents` rows on read (total, not the last job).
 
 ## 4. Contract: `Finding` (analytics → database → API)
 
@@ -201,7 +202,7 @@ Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/soc
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
 | `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
 | `finding.updated` | `{ id, status }` | published by the API on `iw:events` after `PATCH /findings/{id}` commits (status or note change; sync between tabs) |
-| `scan.started` / `scan.finished` | `{ source_id, documents?, status? }` (`documents` may be null; `status` is `ok`, `partial` or `failed`) | scan progress bar |
+| `scan.started` / `scan.finished` | `{ source_id, documents, status }`: `documents` = new documents of that job (integer or null), `status` = `ok\|partial\|failed` or null ([`events.schema.json`](../contracts/schemas/events.schema.json)) | scan progress bar |
 
 ## 7. Shared conventions
 
