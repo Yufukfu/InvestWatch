@@ -26,10 +26,10 @@
 
 ## 5. Packaging and run instructions
 
-- [ ] 5.1 Write a failing smoke test that starts the app with replay disabled and calls `GET /api/health`
-- [ ] 5.2 Add a `Dockerfile` (official pinned `python:3.13-slim` image, non-root user, only port 8000 exposed) and a `python -m` entry point
-- [ ] 5.3 Add the "Mock server" section to `contracts/README.md` (run locally, run in Docker, env variables, base URLs for `web/`, what `/__mock/` does)
-- [ ] 5.4 Run `pip-audit` on the pinned requirements and record the result for the PR body
+- [x] 5.1 Write a failing smoke test that starts the app with replay disabled and calls `GET /api/health`
+- [x] 5.2 Add a `Dockerfile` (official pinned `python:3.13-slim` image, non-root user, only port 8000 exposed) and a `python -m` entry point
+- [x] 5.3 Add the "Mock server" section to `contracts/README.md` (run locally, run in Docker, env variables, base URLs for `web/`, what `/__mock/` does)
+- [x] 5.4 Run `pip-audit` on the pinned requirements and record the result for the PR body
 
 ## 6. Closing tasks
 

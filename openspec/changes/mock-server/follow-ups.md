@@ -22,4 +22,6 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 16 | review group 2 | runtime findings must use `...Z` timestamps for trend buckets | fix-here in group 4 (replay uses `bumped_timestamp`, always UTC `Z`) |
 | 17 | review group 2 | clients must URL-encode `+` in `date_from`/`date_to` | docs (README mock-server section) |
 | 18 | review group 2 | CORS headers missing on unhandled 500s; `MOCK_PORT` upper bound; `nan`/`inf` intervals; partial first hour in day buckets | wont-fix (mock-only edge cases; no 500s expected, values come from the team's own `.env`) |
+| 20 | group 5 | `docker build` of `contracts/mock-server/Dockerfile` not run: Docker Desktop was not running on C's machine | new-item (build once Docker is up, before the PR is merged; `python -m iw_mock_server` is covered by the smoke tests) |
+| 21 | group 5 | `pip-audit -r requirements.txt -r requirements-dev.txt` (pip-audit 2.10.1, 2026-11-21) | docs (result: "No known vulnerabilities found"; for the PR body) |
 | 19 | group 4 | uvicorn without `websockets` silently falls back to long-polling | fix-here (`websockets` pinned in `requirements.txt`) |
