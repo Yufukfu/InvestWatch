@@ -20,6 +20,8 @@ from ..config import LlmSettings
 
 log = logging.getLogger(__name__)
 CONNECT_TIMEOUT_S = 3.0
+#: A chat-completions answer for a few checks is a few kB; anything far larger is not one.
+MAX_RESPONSE_BYTES = 1_000_000
 
 
 class LlmError(Exception):
@@ -50,7 +52,8 @@ class ChatClient:
         headers = {"Content-Type": "application/json"}
         if settings.api_key:
             headers["Authorization"] = f"Bearer {settings.api_key}"
-        self._http = httpx.Client(headers=headers, transport=transport, follow_redirects=False)
+        # trust_env=False: no proxy, netrc or CA bundle from the environment (scraped text and key stay direct).
+        self._http = httpx.Client(headers=headers, transport=transport, follow_redirects=False, trust_env=False)
 
     def close(self) -> None:
         self._http.close()
@@ -65,30 +68,43 @@ class ChatClient:
             "response_format": {"type": "json_object"},
         }
         started = time.perf_counter()
+        # httpx timeouts are per socket read; the deadline also bounds a server that trickles the body.
+        deadline = time.monotonic() + read
+        status = None
         try:
-            response = self._http.post(self._url, json=body, timeout=timeout)
+            with self._http.stream("POST", self._url, json=body, timeout=timeout) as response:
+                status = response.status_code
+                if status >= 300:
+                    self._log("llm call failed", started, status=status, reason="llm_unavailable")
+                    raise LlmUnavailable(f"HTTP {status}", status=status)
+                raw = bytearray()
+                for part in response.iter_bytes():
+                    raw += part
+                    if len(raw) > MAX_RESPONSE_BYTES:
+                        raise LlmMalformed("response too large")
+                    if time.monotonic() > deadline:
+                        raise httpx.ReadTimeout("total deadline exceeded")
         except httpx.TimeoutException as exc:
             self._log("llm call failed", started, error=type(exc).__name__, reason="llm_timeout")
             raise LlmUnavailable(f"timeout after {read:g} s", timeout=True) from None
         except httpx.HTTPError as exc:
             self._log("llm call failed", started, error=type(exc).__name__, reason="llm_unavailable")
             raise LlmUnavailable(f"cannot reach the LLM endpoint ({type(exc).__name__})") from None
-        if response.status_code >= 300:
-            self._log("llm call failed", started, status=response.status_code, reason="llm_unavailable")
-            raise LlmUnavailable(f"HTTP {response.status_code}", status=response.status_code)
-        try:
-            content = self._content(response)
         except LlmMalformed as exc:
-            self._log("llm call failed", started, status=response.status_code, reason="llm_malformed",
-                      error=str(exc))
+            self._log("llm call failed", started, status=status, reason="llm_malformed", error=str(exc))
             raise
-        self._log("llm call", started, status=response.status_code)
+        try:
+            content = self._content(bytes(raw))
+        except LlmMalformed as exc:
+            self._log("llm call failed", started, status=status, reason="llm_malformed", error=str(exc))
+            raise
+        self._log("llm call", started, status=status)
         return content
 
     @staticmethod
-    def _content(response: httpx.Response) -> dict[str, Any]:
+    def _content(raw: bytes) -> dict[str, Any]:
         try:
-            envelope = response.json()
+            envelope = json.loads(raw)
             content = envelope["choices"][0]["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError):
             raise LlmMalformed("not a chat completions response") from None

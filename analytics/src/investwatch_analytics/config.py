@@ -107,6 +107,25 @@ def _positive_number(env: Mapping[str, str], key: str, default: float, *, intege
 _LOCAL_HOSTS = {"ollama", "localhost", "127.0.0.1", "::1"}
 
 
+def _check_base_url(url: str, *, has_key: bool) -> None:
+    """http(s) with a host, no credentials, query or fragment; a key never goes over plain http to a remote host.
+
+    The message never quotes the URL: it could carry a password or a key in the query.
+    """
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname
+        userinfo = parts.username is not None or parts.password is not None
+    except ValueError:
+        raise ConfigError("LLM_BASE_URL is not a valid URL") from None
+    if parts.scheme not in ("http", "https") or not host:
+        raise ConfigError("LLM_BASE_URL must be an http(s) URL with a host, e.g. http://ollama:11434/v1")
+    if userinfo or parts.query or parts.fragment:
+        raise ConfigError("LLM_BASE_URL must not carry credentials, a query or a fragment (put the key in LLM_API_KEY)")
+    if has_key and parts.scheme == "http" and host not in _LOCAL_HOSTS:
+        raise ConfigError("LLM_BASE_URL must use https when LLM_API_KEY is set and the host is not local")
+
+
 @dataclass(frozen=True)
 class LlmSettings:
     """OpenAI-compatible chat completions endpoint, env only. Empty `LLM_BASE_URL` = disabled (rules-only)."""
@@ -139,6 +158,7 @@ class LlmSettings:
         base_url = (env.get("LLM_BASE_URL") or "").strip()
         if not base_url:
             return cls()
+        _check_base_url(base_url, has_key=bool((env.get("LLM_API_KEY") or "").strip()))
         model = (env.get("LLM_MODEL") or "").strip()
         if not model:
             raise ConfigError("LLM_MODEL is required when LLM_BASE_URL is set")

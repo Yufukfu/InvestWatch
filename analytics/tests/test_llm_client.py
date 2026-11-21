@@ -234,3 +234,93 @@ def test_network_guard_blocks_non_local_hosts():
 def test_stub_records_json_body(stub_llm):
     client_for(stub_llm).complete("s", "u")
     assert json.dumps(stub_llm.requests[0]["body"])
+
+
+# ---- group 5 review fixes ------------------------------------------------------------------------
+
+
+def _drip_server(body: bytes, delay: float, *, headers_slow: bool = False):
+    """Raw-socket server answering one request, trickling the body one byte every `delay` seconds."""
+    import socket
+    import threading
+
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+    from llm_stub import register_port
+
+    register_port(port)
+
+    def serve():
+        conn, _ = srv.accept()
+        conn.recv(65536)
+        head = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n".encode()
+        try:
+            conn.sendall(head)
+            for b in body:
+                conn.sendall(bytes([b]))
+                time.sleep(delay)
+        except OSError:
+            pass
+        finally:
+            conn.close()
+            srv.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return f"http://127.0.0.1:{port}/v1"
+
+
+def test_slow_drip_body_is_bounded_by_the_total_deadline():
+    from investwatch_analytics.llm.client import LlmUnavailable
+
+    content = json.dumps({"results": []})
+    body = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
+    url = _drip_server(body, 0.2)
+    start = time.perf_counter()
+    with pytest.raises(LlmUnavailable) as exc:
+        client_for(url, LLM_TIMEOUT_S="1").complete("s", "u")
+    assert exc.value.reason == "llm_timeout" and time.perf_counter() - start < 1 + 1
+
+
+def test_oversized_response_is_malformed(stub_llm):
+    from investwatch_analytics.llm.client import MAX_RESPONSE_BYTES, LlmMalformed
+
+    envelope = {"choices": [{"message": {"content": '{"results": []}'}}], "pad": "x" * (MAX_RESPONSE_BYTES + 10)}
+    stub_llm.script.append(Reply(body=json.dumps(envelope).encode()))  # valid JSON: only the size cap rejects it
+    with pytest.raises(LlmMalformed):
+        client_for(stub_llm).complete("s", "u")
+
+
+@pytest.mark.parametrize("url", [
+    "api.example.com/v1", "ftp://api.example.com/v1", "http:///v1",
+    "http://user:pw@127.0.0.1:1/v1", "https://api.example.com/v1?key=x", "https://api.example.com/v1#x",
+])
+def test_bad_base_url_is_a_config_error(url):
+    with pytest.raises(ConfigError, match="LLM_BASE_URL") as exc:
+        LlmSettings.from_env({"LLM_BASE_URL": url, "LLM_MODEL": "m"})
+    assert "pw" not in str(exc.value) and "key=x" not in str(exc.value)
+
+
+def test_key_over_plain_http_to_a_remote_host_is_refused():
+    with pytest.raises(ConfigError, match="LLM_BASE_URL"):
+        LlmSettings.from_env({"LLM_BASE_URL": "http://gpu-box.lan:11434/v1", "LLM_MODEL": "m", "LLM_API_KEY": "k"})
+    # local Ollama over http, or a remote http endpoint without a key, stays allowed
+    assert LlmSettings.from_env({"LLM_BASE_URL": "http://ollama:11434/v1", "LLM_MODEL": "m", "LLM_API_KEY": "ollama"}).enabled
+    assert LlmSettings.from_env({"LLM_BASE_URL": "http://gpu-box.lan:11434/v1", "LLM_MODEL": "m"}).enabled
+
+
+def test_proxy_environment_is_ignored(stub_llm, monkeypatch):
+    monkeypatch.setenv("HTTP_PROXY", "http://10.255.255.1:3128")
+    monkeypatch.setenv("http_proxy", "http://10.255.255.1:3128")
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+    client_for(stub_llm, LLM_TIMEOUT_S="2").complete("s", "u")
+    assert len(stub_llm.requests) == 1
+
+
+def test_network_guard_blocks_loopback_ports_that_are_not_a_stub():
+    import httpx
+
+    with pytest.raises(AssertionError, match="not a test stub"):
+        httpx.Client().get("http://127.0.0.1:11434/v1/models")  # a developer's real local Ollama

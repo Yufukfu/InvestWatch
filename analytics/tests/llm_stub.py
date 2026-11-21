@@ -15,6 +15,17 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+#: Loopback ports the test network guard lets through (conftest `_no_real_llm`).
+_PORTS: set[int] = set()
+
+
+def register_port(port: int) -> None:
+    _PORTS.add(port)
+
+
+def is_stub_port(port: int | None) -> bool:
+    return port in _PORTS
+
 
 @dataclass
 class Reply:
@@ -72,6 +83,7 @@ class StubLLM:
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self._server.daemon_threads = True
+        register_port(self._server.server_address[1])
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
 
@@ -90,4 +102,5 @@ def closed_port_url() -> str:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
+    register_port(port)
     return f"http://127.0.0.1:{port}/v1"

@@ -30,7 +30,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 - [x] 5.1 Failing tests: `stub_llm` fixture with a scripted queue (valid content, truncated JSON, non-chat body, array content, 500, 429, 401, sleep past timeout, closed connection) and request recording; config scenarios (disabled by default, model missing exits 2, budget ≥ claim idle, key never logged); request shape (temperature 0, `response_format`, two messages, no `Authorization` without a key); error taxonomy `LlmUnavailable` / `LlmMalformed`; a conftest guard that fails any judge pointed at a non-stub URL
 - [x] 5.2 `config.py` `LlmSettings.from_env` (validated against `WorkerSettings.claim_min_idle_ms` in the worker), `llm/client.py` on `httpx` (connect 3 s, read `LLM_TIMEOUT_S`), host-only logging; `httpx` pinned in `requirements.txt`, `pip-audit -r analytics/requirements.txt` clean; tests green
-- [x] 5.3 Mutation check; `mutations: 20 tried, 20 caught`
+- [x] 5.3 Mutation check; `mutations: 20 tried, 20 caught`; review fixes (follow-ups R37, R39-R42): `mutations: 12 tried, 12 caught`
 
 ## 6. Prompt, delimiting and chunking (~1 h)
 

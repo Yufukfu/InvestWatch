@@ -80,7 +80,7 @@ def stub_llm():
 
 @pytest.fixture(autouse=True)
 def _no_real_llm(monkeypatch):
-    """Fail any test whose HTTP request leaves the loopback host (a real LLM endpoint by accident)."""
+    """Fail any test whose HTTP request is not to a local test stub (a real LLM endpoint by accident)."""
     try:
         import httpx
     except ImportError:  # pragma: no cover - httpx is a runtime dependency
@@ -90,6 +90,10 @@ def _no_real_llm(monkeypatch):
     def guarded(self, request, *args, **kwargs):
         if request.url.host not in ("127.0.0.1", "localhost", "::1"):
             raise AssertionError(f"test tried to reach a non-local host: {request.url.host}")
+        from llm_stub import is_stub_port
+
+        if not is_stub_port(request.url.port):
+            raise AssertionError(f"test tried to reach a loopback port that is not a test stub: {request.url.port}")
         return original(self, request, *args, **kwargs)
 
     monkeypatch.setattr(httpx.Client, "send", guarded)

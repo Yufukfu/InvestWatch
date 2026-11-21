@@ -97,3 +97,16 @@ Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14
 
 - Commits `f7e07d0..672d927` (11 commits, from the R6 commit to the ReDoS fix) have an `m2_rules.yaml` that does not load. This is an artefact of the conflict resolution during the rebase onto `analytics-worker` 9bd27e8: a joined line and a dropped `shared:` block. `55a578e` repairs it. CI runs on the PR head only. The coordinator decided not to rewrite the history again (2026-11-21).
 - `egress` is re-added to `analytics/compose.yaml` together with the hosted-LLM client (group 12). Kacper's #26 review removed it until the client existed.
+
+## Review findings, group 5 (focus: security)
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R37 | review group 5 | A slow-drip server kept a call alive far past `LLM_TIMEOUT_S` (httpx timeouts are per read); the response size was unbounded | `fix-here`: streamed read with a total deadline and a 1 MB cap (`MAX_RESPONSE_BYTES`) |
+| R38 | review group 5 | A server trickling the response *headers* is still bounded only per read | `wont-fix` for now: a hard deadline needs an async client; the per-document budget and the breaker still cap the damage between calls |
+| R39 | review group 5 | Userinfo in `LLM_BASE_URL` reached httpx's INFO log and replaced the Bearer key | `fix-here`: credentials, query and fragment in `LLM_BASE_URL` are a config error; the message never quotes the URL |
+| R40 | review group 5 | A malformed `LLM_BASE_URL` degraded silently forever | `fix-here`: http(s) with a host required; a key over plain http to a non-local host is refused |
+| R41 | review group 5 | The test guard let any loopback port through (a developer's real local Ollama) | `fix-here`: only ports registered by the stub (and the closed-port helper) pass |
+| R42 | review group 5 | `trust_env` defaulted to on (proxy, netrc, CA bundle from the environment) | `fix-here`: `trust_env=False` |
+| R43 | review group 5, declined | 400/404/422 count toward the breaker; one oversized prompt rejected by Ollama could open it | `new-item`: revisit with real Ollama behaviour in task 12.4 |
+| R44 | review group 5, declined | Transitive deps of httpx are not pinned; `pyproject.toml` lists no runtime deps | `wont-fix`: same pattern as the other services; pip-audit runs on the resolved set |

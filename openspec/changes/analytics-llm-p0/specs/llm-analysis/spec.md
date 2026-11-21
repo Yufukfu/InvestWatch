@@ -17,6 +17,10 @@ Analytics SHALL configure the LLM only from environment variables (`LLM_BASE_URL
 - **THEN** startup fails with an error naming `LLM_DOC_BUDGET_S`
 - **AND** `LLM_DOC_BUDGET_S` in milliseconds SHALL be below the worker's `CLAIM_MIN_IDLE_MS`
 
+#### Scenario: Bad base URL
+- **WHEN** `LLM_BASE_URL` has no http(s) scheme or host, carries credentials, a query or a fragment, or is plain http to a non-local host while `LLM_API_KEY` is set
+- **THEN** startup fails with an error naming `LLM_BASE_URL` that does not quote the URL
+
 #### Scenario: Key never logged
 - **WHEN** a request with `LLM_API_KEY=sk-test-123` fails with HTTP 401
 - **THEN** no log line contains `sk-test-123`
@@ -100,6 +104,7 @@ No LLM failure SHALL fail the document: the affected module's checks SHALL keep 
 #### Scenario: Timeout
 - **WHEN** the stub sleeps longer than `LLM_TIMEOUT_S` before answering
 - **THEN** the call is abandoned within the timeout plus one second and the finding has the rules-only results with the log reason `llm_timeout`
+- **AND** `LLM_TIMEOUT_S` SHALL also bound a server that trickles the response body, and a response over 1 MB SHALL be malformed
 
 #### Scenario: Malformed JSON
 - **WHEN** the stub answers HTTP 200 with content `{"results": [{"rule_id": "R17", "result": "fail"` (truncated)
