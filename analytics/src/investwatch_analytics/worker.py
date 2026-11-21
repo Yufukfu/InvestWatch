@@ -28,6 +28,7 @@ import redis
 from . import logging_setup
 from .config import ConfigError, Settings, WorkerSettings
 from .events import NoopPublisher, RedisPublisher
+from .health import start_health_server
 from .pipeline import analyze
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
@@ -42,6 +43,11 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 BACKOFF_START_S = 1
 BACKOFF_CAP_S = 30
 CLAIM_COUNT = 10
+
+
+class StopRequested(BaseException):
+    """Raised by the signal handler only while the worker idles in XREADGROUP, to leave the wait at once.
+    A BaseException (like KeyboardInterrupt), so no `except Exception` on the way can swallow it."""
 
 
 @dataclass(frozen=True)
@@ -80,6 +86,7 @@ class Worker:
         self._sleep = sleep or self._stop_event.wait
         self._jitter = jitter
         self._stop = False
+        self._idle_read = False
         self._backoff = BACKOFF_START_S
 
     # -- lifecycle ---------------------------------------------------------------------------------
@@ -88,6 +95,15 @@ class Worker:
         """Called from a signal handler: finish the current message, then leave `run`."""
         self._stop = True
         self._stop_event.set()
+
+    def handle_signal(self) -> None:
+        """SIGTERM / SIGINT. While idle in XREADGROUP nothing is in flight, so the blocking read is abandoned at
+        once (a message the server handed over in that instant stays pending and is reclaimed later). While a
+        message is being processed only the flag is set and that message finishes. Docker Desktop stops
+        containers after 1 s, Linux after 10 s; a full STREAM_BLOCK_MS wait would be SIGKILLed on the former."""
+        self.request_stop()
+        if self._idle_read:
+            raise StopRequested
 
     def ensure_group(self) -> None:
         """Create the stream and the group from id 0 (backlog included); an existing group is success."""
@@ -113,6 +129,8 @@ class Worker:
             try:
                 self.run_once()
                 self._backoff = BACKOFF_START_S
+            except StopRequested:
+                return
             except (redis.ConnectionError, redis.TimeoutError) as exc:
                 self._back_off("redis_unavailable", exc)
             except redis.ResponseError as exc:
@@ -138,9 +156,13 @@ class Worker:
             handled += 1
         if handled or self._stop:
             return handled
-        response = self._redis.xreadgroup(
-            GROUP, self._config.consumer, {self._config.stream: ">"}, count=1, block=self._config.block_ms
-        )
+        self._idle_read = True
+        try:
+            response = self._redis.xreadgroup(
+                GROUP, self._config.consumer, {self._config.stream: ">"}, count=1, block=self._config.block_ms
+            )
+        finally:
+            self._idle_read = False
         for _stream, messages in response or []:
             for message_id, fields in messages:
                 self._process(message_id, fields or {})
@@ -229,6 +251,12 @@ class Worker:
 # ---- entry point -----------------------------------------------------------------------------------
 
 
+def install_signal_handlers(worker: Worker) -> None:
+    """SIGTERM (docker stop) and SIGINT (Ctrl+C) both go to `Worker.handle_signal`."""
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda *_: worker.handle_signal())
+
+
 def main(env: Mapping[str, str] | None = None) -> int:
     """Start the worker. Returns the process exit code: 0 after a clean stop, 2 on a configuration error."""
     import os
@@ -263,9 +291,14 @@ def main(env: Mapping[str, str] | None = None) -> int:
                                         block_ms=worker_settings.stream_block_ms,
                                         claim_min_idle_ms=worker_settings.claim_min_idle_ms,
                                         max_deliveries=worker_settings.max_deliveries))
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda *_: worker.request_stop())
-    log.info("worker starting", extra={"consumer": worker_settings.consumer, "stream": STREAM, "group": GROUP})
+    install_signal_handlers(worker)
+    # /health has its own short-timeout clients, so a slow dependency never blocks the HTTP thread or the loop.
+    health_redis = redis.Redis.from_url(worker_settings.redis_url, socket_timeout=1, socket_connect_timeout=1)
+    health_store = PostgresStore(worker_settings.database_url, connect_timeout=1)
+    health = start_health_server(worker_settings.health_port,
+                                 {"redis": lambda: bool(health_redis.ping()), "db": health_store.ping})
+    log.info("worker starting", extra={"consumer": worker_settings.consumer, "stream": STREAM, "group": GROUP,
+                                       "health_port": worker_settings.health_port})
     try:
         worker.ensure_group()
         worker.run()
@@ -273,6 +306,9 @@ def main(env: Mapping[str, str] | None = None) -> int:
         log.error("worker stopped", extra={"reason": "config_error", "error": str(exc)})
         return 2
     finally:
+        health.shutdown()
+        health_store.close()
+        health_redis.close()
         store.close()
         client.close()
     log.info("worker stopped", extra={"reason": "signal"})

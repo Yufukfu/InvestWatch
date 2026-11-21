@@ -19,7 +19,15 @@ from investwatch_analytics.registry import Registry
 from investwatch_analytics.config import Settings
 from investwatch_analytics.rules.engine import Catalogue
 from investwatch_analytics.storage import InMemoryStore, StoreError, StoreMisconfigured, StoreUnavailable
-from investwatch_analytics.worker import GROUP, STREAM, Worker, WorkerConfig, main
+from investwatch_analytics.worker import (
+    GROUP,
+    STREAM,
+    StopRequested,
+    Worker,
+    WorkerConfig,
+    install_signal_handlers,
+    main,
+)
 
 DOC_ID = "22222222-2222-4222-8222-222222222222"
 DOC2_ID = "33333333-3333-4333-8333-333333333333"
@@ -638,3 +646,52 @@ def test_other_redis_response_error_backs_off(store, registry, catalogue, caplog
     with caplog.at_level(logging.WARNING):
         w.run(max_iterations=2)
     assert sleeps == [1, 2]
+
+
+def test_signal_during_the_idle_read_leaves_at_once(store, registry, catalogue):
+    holder: dict = {}
+
+    class SignalWhileBlocked(fakeredis.FakeRedis):
+        def xreadgroup(self, *a, **k):
+            holder["worker"].handle_signal()  # SIGTERM arrives while blocked in the read
+            raise AssertionError("not reached: the handler raises inside the blocking call")
+
+    sr = SignalWhileBlocked(decode_responses=True)
+    w = make_worker(sr, store, registry, catalogue)
+    holder["worker"] = w
+    w.ensure_group()
+    w.run(max_iterations=10)  # returns, does not raise
+    assert w._stop and not w._idle_read
+
+
+def test_signal_while_processing_finishes_the_message(r, store, registry, catalogue):
+    class SignalDuringPublish(Recorder):
+        def publish_findings(self, saved):
+            worker.handle_signal()  # not idle: must not raise, only set the flag
+            return super().publish_findings(saved)
+
+    worker = make_worker(r, store, registry, catalogue, publisher=SignalDuringPublish())
+    worker.ensure_group()
+    xadd(r)
+    worker.run(max_iterations=10)
+    assert pending(r) == 0 and len(store.findings_for_document(DOC_ID)) == 1
+
+
+def test_installed_handlers_route_signals_to_the_worker(r, store, registry, catalogue):
+    import signal
+
+    w = make_worker(r, store, registry, catalogue)
+    saved = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    try:
+        install_signal_handlers(w)
+        w._idle_read = True
+        with pytest.raises(StopRequested):
+            signal.raise_signal(signal.SIGINT)
+        assert w._stop
+        w._idle_read = False
+        w._stop = False
+        signal.raise_signal(signal.SIGTERM)  # not idle: no exception, only the flag
+        assert w._stop
+    finally:
+        for sig, handler in saved.items():
+            signal.signal(sig, handler)

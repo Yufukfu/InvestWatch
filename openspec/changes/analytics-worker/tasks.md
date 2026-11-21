@@ -1,6 +1,6 @@
 # Tasks
 
-Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this branch is rebased on `origin/main`. Groups 1 and 3 need no infra. Group 2 is reconciled with `api-db-schema` at `origin/api/api-db-schema` `7af51ab` (PR #15). Group 5 waits for `infra-compose`.
+Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this branch is rebased on `origin/main`. Groups 1 and 3 need no infra. Group 2 is reconciled with `api-db-schema` at `origin/api/api-db-schema` `7af51ab` (PR #15). Group 5 is reconciled with infra-compose (PR #18) and `api/compose.yaml` (PR #15); this branch merges after both.
 
 ## 1. Config and store interface with the in-memory store
 
@@ -30,11 +30,11 @@ Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this b
 
 ## 5. Health, container and compose
 
-- [ ] 5.1 Reconcile Redis network name, `REDIS_URL` and the migration job name with `infra-compose` and the API change (design "Assumed infra"); record in `design.md`
-- [ ] 5.2 Failing tests: `/health` 200 with both up, 503 with `"db": false` when the store is down, 503 with `"redis": false` when Redis is down
-- [ ] 5.3 `health.py` (stdlib `http.server` thread); `analytics/Dockerfile` (`public.ecr.aws/docker/library/python:3.13-slim`, uid 10001, HEALTHCHECK), `.dockerignore`, `analytics/compose.yaml` (hardened like `web/compose.yaml`), one `include:` line in the root `compose.yaml` (announced to B), `.env.example` additions; tests green
-- [ ] 5.4 Manual check: `docker build` succeeds, `id -u` in the image is not 0, `docker compose up --build` makes `analytics` healthy, and an `XADD iw:documents * document_id <mock id> schema v1` for a seeded mock document yields a `findings` row and a `finding.created` message seen with `SUBSCRIBE iw:events`
-- [ ] 5.5 Mutation check; `mutations: n/a, container and compose config` unless 5.3 adds logic beyond `health.py`, in which case `mutations: N tried, N caught`
+- [x] 5.1 Reconcile Redis network name, `REDIS_URL` and the migration job name with `infra-compose` and the API change (design "Assumed infra"); record in `design.md`
+- [x] 5.2 Failing tests: `/health` 200 with both up, 503 with `"db": false` when the store is down, 503 with `"redis": false` when Redis is down
+- [x] 5.3 `health.py` (stdlib `http.server` thread); `analytics/Dockerfile` (`public.ecr.aws/docker/library/python:3.13-slim`, uid 10001, HEALTHCHECK), `.dockerignore`, `analytics/compose.yaml` (hardened like `web/compose.yaml`), one `include:` line in the root `compose.yaml` (announced to B), `.env.example` additions; tests green
+- [x] 5.4 Manual check: `docker build` succeeds, `id -u` in the image is not 0, `docker compose up --build` makes `analytics` healthy, and an `XADD iw:documents * document_id <mock id> schema v1` for a seeded mock document yields a `findings` row and a `finding.created` message seen with `SUBSCRIBE iw:events`
+- [x] 5.5 Mutation check; `mutations: 11 tried, 11 caught` (`health.py` 6/6; the SIGTERM path 5/5, where two first survived: `StopRequested` became a `BaseException` and the handler install got a test). Dockerfile and compose are config: `mutations: n/a, config only`, verified by 5.4 instead
 
 ## 7. Advertiser on `Finding` (issue #20, follow-up 3)
 

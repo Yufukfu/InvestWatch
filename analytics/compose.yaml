@@ -1,0 +1,30 @@
+# analytics/ deployment unit (owner Damian): the iw:documents stream worker. Included from the root compose.yaml
+# next to infra/compose.yaml, which owns postgres, redis and the data / egress networks (none is declared here),
+# and api/compose.yaml, whose one-shot api-migrate creates the tables this worker reads and writes.
+# Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml up analytics
+services:
+  analytics:
+    build: .
+    image: investwatch/analytics:${IW_VERSION:-dev}
+    restart: unless-stopped
+    environment:
+      # App role: CRUD only, no DDL (infra/postgres/init/01-app-role.sh).
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      HEALTH_PORT: "8001"
+      # Optional tuning, defaults in analytics/.env.example: WORKER_CONSUMER (hostname), STREAM_BLOCK_MS,
+      # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES. REGISTRY_CSV defaults to the bundled fictional seed.
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # data: Postgres and Redis (internal, no route out). egress: the hosted LLM (ADR 0304), unused while rules-only.
+    networks: [data, egress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
