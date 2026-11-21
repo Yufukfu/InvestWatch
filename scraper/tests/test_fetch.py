@@ -491,3 +491,116 @@ async def test_error_status_with_a_non_html_body_is_still_http_error(stub):
     failure = await failure_of(stub.url("/api"), IDENTITY, None)
 
     assert failure.reason is Reason.HTTP_ERROR
+
+
+async def test_large_page_that_embeds_a_captcha_widget_is_not_a_block(stub):
+    widget = b'<form><div class="g-recaptcha" data-sitekey="k"></div></form>'
+    stub.route("/contact", body=b"<html><body><p>" + b"tresc " * 6000 + b"</p>" + widget + b"</body></html>")
+
+    result = await fetch(stub.url("/contact"), IDENTITY, None)
+
+    assert result.status == 200
+
+
+async def test_small_page_with_a_captcha_widget_is_a_block(stub):
+    stub.route("/c", body=b'<html><body><div class="g-recaptcha"></div></body></html>')
+
+    failure = await failure_of(stub.url("/c"), IDENTITY, None)
+
+    assert failure.reason is Reason.BLOCKED
+
+
+@pytest.mark.parametrize("url", ["http://user:pw@example.pl/x", "http://:pw@example.pl/x", "http://user@example.pl/x"])
+async def test_url_with_credentials_is_refused_without_a_request(url):
+    failure = await failure_of(url, IDENTITY, None)
+
+    assert failure.reason is Reason.BLOCKED_TARGET
+    assert "pw" not in failure.detail
+
+
+async def test_redirect_to_a_url_with_credentials_is_refused(stub):
+    stub.route("/a", status=302, headers={"Location": "http://user:pw@example.pl/x"}, content_type=None)
+
+    failure = await failure_of(stub.url("/a"), IDENTITY, None)
+
+    assert failure.reason is Reason.BLOCKED_TARGET
+    assert len(stub.requests) == 1
+
+
+@pytest.mark.parametrize("location", ["file:///etc/passwd", "ftp://example.pl/x", "javascript:alert(1)"])
+async def test_redirect_to_a_non_http_scheme_is_refused(stub, location):
+    stub.route("/a", status=302, headers={"Location": location}, content_type=None)
+
+    failure = await failure_of(stub.url("/a"), IDENTITY, None)
+
+    assert failure.reason is Reason.BLOCKED_TARGET
+    assert len(stub.requests) == 1
+
+
+async def test_scheme_relative_redirect_is_resolved_and_shown_to_the_guard(stub):
+    stub.route("/a", status=302, headers={"Location": "//other.test/x"}, content_type=None)
+    asked: list[str] = []
+
+    async def guard(url: str) -> str | None:
+        asked.append(url)
+        if "other.test" in url:
+            raise FetchFailure(Reason.BLOCKED_TARGET, "refused")
+        return None
+
+    failure = await failure_of(stub.url("/a"), IDENTITY, None, guard=guard)
+
+    assert failure.reason is Reason.BLOCKED_TARGET
+    assert asked[-1] == "http://other.test/x"
+
+
+async def test_library_errors_other_than_tls_exceptions_become_http_error_without_credentials(monkeypatch):
+    class Exploding(Session):
+        async def execute_request(self, method, url, **kwargs):
+            raise ValueError("bad payload for http://user:secret@proxy:8080")
+
+    monkeypatch.setattr(fetch_module, "Session", Exploding)
+
+    failure = await failure_of("http://example.pl/", IDENTITY, None)
+
+    assert failure.reason is Reason.HTTP_ERROR
+    assert "secret" not in failure.detail
+
+
+async def test_a_failing_session_close_does_not_hide_the_real_outcome(stub, monkeypatch):
+    class BadClose(Session):
+        async def close(self):
+            raise RuntimeError("close failed")
+
+    monkeypatch.setattr(fetch_module, "Session", BadClose)
+    stub.route("/missing", status=404, body=b"nope")
+
+    failure = await failure_of(stub.url("/missing"), IDENTITY, None)
+
+    assert failure.reason is Reason.HTTP_ERROR
+    assert "404" in failure.detail
+
+
+@pytest.mark.parametrize("size, blocked", [(20_000, True), (20_001, False)])
+async def test_marker_scan_applies_up_to_the_size_threshold(stub, size, blocked):
+    widget = b'<div class="g-recaptcha"></div>'
+    stub.route("/edge", body=widget + b"x" * (size - len(widget)))
+
+    if blocked:
+        assert (await failure_of(stub.url("/edge"), IDENTITY, None)).reason is Reason.BLOCKED
+    else:
+        assert (await fetch(stub.url("/edge"), IDENTITY, None)).status == 200
+
+
+async def test_a_failed_close_is_logged_without_credentials(stub, monkeypatch, caplog):
+    class BadClose(Session):
+        async def close(self):
+            raise RuntimeError("close failed for http://user:secret@proxy:8080")
+
+    monkeypatch.setattr(fetch_module, "Session", BadClose)
+    stub.route("/ok", body=PAGE.encode())
+
+    with caplog.at_level("WARNING", logger="iw_scraper.fetch"):
+        await fetch(stub.url("/ok"), IDENTITY, None)
+
+    assert "closing the session failed" in caplog.text
+    assert "secret" not in caplog.text

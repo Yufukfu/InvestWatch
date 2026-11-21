@@ -8,6 +8,7 @@ Facts about the client (`noble-tls` over the Go `tls-client`, ADR 0101) that sha
 - redirects are followed here, one hop at a time, so every hop can be checked.
 """
 
+import logging
 import os
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -16,18 +17,21 @@ from pathlib import Path
 from urllib.parse import SplitResult, urljoin, urlsplit
 
 from noble_tls import Client, Session
-from noble_tls.exceptions.exceptions import TLSClientException
 
 from iw_scraper.parsing import HTML_TYPES, content_type_params
 from iw_scraper.reporting import redact
 from iw_scraper.types import Reason
 
+_log = logging.getLogger(__name__)
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 5
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _WEB_SCHEMES = frozenset({"http", "https"})
 _BLOCK_STATUSES = frozenset({403, 429})
+# Challenge pages are small. A large page that merely embeds a captcha widget (a contact or newsletter
+# form) is a real page, and `blocked` would not be retried, so the marker scan skips it.
+_MARKER_SCAN_MAX_BYTES = 20_000
 # Vendor-specific names found in challenge pages. The bare word "captcha" is not a marker: the real KNF
 # page contains it in ordinary text.
 _BLOCK_MARKERS = (
@@ -103,7 +107,7 @@ def _address_url(parts: SplitResult, address: str) -> str:
     return parts._replace(netloc=netloc).geturl()
 
 
-def _transport_failure(exc: TLSClientException) -> FetchFailure:
+def _transport_failure(exc: Exception) -> FetchFailure:
     message = redact(str(exc))
     lowered = message.lower()
     if "timeout" in lowered or "deadline exceeded" in lowered:
@@ -119,6 +123,8 @@ def _headers_of(response) -> dict[str, str]:
 
 
 def _block_marker(body: bytes) -> str | None:
+    if len(body) > _MARKER_SCAN_MAX_BYTES:
+        return None
     lowered = body.lower()
     return next((m.decode() for m in _BLOCK_MARKERS if m in lowered), None)
 
@@ -148,6 +154,8 @@ async def _request_once(
         raise FetchFailure(Reason.BLOCKED_TARGET, "URL cannot be parsed") from exc
     if parts.scheme not in _WEB_SCHEMES or not hostname:
         raise FetchFailure(Reason.BLOCKED_TARGET, f"scheme not allowed: {parts.scheme or 'none'}")
+    if "@" in parts.netloc:  # userinfo of any kind
+        raise FetchFailure(Reason.BLOCKED_TARGET, "URL carries credentials")  # never echo them
 
     address = await guard(url) if guard else None
     request_url, host_override = url, None
@@ -169,7 +177,7 @@ async def _request_once(
                 request_host_override=host_override,
                 stream_output_path=path,
             )
-        except TLSClientException as exc:
+        except (OSError, ValueError) as exc:  # TLSClientException is an OSError; a library fault may be a ValueError
             raise _transport_failure(exc) from None
         headers = _headers_of(response)
         status = response.status_code
@@ -217,4 +225,7 @@ async def fetch(
             )
         raise FetchFailure(Reason.HTTP_ERROR, f"more than {MAX_REDIRECTS} redirects")
     finally:
-        await session.close()
+        try:
+            await session.close()
+        except Exception as exc:  # a failed close must not hide the real outcome
+            _log.warning("closing the session failed: %s", redact(str(exc)))

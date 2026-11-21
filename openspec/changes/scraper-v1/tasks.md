@@ -21,7 +21,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 - [x] 3.1 Failing tests, then `fetch(url, identity, proxy)` with timeout, manual redirect hops, streamed-to-file body with the size cap checked on the transferred size, IP pinning, non-HTML rejection and charset decoding, against a local stub server; the timeout, http_error, no-retry, oversized, non-HTML and charset scenarios pass. Manual probe of the KNF page recorded in the AI log
 - [x] 3.2 Failing tests, then block detection (403, 429, captcha marker including a 200 block page, empty body); the blocked scenarios pass
-- [x] 3.3 Mutation check; `mutations: 48 tried, 48 caught`
+- [x] 3.3 Mutation check; `mutations: 59 tried, 59 caught`
 
 ## 4. Identity, proxy, politeness (Redis)
 
