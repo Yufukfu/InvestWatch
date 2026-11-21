@@ -71,7 +71,7 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 {
   "id": "uuid",
   "source_id": "uuid",                  // row in the sources table
-  "platform": "web|facebook|instagram|tiktok|youtube|x|forum|other",
+  "platform": "web|facebook|instagram|tiktok|youtube|x|forum|other", // Telegram posts are `other` until a `telegram` value joins the enum (contract v2); `scrape_meta.network` = "telegram" marks them
   "source_kind": "firm_own|third_party|unknown", // published by the firm itself (M2) or by someone else (M1/M3)
   "url": "https://...",
   "canonical_url": "https://...",
