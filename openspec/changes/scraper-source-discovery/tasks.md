@@ -2,9 +2,9 @@
 
 ## 1. Candidate selection (pure)
 
-- [ ] 1.1 Write `scraper/tests/test_discover.py` first (cases from the spec: denylist and subdomains, unsafe URL shapes, tracking strip, one candidate per host with most-linked URL and tie-break, known-host skip with `www.` folding, union of target modules, `["M1"]` fallback, limit and skipped-by-cap count, malformed link entries); run it in the image and confirm it fails because `iw_scraper.discover` is missing
-- [ ] 1.2 Implement the selection functions in `scraper/src/iw_scraper/discover.py` and verify `test_discover.py` passes
-- [ ] 1.3 Mutation check: drop each filter, invert the known-host skip, remove the tie-break and the cap in turn, and verify a test goes red each time; record `mutations: N tried, N caught`
+- [x] 1.1 Write `scraper/tests/test_discover.py` first (cases from the spec: denylist and subdomains, unsafe URL shapes, tracking strip, one candidate per host with most-linked URL and tie-break, known-host skip with `www.` folding, union of target modules, `["M1"]` fallback, limit and skipped-by-cap count, malformed link entries); run it in the image and confirm it fails because `iw_scraper.discover` is missing
+- [x] 1.2 Implement the selection functions in `scraper/src/iw_scraper/discover.py` and verify `test_discover.py` passes
+- [x] 1.3 Mutation check: drop each filter, invert the known-host skip, remove the tie-break and the cap in turn, and verify a test goes red each time; record `mutations: N tried, N caught`. Result: `mutations: 20 tried, 20 caught` (a survivor on the backslash check added a test case, then it was caught)
 
 ## 2. Database read and insert
 
