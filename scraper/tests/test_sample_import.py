@@ -1,13 +1,17 @@
 """Sample import, pure logic: readers, directory scan and manifest. The ingest run is covered further down."""
 
+import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from iw_scraper.ingest.pipeline import Ingestor
 from iw_scraper.parsing import ParseFailure, parse_page
-from iw_scraper.sample_import import ManifestError, load_manifest, read_sample, scan
+from iw_scraper.pgstore import PgSourceStore
+from iw_scraper.sample_import import ManifestError, Summary, exit_code, import_directory, load_manifest, read_sample, scan
 from iw_scraper.types import Reason
 
 PAGE = (
@@ -298,3 +302,185 @@ published_at = "2026-11-01T12:00:00+02:00"
 
     assert first["published_at"] == second["published_at"] == "2026-11-01T10:00:00Z"
     assert datetime.fromisoformat(first["published_at"].replace("Z", "+00:00")) == datetime(2026, 11, 1, 10, tzinfo=timezone.utc)
+
+
+# --- the run: needs PostgreSQL, Redis and MinIO (`IW_TEST_*`) ---------------------------------------------------
+
+EMPTY_HTML = "<html><body></body></html>"
+OVERRIDES = """
+source_kind = "third_party"
+target_modules = ["M3"]
+
+[files."xtb.txt"]
+source_kind = "firm_own"
+platform = "forum"
+target_modules = ["M2"]
+author = { name = "XTB", handle = "@xtb", profile_url = "https://example.com/xtb" }
+"""
+
+
+async def run(directory, pool, storage, redis_client, stream_name, *, kind="third_party", modules="M3"):
+    sample_set = load_manifest(directory, kind=kind, modules=modules)
+    ingestor = Ingestor(pool, storage, redis_client, stream=stream_name)
+    return await import_directory(directory, sample_set, pool=pool, ingestor=ingestor, max_bytes=MAX_BYTES * 100)
+
+
+async def stream_ids(redis_client, stream_name) -> list[str]:
+    return [fields["document_id"] for _, fields in await redis_client.xrange(stream_name)]
+
+
+def events(caplog, name: str) -> list[dict]:
+    lines = [json.loads(r.getMessage()) for r in caplog.records if r.name == "iw_scraper.sample_import"]
+    return [line for line in lines if line["event"] == name]
+
+
+@pytest.fixture
+def three(directory):
+    put(directory, "a.html", PAGE)
+    put(directory, "b.txt", "Pierwszy post")
+    put(directory, "c.md", "# Drugi post")
+    return directory
+
+
+async def test_three_files_become_three_documents_objects_and_events(three, pool, storage, redis_client, stream_name):
+    summary = await run(three, pool, storage, redis_client, stream_name)
+
+    rows = await pool.fetch("SELECT id::text, url, html_object_key FROM documents ORDER BY url")
+    assert str(summary) == "inserted 3, duplicate 0, skipped 0, failed 0"
+    assert [r["url"] for r in rows] == [f"https://sample.invalid/uknf-1/{n}" for n in ("a.html", "b.txt", "c.md")]
+    assert sorted(await storage.list_keys()) == sorted(f"html/{r['id']}.html" for r in rows)
+    assert sorted(await stream_ids(redis_client, stream_name)) == sorted(r["id"] for r in rows)
+
+
+async def test_a_rerun_inserts_nothing_and_publishes_nothing(three, pool, storage, redis_client, stream_name):
+    await run(three, pool, storage, redis_client, stream_name)
+    objects, events_before = sorted(await storage.list_keys()), await stream_ids(redis_client, stream_name)
+
+    summary = await run(three, pool, storage, redis_client, stream_name)
+
+    assert str(summary) == "inserted 0, duplicate 3, skipped 0, failed 0"
+    assert await pool.fetchval("SELECT count(*) FROM documents") == 3
+    assert sorted(await storage.list_keys()) == objects
+    assert await stream_ids(redis_client, stream_name) == events_before
+
+
+async def test_the_set_is_an_inactive_source_nobody_collects(three, pool, storage, redis_client, stream_name):
+    await run(three, pool, storage, redis_client, stream_name)
+
+    rows = await pool.fetch("SELECT id::text, name, platform, url, active, schedule_cron, target_modules FROM sources")
+    assert [(r["name"], r["platform"], r["url"], r["active"], r["schedule_cron"], list(r["target_modules"])) for r in rows] == [
+        ("uknf-1", "web", "https://sample.invalid/uknf-1", False, None, ["M3"])
+    ]
+    store = PgSourceStore(pool)
+    assert [s.id for s in await store.collectable()] == [] and [s.id for s in await store.schedulable()] == []
+    assert {r["source_id"] for r in await pool.fetch("SELECT source_id::text FROM documents")} == {rows[0]["id"]}
+
+
+async def test_a_source_that_already_has_the_url_is_reused_and_left_unchanged(three, pool, storage, redis_client, stream_name):
+    existing = await pool.fetchval(
+        "INSERT INTO sources (id, name, platform, url, source_kind, target_modules, schedule_cron, active)"
+        " VALUES (gen_random_uuid(), 'Edited in the dashboard', 'web', 'https://sample.invalid/uknf-1', 'firm_own', ARRAY['M2'], '0 * * * *', true)"
+        " RETURNING id::text"
+    )
+
+    await run(three, pool, storage, redis_client, stream_name)
+
+    rows = await pool.fetch("SELECT id::text, name, source_kind, target_modules, schedule_cron, active FROM sources")
+    assert [(r["id"], r["name"], r["source_kind"], list(r["target_modules"]), r["schedule_cron"], r["active"]) for r in rows] == [
+        (existing, "Edited in the dashboard", "firm_own", ["M2"], "0 * * * *", True)
+    ]
+    assert await pool.fetchval("SELECT count(DISTINCT source_id) FROM documents WHERE source_id = $1::uuid", existing) == 1
+
+
+async def test_one_empty_file_fails_and_the_others_still_land(directory, pool, storage, redis_client, stream_name):
+    put(directory, "a.txt", "Pierwszy")
+    put(directory, "empty.html", EMPTY_HTML)
+    put(directory, "z.txt", "Ostatni")
+
+    summary = await run(directory, pool, storage, redis_client, stream_name)
+
+    errors = await pool.fetch("SELECT reason, detail, source_id::text FROM job_errors")
+    assert str(summary) == "inserted 2, duplicate 0, skipped 0, failed 1"
+    assert [(e["reason"], e["source_id"] is not None) for e in errors] == [("empty_text", True)]
+    assert "empty.html" in errors[0]["detail"] and str(directory) not in errors[0]["detail"]
+    assert await pool.fetchval("SELECT count(*) FROM documents") == 2
+
+
+async def test_a_blank_text_file_and_an_undecodable_one_are_recorded_and_the_run_continues(
+    directory, pool, storage, redis_client, stream_name
+):
+    put(directory, "blank.txt", "   \n")
+    put(directory, "bad.txt", b"\xff\xfe bad")
+    put(directory, "good.txt", "Dobry")
+
+    summary = await run(directory, pool, storage, redis_client, stream_name)
+
+    reasons = sorted(r["reason"] for r in await pool.fetch("SELECT reason FROM job_errors"))
+    assert str(summary) == "inserted 1, duplicate 0, skipped 0, failed 2"
+    assert reasons == ["empty_text", "parse_error"]
+
+
+async def test_unsupported_files_and_symlinks_are_skipped_not_failed(directory, tmp_path, pool, storage, redis_client, stream_name):
+    put(directory, "a.txt", "Tekst")
+    put(directory, "skan.pdf", "%PDF")
+    outside = tmp_path / "secret.txt"
+    outside.write_text("do not read")
+    (directory / "link.txt").symlink_to(outside)
+
+    summary = await run(directory, pool, storage, redis_client, stream_name)
+
+    assert str(summary) == "inserted 1, duplicate 0, skipped 2, failed 0"
+    assert await pool.fetchval("SELECT count(*) FROM job_errors") == 0
+    assert await pool.fetchval("SELECT count(*) FROM documents WHERE text LIKE '%do not read%'") == 0
+
+
+async def test_a_per_file_kind_wins_while_the_source_stays_the_sets(directory, pool, storage, redis_client, stream_name):
+    put(directory, "samples.toml", OVERRIDES)
+    put(directory, "xtb.txt", "Oferta XTB")
+    put(directory, "other.txt", "Opinia klienta")
+    ingestor = Ingestor(pool, storage, redis_client, stream=stream_name)
+
+    await import_directory(directory, load_manifest(directory), pool=pool, ingestor=ingestor, max_bytes=MAX_BYTES)
+
+    rows = {r["url"].rsplit("/", 1)[1]: r for r in await pool.fetch("SELECT url, source_kind, platform, source_id::text, payload FROM documents")}
+    assert (rows["xtb.txt"]["source_kind"], rows["other.txt"]["source_kind"]) == ("firm_own", "third_party")
+    assert (rows["xtb.txt"]["platform"], rows["other.txt"]["platform"]) == ("forum", "web")
+    assert rows["xtb.txt"]["source_id"] == rows["other.txt"]["source_id"]
+    assert json.loads(rows["xtb.txt"]["payload"])["author"] == {"name": "XTB", "handle": "@xtb", "profile_url": "https://example.com/xtb"}
+    assert "author" not in json.loads(rows["other.txt"]["payload"])
+
+
+async def test_markup_author_is_never_stored(directory, pool, storage, redis_client, stream_name):
+    put(directory, "a.html", PAGE)  # carries <meta name="author" content="Jan">
+
+    await run(directory, pool, storage, redis_client, stream_name)
+
+    assert "author" not in json.loads(await pool.fetchval("SELECT payload FROM documents"))
+
+
+async def test_every_file_gets_a_json_log_line_and_the_summary_is_logged_not_printed(
+    three, pool, storage, redis_client, stream_name, caplog, capsys
+):
+    put(three, "empty.html", EMPTY_HTML)
+    caplog.set_level(logging.INFO, logger="iw_scraper.sample_import")
+
+    await run(three, pool, storage, redis_client, stream_name)
+
+    ids = {r["url"].rsplit("/", 1)[1]: r["id"] for r in await pool.fetch("SELECT url, id::text FROM documents")}
+    files = {line["file"]: line for line in events(caplog, "sample_file")}
+    assert {name: (line["outcome"], line.get("document_id")) for name, line in files.items()} == {
+        "a.html": ("inserted", ids["a.html"]),
+        "b.txt": ("inserted", ids["b.txt"]),
+        "c.md": ("inserted", ids["c.md"]),
+        "empty.html": ("failed", None),
+    }
+    assert files["empty.html"]["reason"] == "empty_text"
+    assert [{k: v for k, v in line.items() if k != "event"} for line in events(caplog, "sample_summary")] == [
+        {"inserted": 3, "duplicate": 0, "skipped": 0, "failed": 1}
+    ]
+    assert capsys.readouterr().out == ""
+
+
+def test_the_exit_code_is_non_zero_only_when_a_file_failed():
+    assert exit_code(Summary(inserted=2, duplicate=1, skipped=3)) == 0
+    assert exit_code(Summary(inserted=2, failed=1)) == 1

@@ -9,10 +9,10 @@
 
 ## 2. Source row and ingest run (needs PostgreSQL, Redis, MinIO)
 
-- [ ] 2.1 Extend the tests (the `IW_TEST_*` stack): a directory of three files inserts three documents, objects and stream events; a rerun inserts nothing and reports duplicates; the source row is `active = false` with no cron and is absent from `collectable()`; an existing source with the URL is not changed; one empty file gives `empty_text` and the others still land, summary `inserted 2, duplicate 0, skipped 0, failed 1`; run and see them fail
-- [ ] 2.2 Implement `ensure_source`, the runner, the per-file and summary JSON log lines (`logging`, no `print`), the exit code and `main()` (own wiring from the env of `app.runtime`, no import of `app.py`)
-- [ ] 2.3 Mutation check of the `active = false` insert and the duplicate path; record `mutations: N tried, N caught` (1.3: mutations: 14 tried, 14 caught)
-- [ ] 2.4 Commit
+- [x] 2.1 Extend the tests (the `IW_TEST_*` stack): a directory of three files inserts three documents, objects and stream events; a rerun inserts nothing and reports duplicates; the source row is `active = false` with no cron and is absent from `collectable()`; an existing source with the URL is not changed; one empty file gives `empty_text` and the others still land, summary `inserted 2, duplicate 0, skipped 0, failed 1`; run and see them fail
+- [x] 2.2 Implement `ensure_source`, the runner, the per-file and summary JSON log lines (`logging`, no `print`), the exit code and `main()` (own wiring from the env of `app.runtime`, no import of `app.py`)
+- [x] 2.3 Mutation check of the `active = false` insert and the duplicate path; record `mutations: N tried, N caught` (1.3: mutations: 14 tried, 14 caught)
+- [x] 2.4 Commit
 
 ## 3. Usage and a rehearsal
 

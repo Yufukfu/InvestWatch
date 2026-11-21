@@ -3,28 +3,44 @@
     python -m iw_scraper.sample_import DIR [--kind KIND --modules M1,M3]
 
 Without a `samples.toml` in DIR, `--kind` and `--modules` are required: routing is never inferred. Reading and the
-manifest are in this half of the module; the run against PostgreSQL, Redis and MinIO is below it.
+manifest come first; the run against PostgreSQL, Redis and MinIO is at the end. The importer builds its own small
+wiring from the environment of `app.runtime` and does not import `app.py`.
 """
 
+import argparse
+import asyncio
 import json
+import logging
 import os
 import re
 import stat
+import sys
 import tomllib
-from dataclasses import dataclass
-from datetime import datetime
+from collections import Counter
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from functools import lru_cache
 from html import escape
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
+import asyncpg
 from jsonschema import Draft202012Validator, FormatChecker
+from redis import asyncio as aioredis
 
-from iw_scraper.config import contracts_dir
+from iw_scraper.config import contracts_dir, fetch_settings
 from iw_scraper.events import utc_iso
 from iw_scraper.ingest.document import parse_timestamp
+from iw_scraper.ingest.errors import record_error
+from iw_scraper.ingest.pipeline import Ingestor
+from iw_scraper.ingest.storage import Storage
+from iw_scraper.logs import configure_logging
 from iw_scraper.parsing import ParseFailure, parse_page
-from iw_scraper.types import Reason
+from iw_scraper.pgstore import PgSourceStore
+from iw_scraper.types import JobError, Reason, Source
+
+log = logging.getLogger("iw_scraper.sample_import")
 
 MANIFEST = "samples.toml"
 CLIENT = "sample-import"
@@ -289,3 +305,134 @@ def load_manifest(directory: Path, *, kind: str | None = None, modules: str | No
         defaults=layer,
         files=files,
     )
+
+
+# --- the run ---------------------------------------------------------------------------------------------------
+
+# Matched by URL like `seed.py` and never updated: an operator's edits in the dashboard survive a rerun. `active`
+# is false and there is no cron, so neither the scheduler nor the collector (and its URL guard) ever selects it.
+_INSERT_SOURCE = """
+INSERT INTO sources (id, name, platform, url, source_kind, target_modules, schedule_cron, active)
+SELECT gen_random_uuid(), $1, $2, $3, $4, $5, NULL, false
+WHERE NOT EXISTS (SELECT 1 FROM sources WHERE url = $3)
+"""
+
+
+@dataclass(frozen=True)
+class Summary:
+    inserted: int = 0
+    duplicate: int = 0
+    skipped: int = 0
+    failed: int = 0
+
+    def __str__(self) -> str:
+        return f"inserted {self.inserted}, duplicate {self.duplicate}, skipped {self.skipped}, failed {self.failed}"
+
+
+async def ensure_source(pool: asyncpg.Pool, sample_set: SampleSet) -> Source:
+    """The set's `sources` row: the existing one with the set's URL, unchanged, else a new inactive one."""
+    await pool.execute(
+        _INSERT_SOURCE, sample_set.name, sample_set.platform, sample_set.url, sample_set.source_kind,
+        list(sample_set.target_modules),
+    )
+    source_id = await pool.fetchval("SELECT id FROM sources WHERE url = $1 ORDER BY id LIMIT 1", sample_set.url)
+    return await PgSourceStore(pool).get(str(source_id))
+
+
+async def _ingest_file(directory: Path, name: str, sample_set: SampleSet, source: Source, pool, ingestor, max_bytes) -> dict:
+    settings = sample_set.settings_for(name)
+    # the document takes `source_kind` and `platform` from the Source it is built for: same id, this file's values
+    file_source = replace(
+        source, source_kind=settings.source_kind, platform=settings.platform, target_modules=settings.target_modules
+    )
+    try:
+        page, author = read_sample(directory, name, settings, max_bytes)
+    except ParseFailure as failure:
+        await record_error(pool, JobError(failure.reason, failure.detail, source.id))
+        return {"outcome": "failed", "reason": failure.reason.value}
+    result = await ingestor.ingest(
+        page, file_source, fetched_at=datetime.now(UTC), duration_ms=0, proxy=None, author=author
+    )
+    if result.outcome == "failed":  # the ingestor has recorded it in `job_errors`
+        return {"outcome": "failed", "reason": result.error.reason.value}
+    if result.outcome == "inserted":
+        return {"outcome": "inserted", "document_id": result.document_id}
+    return {"outcome": "duplicate"}
+
+
+async def import_directory(
+    directory: Path, sample_set: SampleSet, *, pool: asyncpg.Pool, ingestor: Ingestor, max_bytes: int
+) -> Summary:
+    """Ingest every supported file of `directory`; one JSON log line per file, then one for the summary.
+
+    A file that fails is recorded and the rest go on. The ids in the per-file lines are what a gold label attaches to.
+    """
+    directory = Path(directory)
+    source = await ensure_source(pool, sample_set)
+    counts: Counter = Counter()
+    for entry in scan(directory):
+        if entry.skipped:
+            line = {"outcome": "skipped", "reason": entry.skipped}
+        else:
+            line = await _ingest_file(directory, entry.name, sample_set, source, pool, ingestor, max_bytes)
+        counts[line["outcome"]] += 1
+        log.info(json.dumps({"event": "sample_file", "file": entry.name, **line}))
+    summary = Summary(**counts)
+    log.info(json.dumps({"event": "sample_summary", **vars(summary)}))
+    return summary
+
+
+@asynccontextmanager
+async def _ingestor():
+    """Pool, storage and Redis from the environment of `app.runtime`; the stores are closed afterwards."""
+    pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=2)
+    try:
+        storage = Storage(
+            os.environ["MINIO_ENDPOINT"],
+            os.environ["MINIO_ACCESS_KEY"],
+            os.environ["MINIO_SECRET_KEY"],
+            bucket=os.environ.get("MINIO_BUCKET", "iw-raw"),
+            secure=os.environ.get("MINIO_SECURE", "false").lower() == "true",
+        )
+        await storage.check_bucket()
+        redis = aioredis.from_url(os.environ["REDIS_URL"])
+        try:
+            yield pool, Ingestor(pool, storage, redis)
+        finally:
+            await redis.aclose()
+    finally:
+        await pool.close()
+
+
+def exit_code(summary: Summary) -> int:
+    """Non-zero when any file failed; skipped and duplicate files do not count."""
+    return 1 if summary.failed else 0
+
+
+def _usage_error(event: str, error: str) -> int:
+    log.error(json.dumps({"event": event, "error": error}))
+    return 2
+
+
+async def main(argv: list[str]) -> int:
+    """Exit code: 0 all fine, 1 when any file failed, 2 on a usage or manifest error (nothing was ingested)."""
+    configure_logging()
+    parser = argparse.ArgumentParser(prog="python -m iw_scraper.sample_import", description=__doc__.split("\n")[0])
+    parser.add_argument("directory", type=Path, help="the directory of saved samples")
+    parser.add_argument("--kind", help="source_kind of the set (firm_own, third_party, unknown) when there is no samples.toml")
+    parser.add_argument("--modules", help="target modules, comma separated (M1,M2,M3), when there is no samples.toml")
+    args = parser.parse_args(argv)
+    if not args.directory.is_dir():
+        return _usage_error("usage_error", "the directory argument is not a directory")
+    try:
+        sample_set = load_manifest(args.directory, kind=args.kind, modules=args.modules)
+    except ManifestError as exc:
+        return _usage_error("manifest_invalid", str(exc))
+    _, max_bytes = fetch_settings()
+    async with _ingestor() as (pool, ingestor):
+        summary = await import_directory(args.directory, sample_set, pool=pool, ingestor=ingestor, max_bytes=max_bytes)
+    return exit_code(summary)
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main(sys.argv[1:])))
