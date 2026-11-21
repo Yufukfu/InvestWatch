@@ -30,13 +30,25 @@ This is our gold set, not UKNF's. It measures how well the rules follow our read
 
 ## Privacy and fictional names
 
-- Firms exist only in `registry.csv` next to this file: Zentrovia DM, Bank Kwarcowy BM, Nordavik Markets, Maltavera Trading, Lunaris DM. None of them shares a name, alias or domain with `analytics/registry/` (tested).
+- Registered firms exist only in `registry.csv` next to this file: Zentrovia DM, Bank Kwarcowy BM, Nordavik Markets, Maltavera Trading, Lunaris DM. None of them shares a name, alias or domain with `analytics/registry/` (tested). Unregistered M3 entities (Aurum Horizon, Meridian Wealth, Kapitał Plus Doradcy and others) are invented too, with `*.example.*` domains.
 - Domains are `*.example.pl` or `*.example.com`. Platform URLs are `*.example.com`.
 - No real person's name, photo, phone number or address. Phone numbers are `+48 000 …` only (tested).
 - Every `author.handle` in the gold set is one of these fictional handles (tested):
 
-- `@zentroviadm`
+- `@etf_ziomek`
+- `@fx_mentor_pl`
+- `@gieldowy_kot`
+- `@global_swing_desk`
+- `@krypto_rakieta`
 - `@kwarcowybm`
+- `@ostrozny_inwestor`
+- `@portfel_na_luzie`
+- `@pytajacy_nowicjusz`
+- `@spokojny_portfel`
+- `@sygnaly_gpw_pro`
+- `@trader_bez_kawy`
+- `@wig20_snajper`
+- `@zentroviadm`
 
 ## Adding a line
 

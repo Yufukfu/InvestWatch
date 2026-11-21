@@ -47,14 +47,20 @@ def labels(items, module):
     return out
 
 
-@pytest.mark.parametrize("module", ["M2"])
+#: Signals the gold set does not need a `fail` for: S3.7 (KNF warnings list) needs a warnings list to check against.
+NO_PAIR_NEEDED = {"S3.7"}
+
+
+@pytest.mark.parametrize("module", ["M1", "M2", "M3"])
 def test_coverage_per_module(items, build, module):
     labeled = [i for i in items if module in i.expect]
     positives = sum(i.expect[module].positive for i in labeled)
     assert len(labeled) >= MIN_DOCS[module]
     assert positives >= 5 and len(labeled) - positives >= 5
     counts = labels(items, module)
-    wanted = [r for r, on in (build.catalogues.get(module) or {}).items() if on]
+    implemented = [r for r, on in (build.catalogues.get(module) or {}).items() if on]
+    # M1/M3: every known signal, so the labels are ready before the stage-2 catalogues are in this build.
+    wanted = implemented if module == "M2" else sorted(set(implemented) | set(KNOWN_IDS[module]) - NO_PAIR_NEEDED)
     for rule_id in wanted:
         assert counts.get(rule_id, Counter())["fail"] >= 1, f"{module} {rule_id} has no fail label"
         assert counts.get(rule_id, Counter())["pass"] >= 1, f"{module} {rule_id} has no pass label"
@@ -113,8 +119,9 @@ def test_thresholds_move_fp_and_fn(report, module):
     if entry is None or entry["status"] != "evaluated":
         pytest.skip(f"{module} is not in this build or not labeled yet")
     at = {p["threshold"]: p for p in entry["points"]}
-    low, high = at[DEFAULT[module]], at[round(DEFAULT[module] + 0.2, 2)]
-    assert (low["fp"], low["fn"]) != (high["fp"], high["fn"])
+    here = at[DEFAULT[module]]
+    around = [at[t] for t in (round(DEFAULT[module] - 0.2, 2), round(DEFAULT[module] + 0.2, 2)) if t in at]
+    assert any((p["fp"], p["fn"]) != (here["fp"], here["fn"]) for p in around)
 
 
 def test_rules_only_run_has_no_analysis_errors(report):

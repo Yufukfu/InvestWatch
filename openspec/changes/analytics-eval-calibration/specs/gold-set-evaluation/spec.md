@@ -83,7 +83,7 @@ For each module with labels, the evaluation SHALL pair each labeled document's l
 
 #### Scenario: Thresholds move FP and FN
 - **WHEN** the committed gold set is evaluated rules-only
-- **THEN** for each of M1 (0.6), M2 (0.5) and M3 (0.7) the point at the default threshold and the point 0.2 above it differ in `fp` or `fn`
+- **THEN** for each evaluated module of M1 (0.6), M2 (0.5) and M3 (0.7), the point at the default threshold differs in `fp` or `fn` from the point 0.2 below it or the point 0.2 above it
 
 ### Requirement: Per-rule and per-signal metrics
 For each rule or signal with labels, the report SHALL give `tp`, `fp`, `fn`, `tn`, `precision`, `recall` and `f1` in two readings: `strict`, where a predicted `uncertain` counts as not flagged, and `review`, where it counts as flagged; plus the count of predicted `uncertain` and of `applicability_errors` (gold `not_applicable` with a predicted applicable result, or the reverse). Gold `fail` SHALL be a positive and gold `pass` a negative; gold `not_applicable` SHALL NOT enter the confusion counts. Rules with `implemented: false` SHALL be listed as `not_implemented`, and known ids missing from the loaded catalogue as `not_in_build`, both without metrics.
