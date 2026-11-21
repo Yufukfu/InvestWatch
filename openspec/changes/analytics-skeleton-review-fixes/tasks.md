@@ -6,9 +6,9 @@
 
 ## 2. CLI batch
 
-- [ ] 2.1 Test: one invalid document is skipped and the rest are analyzed; all invalid exits 2; the log carries no input values
-- [ ] 2.2 Per-item validation in `cli.main`, errors logged as `loc` and `type` only
-- [ ] 2.3 Mutation check
+- [x] 2.1 Test: one invalid document is skipped and the rest are analyzed; all invalid exits 2; the log carries no input values
+- [x] 2.2 Per-item validation in `cli.main`, errors logged as `loc` and `type` only
+- [x] 2.3 Mutation check — mutations: 7 tried, 7 caught
 
 ## 3. Rules and summary
 
