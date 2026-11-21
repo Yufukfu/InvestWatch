@@ -16,7 +16,7 @@ A Telegram source SHALL have a URL of the form `https://t.me/s/<handle>` with `<
 - **THEN** no page is requested, no document is emitted and the refusal is not recorded as a block
 
 ### Requirement: One document per post
-The collector SHALL emit one document per post that has text, with `url` the permalink of the post, `text` the post text without markup, `published_at` the post time in UTC ISO-8601, `platform` and `source_kind` copied from the source row, `title` and `lang` null and `canonical_url` equal to `url`. `scrape_meta` SHALL add `message_id` (the numeric id), `views` (an integer, or null when the page shows none) and `network` (the string `telegram`) to the fields of the fetch layer. The raw HTML stored for the document SHALL be the markup of that post only, not the whole channel page. Re-collecting an unchanged post SHALL add nothing (`document-ingest` dedup).
+The collector SHALL emit one document per post that has text, with `url` the post permalink, `text` without markup, `published_at` in UTC ISO-8601, `platform` and `source_kind` from the source row, `title` and `lang` null and `canonical_url` equal to `url`. `scrape_meta` SHALL add `message_id`, `views` (integer or null) and `network` (`telegram`). The stored raw HTML SHALL be that post's markup only.
 
 #### Scenario: Text post
 - **WHEN** a channel page contains a post with id 1999, text `Sygnał: BTC long, zysk do 30%` and time `2026-11-20T09:15:00+00:00`
@@ -58,7 +58,7 @@ A post that has no text (an image, video or sticker with no caption) SHALL NOT p
 - **THEN** the run ends without a document and without a job error
 
 ### Requirement: Author comes from the channel header
-Every document of a channel SHALL carry `author` with `name` the channel title, `handle` the channel username with a leading `@`, `profile_url` `https://t.me/<handle>` and `followers` the subscriber count as an integer, or null when the header shows none or an unreadable value. The collector SHALL pass it to ingest as the trusted `author` argument and SHALL NOT put it in the page dict, because ingest drops an `author` that comes from a page (`scraper-author-provenance`, issue 36). A count with a `K` or `M` suffix SHALL be read as thousands or millions (`36.1K` is 36100, `1.2M` is 1200000); a plain number is read as it is.
+Every document of a channel SHALL carry `author`: `name` the channel title, `handle` the username with a leading `@`, `profile_url` `https://t.me/<handle>`, `followers` the subscriber count as an integer or null. The collector SHALL pass it to ingest as the trusted `author` argument and never in the page dict, because ingest drops a page's `author` (issue 36). A `K` or `M` suffix SHALL read as thousands or millions (`36.1K` is 36100).
 
 #### Scenario: Author is a trusted argument
 - **WHEN** a post is ingested
@@ -137,7 +137,7 @@ A blocked response (403, 429, block marker), a timeout, an HTTP error status, or
 - **THEN** the run ends without a document and without a job error
 
 ### Requirement: Social collection uses the same fetch path as web pages
-The collector SHALL request every page of a channel through the same fetch layer, robots check, per-domain rate limit and URL guards as a web page, with no HTTP client, proxy handling or header logic of its own. The identity (user agent, TLS profile and client hints as one unit) SHALL be drawn once per run and used for every page of that run, and a proxy SHALL be chosen per request with the same rotation and cooldown as for web sources. The challenge brief asks for user-agent and proxy rotation in social collectors; this is how this collector meets it.
+The collector SHALL request every page of a channel through the same fetch layer, robots check, per-domain rate limit and URL guards as a web page, with no HTTP client, proxy handling or header logic of its own. One identity SHALL be drawn per run and used for every page of it, and a proxy SHALL be chosen per request with the same rotation and cooldown as for web sources (this meets the brief's user-agent and proxy rotation).
 
 #### Scenario: Identity and proxy come from the shared layer
 - **WHEN** a run collects two pages of a channel with proxies configured
@@ -152,7 +152,7 @@ The collector SHALL request every page of a channel through the same fetch layer
 - **THEN** the run ends, documents already stored stay, and no further page is requested
 
 ### Requirement: Telegram channels are seeded as sources
-This change SHALL provide the Telegram `sources` rows for the demo, written through the seed mechanism of `scraper-orchestration` (idempotent by URL, never overwriting, the dashboard owns later edits). Each row has `platform = other`, a `https://t.me/s/<handle>` URL and a schedule. A channel that promotes registered brokers with referral or bonus offers targets `M1` with `source_kind = third_party`; a channel selling signals or advice targets `M3` with `source_kind = unknown`, because the scraper cannot know registry status. A neutral news channel may be seeded as a control.
+This change SHALL provide the Telegram `sources` rows for the demo, written through the seed mechanism of `scraper-orchestration` (idempotent by URL, never overwriting, the dashboard owns later edits). Each row has `platform = other`, a `https://t.me/s/<handle>` URL and a schedule. A broker-promoting channel targets `M1` with `third_party`; a signals or advice channel targets `M3` with `unknown` (registry status is not known to the scraper); a news channel may be a control.
 
 #### Scenario: Seeding twice
 - **WHEN** the seed runs twice against the same database
