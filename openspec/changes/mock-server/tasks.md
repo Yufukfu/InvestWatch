@@ -1,9 +1,9 @@
 ## 1. Package, configuration and data loading
 
-- [ ] 1.1 Write failing tests: loading `contracts/mocks/` builds a store whose findings, documents, sources and events all validate against `contracts/schemas/`; a missing file or an item that fails its schema raises an error naming the file
-- [ ] 1.2 Create `contracts/mock-server/` with `pyproject.toml`, pinned `requirements.txt` / `requirements-dev.txt`, `.env.example` and the package skeleton
-- [ ] 1.3 Implement env-only settings (`MOCK_PORT`, `MOCK_CORS_ORIGINS`, `MOCK_REPLAY_INTERVAL_S`, `MOCK_SCAN_DELAY_S`, `CONTRACTS_DIR`) and the JSON logger
-- [ ] 1.4 Implement the loader and the in-memory store (deep copy, `reset()`), `risk_level` derivation from thresholds
+- [x] 1.1 Write failing tests: loading `contracts/mocks/` builds a store whose findings, documents, sources and events all validate against `contracts/schemas/`; a missing file or an item that fails its schema raises an error naming the file
+- [x] 1.2 Create `contracts/mock-server/` with `pyproject.toml`, pinned `requirements.txt` / `requirements-dev.txt`, `.env.example` and the package skeleton
+- [x] 1.3 Implement env-only settings (`MOCK_PORT`, `MOCK_CORS_ORIGINS`, `MOCK_REPLAY_INTERVAL_S`, `MOCK_SCAN_DELAY_S`, `CONTRACTS_DIR`) and the JSON logger
+- [x] 1.4 Implement the loader and the in-memory store (deep copy, `reset()`), `risk_level` derivation from thresholds
 
 ## 2. Read endpoints
 

@@ -1,0 +1,9 @@
+[project]
+name = "iw-mock-server"
+version = "0.1.0"
+description = "Contract-conformant mock of the InvestWatch REST API and Socket.IO events, backed by contracts/mocks."
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
