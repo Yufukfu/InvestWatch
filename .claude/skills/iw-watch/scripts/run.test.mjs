@@ -1,5 +1,5 @@
 // `run` end to end with real git (a bare "origin", a main clone, disposable clones) and a stub `claude`
-// that behaves like an agent: commits a fix, writes the reply, pushes or gets denied.
+// that behaves like an agent: commits a fix and writes the reply. The runner pushes and posts (--publish).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,7 +54,7 @@ const stream = (denials = [], isError = false) => [
   JSON.stringify({ type: 'result', subtype: isError ? 'error_max_budget_usd' : 'success', is_error: isError, total_cost_usd: 0.42, num_turns: 7, result: 'Fixed the store split; replied on the PR.', permission_denials: denials }),
 ].join('\n');
 
-// behaviour: 'push' | 'denied' | 'local' | 'fail'
+// behaviour: 'commit' | 'fail'
 function stubClaude(behaviour, calls) {
   return (file, args, opts) => {
     calls.push({ file, args, opts });
@@ -66,23 +66,19 @@ function stubClaude(behaviour, calls) {
     fs.writeFileSync(path.join(cwd, 'web/a.ts'), 'export const a = 2;\n');
     git(cwd, 'add', 'web/a.ts');
     git(cwd, 'commit', '-q', '-m', 'fix(web): address review');
-    const branch = git(cwd, 'rev-parse', '--abbrev-ref', 'HEAD');
-    if (behaviour === 'push' && allowedOf(args).includes(`Bash(git push origin ${branch})`)) {
-      git(cwd, 'push', '-q', 'origin', branch);
-      return { status: 0, stdout: stream(), stderr: '' };
-    }
-    const denials = behaviour === 'denied' ? [{ tool_name: 'Bash', tool_use_id: 't', tool_input: { command: `git push origin ${branch}` } }] : [];
-    return { status: 0, stdout: stream(denials), stderr: '' };
+    return { status: 0, stdout: stream(), stderr: '' };
   };
 }
 
-function setup({ behaviour = 'push', over = {}, env = {}, notify } = {}) {
+function setup({ behaviour = 'commit', over = {}, env = {}, notify } = {}) {
   const r = repo();
   const pr11 = { ...fx('pr-11.json'), headRefName: 'web/fe', headRefOid: r.feSha, baseRefName: 'main', files: [{ path: 'web/a.ts' }] };
   const pr28 = { ...fx('pr-28.json'), headRefName: 'analytics/x', headRefOid: r.axSha, baseRefName: 'main', files: [{ path: 'analytics/r.py' }] };
-  const out = []; const err = []; const calls = []; const notified = [];
+  const out = []; const err = []; const calls = []; const notified = []; const execs = [];
+  const fake = fakeGh({ 'pr list mine': [pr11], 'pr list review': [pr28], 'pr list open': [{ number: 11 }, { number: 28 }], ...over });
   const deps = {
-    gh: fakeGh({ 'pr list mine': [pr11], 'pr list review': [pr28], 'pr list open': [{ number: 11 }, { number: 28 }], ...over }).gh,
+    gh: fake.gh,
+    exec: (file, args, opts) => { execs.push({ file, args, opts }); return ''; },
     env: { XDG_STATE_HOME: path.join(r.root, 'state'), PATH: process.env.PATH, ...env },
     home: r.root,
     stdout: (s) => out.push(s),
@@ -96,12 +92,13 @@ function setup({ behaviour = 'push', over = {}, env = {}, notify } = {}) {
   const stateDir = path.join(r.root, 'state', 'iw-watch', 'Yufukfu__InvestWatch');
   const notices = () => out.join('').split('\n').filter((l) => l.startsWith('{')).map((l) => JSON.parse(l)).filter((j) => j.event === 'iw-watch.notice');
   const clone = (n) => path.join(r.root, 'InvestWatch-worktrees', `watch-pr-${n}`);
-  return { ...r, deps, out, err, calls, notified, notices, stateDir, clone, pr11, pr28 };
+  const posts = () => fake.calls.filter((a) => a.includes('POST'));
+  return { ...r, deps, out, err, calls, notified, execs, posts, notices, stateDir, clone, pr11, pr28 };
 }
 
-test('run --mine: the agent fixes, pushes its branch and replies; the clone is removed and the item acknowledged', async () => {
+test('run --mine --publish: the agent commits, the runner pushes the branch and posts the reply; clone removed, item acknowledged', async () => {
   const s = setup();
-  assert.equal(await main(['run', '--mine'], s.deps), 0, s.err.join(''));
+  assert.equal(await main(['run', '--mine', '--publish'], s.deps), 0, s.err.join(''));
   assert.equal(s.calls.length, 1);
   assert.equal(s.calls[0].file, 'claude');
   assert.notEqual(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, 'origin/web/fe moved: the fix was pushed');
@@ -111,6 +108,12 @@ test('run --mine: the agent fixes, pushes its branch and replies; the clone is r
   const [n] = s.notices();
   assert.equal(n.kind, 'done');
   assert.equal(n.pr, 11);
+  const [post] = s.posts();
+  assert.ok(post.includes('repos/Yufukfu/InvestWatch/issues/11/comments') && post.includes('--input'), 'the reply goes from a JSON file, never through argv');
+  const body = JSON.parse(fs.readFileSync(post[post.indexOf('--input') + 1], 'utf8')).body;
+  assert.match(body, /^> iw-watch agent for @kacpermalczyk, round 1\/3\n/, 'a visible agent line first');
+  assert.ok(body.trimEnd().endsWith(MARKER) && body.split(MARKER).length === 2, 'one marker, at the end');
+  assert.match(n.link, /#issuecomment-/);
   const state = JSON.parse(fs.readFileSync(path.join(s.stateDir, 'state.json'), 'utf8'));
   assert.equal(state.prs[11].sessions, 1);
   assert.equal(state.prs[11].pending, undefined, 'acknowledged');
@@ -120,7 +123,7 @@ test('run --mine: the agent fixes, pushes its branch and replies; the clone is r
   const session = JSON.parse(fs.readFileSync(path.join(s.stateDir, 'drafts', drafts[0], 'session.json'), 'utf8'));
   assert.equal(session.cost, 0.42);
   s.out.length = 0;
-  assert.equal(await main(['run', '--mine'], s.deps), 0);
+  assert.equal(await main(['run', '--mine', '--publish'], s.deps), 0);
   assert.equal(s.calls.length, 1, 'nothing new: no second session');
 });
 
@@ -131,51 +134,142 @@ test('run: the session runs in a disposable clone of the PR branch, with the pro
   assert.equal(c.opts.cwd, s.clone(11));
   assert.match(c.opts.input, /untrusted-data/);
   assert.ok(!c.args.some((a) => a.includes('IGNORE') || a.includes(fx('reviews-11.json')[0].body.slice(0, 20))), 'no third-party text in argv');
-  assert.ok(c.args.includes('Bash(git push origin web/fe)'));
-  assert.ok(c.args.includes('Bash(gh pr comment 11 --body-file .iw-watch/reply.md)'));
+  assert.ok(!allowedOf(c.args).some((a) => /git push|gh /.test(a)), 'the session itself cannot publish');
+  const settings = JSON.parse(c.args[c.args.indexOf('--settings') + 1]);
+  assert.equal(settings.sandbox.enabled, true);
+  assert.deepEqual(settings.sandbox.network.allowedDomains, [], 'no network');
+  assert.ok(settings.sandbox.filesystem.denyRead.includes(path.join(s.root, '.config/gh')), 'the gh token is unreadable');
+  assert.equal(c.args[c.args.indexOf('--setting-sources') + 1], 'project');
+  assert.deepEqual(s.execs.map((e) => [e.file, ...e.args]), [], 'web/ has no lockfile here: nothing to install');
 });
 
-test('run: a denied push leaves a draft, keeps the clone and tells the human', async () => {
-  const s = setup({ behaviour: 'denied' });
-  assert.equal(await main(['run', '--mine'], s.deps), 0);
+test('run: the session env is an allow-list: no GH_TOKEN, SSH agent or cloud keys; lockfiles installed by the runner', async () => {
+  const s = setup({ env: { GH_TOKEN: 'ghp_x', SSH_AUTH_SOCK: '/s', AWS_SECRET_ACCESS_KEY: 'k', HOME: '/h' } });
+  git(s.mainRoot, 'checkout', '-q', 'web/fe');
+  fs.writeFileSync(path.join(s.mainRoot, 'web/package-lock.json'), '{}\n');
+  git(s.mainRoot, 'add', '.');
+  git(s.mainRoot, 'commit', '-q', '-m', 'lock');
+  git(s.mainRoot, 'push', '-q', 'origin', 'web/fe');
+  s.deps.gh = fakeGh({ 'pr list mine': [{ ...s.pr11, headRefOid: git(s.mainRoot, 'rev-parse', 'HEAD') }], 'pr list open': [{ number: 11 }] }).gh;
+  await main(['run', '--mine'], s.deps);
+  const env = s.calls[0].opts.env;
+  for (const k of ['GH_TOKEN', 'SSH_AUTH_SOCK', 'AWS_SECRET_ACCESS_KEY']) assert.equal(env[k], undefined, k);
+  assert.equal(env.HOME, '/h');
+  assert.deepEqual(s.execs.map((e) => [e.file, ...e.args]), [['npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund']]);
+  assert.equal(s.execs[0].opts.cwd, path.join(s.clone(11), 'web'));
+  assert.equal(s.execs[0].opts.env.GH_TOKEN, undefined);
+});
+
+test('run: a fix never runs on a branch that changes .claude/, CLAUDE.md or .github/ (their hooks would load)', async () => {
+  for (const file of ['.claude/settings.json', 'web/CLAUDE.md', '.github/workflows/x.yml']) {
+    const s = setup();
+    git(s.mainRoot, 'checkout', '-q', 'web/fe');
+    fs.mkdirSync(path.dirname(path.join(s.mainRoot, file)), { recursive: true });
+    fs.writeFileSync(path.join(s.mainRoot, file), '{"hooks":{}}\n');
+    git(s.mainRoot, 'add', '.');
+    git(s.mainRoot, 'commit', '-q', '-m', 'hostile');
+    git(s.mainRoot, 'push', '-q', 'origin', 'web/fe');
+    s.deps.gh = fakeGh({ 'pr list mine': [{ ...s.pr11, headRefOid: git(s.mainRoot, 'rev-parse', 'HEAD') }], 'pr list open': [{ number: 11 }] }).gh;
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(s.calls.length, 0, file);
+    assert.match(s.notices()[0].detail, new RegExp(`changes ${file.replace(/\./g, '\\.')}`));
+    assert.ok(!fs.existsSync(s.clone(11)), 'nothing left behind');
+  }
+});
+
+test('run: a fork PR, a PR whose head is main, and a head that moved since the scan get no session', async () => {
+  const fork = setup();
+  fork.deps.gh = fakeGh({ 'pr list mine': [{ ...fork.pr11, isCrossRepository: true }], 'pr list open': [{ number: 11 }] }).gh;
+  await main(['run', '--mine', '--publish'], fork.deps);
+  assert.equal(fork.calls.length, 0);
+  assert.match(fork.notices()[0].detail, /fork/);
+  const onMain = setup();
+  onMain.deps.gh = fakeGh({ 'pr list mine': [{ ...onMain.pr11, headRefName: 'main' }], 'pr list open': [{ number: 11 }] }).gh;
+  await main(['run', '--mine', '--publish'], onMain.deps);
+  assert.equal(onMain.calls.length, 0);
+  assert.match(onMain.notices()[0].detail, /never pushes/);
+  const moved = setup();
+  moved.deps.gh = fakeGh({ 'pr list mine': [{ ...moved.pr11, headRefOid: 'b'.repeat(40) }], 'pr list open': [{ number: 11 }] }).gh;
+  await main(['run', '--mine', '--publish'], moved.deps);
+  assert.equal(moved.calls.length, 0);
+  assert.match(moved.notices()[0].detail, /moved since the scan/);
+});
+
+test('run: a push that fails leaves the draft and the clone and tells the human; nothing is posted', async () => {
+  const s = setup();
+  s.deps.git = (args, opts) => {
+    if (args.includes('push')) throw Object.assign(new Error('rejected'), { stderr: '! [rejected] (fetch first)' });
+    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
+  };
+  assert.equal(await main(['run', '--mine', '--publish'], s.deps), 0);
   assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, 'nothing pushed');
   assert.ok(fs.existsSync(s.clone(11)), 'clone kept with the local commit');
   const [n] = s.notices();
   assert.equal(n.kind, 'needs-human');
-  assert.match(n.detail, /push was denied/);
+  assert.match(n.detail, /push of 1 commit failed/);
+  assert.deepEqual(s.posts(), []);
   assert.ok(n.path && fs.existsSync(path.join(n.path, 'reply.md')));
 });
 
-test('run: commits left unpushed without a denial also need the human', async () => {
-  const s = setup({ behaviour: 'local' });
-  await main(['run', '--mine'], s.deps);
-  const [n] = s.notices();
-  assert.equal(n.kind, 'needs-human');
-  assert.match(n.detail, /1 commit.*not pushed/);
+test('run: an agent commit that touches .claude/ or .github/ is never pushed', async () => {
+  const s = setup();
+  s.deps.spawnClaude = (file, args, opts) => {
+    fs.mkdirSync(path.join(opts.cwd, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.claude/settings.json'), '{}');
+    git(opts.cwd, 'add', '.claude/settings.json');
+    git(opts.cwd, 'commit', '-q', '-m', 'sneaky');
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha);
+  assert.deepEqual(s.posts(), []);
+  assert.match(s.notices()[0].detail, /change \.claude\/settings\.json/);
 });
 
-test('run --dry-run: no push or GitHub write is allowed, the result is a draft with publish commands', async () => {
-  const s = setup({ behaviour: 'push' });
-  await main(['run', '--mine', '--dry-run'], s.deps);
-  const args = allowedOf(s.calls[0].args);
-  assert.ok(args.length > 0);
-  assert.ok(!args.some((a) => /git push|gh pr comment|gh issue (create|comment)/.test(a)));
-  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, 'nothing pushed');
-  const [n] = s.notices();
-  assert.equal(n.kind, 'draft-ready');
-  assert.ok(fs.existsSync(path.join(n.path, 'reply.md')));
-  assert.match(n.publish, /git push origin web\/fe/);
-  assert.match(n.publish, /gh pr comment 11 --body-file/);
-  assert.ok(!/gh |git /.test(n.detail), 'no shell command in the text a notifier shows');
-  assert.ok(fs.existsSync(s.clone(11)), 'the local commits stay in the clone');
+test('run is a dry run unless --publish: nothing pushed or posted, the result is a draft', async () => {
+  for (const flags of [[], ['--dry-run']]) {
+    const s = setup();
+    await main(['run', '--mine', ...flags], s.deps);
+    assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, 'nothing pushed');
+    assert.deepEqual(s.posts(), [], 'nothing posted');
+    const [n] = s.notices();
+    assert.equal(n.kind, 'draft-ready');
+    assert.ok(fs.existsSync(path.join(n.path, 'reply.md')));
+    assert.ok(!/gh |git /.test(n.detail), 'no shell command in the text a notifier shows');
+    assert.ok(fs.existsSync(s.clone(11)), 'the local commits stay in the clone');
+  }
+  assert.equal(await main(['run', '--mine', '--dry-run', '--publish'], setup().deps), 64);
+});
+
+test('run --publish: an issue drafted by the agent is opened by the runner, assigned only to a CODEOWNERS owner', async () => {
+  const s = setup();
+  s.deps.spawnClaude = (file, args, opts) => {
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/issue.md'), '# web: pager breaks\nassignee: @attacker\nevidence here\n');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  const issue = s.posts().find((a) => a.includes('repos/Yufukfu/InvestWatch/issues'));
+  const sent = JSON.parse(fs.readFileSync(issue[issue.indexOf('--input') + 1], 'utf8'));
+  assert.equal(sent.title, 'web: pager breaks');
+  assert.equal(sent.assignees, undefined, 'not an owner of the changed files: nobody assigned');
+  assert.match(sent.body, /not in CODEOWNERS/);
+  assert.match(s.notices()[0].detail, /issue https:/);
+  assert.ok(!fs.existsSync(s.clone(11)), 'published: the clone is removed');
 });
 
 test('run --review-requested: review in a clone of the PR head, read-only allow-list, clone removed', async () => {
   const s = setup();
-  await main(['run', '--review-requested'], s.deps);
+  await main(['run', '--review-requested', '--publish'], s.deps);
   assert.equal(s.calls.length, 1);
   const c = s.calls[0];
   assert.equal(c.opts.cwd, s.clone(28));
+  assert.ok(allowedOf(c.args).includes('Bash(git diff origin/main...refs/iw/pr-28)'), 'the PR range, by its exact form');
+  assert.ok(!allowedOf(c.args).includes('Bash(git diff:*)'), 'no free git diff in a review');
+  assert.ok(s.posts()[0].includes('repos/Yufukfu/InvestWatch/issues/28/comments'));
   assert.equal(git(s.mainRoot, 'rev-parse', 'HEAD'), s.feSha, 'the main clone is untouched');
   assert.ok(!allowedOf(c.args).some((a) => /git push|git commit/.test(a)));
   assert.match(c.opts.input, /Approval is left to a human/);
@@ -282,7 +376,7 @@ test('run: the clone ignores the main clone\'s commit-graph (a stale one broke t
   await main(['run', '--mine'], s.deps);
   const clone = seen.find((a) => a.includes('clone'));
   assert.deepEqual(clone.slice(0, 3), ['-c', 'core.commitGraph=false', 'clone']);
-  assert.equal(s.notices()[0].kind, 'done');
+  assert.equal(s.notices()[0].kind, 'draft-ready');
 });
 
 test('run: a clone that fails half-way is removed, so the next run retries instead of seeing a leftover', async () => {
@@ -317,12 +411,12 @@ test('run: uncommitted changes are never thrown away: needs-human, clone kept (l
 });
 
 test('run: a session that wrote no reply is not "done" or "draft-ready"; its final message is kept as summary.md', async () => {
-  for (const flags of [['--dry-run'], []]) {
+  for (const flags of [[], ['--publish']]) {
     const s = setup();
     s.deps.spawnClaude = () => ({ status: 0, stdout: stream([{ tool_name: 'Write', tool_input: { file_path: '.iw-watch/reply.md' } }]), stderr: '' });
     await main(['run', '--mine', ...flags], s.deps);
     const [n] = s.notices();
-    assert.equal(n.kind, 'needs-human', flags.join(' ') || 'live');
+    assert.equal(n.kind, 'needs-human', flags.join(' ') || 'dry');
     assert.match(n.detail, /no reply/);
     assert.match(n.detail, /1 command was denied/);
     assert.ok(fs.existsSync(path.join(n.path, 'summary.md')));
@@ -337,26 +431,21 @@ test('run: the agent\'s questions reach the notifier as copy-paste /iw commands'
     fs.writeFileSync(path.join(opts.cwd, '.iw-watch/questions.md'), "- Pager now or later? => pager: teraz | pager: pozniej'; rm -rf ~\n");
     return { status: 0, stdout: stream(), stderr: '' };
   };
-  await main(['run', '--mine', '--dry-run'], s.deps);
+  await main(['run', '--mine'], s.deps);
   const text = s.notified[0].args[3];
   assert.match(text, /Q: Pager now or later\?/);
   assert.ok(text.includes('/iw pager: teraz'));
   assert.ok(!text.includes('gh pr comment'), 'a comment to leave on the PR, not a shell command');
-  assert.ok(!/rm -rf ~'|;/.test(text.split('\n').filter((l) => l.includes('/iw')).join('\n')));
+  assert.ok(!/rm -rf ~'|;/.test(text.split('\n').filter((l) => l.trim().startsWith('/iw ')).join('\n')));
   assert.equal(s.notices()[0].questions.length, 1);
 });
 
-test('run: the notice links the agent\'s own reply comment when it posted one', async () => {
-  const s = setup({ env: { IWATCH_NOTIFY_CMD: 'n' } });
-  const posted = { id: 77, user: { login: ME, type: 'User' }, author_association: 'OWNER', body: `Fixed.\n${MARKER}`, created_at: '2026-11-21T23:59:00Z', html_url: 'https://github.com/Yufukfu/InvestWatch/pull/11#issuecomment-77' };
-  const base = s.deps.gh;
-  let after = false;
-  s.deps.gh = (args) => (after && args.join(' ').includes('issues/11/comments') ? [posted] : base(args));
-  const spawn = s.deps.spawnClaude;
-  s.deps.spawnClaude = (...a) => { const r = spawn(...a); after = true; return r; };
-  await main(['run', '--mine'], s.deps);
-  assert.equal(s.notices()[0].link, posted.html_url);
-  assert.equal(s.notified[0].args[2], posted.html_url, 'the notifier gets the comment link');
+test('run: the notice links the reply comment the runner posted', async () => {
+  const url = 'https://github.com/Yufukfu/InvestWatch/pull/11#issuecomment-77';
+  const s = setup({ env: { IWATCH_NOTIFY_CMD: 'n' }, over: { 'POST repos/Yufukfu/InvestWatch/issues/11/comments': { html_url: url } } });
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(s.notices()[0].link, url);
+  assert.equal(s.notified[0].args[2], url, 'the notifier gets the comment link');
 });
 
 test('run: --limit caps the sessions per run', async () => {
@@ -378,7 +467,7 @@ test('run: without the claude CLI it exits non-zero with install guidance and wr
 
 test('notify: IWATCH_NOTIFY_CMD gets kind, title and url as argv, no shell; a failing notifier does not fail the run', async () => {
   const s = setup({ env: { IWATCH_NOTIFY_CMD: '/usr/local/bin/my-notify --flag' } });
-  await main(['run', '--mine'], s.deps);
+  await main(['run', '--mine', '--publish'], s.deps);
   const [c] = s.notified;
   assert.equal(c.file, '/usr/local/bin/my-notify');
   assert.deepEqual(c.args.slice(0, 1), ['--flag']);
@@ -387,7 +476,7 @@ test('notify: IWATCH_NOTIFY_CMD gets kind, title and url as argv, no shell; a fa
   u.deps.gh = fakeGh({ 'pr list mine': [{ ...u.pr11, title: 'bad \u001b]52;c;x\u0007 title' }], 'pr list open': [{ number: 11 }] }).gh;
   await main(['run', '--mine'], u.deps);
   assert.ok(!u.notified[0].args.join(' ').includes('\u001b'), 'no control characters reach the notifier');
-  assert.equal(c.args[3], s.pr11.url);
+  assert.match(c.args[3], /#issuecomment-/, 'the link to the posted reply');
   assert.ok(!c.opts.shell);
   const t = setup({ env: { IWATCH_NOTIFY_CMD: 'broken' }, notify: () => { throw new Error('ENOENT'); } });
   assert.equal(await main(['run', '--mine'], t.deps), 0);
@@ -405,3 +494,56 @@ test('run: the item text never reaches a shell or a path', async () => {
 });
 
 test('ME is the account the runner acts for', () => assert.equal(ME, 'kacpermalczyk'));
+
+test('run: a PR into a branch other than the default branch gets no session (its .claude/ would load)', async () => {
+  const s = setup();
+  s.deps.gh = fakeGh({ 'pr list review': [{ ...s.pr28, baseRefName: 'evil-base' }], 'pr list open': [{ number: 28 }] }).gh;
+  await main(['run', '--review-requested', '--publish'], s.deps);
+  assert.equal(s.calls.length, 0);
+  assert.match(s.notices()[0].detail, /targets evil-base, not main/);
+});
+
+test('run: a reply that carries a credential is never posted (a test can write into it)', async () => {
+  for (const secret of ['ghp_abcdefghijklmnopqrstuvwxyz123456', 'my-very-long-api-key-value']) {
+    const s = setup({ env: { ANTHROPIC_API_KEY: 'my-very-long-api-key-value' } });
+    s.deps.spawnClaude = (file, args, opts) => {
+      fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+      fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), `done ${secret}`);
+      return { status: 0, stdout: stream(), stderr: '' };
+    };
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.deepEqual(s.posts(), [], secret);
+    assert.match(s.notices()[0].detail, /looks like a credential/);
+  }
+});
+
+test('run: a session that changes .git/config or adds a hook gets no git call from the runner, so nothing is pushed', async () => {
+  const s = setup();
+  s.deps.spawnClaude = (file, args, opts) => {
+    fs.appendFileSync(path.join(opts.cwd, '.git/config'), '[core]\n\tfsmonitor = touch /tmp/iw-fsmonitor\n');
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.match(s.notices()[0].detail, /changed \.git\/config/);
+  assert.deepEqual(s.posts(), []);
+  assert.ok(!fs.existsSync('/tmp/iw-fsmonitor'));
+});
+
+test('run: a fix branch with a symlink, a .Claude/ in another case or a .npmrc gets no session', async () => {
+  for (const [file, how] of [['web/link', 'symlink'], ['.Claude/settings.json', 'file'], ['web/.npmrc', 'file']]) {
+    const s = setup();
+    git(s.mainRoot, 'checkout', '-q', 'web/fe');
+    fs.mkdirSync(path.dirname(path.join(s.mainRoot, file)), { recursive: true });
+    if (how === 'symlink') fs.symlinkSync('../../../.config/gh/hosts.yml', path.join(s.mainRoot, file));
+    else fs.writeFileSync(path.join(s.mainRoot, file), 'x\n');
+    git(s.mainRoot, 'add', '.');
+    git(s.mainRoot, 'commit', '-q', '-m', 'hostile');
+    git(s.mainRoot, 'push', '-q', 'origin', 'web/fe');
+    s.deps.gh = fakeGh({ 'pr list mine': [{ ...s.pr11, headRefOid: git(s.mainRoot, 'rev-parse', 'HEAD') }], 'pr list open': [{ number: 11 }] }).gh;
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(s.calls.length, 0, file);
+    assert.match(s.notices()[0].detail, how === 'symlink' ? /symlink/ : /changes/, file);
+  }
+});

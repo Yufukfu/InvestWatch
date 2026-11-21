@@ -1,11 +1,13 @@
+// What the runner hands to `claude -p`. Whether Claude Code enforces a rule is shown by the live probes
+// (fixtures/README.md), not here; these tests pin what the runner passes and how it treats the result.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { claudeArgs, allowList, denyList, DENY, TOOLS, parseStream, runSession, childEnv, pushDenied } from './lib/session.mjs';
+import { claudeArgs, allowList, denyList, TOOLS, parseStream, runSession, childEnv, denyReadPaths, sandboxSettings } from './lib/session.mjs';
 
 const help = fs.readFileSync(new URL('./fixtures/claude-help.txt', import.meta.url), 'utf8');
 const stream = fs.readFileSync(new URL('./fixtures/claude-stream-denied.jsonl', import.meta.url), 'utf8');
-const mine = { kind: 'address-review', pr: 11, headRef: 'web/frontend-architecture' };
+const mine = { kind: 'address-review', pr: 11, baseRef: 'main' };
 const valueAfter = (args, flag) => {
   const i = args.indexOf(flag);
   const out = [];
@@ -15,152 +17,95 @@ const valueAfter = (args, flag) => {
 
 test('every flag the runner passes exists in claude --help (Claude Code 2.1.330)', () => {
   for (const kind of ['address-review', 'ci-failed', 'review']) {
-    for (const dryRun of [false, true]) {
-      for (const a of claudeArgs({ ...mine, kind, dryRun, budgetUsd: 2, model: 'haiku' }).filter((x) => x.startsWith('-'))) {
-        assert.ok(new RegExp(`(^|[\\s,])${a.replace(/[-]/g, '\\-')}([\\s,]|$)`, 'm').test(help), `${a} is not in claude --help`);
-      }
+    for (const a of claudeArgs({ ...mine, kind, budgetUsd: 2, model: 'haiku' }).filter((x) => x.startsWith('--'))) {
+      assert.ok(new RegExp(`(^|[\\s,])${a.replace(/[-]/g, '\\-')}([\\s,]|$)`, 'm').test(help), `${a} is not in claude --help`);
     }
   }
-  assert.ok(!/--max-turns/.test(help), 'this version has no --max-turns; the budget and a timeout bound the session');
 });
 
-test('headless mode: dontAsk, nobody to prompt, no persistence, restricted tools, budget', () => {
-  const args = claudeArgs({ ...mine, dryRun: false, budgetUsd: 2 });
+test('headless and isolated: dontAsk, no prompts, project settings only, no MCP, sandbox from the CLI flag', () => {
+  const args = claudeArgs({ ...mine, budgetUsd: 2 });
   assert.equal(args[0], '-p');
   assert.deepEqual(valueAfter(args, '--permission-mode'), ['dontAsk']);
   assert.deepEqual(valueAfter(args, '--permission-prompts'), ['none']);
-  assert.ok(args.includes('--no-session-persistence'));
+  assert.deepEqual(valueAfter(args, '--setting-sources'), ['project'], 'no user-level allow rules, plugins or hooks');
+  assert.ok(args.includes('--strict-mcp-config'), 'no MCP servers');
   assert.deepEqual(valueAfter(args, '--tools'), TOOLS);
-  assert.deepEqual(TOOLS, ['Bash', 'Read', 'Edit', 'Write', 'Grep', 'Glob']);
-  assert.deepEqual(valueAfter(args, '--max-budget-usd'), ['2']);
-  assert.deepEqual(valueAfter(args, '--output-format'), ['stream-json']);
-  for (const bad of ['bypassPermissions', '--dangerously-skip-permissions', '--allow-dangerously-skip-permissions', '--restricted', '--bare', '--safe-mode', '--setting-sources']) {
-    assert.ok(!args.includes(bad), `${bad} would drop a guard (--bare and --restricted skip the project hook)`);
-  }
+  const s = JSON.parse(valueAfter(args, '--settings')[0]).sandbox;
+  assert.equal(s.enabled, true);
+  assert.equal(s.failIfUnavailable, true, 'no sandbox, no session');
+  assert.equal(s.allowUnsandboxedCommands, false);
+  assert.deepEqual(s.network.allowedDomains, []);
+  for (const bad of ['bypassPermissions', '--dangerously-skip-permissions', '--restricted', '--bare', '--safe-mode']) assert.ok(!args.includes(bad), bad);
 });
 
-test('the allow-list for my PR: exact branch push, this PR only, no review, merge, ready, api or network', () => {
-  const allow = allowList({ ...mine, dryRun: false });
-  assert.ok(allow.includes('Bash(git push origin web/frontend-architecture)'));
-  assert.ok(allow.includes('Bash(gh pr comment 11 --body-file .iw-watch/reply.md)'), 'posting only this PR and only the reply file');
-  assert.ok(!allow.some((r) => /gh pr comment 11 \*|gh issue comment/.test(r)), 'no free-form body file, no comment on another issue or PR');
-  assert.ok(allow.includes('Read(./**)') && allow.includes('Edit(./**)'), 'file tools scoped to the clone');
-  assert.ok(!allow.some((r) => ['Read', 'Write', 'Edit'].includes(r)), 'no unscoped file tool');
-  assert.ok(allow.includes('Bash(gh issue create --title * --assignee * --body-file .iw-watch/issue.md)'));
-  assert.ok(!allow.includes('Bash(gh issue create:*)'));
-  assert.ok(!allow.includes('Bash(ls:*)'), 'ls reaches outside the clone; Glob does not');
-  assert.ok(allow.includes('Bash(git commit:*)'));
-  assert.ok(!allow.some((r) => /git push origin:\*|git push:\*/.test(r)), 'no wildcard push');
-  assert.ok(allow.includes('Bash(npm ci --ignore-scripts:*)'), 'a fresh clone can install the lockfile, without install scripts');
-  assert.ok(!allow.some((r) => /npm (install|i|ci)(:\*|\)| \*)/.test(r) || r === 'Bash(npm ci:*)' || /npm exec|npx:\*/.test(r)), 'no other install path');
-  for (const r of allow) {
-    assert.ok(!/gh pr (review|merge|ready)|gh api|WebFetch|WebSearch|curl|wget/.test(r), r);
-    assert.notEqual(r, 'Bash');
-    assert.ok(!/^Bash\(\*?\)$|^Bash\(:\*\)$/.test(r), r);
-  }
-});
-
-test('review of someone else\'s PR: no commit, no push, no test runners', () => {
-  const allow = allowList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false });
-  assert.ok(!allow.some((r) => /git push|git commit|git add|npm|pytest|node --test/.test(r)), allow.join(' '));
-  assert.ok(allow.includes('Bash(gh pr comment 28 --body-file .iw-watch/reply.md)'));
-  assert.ok(allow.includes('Edit(./.iw-watch/**)'), 'a review writes only its reply');
-  assert.ok(!allow.includes('Edit(./**)'));
-});
-
-test('dry run: no push and no GitHub write at all', () => {
+test('no session can publish: no gh, no push, in any kind', () => {
   for (const kind of ['address-review', 'ci-failed', 'review']) {
-    const allow = allowList({ ...mine, kind, dryRun: true });
-    assert.ok(!allow.some((r) => /git push|gh pr comment|gh issue (create|comment)|gh pr create/.test(r)), `${kind}: ${allow.join(' ')}`);
+    const allow = allowList({ ...mine, kind });
+    assert.ok(!allow.some((r) => /\bgh\b|git push|curl|wget|WebFetch|WebSearch/.test(r)), `${kind}: ${allow.join(' ')}`);
+    assert.ok(!allow.some((r) => ['Bash', 'Read', 'Edit', 'Write'].includes(r) || /^Bash\(\*?\)$|^Bash\(:\*\)$/.test(r)), 'nothing unscoped');
+    const deny = denyList({ kind });
+    for (const d of ['Bash(gh:*)', 'Bash(git push:*)', 'Bash(git remote:*)', 'Bash(git config:*)', 'Edit(./.claude/**)', 'Edit(./.github/**)', 'Read(./.git/**)']) assert.ok(deny.includes(d), `${kind}: ${d}`);
   }
 });
 
-test('the deny-list is passed too and names the dangerous commands', () => {
-  const args = claudeArgs({ ...mine, dryRun: false, budgetUsd: 2 });
-  const deny = valueAfter(args, '--disallowedTools');
-  assert.deepEqual(deny, denyList({ ...mine, dryRun: false }));
-  for (const d of DENY) assert.ok(deny.includes(d), d);
-  assert.ok(valueAfter(claudeArgs({ ...mine, dryRun: true, budgetUsd: 2 }), '--disallowedTools').includes('Bash(git push:*)'), 'the dry-run denies reach the argv');
-  assert.ok(valueAfter(claudeArgs({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false, budgetUsd: 2 }), '--disallowedTools').includes('Bash(git commit:*)'), 'the review denies reach the argv');
-  for (const d of ['Bash(gh pr review:*)', 'Bash(gh pr merge:*)', 'Bash(gh pr ready:*)', 'Bash(gh api:*)', 'Bash(curl:*)', 'Bash(wget:*)', 'WebFetch', 'WebSearch']) assert.ok(DENY.includes(d), d);
+test('a review reads only the PR range by exact forms; no free git diff, no commit, no test runner', () => {
+  const allow = allowList({ kind: 'review', pr: 28, baseRef: 'main' });
+  assert.ok(allow.includes('Bash(git diff origin/main...refs/iw/pr-28)'));
+  assert.ok(allow.includes('Bash(git show refs/iw/pr-28:*)'));
+  assert.ok(!allow.some((r) => r === 'Bash(git diff:*)' || r === 'Bash(git show:*)' || /npm|pytest|node --test|git commit|git add/.test(r)), allow.join(' '));
+  assert.ok(!allow.includes('Edit(./**)') && allow.includes('Edit(./.iw-watch/**)'), 'a review writes only its reply');
+  assert.throws(() => allowList({ kind: 'review', pr: 28, baseRef: 'x) Bash(curl:*' }), /branch/);
 });
 
-test('the deny-list blocks other repositories, git and settings files, and outward writes in a dry run', () => {
-  const deny = denyList({ ...mine, dryRun: false });
-  for (const d of ['Bash(gh * --repo *)', 'Bash(gh * --repo=*)', 'Bash(gh * -R *)', 'Bash(gh pr create:*)', 'Edit(./.git/**)', 'Edit(./.claude/**)', 'Read(./.env)']) assert.ok(deny.includes(d), d);
-  const dry = denyList({ ...mine, dryRun: true });
-  for (const d of ['Bash(git push:*)', 'Bash(gh pr comment:*)', 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)']) assert.ok(dry.includes(d), `dry run: ${d}`);
-  assert.ok(!deny.includes('Bash(git push:*)'), 'outside a dry run the exact-branch push stays possible');
-  const review = denyList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false });
-  for (const d of ['Bash(git push:*)', 'Bash(git commit:*)']) assert.ok(review.includes(d), `review: ${d}`);
-});
-
-test('lessons from the live run on PR #39: cd into the clone, the reply folder, npm --prefix, oxlint', () => {
-  const cwd = '/Users/x/Projects/InvestWatch-worktrees/watch-pr-39';
-  const allow = allowList({ ...mine, dryRun: true, cwd });
-  assert.ok(allow.includes(`Bash(cd ${cwd})`) && allow.includes(`Bash(cd ${cwd}/*)`), 'agents write "cd <clone> && git status"; every part of a chain must be allowed');
-  assert.ok(!allow.some((r) => r === 'Bash(cd:*)' || r === 'Bash(cd *)'), 'cd only into the clone');
-  assert.ok(allow.includes('Edit(./.iw-watch/**)'), 'Edit(./**) does not cover dot-directories (probe), so the reply folder is listed');
-  // live run on PR #40: a rule with an inner * and a trailing :* never matched (`npm --prefix web test` denied), plain * did
-  for (const r of ['Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test)', 'Bash(npm --prefix * test *)', 'Bash(npm --prefix * run lint)', 'Bash(npm --prefix * run typecheck)', 'Bash(npx oxlint:*)', 'Bash(git restore --staged:*)']) assert.ok(allow.includes(r), r);
-  assert.ok(!allow.some((r) => /\* .*:\*\)$/.test(r) && r.startsWith('Bash(npm')), 'no rule mixes an inner * with :*');
-  const review = allowList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false, cwd });
-  assert.ok(!review.some((r) => /npm|npx/.test(r)), 'a review still runs no code');
-  assert.ok(valueAfter(claudeArgs({ ...mine, dryRun: false, budgetUsd: 2, cwd }), '--allowedTools').includes(`Bash(cd ${cwd})`));
-  assert.throws(() => allowList({ ...mine, cwd: '/x y/z' }), /clone path/);
-});
-
-test('read-only git and gh forms that reach outside the clone are denied (whole-branch review)', () => {
-  for (const kind of ['address-review', 'review']) {
-    const deny = denyList({ kind, dryRun: false });
-    for (const d of ['Bash(git * --output*)', 'Bash(git * --no-index*)', 'Bash(git blame * --contents*)', 'Bash(gh * --body-file /*)', 'Bash(gh * --body-file ~*)', 'Bash(gh * --body-file ..*)', 'Bash(gh * -F *)', 'Bash(gh * --body *)', 'Bash(gh * -b *)']) assert.ok(deny.includes(d), `${kind}: ${d}`);
+test('git arguments that point outside the clone are denied for every reading command (Adam: git diff /abs /dev/null)', () => {
+  const deny = denyList({ kind: 'address-review' });
+  for (const c of ['diff', 'show', 'log', 'blame']) {
+    for (const p of ['/*', '~*', '..*']) assert.ok(deny.includes(`Bash(git ${c} ${p})`) && deny.includes(`Bash(git ${c} * ${p})`), `${c} ${p}`);
   }
+  assert.ok(!deny.some((d) => /npm --prefix|git commit/.test(d)), 'a fix still runs its tests and commits');
 });
 
-test('the session environment carries no iw-watch secrets (webhook, notify command)', () => {
-  const env = childEnv({ IWATCH_DISCORD_WEBHOOK: 'https://discord.com/api/webhooks/1/x', IWATCH_NOTIFY_CMD: 'n', PATH: '/bin' });
-  assert.deepEqual(Object.keys(env).sort(), ['IWATCH_SESSION', 'PATH']);
+test('the sandbox cannot read the gh token, ssh keys, shell profiles (webhook URL), the state dir or .env files', () => {
+  const paths = denyReadPaths({ home: '/h', stateDir: '/h/.local/state/iw-watch/x', configDir: '/c', envFiles: ['/p/InvestWatch/.env'] });
+  for (const p of ['/h/.ssh', '/h/.config/gh', '/h/.zshenv', '/h/.aws', '/h/.netrc', '/h/.local/state/iw-watch/x', '/c', '/p/InvestWatch/.env']) assert.ok(paths.includes(p), p);
+  assert.deepEqual(sandboxSettings({ denyRead: paths }).sandbox.filesystem.denyRead, paths);
 });
 
-test('a branch name that is not safe never reaches the allow-list', () => {
-  assert.throws(() => allowList({ ...mine, headRef: 'x) Bash(curl:*' }), /branch/);
+test('the session env is an allow-list: Claude login and locale, never tokens, SSH agent, cloud keys or IW_* flags', () => {
+  const env = childEnv({ PATH: '/bin', HOME: '/h', LANG: 'pl_PL.UTF-8', LC_ALL: 'C', CLAUDE_CONFIG_DIR: '/c', ANTHROPIC_API_KEY: 'k', GH_TOKEN: 'g', GITHUB_TOKEN: 'g', SSH_AUTH_SOCK: '/s', AWS_SECRET_ACCESS_KEY: 'a', IW_SKIP_SPEC: '1', IWATCH_DISCORD_WEBHOOK: 'w', NODE_OPTIONS: '--require /x' });
+  assert.deepEqual(Object.keys(env).sort(), ['ANTHROPIC_API_KEY', 'CLAUDE_CONFIG_DIR', 'HOME', 'IWATCH_SESSION', 'LANG', 'LC_ALL', 'PATH']);
 });
 
-test('parseStream reads a real dontAsk denial and pushDenied spots a denied push', () => {
+test('parseStream reads a real dontAsk denial', () => {
   const r = parseStream(stream);
   assert.equal(r.isError, false);
   assert.equal(r.denials[0].tool_input.command, 'git push --force origin main');
   assert.ok(r.cost > 0);
-  assert.equal(pushDenied(r.denials), true);
-  assert.equal(pushDenied([{ tool_name: 'Bash', tool_input: { command: 'git status' } }]), false);
-  assert.equal(pushDenied([{ tool_name: 'Bash', tool_input: { command: 'cd x && git  push origin y' } }]), true);
   assert.deepEqual(parseStream('not json\n').denials, [], 'garbage lines are skipped');
   assert.equal(parseStream('').isError, true, 'no result line means the session did not finish');
 });
 
-test('the prompt goes through stdin, never argv, and the child env has no IW_* flags', () => {
+test('the prompt goes through stdin, never argv; claude leads its own process group', () => {
   const seen = {};
   const spawn = (file, args, opts) => { Object.assign(seen, { file, args, opts }); return { status: 0, stdout: stream, stderr: '' }; };
   const prompt = 'SECRET-PROMPT-TEXT from a review';
-  const res = runSession({ spawn, cwd: '/tmp/x', prompt, args: claudeArgs({ ...mine, dryRun: false, budgetUsd: 2 }), env: { PATH: '/bin', IW_SKIP_SPEC: '1', IW_ALLOW_GIT: '1', HOME: '/h' } });
+  const res = runSession({ spawn, cwd: '/tmp/x', prompt, args: claudeArgs({ ...mine, budgetUsd: 2 }), env: { PATH: '/bin', IW_SKIP_SPEC: '1', GH_TOKEN: 'g' } });
   assert.equal(seen.file, 'claude');
   assert.equal(seen.opts.input, prompt);
   assert.ok(!seen.args.some((a) => a.includes('SECRET')));
   assert.ok(!seen.opts.shell);
-  assert.equal(seen.opts.cwd, '/tmp/x');
-  assert.ok(seen.opts.timeout > 0);
-  assert.deepEqual(Object.keys(seen.opts.env).filter((k) => k.startsWith('IW_')), []);
-  assert.equal(seen.opts.env.IWATCH_SESSION, '1');
-  assert.equal(res.denials.length, 1);
-  assert.deepEqual(Object.keys(childEnv({ IW_X: '1', iw_y: '2', A: 'b' })).sort(), ['A', 'IWATCH_SESSION']);
+  assert.equal(seen.opts.detached, true);
+  assert.equal(seen.opts.env.GH_TOKEN, undefined);
+  assert.equal(res.ok, true);
 });
 
-test('a session that times out or exits non-zero is reported as failed', () => {
-  const t = runSession({ spawn: () => ({ status: null, signal: 'SIGTERM', error: Object.assign(new Error('t'), { code: 'ETIMEDOUT' }), stdout: '' }), cwd: '/', prompt: 'x', args: [], env: {} });
-  assert.equal(t.timedOut, true);
-  assert.equal(t.ok, false);
-  const f = runSession({ spawn: () => ({ status: 1, stdout: stream }), cwd: '/', prompt: 'x', args: [], env: {} });
-  assert.equal(f.ok, false);
-  const g = runSession({ spawn: () => ({ status: 0, stdout: stream }), cwd: '/', prompt: 'x', args: [], env: {} });
-  assert.equal(g.ok, true);
+test('a timeout or an output overflow fails the session and kills the whole process group', () => {
+  for (const r of [{ status: null, signal: 'SIGKILL', error: Object.assign(new Error('t'), { code: 'ETIMEDOUT' }), stdout: '', pid: 4242 }, { status: null, error: Object.assign(new Error('b'), { code: 'ENOBUFS' }), stdout: stream, pid: 4242 }]) {
+    const killed = [];
+    const res = runSession({ spawn: () => r, cwd: '/', prompt: 'x', args: [], env: {}, kill: (pid) => killed.push(pid) });
+    assert.equal(res.ok, false);
+    assert.deepEqual(killed, [4242]);
+  }
+  assert.equal(runSession({ spawn: () => ({ status: 1, stdout: stream }), cwd: '/', prompt: 'x', args: [], env: {} }).ok, false);
 });

@@ -1,97 +1,116 @@
 // The headless Claude Code session. Flags are pinned against `claude --help` of 2.1.330
 // (fixtures/claude-help.txt): there is no --max-turns, so a dollar budget and a wall-clock timeout bound it.
-// Never --bare, --restricted or --safe-mode: they skip the project's hooks, and git-guard must run.
+// Never --bare, --restricted or --safe-mode: they skip the project's hooks, and git-guard must run. The hooks
+// that load are the base branch's: the runner refuses a branch that changes .claude/ (worktree.mjs).
+//
+// The session publishes nothing. It has no gh, no git push and no network: the runner pushes and posts after
+// it (watch.mjs publish). Allow rules do not bound what a test runner does (Claude Code docs), so every Bash
+// command runs in the Claude Code sandbox: no network, no writes outside the clone, no reads of the secrets
+// listed in denyRead. Probed in -p on 2.1.330 (fixtures/README.md).
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 import { safeBranch } from './prompt.mjs';
 
 export const TOOLS = ['Bash', 'Read', 'Edit', 'Write', 'Grep', 'Glob'];
 export const TIMEOUT_MS = 20 * 60 * 1000;
 
-// Rule semantics probed on 2.1.330 (see fixtures/README.md): a deny beats any allow, also a project one;
-// `Read(./**)` confines reads (and Grep) to the clone; Write is governed by `Edit(...)` rules; `cmd 11 *`
-// does not match `cmd 110`; a `*` inside a deny pattern matches (`gh * --repo *`); a leading VAR=x or a
-// chained `&& other` stops an allow rule matching. Project allow rules of an untrusted directory (every
-// fresh clone) are ignored in -p, so this list is the whole allow-list; project hooks still run.
+const OUT_OF_CLONE = ['/*', '~*', '..*'];
+const READERS = ['diff', 'show', 'log', 'blame', 'grep', 'cat-file', 'archive', 'format-patch'];
+
+// Rule semantics probed on 2.1.330: a deny beats any allow; `Read(./**)` confines reads (and Grep) to the
+// clone; Write is governed by `Edit(...)`; a chained `&& other` or a leading VAR=x stops an allow matching.
 export const DENY = [
-  'Bash(gh pr review:*)', 'Bash(gh pr merge:*)', 'Bash(gh pr ready:*)', 'Bash(gh pr close:*)', 'Bash(gh pr create:*)', 'Bash(gh api:*)',
-  'Bash(gh repo:*)', 'Bash(gh secret:*)', 'Bash(gh workflow:*)', 'Bash(gh auth:*)', 'Bash(gh alias:*)', 'Bash(gh extension:*)',
-  'Bash(gh * --repo *)', 'Bash(gh * --repo=*)', 'Bash(gh * -R *)',
-  'Bash(curl:*)', 'Bash(wget:*)', 'Bash(git push --force:*)', 'Bash(git remote:*)', 'Bash(git config:*)',
-  'Edit(./.git/**)', 'Edit(./.claude/**)', 'Read(./.env)', 'Read(./**/.env)',
-  // read-only git forms that write or read outside the clone (whole-branch review)
-  'Bash(git * --output*)', 'Bash(git * --no-index*)', 'Bash(git blame * --contents*)',
-  // a body only from the agent's own reply files: no file elsewhere, no inline body
-  'Bash(gh * --body-file /*)', 'Bash(gh * --body-file ~*)', 'Bash(gh * --body-file ..*)', 'Bash(gh * -F *)', 'Bash(gh * --body *)', 'Bash(gh * -b *)',
+  'Bash(gh:*)', 'Bash(curl:*)', 'Bash(wget:*)', 'Bash(ssh:*)', 'Bash(scp:*)', 'Bash(nc:*)',
+  'Bash(git push:*)', 'Bash(git remote:*)', 'Bash(git config:*)', 'Bash(git fetch:*)', 'Bash(git pull:*)',
+  'Bash(git clone:*)', 'Bash(git submodule:*)', 'Bash(git -c:*)', 'Bash(git -C:*)', 'Bash(git credential:*)',
+  'Bash(git * --output*)', 'Bash(git * --no-index*)', 'Bash(git blame * --contents*)', 'Bash(git * --exec*)',
+  // `git diff /abs/file /dev/null` reads a file outside the repo even without --no-index (Adam, PR #48)
+  ...READERS.flatMap((c) => OUT_OF_CLONE.flatMap((p) => [`Bash(git ${c} ${p})`, `Bash(git ${c} * ${p})`])),
+  'Bash(npm install:*)', 'Bash(npm i:*)', 'Bash(npm ci:*)', 'Bash(npx -y:*)', 'Bash(npm exec:*)',
+  'Edit(./.git/**)', 'Edit(./.claude/**)', 'Edit(./.github/**)', 'Edit(./**/CLAUDE.md)', 'Edit(./CLAUDE.md)', 'Edit(./.mcp.json)',
+  'Read(./.git/**)', 'Read(./.env)', 'Read(./**/.env)',
   'WebFetch', 'WebSearch',
 ];
 
-const READ = [
-  'Read(./**)', 'Grep', 'Glob',
-  'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git blame:*)',
-  'Bash(gh pr view:*)', 'Bash(gh pr diff:*)', 'Bash(gh issue list:*)', 'Bash(gh issue view:*)',
-  // Edit(./**) does not cover dot-directories (probe), so the reply folder is listed on its own
-  'Edit(./.iw-watch/**)',
-];
-const SAFE_PATH = /^\/[A-Za-z0-9._/-]+$/;
-// Tests run code. That is acceptable on my own branch, where the text that reached the agent came only from
-// people with write access (scan.mjs TRUSTED); a review of someone else's branch never runs their code.
 const FIX = [
-  'Bash(git add:*)', 'Bash(git commit:*)',
-  // a fresh clone has no node_modules: the lockfile only, and no install scripts
-  'Bash(npm ci --ignore-scripts:*)',
+  'Edit(./**)',
+  'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git blame:*)',
+  'Bash(git add:*)', 'Bash(git commit:*)', 'Bash(git restore --staged:*)',
+  // test runners run code: allowed because of the sandbox, not because of these rules
   'Bash(node --test:*)', 'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run typecheck:*)',
   'Bash(npx vitest run:*)', 'Bash(npx tsc:*)', 'Bash(npx oxlint:*)',
-  // a package below the root without cd: npm --prefix web test
   // plain * only: a rule with an inner * and a trailing :* never matched (live run on PR #40)
-  'Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test)', 'Bash(npm --prefix * test *)',
-  'Bash(npm --prefix * run lint)', 'Bash(npm --prefix * run typecheck)',
-  'Bash(git restore --staged:*)',
+  'Bash(npm --prefix * test)', 'Bash(npm --prefix * test *)', 'Bash(npm --prefix * run lint)', 'Bash(npm --prefix * run typecheck)',
   'Bash(pytest:*)', 'Bash(python -m pytest:*)', 'Bash(uv run pytest:*)',
   'Bash(openspec validate:*)', 'Bash(node .claude/skills/iw-docs-update/scripts/docs-check.mjs:*)',
 ];
 
-/** Least privilege per session: push only this branch, comment only on this PR, nothing outward in a dry run */
-export function allowList({ kind, pr, headRef, dryRun, cwd }) {
+const fixes = (kind) => kind === 'address-review' || kind === 'ci-failed';
+
+/** Least privilege per session. A review reads the PR range only, by its exact forms. */
+export function allowList({ kind, pr, baseRef }) {
   if (!Number.isInteger(pr)) throw new Error('allowList needs a PR number');
-  const fixes = kind === 'address-review' || kind === 'ci-failed';
-  if (fixes && !safeBranch(headRef)) throw new Error(`refusing unsafe branch name ${JSON.stringify(headRef)}`);
-  if (cwd !== undefined && !SAFE_PATH.test(cwd)) throw new Error(`refusing clone path ${JSON.stringify(cwd)}`);
-  // a review edits nothing but its own reply; a fix edits the clone, never .git/ or .claude/ (see DENY)
-  const allow = [...READ, ...(fixes ? ['Edit(./**)', ...FIX] : [])];
-  // agents write `cd <clone> && git status`, and every part of a chain must be allowed (live run, PR #39)
-  if (cwd) allow.push(`Bash(cd ${cwd})`, `Bash(cd ${cwd}/*)`);
-  if (!dryRun) {
-    if (fixes) allow.push(`Bash(git push origin ${headRef})`, `Bash(git push -u origin ${headRef})`);
-    allow.push(
-      `Bash(gh pr comment ${pr} --body-file .iw-watch/reply.md)`,
-      'Bash(gh issue create --title * --assignee * --body-file .iw-watch/issue.md)',
-      'Bash(gh issue create --title * --body-file .iw-watch/issue.md)',
-    );
-  }
-  return allow;
+  const allow = ['Read(./**)', 'Grep', 'Glob', 'Edit(./.iw-watch/**)', 'Bash(git status)'];
+  if (fixes(kind)) return [...allow, ...FIX];
+  if (!safeBranch(baseRef)) throw new Error(`refusing unsafe branch name ${JSON.stringify(baseRef)}`);
+  const range = `origin/${baseRef}...refs/iw/pr-${pr}`;
+  const log = `origin/${baseRef}..refs/iw/pr-${pr}`;
+  return [
+    ...allow,
+    `Bash(git diff ${range})`, `Bash(git diff --stat ${range})`, `Bash(git diff --name-only ${range})`, `Bash(git diff ${range} -- *)`,
+    `Bash(git log ${log})`, `Bash(git log --oneline ${log})`, `Bash(git log --stat ${log})`,
+    `Bash(git show refs/iw/pr-${pr}:*)`,
+  ];
 }
 
-/** Explicit denies on top: they hold even if some other settings source allowed the command */
-export function denyList({ kind, dryRun }) {
-  const fixes = kind === 'address-review' || kind === 'ci-failed';
-  const deny = [...DENY];
-  if (!fixes) deny.push('Bash(git push:*)', 'Bash(git commit:*)', 'Bash(git add:*)');
-  if (dryRun) deny.push('Bash(git push:*)', 'Bash(gh pr comment:*)', 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)');
+export function denyList({ kind, denyRead = [] }) {
+  // the same paths for the Read tool, which the sandbox does not cover (absolute rules start with //)
+  const deny = [...DENY, ...denyRead.filter((p) => p.startsWith('/')).flatMap((p) => [`Read(/${p})`, `Read(/${p}/**)`])];
+  if (!fixes(kind)) deny.push('Bash(git commit:*)', 'Bash(git add:*)', 'Edit(./**)');
   return [...new Set(deny)];
 }
 
-export function claudeArgs({ kind, pr, headRef, dryRun, budgetUsd = 2, model, cwd }) {
+/** Secrets a sandboxed command must not read, plus the .env files the runner found (watch.mjs) */
+export function denyReadPaths({ home, stateDir, envFiles = [], configDir }) {
+  const h = (p) => path.join(home, p);
+  return [
+    h('.ssh'), h('.config/gh'), h('.aws'), h('.gnupg'), h('.netrc'), h('.npmrc'), h('.docker'), h('.kube'),
+    h('.zshenv'), h('.zshrc'), h('.zprofile'), h('.bashrc'), h('.bash_profile'), h('.profile'), h('.git-credentials'),
+    h('.claude'), h('.claude.json'), h('.config'), h('.azure'), h('.gcloud'), h('Library/Keychains'), h('Library/Application Support/gh'),
+    ...(configDir ? [configDir] : []), ...(stateDir ? [stateDir] : []), ...envFiles,
+  ];
+}
+
+export function sandboxSettings({ denyRead = [] } = {}) {
+  return {
+    sandbox: {
+      enabled: true,
+      failIfUnavailable: true,
+      allowUnsandboxedCommands: false,
+      autoAllowBashIfSandboxed: false,
+      network: { allowedDomains: [] },
+      filesystem: { denyRead },
+    },
+  };
+}
+
+export function claudeArgs({ kind, pr, baseRef, budgetUsd = 2, model, denyRead = [] }) {
   return [
     '-p',
     '--permission-mode', 'dontAsk',
     '--permission-prompts', 'none',
     '--no-session-persistence',
+    // no user-level allow rules, plugins or hooks, and no MCP servers: only the base branch's project settings
+    '--setting-sources', 'project',
+    '--strict-mcp-config',
+    // CLI settings outrank project settings, so the branch cannot switch the sandbox off
+    '--settings', JSON.stringify(sandboxSettings({ denyRead })),
     '--output-format', 'stream-json', '--verbose',
     '--max-budget-usd', String(budgetUsd),
     ...(model ? ['--model', model] : []),
     '--tools', ...TOOLS,
-    '--allowedTools', ...allowList({ kind, pr, headRef, dryRun, cwd }),
-    '--disallowedTools', ...denyList({ kind, dryRun }),
+    '--allowedTools', ...allowList({ kind, pr, baseRef }),
+    '--disallowedTools', ...denyList({ kind, denyRead }),
   ];
 }
 
@@ -116,20 +135,26 @@ export function parseStream(text) {
   };
 }
 
-export const pushDenied = (denials) => denials.some((d) => /(^|[\s;&|(])git\s+push\b/.test(d.tool_input?.command || ''));
+// What Claude Code itself needs (login, locale, temp dir). No GH_TOKEN, SSH_AUTH_SOCK, cloud keys or IW_* flags.
+const ENV_KEEP = new Set(['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'LANG', 'TERM', 'TMPDIR', 'TZ', 'CLAUDE_CONFIG_DIR', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL']);
 
-/** The session's environment: no IW_* escape flags reach it, whatever the caller's shell had */
+/** The session's environment: an allow-list, whatever the caller's shell had */
 export function childEnv(env) {
   const out = {};
-  // no IW_* escape flags, and no iw-watch secrets (webhook URL, notify command): fix sessions run tests, which can read the env
-  for (const [k, v] of Object.entries(env)) if (!/^iw_/i.test(k) && !/^iwatch_/i.test(k)) out[k] = v;
+  for (const [k, v] of Object.entries(env)) if (ENV_KEEP.has(k) || /^LC_[A-Z]+$/.test(k)) out[k] = v;
   out.IWATCH_SESSION = '1';
   return out;
 }
 
-export function runSession({ spawn = spawnSync, cwd, prompt, args, env, timeoutMs = TIMEOUT_MS }) {
-  const r = spawn('claude', args, { cwd, input: prompt, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024, env: childEnv(env), stdio: ['pipe', 'pipe', 'pipe'] });
-  const timedOut = r.error?.code === 'ETIMEDOUT' || r.signal === 'SIGTERM';
+const killGroup = (pid) => { try { process.kill(-pid, 'SIGKILL'); } catch { /* already gone */ } };
+
+export function runSession({ spawn = spawnSync, cwd, prompt, args, env, timeoutMs = TIMEOUT_MS, kill = killGroup }) {
+  // detached: claude leads its own process group, so a timeout also stops the test runners it started
+  const r = spawn('claude', args, { cwd, input: prompt, encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL', detached: true, maxBuffer: 256 * 1024 * 1024, env: childEnv(env), stdio: ['pipe', 'pipe', 'pipe'] });
+  const timedOut = r.error?.code === 'ETIMEDOUT' || r.signal === 'SIGTERM' || r.signal === 'SIGKILL';
+  const overflow = r.error?.code === 'ENOBUFS';
+  // always: a test runner left in the background must not keep running while the runner pushes
+  if (r.pid) kill(r.pid);
   const parsed = parseStream(r.stdout);
-  return { ...parsed, code: r.status, timedOut, stderr: String(r.stderr || '').slice(-2000), ok: !timedOut && r.status === 0 && !parsed.isError };
+  return { ...parsed, code: r.status, timedOut, overflow, stderr: String(r.stderr || '').slice(-2000), ok: !timedOut && !overflow && r.status === 0 && !parsed.isError };
 }

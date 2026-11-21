@@ -124,7 +124,7 @@ test('the session prompt routes defects to the owner, and has rules for no owner
   const p = buildPrompt({ item, me: ME, owners, nonce: 'n' });
   assert.match(p, /analytics\/r\.py: @Yufukfu/);
   assert.match(p, /\.docs\/STATUS\.md: no owner/);
-  assert.match(p, /no owner[^\n]*do not open an issue[^\n]*Needs @kacpermalczyk/i);
-  assert.match(p, /team[^\n]*assign/i);
-  assert.match(p, /--assignee <owner login>/);
+  assert.match(p, /no owner[^\n]*do not draft an issue[^\n]*Needs @kacpermalczyk/i);
+  assert.match(p, /team owner[^\n]*assignee: none/i);
+  assert.match(p, /assignee: <owner login>/);
 });

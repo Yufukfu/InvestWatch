@@ -31,6 +31,16 @@ export function fakeGh(over = {}) {
     calls.push(args);
     const s = args.join(' ');
     let key;
+    // the runner's writes: a comment or an issue from a JSON file (--input), answered like GitHub does
+    if (args[0] === 'api' && args.includes('POST')) {
+      const target = args.find((x) => x.startsWith('repos/'));
+      const n = (/issues\/(\d+)\/comments$/.exec(target) || [])[1];
+      const v = routes[`POST ${target}`];
+      if (v instanceof Error) throw v;
+      return v ?? { html_url: n ? `https://github.com/${REPO}/pull/${n}#issuecomment-${calls.length}` : `https://github.com/${REPO}/issues/${900 + calls.length}` };
+    }
+    if (s.startsWith('issue list')) return structuredClone(routes['issue list'] ?? []);
+    if (s.startsWith('pr view')) return structuredClone(routes['pr view']);
     if (s === 'api user') key = 'api user';
     else if (s.startsWith('repo view')) key = 'repo view';
     else if (s.startsWith('pr list') && args.includes('--author') && args[args.indexOf('--author') + 1] === '@me') key = 'pr list mine';

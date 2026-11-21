@@ -2,35 +2,39 @@
 // iw-watch runner. The runner decides what to do (poll, filter, dedupe, cap); the model decides how.
 //   watch.mjs scan [--mine] [--review-requested] [--author L] [--max-rounds N] [--json]
 //   watch.mjs ack <item-id>...
-//   watch.mjs run  [same filters] [--dry-run] [--limit N] [--budget-usd X] [--model M]
+//   watch.mjs notify <done|needs-human> --pr N [--link <comment url>] [--questions <file>] [--note <text>]
+//     (in-session mode: the agent sends its Discord notice; the questions file becomes /iw comments to paste)
+//   watch.mjs run  [same filters] [--publish] [--limit N] [--budget-usd X] [--model M]   (a dry run unless --publish)
 // Exit codes: 0 ok (also "already running"), 2 GitHub or environment error, 64 usage error.
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { makeGh, GhError } from './lib/gh.mjs';
 import { scan, domainFilter, DomainError } from './lib/scan.mjs';
 import { stateDir, loadState, saveState, ack, dropClosed, acquireLock, releaseLock, refreshLock, recordSession } from './lib/state.mjs';
 import { loadCodeowners, ownerOf } from './lib/codeowners.mjs';
 import { buildPrompt, safeBranch } from './lib/prompt.mjs';
-import { claudeArgs, runSession, pushDenied } from './lib/session.mjs';
-import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman } from './lib/worktree.mjs';
-import { makeNotifier } from './lib/notify.mjs';
+import { claudeArgs, runSession, childEnv, denyReadPaths } from './lib/session.mjs';
+import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman, newCommitPaths, pushBranch, installDeps, findEnvFiles, gitSnapshot } from './lib/worktree.mjs';
+import { makeNotifier, KINDS } from './lib/notify.mjs';
 import { parseQuestions, questionsText } from './lib/questions.mjs';
 import { MARKER } from './lib/rounds.mjs';
 
 const USAGE = `usage: watch.mjs scan|run [--mine] [--review-requested] [--author <login>] [--domain <dir>|mine]
                  [--max-rounds N] [--json]                                  (scan)
-                 [--dry-run] [--limit N] [--budget-usd X] [--model M]       (run)
-       watch.mjs ack <item-id>...`;
+                 [--publish] [--limit N] [--budget-usd X] [--model M]       (run; dry unless --publish)
+       watch.mjs ack <item-id>...
+       watch.mjs notify <done|needs-human> --pr N [--link <url>] [--questions <file>] [--note <text>]`;
 
 class UsageError extends Error {}
 
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
-  if (!['scan', 'ack', 'run'].includes(cmd)) throw new UsageError(`unknown command ${JSON.stringify(cmd ?? '')}`);
-  const o = { cmd, mine: false, reviewRequested: false, author: null, domains: [], maxRounds: 3, json: false, dryRun: false, limit: null, budgetUsd: 2, model: null, ids: [] };
+  if (!['scan', 'ack', 'run', 'notify'].includes(cmd)) throw new UsageError(`unknown command ${JSON.stringify(cmd ?? '')}`);
+  if (cmd === 'notify') return parseNotify(rest);
+  const o = { cmd, mine: false, reviewRequested: false, author: null, domains: [], maxRounds: 3, json: false, dryRun: true, publish: false, limit: null, budgetUsd: 2, model: null, ids: [] };
   const value = (flag) => {
     const v = rest.shift();
     if (v === undefined || v.startsWith('--')) throw new UsageError(`${flag} needs a value`);
@@ -50,7 +54,8 @@ export function parseArgs(argv) {
     else if (a === '--max-rounds') o.maxRounds = count(a);
     else if (a === '--limit') o.limit = count(a);
     else if (a === '--json') o.json = true;
-    else if (a === '--dry-run') o.dryRun = true;
+    else if (a === '--dry-run') o.forceDry = true;
+    else if (a === '--publish') o.publish = true;
     else if (a === '--budget-usd') {
       o.budgetUsd = Number(value(a));
       if (!(o.budgetUsd > 0 && o.budgetUsd <= 20)) throw new UsageError('--budget-usd must be more than 0 and at most 20');
@@ -62,12 +67,47 @@ export function parseArgs(argv) {
   }
   if (o.author && !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(o.author)) throw new UsageError('--author must be a GitHub login');
   if (cmd === 'ack' && !o.ids.length) throw new UsageError('ack needs at least one item id');
-  if (cmd === 'scan' && (o.dryRun || o.limit !== null || o.model)) throw new UsageError('--dry-run, --limit and --model apply to run only');
+  if (cmd === 'scan' && (o.forceDry || o.publish || o.limit !== null || o.model)) throw new UsageError('--dry-run, --publish, --limit and --model apply to run only');
+  if (o.forceDry && o.publish) throw new UsageError('--dry-run and --publish exclude each other');
+  // unattended runs draft by default (Adam, PR #48): pushing and posting needs --publish
+  o.dryRun = !o.publish;
+  delete o.forceDry;
   if (cmd !== 'ack' && !o.mine && !o.reviewRequested && !o.author && !o.domains.length) {
     throw new UsageError('say what to watch: --mine, --review-requested, --author <login> or --domain <dir>');
   }
   o.limit ??= 3;
   return o;
+}
+
+function parseNotify(rest) {
+  const o = { cmd: 'notify', kind: rest.shift(), pr: null, link: null, questions: null, note: '' };
+  if (!KINDS.includes(o.kind)) throw new UsageError(`notify needs a kind first: ${KINDS.join(', ')}`);
+  while (rest.length) {
+    const a = rest.shift();
+    const v = rest.shift();
+    if (v === undefined) throw new UsageError(`${a} needs a value`);
+    if (a === '--pr') o.pr = Number(v);
+    else if (a === '--link') o.link = v;
+    else if (a === '--questions') o.questions = v;
+    else if (a === '--note') o.note = v;
+    else throw new UsageError(`unknown argument ${JSON.stringify(a)}`);
+  }
+  if (!Number.isInteger(o.pr) || o.pr < 1) throw new UsageError('notify needs --pr <number>');
+  return o;
+}
+
+/** In-session notice: title and URL come from GitHub, the link must be this PR's, the questions from a file */
+function notifyCmd(deps, ctx, o) {
+  const pr = deps.gh(['pr', 'view', String(o.pr), '--json', 'number,title,url']);
+  const link = o.link && new RegExp(`^https://github\\.com/${ctx.repo.replace('/', '\\/')}/(pull|issues)/${o.pr}(#issuecomment-\\d+)?$`).test(o.link) ? o.link : null;
+  if (o.link && !link) deps.stderr(`iw-watch: --link is not a link into #${o.pr}; the PR link is used\n`);
+  const questions = o.questions ? parseQuestions(fs.readFileSync(o.questions, 'utf8')) : [];
+  const note = clean(o.note).slice(0, 300);
+  makeNotifier({ env: deps.env, stdout: deps.stdout, stderr: deps.stderr, now: deps.now, spawn: deps.spawnNotify })({
+    pr: pr.number, title: pr.title, url: pr.url, ...(link ? { link } : {}), kind: questions.length && o.kind === 'done' ? 'needs-human' : o.kind,
+    ...(note ? { detail: note } : {}), ...(questions.length ? { questions, ask: questionsText(questions) } : {}),
+  });
+  return 0;
 }
 
 export function defaultDeps() {
@@ -82,6 +122,7 @@ export function defaultDeps() {
     mainRoot: null, // found from the current directory when needed
     spawnClaude: spawnSync,
     spawnNotify: spawnSync,
+    exec: execFileSync,
     claudeAvailable: () => !spawnSync('claude', ['--version'], { stdio: 'ignore' }).error,
   };
 }
@@ -165,6 +206,16 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (!safeBranch(it.headRef) || !safeBranch(it.baseRef)) {
     return { ...base, kind: 'needs-human', detail: `refused branch name ${JSON.stringify(clean(it.headRef))}: only [A-Za-z0-9._/-] is handled` };
   }
+  const own = it.kind === 'address-review' || it.kind === 'ci-failed';
+  // the push target: this repository's PR branch, never a fork's, never the base or default branch
+  if (own && it.crossRepo) return { ...base, kind: 'needs-human', detail: `#${it.pr} comes from a fork; an agent does not push to it` };
+  if (own && [it.baseRef, ctx.defaultBranch, 'main', 'master'].includes(it.headRef)) {
+    return { ...base, kind: 'needs-human', detail: `#${it.pr} has ${it.headRef} as its head branch; an agent never pushes to it` };
+  }
+  // the clone checks out the base branch (a review) or diffs against it (a fix): only the default branch is trusted
+  if (it.baseRef !== ctx.defaultBranch) {
+    return { ...base, kind: 'needs-human', detail: `#${it.pr} targets ${it.baseRef}, not ${ctx.defaultBranch}; an agent runs only on PRs into the default branch` };
+  }
   const draftDir = path.join(sdir, 'drafts', it.id.replace(/[^0-9a-z.-]/gi, '_'));
   let clone;
   try {
@@ -178,8 +229,13 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   delete (state.prs[it.pr] ??= {}).blockedItem;
   recordSession(state, it.pr);
   saveState(sdir, state); // a crash during the session still counts the round
-  const prompt = buildPrompt({ item: it, me: ctx.me, owners: owners({ ...deps, mainRoot }, ctx, it.files), dryRun: o.dryRun });
-  const args = claudeArgs({ kind: it.kind, pr: it.pr, headRef: it.headRef, dryRun: o.dryRun, budgetUsd: o.budgetUsd, model: o.model, cwd: clone.dir });
+  // the session has no network: the runner installs the lockfiles, without install scripts
+  if (own) installDeps({ run: deps.exec, dir: clone.dir, files: it.files, env: childEnv(deps.env) });
+  const before = gitSnapshot({ dir: clone.dir });
+  const fileOwners = owners({ ...deps, mainRoot }, ctx, it.files);
+  const prompt = buildPrompt({ item: it, me: ctx.me, owners: fileOwners, dryRun: o.dryRun });
+  const denyRead = denyReadPaths({ home: deps.home, stateDir: sdir, configDir: deps.env.CLAUDE_CONFIG_DIR, envFiles: findEnvFiles({ mainRoot }) });
+  const args = claudeArgs({ kind: it.kind, pr: it.pr, baseRef: it.baseRef, budgetUsd: o.budgetUsd, model: o.model, denyRead });
   const res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
   const copied = collectDrafts({ dir: clone.dir, to: draftDir });
   // questions for the human, each answer as a command to copy (Discord shows them)
@@ -187,37 +243,86 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   // the agent's last message: when it could not write its reply file, the reply is usually in here
   fs.writeFileSync(path.join(draftDir, 'summary.md'), `${res.summary}\n`, { mode: 0o600 });
   fs.writeFileSync(path.join(draftDir, 'session.json'), `${JSON.stringify({ item: it.id, kind: it.kind, ok: res.ok, code: res.code, timedOut: res.timedOut, cost: res.cost, turns: res.turns, subtype: res.subtype, denials: res.denials, summary: res.summary, clone: clone.dir }, null, 2)}\n`, { mode: 0o600 });
-  const own = it.kind === 'address-review' || it.kind === 'ci-failed';
-  // a link straight to the reply the agent posted, so the notice opens the conversation
-  let link;
-  if (!o.dryRun) {
-    try {
-      const mine = (deps.gh(['api', '--paginate', `repos/${ctx.repo}/issues/${it.pr}/comments?per_page=100`]) || []).filter((c) => c.user?.login?.toLowerCase() === ctx.me.toLowerCase() && String(c.body || '').includes(MARKER));
-      link = mine.at(-1)?.html_url;
-    } catch { /* the notice keeps the PR link */ }
-  }
-  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost, ...(link ? { link } : {}), ...(questions.length ? { questions, ask: questionsText(questions) } : {}) };
+  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost, ...(questions.length ? { questions, ask: questionsText(questions) } : {}) };
   const n = res.denials.length;
   const denied = n ? `; ${n} command${n > 1 ? 's were' : ' was'} denied (see session.json)` : '';
   // every needs-human below keeps the clone and the item: remove the clone to let the watcher retry
   const human = (detail) => ({ ...at, kind: 'needs-human', keep: true, detail: `${detail}${denied}; clone kept at ${clone.dir}, remove it to retry` });
   if (!res.ok) return human(`session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`})`);
-  const dirty = own ? deps.git(['-C', clone.dir, 'status', '--porcelain']) : '';
+  // sandboxed code can write .git/: a changed config or hook would run, outside the sandbox, in the git calls below
+  if (gitSnapshot({ dir: clone.dir }) !== before) return human('the session changed .git/config, .git/hooks or .git/info/attributes; the runner runs no git in this clone');
+  const git = (args, opts) => deps.git(['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args], opts);
+  const dirty = own ? git(['-C', clone.dir, 'status', '--porcelain']) : '';
   if (dirty) return human(`uncommitted changes in ${dirty.split('\n').length} file(s) were left; nothing is thrown away`);
   if (!copied.includes('reply.md')) return human(`the session wrote no reply (.iw-watch/reply.md); its last message is in ${path.join(draftDir, 'summary.md')}`);
+  // the agent's commits are checked before anything leaves the machine
+  const bad = own ? newCommitPaths({ git, dir: clone.dir, headRef: it.headRef }) : [];
+  if (bad.length) return human(`the agent's commits change ${bad.slice(0, 3).join(', ')}; the runner does not push settings, hooks, CI or agent instructions`);
+  const body = postBody({ me: ctx.me, it, text: fs.readFileSync(path.join(draftDir, 'reply.md'), 'utf8') });
+  const issueText = copied.includes('issue.md') ? fs.readFileSync(path.join(draftDir, 'issue.md'), 'utf8') : '';
+  // a test the agent ran can write into its own reply: never post what looks like a credential
+  if (leaks(`${body}\n${issueText}`, deps.env)) return human('the reply or the issue contains something that looks like a credential; nothing is posted, check the drafts');
+  fs.writeFileSync(path.join(draftDir, 'post.json'), JSON.stringify({ body }), { mode: 0o600 });
   if (o.dryRun) {
-    const steps = [`cd ${clone.dir}`];
-    if (own) steps.push(`git push origin ${it.headRef}`);
-    steps.push(`gh pr comment ${it.pr} --body-file ${path.join(draftDir, 'reply.md')}`);
-    // the publish commands stay in the JSON log (publish), never in the message text that goes to Discord
-    return { ...at, kind: 'draft-ready', publish: steps.join(' && '), detail: `dry run: nothing was pushed or posted${denied}. The draft reply is in ${path.join(draftDir, 'reply.md')}` };
+    return { ...at, kind: 'draft-ready', detail: `dry run: nothing was pushed or posted${denied}. The draft reply is in ${path.join(draftDir, 'reply.md')}; run with --publish to push and post` };
   }
-  if (own && pushDenied(res.denials)) return human(`the push was denied; the commits and the reply are kept (drafts ${draftDir})`);
-  const left = own ? unpushed({ git: deps.git, dir: clone.dir, headRef: it.headRef }) : 0;
-  if (left > 0) return human(`${left} commit${left > 1 ? 's' : ''} not pushed`);
+  const left = own ? unpushed({ git, dir: clone.dir, headRef: it.headRef }) : 0;
+  if (left > 0) {
+    try {
+      pushBranch({ git, dir: clone.dir, headRef: it.headRef });
+    } catch (e) {
+      return human(`the push of ${left} commit${left > 1 ? 's' : ''} failed (${clean(String(e.stderr || e.message).split('\n')[0])}); a teammate may have pushed meanwhile`);
+    }
+  }
+  let link;
+  try {
+    link = deps.gh(['api', '-X', 'POST', `repos/${ctx.repo}/issues/${Number(it.pr)}/comments`, '--input', path.join(draftDir, 'post.json')])?.html_url;
+  } catch (e) {
+    return human(`${left ? 'pushed, but ' : ''}posting the reply failed: ${clean(e.message)}`);
+  }
+  if (link) at.link = link;
+  const issue = copied.includes('issue.md') ? openIssue({ deps, ctx, it, draftDir, owners: fileOwners }) : null;
   removeClone({ dir: clone.dir });
   delete at.clone;
-  return { ...at, kind: 'done', detail: `${res.summary.slice(0, 500)}${denied}` };
+  return { ...at, kind: 'done', ...(issue ? { issue } : {}), detail: `${res.summary.slice(0, 500)}${denied}${issue?.url ? `; issue ${issue.url}` : issue?.skipped ? `; issue not opened: ${issue.skipped}` : ''}` };
+}
+
+const REPLY_LIMIT = 60000;
+const TOKEN = /sk-ant-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+/;
+
+/** A known token shape, or the literal value of any secret-looking variable the runner holds */
+export function leaks(text, env = {}) {
+  if (TOKEN.test(text)) return true;
+  return Object.entries(env).some(([k, v]) => /TOKEN|KEY|SECRET|PASS|WEBHOOK|AUTH|CREDENTIAL/i.test(k) && typeof v === 'string' && v.length >= 12 && text.includes(v));
+}
+
+/** What the runner posts: a visible agent line first (all agents post from human accounts), the marker last */
+export function postBody({ me, it, text }) {
+  const reply = String(text).split(MARKER).join('').trim().slice(0, REPLY_LIMIT);
+  return `> iw-watch agent for @${me}, round ${it.rounds + 1}/${it.maxRounds}\n\n${reply}\n\n${MARKER}\n`;
+}
+
+/** .iw-watch/issue.md: `# title`, `assignee: login|none`, body. The owner must be in CODEOWNERS; no duplicate titles. */
+function openIssue({ deps, ctx, it, draftDir, owners: fileOwners }) {
+  const [first = '', second = '', ...rest] = fs.readFileSync(path.join(draftDir, 'issue.md'), 'utf8').split('\n');
+  const title = first.replace(/^#\s*/, '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200);
+  if (!title) return { skipped: 'issue.md has no title line' };
+  const asked = (/^assignee:\s*@?([A-Za-z0-9-]+)\s*$/i.exec(second) || [])[1];
+  const known = new Set(fileOwners.flatMap((f) => f.owners).filter((o) => !o.includes('/')).map((o) => o.toLowerCase()));
+  const assignee = asked && asked.toLowerCase() !== 'none' && known.has(asked.toLowerCase()) ? asked : null;
+  const norm = (s) => s.toLowerCase().replace(/\s+/g, '');
+  try {
+    const open = deps.gh(['issue', 'list', '--state', 'open', '--limit', '100', '--search', `${title} in:title`, '--json', 'number,title,url']) || [];
+    const dup = open.find((x) => norm(x.title) === norm(title));
+    if (dup) return { skipped: `a duplicate is open: ${dup.url}` };
+    const body = postBody({ me: ctx.me, it, text: `${rest.join('\n').trim()}\n\nFound while handling ${it.url}.${asked && !assignee ? ` Proposed owner @${asked} is not in CODEOWNERS for the changed files, so nobody is assigned.` : ''}` });
+    const file = path.join(draftDir, 'issue.json');
+    fs.writeFileSync(file, JSON.stringify({ title, body, ...(assignee ? { assignees: [assignee] } : {}) }), { mode: 0o600 });
+    const made = deps.gh(['api', '-X', 'POST', `repos/${ctx.repo}/issues`, '--input', file]);
+    return { url: made?.html_url, assignee };
+  } catch (e) {
+    return { skipped: clean(e.message) };
+  }
 }
 
 function runCmd(deps, ctx, o) {
@@ -264,6 +369,7 @@ export async function main(argv, deps = defaultDeps()) {
   deps = { ...defaultDeps(), ...deps };
   try {
     if (o.cmd === 'run' && !deps.claudeAvailable()) return runCmd(deps, null, o);
+    if (o.cmd === 'notify') return notifyCmd(deps, context(deps), o);
     const ctx = withDomains(deps, context(deps), o);
     if (o.cmd === 'ack') {
       withState(deps, ctx.repo, (state) => { for (const id of o.ids) ack(state, id); });

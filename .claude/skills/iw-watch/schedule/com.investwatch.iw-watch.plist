@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  iw-watch every 2 minutes on macOS. Set the two paths (REPO and the log), then:
+  iw-watch every 2 minutes on macOS. Set the repository path, then:
     cp com.investwatch.iw-watch.plist ~/Library/LaunchAgents/
     launchctl load ~/Library/LaunchAgents/com.investwatch.iw-watch.plist
   Stop: launchctl unload ~/Library/LaunchAgents/com.investwatch.iw-watch.plist
   A login shell (-l) so node, gh and claude are on PATH as in your terminal; zsh also reads ~/.zshenv,
   where the IWATCH_* variables go (README.md).
+  It drafts only: add --publish once you trust it (ADR 0210). The log holds agent-written text, so it is
+  ~/Library/Logs/iw-watch.log, private to you (umask 077), not a world-readable file in /tmp.
 -->
 <plist version="1.0">
 <dict>
@@ -16,13 +18,9 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>cd "$HOME/Projects/InvestWatch" &amp;&amp; node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2</string>
+    <string>umask 077 &amp;&amp; cd "$HOME/Projects/InvestWatch" &amp;&amp; node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2 &gt;&gt; "$HOME/Library/Logs/iw-watch.log" 2&gt;&amp;1</string>
   </array>
   <key>StartInterval</key>
   <integer>120</integer>
-  <key>StandardOutPath</key>
-  <string>/tmp/iw-watch.log</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/iw-watch.log</string>
 </dict>
 </plist>

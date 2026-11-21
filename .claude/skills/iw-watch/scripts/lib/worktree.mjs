@@ -1,7 +1,9 @@
 // One disposable clone per handled item, next to the other worktrees: ../InvestWatch-worktrees/watch-pr-<n>.
 // A clone, not a `git worktree`: the PR branch is usually checked out in the author's own worktree, and git
 // refuses a second worktree of it. The clone borrows objects from the main clone (--reference, then
-// --dissociate), has the real `origin` URL, and carries the branch's own .claude/ (settings and git-guard).
+// --dissociate) and has the real `origin` URL. A fix runs on the PR branch only when the branch leaves
+// .claude/, CLAUDE.md, .github/ and .mcp.json as the base has them: those load as settings, hooks and
+// instructions, and project hooks run even in an untrusted directory (Adam, PR #48).
 import realFs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -43,6 +45,12 @@ function populate({ git, fs, mainRoot, item, dir, url, own }) {
   if (own) {
     git(['-C', dir, 'fetch', '--quiet', 'origin', `+refs/heads/${item.baseRef}:refs/remotes/origin/${item.baseRef}`]);
     head = git(['-C', dir, 'rev-parse', 'HEAD']);
+    if (item.headSha && head !== item.headSha) throw new NeedsHuman(`the branch moved since the scan (${head.slice(0, 12)}, scanned ${String(item.headSha).slice(0, 12)}); the next run picks up the new head`);
+    const touched = protectedPaths(git(['-C', dir, 'diff', '--name-only', `origin/${item.baseRef}...HEAD`]));
+    if (touched.length) throw new NeedsHuman(`the branch changes ${touched.slice(0, 3).join(', ')}: settings, hooks or agent instructions; an agent does not run on it, over to you`);
+    // a symlink could point the Read tool outside the clone (the sandbox bounds Bash, not Read)
+    const links = git(['-C', dir, 'diff', '--raw', '--no-renames', `origin/${item.baseRef}...HEAD`]).split('\n').filter((l) => / 120000 [0-9a-f]+ [0-9a-f]+ [AMT]\t/.test(l));
+    if (links.length) throw new NeedsHuman(`the branch adds or changes ${links.length} symlink${links.length > 1 ? 's' : ''}; an agent does not run on it, over to you`);
   } else {
     // Someone else's PR is never checked out: its .claude/ (hooks, settings) and CLAUDE.md would load in the
     // session, and project hooks run even in an untrusted directory. The working tree stays on the base
@@ -60,12 +68,75 @@ function populate({ git, fs, mainRoot, item, dir, url, own }) {
 
 export const prRef = (pr) => `refs/iw/pr-${Number(pr)}`;
 
+// What loads as settings, hooks or agent instructions, or changes CI: never touched by an unattended run
+// Case-insensitive: macOS checks `.Claude/` out as `.claude/`. A branch .npmrc would steer the runner's npm ci.
+const PROTECTED = /^(\.claude\/|\.github\/|\.mcp\.json$|\.iw-watch\/)|(^|\/)(CLAUDE\.md|\.npmrc|\.yarnrc(\.yml)?)$/i;
+export const protectedPaths = (nameOnly) => String(nameOnly || '').split('\n').map((s) => s.trim()).filter((f) => f && PROTECTED.test(f));
+
+/** The agent's new commits, checked before the runner pushes them */
+export function newCommitPaths({ git = realGit, dir, headRef }) {
+  return protectedPaths(git(['-C', dir, 'diff', '--name-only', `refs/remotes/origin/${headRef}..HEAD`]));
+}
+
+/** The runner pushes, not the session: never force, only to the PR's own branch name */
+export function pushBranch({ git = realGit, dir, headRef }) {
+  if (!safeBranch(headRef)) throw new NeedsHuman(`refused branch name ${JSON.stringify(headRef)}`);
+  git(['-C', dir, 'push', '--quiet', 'origin', `HEAD:refs/heads/${headRef}`]);
+}
+
+/**
+ * The session has no network, so the runner installs the lockfiles first: `npm ci --ignore-scripts` in each
+ * top-level package the PR touches. No install scripts run; the session's own environment (no tokens).
+ */
+export function installDeps({ fs = realFs, run, dir, files, env }) {
+  const dirs = [...new Set((files || []).map((f) => f.split('/')[0]).filter((d) => /^[A-Za-z0-9._-]+$/.test(d) && d !== '..'))];
+  const out = [];
+  for (const d of dirs) {
+    const pkg = path.join(dir, d);
+    if (!fs.existsSync(path.join(pkg, 'package-lock.json'))) continue;
+    try {
+      run('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: pkg, env, timeout: 10 * 60 * 1000, stdio: 'ignore' });
+      out.push({ dir: d, ok: true });
+    } catch (e) {
+      out.push({ dir: d, ok: false, error: String(e.message).split('\n')[0] });
+    }
+  }
+  return out;
+}
+
 /** Commits on the clone's branch that origin does not have */
 export function unpushed({ git = realGit, dir, headRef }) {
   try {
     git(['-C', dir, 'fetch', '--quiet', 'origin', `+refs/heads/${headRef}:refs/remotes/origin/${headRef}`]);
   } catch { /* offline: compare with what we have */ }
   return Number(git(['-C', dir, 'rev-list', '--count', `refs/remotes/origin/${headRef}..HEAD`]));
+}
+
+/** .env files in the main clone and the sibling worktrees: a sandboxed command must not read them */
+export function findEnvFiles({ fs = realFs, mainRoot }) {
+  const roots = [mainRoot];
+  const wt = path.join(path.dirname(mainRoot), 'InvestWatch-worktrees');
+  try { for (const d of fs.readdirSync(wt)) roots.push(path.join(wt, d)); } catch { /* no worktrees */ }
+  const out = [];
+  const walk = (dir, depth) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.isFile() && /^\.env(\..+)?$/.test(e.name) && !/\.example$/.test(e.name)) out.push(path.join(dir, e.name));
+      else if (e.isDirectory() && depth < 2 && !['node_modules', '.git', '.venv'].includes(e.name)) walk(path.join(dir, e.name), depth + 1);
+    }
+  };
+  for (const r of roots) walk(r, 0);
+  return out;
+}
+
+/** What git would run or obey in the clone: config, hooks, attributes. Compared before and after a session. */
+export function gitSnapshot({ fs = realFs, dir }) {
+  const g = path.join(dir, '.git');
+  const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } };
+  let hooks = [];
+  try { hooks = fs.readdirSync(path.join(g, 'hooks')).sort().map((h) => [h, read(path.join(g, 'hooks', h))]); } catch { /* none */ }
+  return JSON.stringify({ config: read(path.join(g, 'config')), attributes: read(path.join(g, 'info', 'attributes')), hooks });
 }
 
 export function removeClone({ fs = realFs, dir }) {

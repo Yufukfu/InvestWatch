@@ -1,3 +1,4 @@
 # iw-watch every 2 minutes (crontab -e). Set the repository path; the login shell puts node, gh and claude on PATH.
 # Notices are JSON lines in the log; IWATCH_NOTIFY_CMD (see SKILL.md) sends them elsewhere.
-*/2 * * * * /bin/bash -lc 'cd "$HOME/Projects/InvestWatch" && node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2' >> "$HOME/.local/state/iw-watch.log" 2>&1
+# It drafts only; add --publish once you trust it (ADR 0210). umask 077: the log holds agent-written text.
+*/2 * * * * /bin/bash -lc 'umask 077 && cd "$HOME/Projects/InvestWatch" && node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2 >> "$HOME/.local/state/iw-watch.log" 2>&1'

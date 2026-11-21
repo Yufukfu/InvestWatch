@@ -28,9 +28,17 @@ The agent never sees these variables: the runner removes every `IWATCH_*` and `I
 |---|---|
 | In a Claude session | `/loop 2m /iw-watch --mine` |
 | See what is waiting, no agent | `node .claude/skills/iw-watch/scripts/watch.mjs scan --mine --review-requested` |
-| One headless pass, nothing published | `node .claude/skills/iw-watch/scripts/watch.mjs run --mine --dry-run` |
-| One headless pass that pushes and replies | `node .claude/skills/iw-watch/scripts/watch.mjs run --mine` |
-| Every 2 minutes in the background | `schedule/com.investwatch.iw-watch.plist` (macOS) or `schedule/crontab.example` |
+| One headless pass, nothing published (the default) | `node .claude/skills/iw-watch/scripts/watch.mjs run --mine` |
+| One headless pass that pushes and replies | `node .claude/skills/iw-watch/scripts/watch.mjs run --mine --publish` |
+| Every 2 minutes in the background | `schedule/com.investwatch.iw-watch.plist` (macOS, logs to `~/Library/Logs/iw-watch.log`) or `schedule/crontab.example` |
+
+A headless session runs in the Claude Code sandbox:
+- no network;
+- writes only inside its clone;
+- no reads of `~/.ssh`, `~/.config/gh`, `~/.aws`, your shell profiles or `.env` files;
+- no `GH_TOKEN` or `SSH_AUTH_SOCK` in its environment.
+
+It cannot push or post. After the session the runner does both, with your own git and `gh` credentials, and only with `--publish`. Before publishing it checks that the tree is clean and that no commit touches `.claude/`, `CLAUDE.md`, `.github/` or `.mcp.json`. Every comment it posts starts with `iw-watch agent for @you, round N/3`. A sandboxed session can still read other files on your machine and quote them in its reply, so turn on `--publish` only on a machine without production credentials. See [ADR 0210](../../../.docs/decisions/0210-unattended-pr-watcher.md).
 
 ## 4. When it asks you something
 

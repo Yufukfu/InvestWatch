@@ -78,6 +78,12 @@ export function ack(state, id) {
     e.handled = [...new Set([...(e.handled || []), ...keys])].slice(-HANDLED_MAX);
     delete e.pending[id];
     if (!Object.keys(e.pending).length) delete e.pending;
+  } else if (kind === 'review' && e.pending?.[id]) {
+    // a review round started by my /iw answers: the answers are handled, the head is reviewed
+    e.handled = [...new Set([...(e.handled || []), ...e.pending[id]])].slice(-HANDLED_MAX);
+    delete e.pending[id];
+    if (!Object.keys(e.pending).length) delete e.pending;
+    e.reviewedSha = cursor.split('-')[0];
   } else {
     e[KINDS[kind]] = cursor;
   }

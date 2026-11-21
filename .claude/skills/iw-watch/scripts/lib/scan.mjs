@@ -2,7 +2,7 @@
 // It records the event keys of each address-review item as pending in the state (ack moves them to handled);
 // the caller saves the state only when the whole scan succeeded.
 import { itemId, digest, setPending, isHandled } from './state.mjs';
-import { countRounds, capReached } from './rounds.mjs';
+import { countRounds, capReached, MARKER } from './rounds.mjs';
 import { ownedDirs } from './codeowners.mjs';
 
 export class DomainError extends Error {}
@@ -41,7 +41,7 @@ function filesOf(gh, repo, pr) {
   return (gh(['api', '--paginate', `repos/${repo}/pulls/${Number(pr.number)}/files?per_page=100`]) || []).map((f) => f.filename);
 }
 
-export const PR_FIELDS = 'number,title,url,isDraft,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files';
+export const PR_FIELDS = 'number,title,url,isDraft,isCrossRepository,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files';
 export const LIST_LIMIT = 100;
 export const OPEN_LIMIT = 500;
 // A superseded run is CANCELLED; that is not a failure to fix.
@@ -73,6 +73,9 @@ function events({ reviews, reviewComments, comments }) {
   ];
 }
 
+/** A /iw comment I wrote by hand: mine, starts with /iw, and carries no agent marker */
+export const isAnswer = (e, me) => lc(e.author) === lc(me) && /^\/iw\b/.test(e.body.trim()) && !e.body.includes(MARKER) && !/iw-watch agent for @/.test(e.body);
+
 const strip = ({ user, trusted, ...e }) => e;
 const byTime = (x, y) => Date.parse(x.at) - Date.parse(y.at) || x.key.localeCompare(y.key);
 
@@ -87,6 +90,7 @@ function base(pr, repo) {
     headSha: pr.headRefOid,
     baseRef: pr.baseRefName,
     isDraft: pr.isDraft,
+    crossRepo: Boolean(pr.isCrossRepository),
     files: (pr.files || []).map((f) => f.path),
   };
 }
@@ -104,9 +108,10 @@ function capItem(b, r, maxRounds, st) {
 function minePr(gh, repo, me, pr, st, maxRounds, state) {
   const b = base(pr, repo);
   const act = activity(gh, repo, pr.number);
-  // my own comments are not work, except an answer that starts with /iw (questions.mjs)
+  // my own comments are not work, except an answer that starts with /iw (questions.mjs). The agents post from
+  // my account too, so a comment with the marker is the agent's, never my answer (Adam, PR #48)
   const others = events(act)
-    .map((e) => (lc(e.author) === lc(me) && /^\/iw\b/.test(e.body.trim()) ? { ...e, type: 'answer', trusted: true } : e))
+    .map((e) => (isAnswer(e, me) ? { ...e, type: 'answer', trusted: true } : e))
     .filter((e) => (lc(e.author) !== lc(me) || e.type === 'answer') && !isBot(e.user) && !isHandled(st, e.key));
   const outsiders = others.filter((e) => !e.trusted).length;
   const fresh = others
@@ -137,10 +142,11 @@ function minePr(gh, repo, me, pr, st, maxRounds, state) {
 }
 
 /** Someone else's PR that waits for my review at its current head sha */
-function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false, warn = () => {} } = {}) {
+function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false, warn = () => {}, state } = {}) {
   if (pr.isDraft || lc(pr.author?.login) === lc(me)) return [];
   const b = base(pr, repo);
-  if (st.reviewedSha === b.headSha) return [];
+  // a reviewed head needs no new review, unless I answered the agent's question there with /iw
+  const answersOnly = st.reviewedSha === b.headSha;
   // a PR is text and code by its author: only someone with write access gets an agent's review session
   const assoc = (gh(['api', `repos/${repo}/pulls/${Number(pr.number)}`]) || {}).author_association;
   if (!TRUSTED.has(assoc)) {
@@ -148,15 +154,23 @@ function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false, warn = ()
     return [];
   }
   const act = activity(gh, repo, pr.number);
+  const answers = events(act).filter((e) => isAnswer(e, me) && !isHandled(st, e.key)).map((e) => ({ ...e, type: 'answer', trusted: true }));
   const mine = act.reviews.filter((r) => lc(r.user?.login) === lc(me) && r.state !== 'PENDING');
-  if (mine.some((r) => r.commit_id === b.headSha)) return [];
-  // found only through reviewed-by:@me: re-review a new head unless my last word was an approval
-  if (rereview && (!mine.length || mine.at(-1).state === 'APPROVED')) return [];
+  if (!answers.length) {
+    if (answersOnly || mine.some((r) => r.commit_id === b.headSha)) return [];
+    // found only through reviewed-by:@me: re-review a new head unless my last word was an approval
+    if (rereview && (!mine.length || mine.at(-1).state === 'APPROVED')) return [];
+  }
   const r = rounds(act, me, st);
   if (capReached(r, maxRounds)) return [capItem(b, r, maxRounds, st)].filter(Boolean);
-  const all = events(act).filter((e) => !isBot(e.user));
+  const keys = new Set(answers.map((e) => e.key));
+  const all = [...events(act).filter((e) => !isBot(e.user) && !keys.has(e.key)), ...answers];
   const context = all.filter((e) => e.trusted).map(strip).sort(byTime);
-  return [{ ...b, id: itemId({ kind: 'review', pr: b.pr, cursor: b.headSha }), kind: 'review', rounds: r, maxRounds, events: context, checks: [], ignoredOutsiders: all.length - context.length }];
+  // `<sha>-<digest>`: ack records the sha as reviewed and the answers as handled (state.mjs)
+  const cursor = answers.length ? `${b.headSha}-${digest([...keys])}` : b.headSha;
+  const item = { ...b, id: itemId({ kind: 'review', pr: b.pr, cursor }), kind: 'review', rounds: r, maxRounds, events: context, checks: [], ignoredOutsiders: all.length - context.length };
+  if (answers.length && state) setPending(state, pr.number, { [item.id]: [...keys] });
+  return [item];
 }
 
 /**
@@ -197,7 +211,7 @@ export function scan({ gh, repo, me, mode, state, maxRounds = 3, warn = () => {}
     for (const pr of prs.filter(keep)) {
       if (done.has(pr.number)) continue;
       done.add(pr.number);
-      items.push(...reviewPr(gh, repo, me, pr, st(pr.number), maxRounds, { rereview, warn }));
+      items.push(...reviewPr(gh, repo, me, pr, st(pr.number), maxRounds, { rereview, warn, state }));
     }
   }
   items.sort((x, y) => x.pr - y.pr || x.kind.localeCompare(y.kind));
