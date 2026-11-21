@@ -19,7 +19,7 @@ pytest, saved real responses in `tests/fixtures/`, no live network in unit tests
 
 - A session is one attempt: fresh cookies, an identity drawn per run, a proxy picked per request. A block ends the run and is never retried; a `robots.txt` refusal is not a block.
 - Every URL (source URL, redirect hop, scraped link) goes through the guards before a request: http(s), allow-listed host, `ALLOWED_PORTS`, then our own DNS and a public address; connect to the address that was checked.
-- `author` is never taken from a page's markup (`ingest.document.build_document` drops it): analytics routes on `author.handle` / `profile_url`, so only a platform collector may set it, from account data, via the `author=` argument. Provenance per platform: [`README.md`](README.md), "Author provenance".
+- `author` is never taken from claims a page's writer controls (`<meta>`, `rel=author`, embedded JSON; `ingest.document.build_document` drops it): analytics routes on `author.handle` / `profile_url` (and the host of `url`), so only a platform collector may set it, from the platform's own account fields, via the `author=` argument. Provenance per platform: [`README.md`](README.md), "Author provenance".
 - Errors use the closed `Reason` set; details never carry a proxy URL, credentials, a path or a query.
 
 ## Ingest (`src/iw_scraper/ingest/`)

@@ -8,7 +8,7 @@ Issue #36: analytics routes a post to M2 (published by the firm itself) when `au
 
 - `build_document` drops `author` from the parsed page: the field is stored only when a platform collector passes platform account data as the new `author` argument of `build_document` and `Ingestor.ingest`.
 - Document the provenance of `author.handle` and `author.profile_url` per platform in `scraper/README.md` and `scraper/CLAUDE.md`, and the trust rule in the contract notes (`.docs/integration-plan.md` §3).
-- Out of scope: a `scrape_meta` flag for "author verified" (needs a contract change, proposal in the PR body and issue reply), the social collectors (`scraper-v2`), analytics routing.
+- Out of scope: a `scrape_meta` flag for "author verified" (needs a contract change, proposal in the reply on issue 36, with the note that the flag must be set only by the trusted `author=` path, never taken from a page's `scrape_meta`), the social collectors (`scraper-v2`), analytics routing.
 - Owner: Adam's module (`scraper/`).
 - Contracts: none changed. `author` is already optional and nullable in `ScrapedDocument` v1.
 
