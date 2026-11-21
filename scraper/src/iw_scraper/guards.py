@@ -2,6 +2,9 @@
 
 from arq.connections import ArqRedis
 
+# Our own keys; arq's `arq:job:` and `arq:result:` prefixes are fixed by the library.
+KEY_PREFIX = "iw:scraper:"
+
 _ACQUIRE_LEASE = """
 local t = redis.call('TIME')
 local now = t[1] * 1000 + math.floor(t[2] / 1000)
@@ -31,6 +34,13 @@ return 0
 """
 
 
+# Raise the deferral, never shorten one that is already longer (PTTL is -2 when the key is absent).
+_DEFER = """
+if redis.call('PTTL', KEYS[1]) < tonumber(ARGV[1]) then redis.call('SET', KEYS[1], 1, 'PX', ARGV[1]) end
+return 1
+"""
+
+
 def _millis(seconds: float) -> int:
     return max(1, int(seconds * 1000))
 
@@ -40,7 +50,7 @@ class LeaseSemaphore:
 
     def __init__(self, redis: ArqRedis, name: str, cap: int) -> None:
         self._redis = redis
-        self._key = f"iw:sem:{name}"
+        self._key = f"{KEY_PREFIX}sem:{name}"
         self._cap = cap
 
     async def acquire(self, lease_id: str, ttl: float) -> bool:
@@ -57,7 +67,7 @@ class RunLock:
 
     def __init__(self, redis: ArqRedis, source_id: str, owner: str) -> None:
         self._redis = redis
-        self._key = f"iw:lock:{source_id}"
+        self._key = f"{KEY_PREFIX}lock:{source_id}"
         self._owner = owner
 
     async def acquire(self, ttl: float) -> bool:
@@ -72,12 +82,16 @@ class RunLock:
 
 
 class DomainHealth:
-    """Failure cooldown: consecutive failed jobs pause a domain; one outcome is recorded per job."""
+    """Per-domain waits: a `Retry-After` deferral, and the failure cooldown after consecutive failed jobs.
+
+    One outcome is recorded per job for the cooldown; every worker sees both waits.
+    """
 
     def __init__(self, redis: ArqRedis, domain: str, *, threshold: int, cooldown: float) -> None:
         self._redis = redis
-        self._failures_key = f"iw:domain:{domain}:failures"
-        self._paused_key = f"iw:domain:{domain}:paused"
+        self._failures_key = f"{KEY_PREFIX}domain:{domain}:failures"
+        self._paused_key = f"{KEY_PREFIX}domain:{domain}:paused"
+        self._deferred_key = f"{KEY_PREFIX}domain:{domain}:deferred"
         self._threshold = threshold
         self._cooldown = cooldown
 
@@ -85,6 +99,18 @@ class DomainHealth:
         """Seconds until the domain may be used again, 0 when it is not paused."""
         remaining_ms = await self._redis.pttl(self._paused_key)
         return max(0, remaining_ms) / 1000
+
+    async def defer(self, seconds: float) -> None:
+        """Keep every worker off the domain for `seconds` (a `Retry-After`)."""
+        await self._redis.eval(_DEFER, 1, self._deferred_key, _millis(seconds))
+
+    async def deferred_for(self) -> float:
+        remaining_ms = await self._redis.pttl(self._deferred_key)
+        return max(0, remaining_ms) / 1000
+
+    async def wait_for(self) -> float:
+        """Seconds until the domain may be used again: the longer of the pause and the deferral."""
+        return max(await self.paused_for(), await self.deferred_for())
 
     async def record(self, ok: bool) -> None:
         if ok:
