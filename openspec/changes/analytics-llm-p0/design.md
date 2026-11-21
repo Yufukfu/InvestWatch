@@ -144,11 +144,11 @@ All dictionaries live in `m2_rules.yaml`. Risk-warning patterns are shared with 
   - `uncertain` when no warning sentence has a known language.
 
   The heuristic guesser stays, and `lingua` was not chosen: it adds a large dependency, and the rule needs only pl versus en.
-- **R14 warning next to past performance (text).**
+- **R14 past-performance disclaimer (text).**
   - A past-performance sentence is one with a return figure (R3's claim patterns) plus a past marker: a past-tense return verb (`zarobili`, `wypracował…`, `osiągnął…`, `przyniósł…`), `historyczn…`, `w ostatnich N latach/miesiącach`, or a year no later than `doc.fetched_at.year` with no future marker (`spodziewa…`, `prognoz…`, `będzie`, `expected`, `will`).
   - ZASÓB requires "obecność wyraźnego zastrzeżenia", a clear disclaimer. Unlike R3, it sets no proximity requirement, so distance alone never fails R14.
-  - `not_applicable` without such a sentence. `pass` when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material and at least one occurrence is not footnote-marked, quoting it.
-  - When the only disclaimers are footnotes, R14 is `fail`, quoting the first past-performance sentence. A footnote-only placement is also an R6 matter. Our reading of "not only a footnote" is that a footnote does not count as a clear disclaimer (resolved question 4).
+  - `not_applicable` without such a sentence. `pass` when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material, footnotes included, quoting the first occurrence that is not a footnote if there is one.
+  - A disclaimer that appears only as a footnote is still `pass` for R14. ZASÓB R14 asks for "obecność wyraźnego zastrzeżenia", and footnote text is present and explicit. ZASÓB R6 names exactly this case, "ryzyko ukryte w przypisach", so R6 flags the placement when `blocks` show it. This follows the same principle as the conditional rules: one violation is counted once, by the rule that names it (resolved question 4).
   - `fail`, quoting the first past-performance sentence, when no disclaimer exists.
   - Rules-only, as the plan says.
 - **R17 and R18, the shared approach.** Per ZASÓB, stating supervision is not a violation on its own. R17 is a mention "używane do sugerowania zatwierdzenia lub aprobaty produktu/usługi". R18 is its "szczególny przypadek", in which KNF is used as a safety argument (ZASÓB example: "w pełni bezpieczna – spełniamy rygorystyczne wymogi nadzorcze KNF"). Both rules detect a mention first and then classify how it is used.
@@ -219,11 +219,11 @@ Answered by the coordinating session on Damian's instruction to follow the chall
 1. **R3 borderline.** The warning must "bezpośrednio towarzyszy" each claim. The LLM may decide, and overturn a rules `fail`, only in the cases the rules mark as borderline (near-window proximity). It never decides an absent warning.
 2. **R17 with the LLM off.** A bare "pod nadzorem KNF" is `pass`. Supervision stated alone is not a violation: detect the mention, then classify its use (approval: R17; safety argument: R18).
 3. **R10.** A Polish warning plus an extra English one is `pass`. The main message's language, which ZASÓB does not define, is the dominant language of the headline and body, excluding legal and footer blocks.
-4. **R14.** A clear disclaimer anywhere in the material, with no proximity requirement. A footnote-only disclaimer is not a clear one, so R14 fails and R6 also covers the placement. Distance never fails R14 on its own.
+4. **R14.** A clear disclaimer anywhere in the material, with no proximity requirement. A footnote-only disclaimer is `pass` for R14, and R6 flags the placement (ZASÓB R6: "ryzyko ukryte w przypisach"). One violation is counted once, by the rule that names it. Distance never fails R14.
 5. **R4/R6 viewports.** Desktop and mobile, plus tablet when present. The worst is reported.
 6. **No risk information.** R4, R6 and R10 (and later R5, R7, R9) are `not_applicable` with `brak informacji o ryzyku`, and R3 carries the violation. R11 and R15 "Flaguje w raporcie" is noted in the catalogue for later.
 7. **LLM default.** Hosted, per ADR 0304; local Ollama with Gemma is the swap target, kept working and covered by the stub-server tests. No new ADR.
 
 ## Open Questions
 
-- **The R14 footnote-only reading** (question 4): `fail` is our reading of "is not only a footnote". If Damian prefers to leave it entirely to R6, it becomes a one-line change to `pass`.
+None. All product questions are resolved above.

@@ -169,7 +169,7 @@ R10 checks that risk information is not given in a language other than the main 
 - **THEN** R10 is `uncertain`
 
 ### Requirement: R14 past-performance disclaimer
-R14 SHALL be `not_applicable` when no sentence presents past performance: a return figure together with a past marker (a past-tense return verb such as `zarobili`, `wypracował`, `osiągnął`, `przyniósł`; `historyczn…`; `w ostatnich N latach/miesiącach`; or a year not later than the document's `fetched_at` year without a future marker such as `spodziewa`, `prognoz`, `będzie`, `expected`, `will`). ZASÓB requires a clear disclaimer to be present, with no proximity requirement. R14 SHALL pass when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material and at least one occurrence is not footnote-marked, quoting it. It SHALL fail, quoting the first past-performance sentence, when there is no disclaimer or only footnote-marked ones. Distance between the claim and the disclaimer SHALL NOT affect R14.
+R14 SHALL be `not_applicable` when no sentence presents past performance: a return figure together with a past marker (a past-tense return verb such as `zarobili`, `wypracował`, `osiągnął`, `przyniósł`; `historyczn…`; `w ostatnich N latach/miesiącach`; or a year not later than the document's `fetched_at` year without a future marker such as `spodziewa`, `prognoz`, `będzie`, `expected`, `will`). ZASÓB requires a clear disclaimer to be present, with no proximity requirement. R14 SHALL pass when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material, including only as a footnote, quoting the first non-footnote occurrence if there is one, else the footnote. A footnote-only placement SHALL be left to R6 (ZASÓB: "ryzyko ukryte w przypisach"), so one violation is counted once. It SHALL fail, quoting the first past-performance sentence, when there is no disclaimer. Distance between the claim and the disclaimer SHALL NOT affect R14.
 
 #### Scenario: Past returns without warning
 - **WHEN** the `eurotrade` mock is analyzed (`Nasi klienci zarobili średnio 34% w 2025 roku.`)
@@ -188,8 +188,8 @@ R14 SHALL be `not_applicable` when no sentence presents past performance: a retu
 - **THEN** R14 is `pass`
 
 #### Scenario: Disclaimer only as a footnote
-- **WHEN** the only disclaimer is `*Wyniki historyczne nie są gwarancją przyszłych wyników.`
-- **THEN** R14 is `fail`
+- **WHEN** the only disclaimer is `*Wyniki historyczne nie są gwarancją przyszłych wyników.`, and the document's `blocks` show it as the only risk block, in `footer` with `in_viewport_on_load: false`
+- **THEN** R14 is `pass` with the footnote as evidence and R6 is `fail`
 
 ### Requirement: R17 implying supervisory approval
 Stating supervision alone SHALL NOT be a violation; R17 covers a mention used to suggest approval of the product or service (ZASÓB). R17 SHALL be `not_applicable` when the text does not mention a supervisor (`KNF`, `UKNF`, `Komisja Nadzoru Finansowego`, `ESMA`, `nadzór`/`nadzorowany`, `regulowany`, `licencja`, `supervised`, `regulated by`). It SHALL fail, quoting the sentence, when an approval word (`zatwierdzon…`, `zaaprobowan…`, `aprobat…`, `rekomendowan… przez`, `certyfikat…`, `approved by`, `endorsed by`) is in the same sentence as a mention. Otherwise its rules-only result SHALL be `pass`, quoting the first mention, and it SHALL be deferred to the LLM (`llm.when: always`), which judges whether the wording suggests that the supervisor approves the product.

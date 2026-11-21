@@ -4,13 +4,13 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 1. R14 past-performance disclaimer (~45 min)
 
-- [ ] 1.1 Failing tests for the R14 scenarios (eurotrade `fail`, disclaimer next to past returns `pass`, disclaimer far from the claim `pass` (no proximity requirement, ZASÓB), forecast `not_applicable` with `fetched_at` year, footnote-only `fail`)
+- [ ] 1.1 Failing tests for the R14 scenarios (eurotrade `fail`, disclaimer next to past returns `pass`, disclaimer far from the claim `pass` (no proximity requirement, ZASÓB), forecast `not_applicable` with `fetched_at` year, footnote-only R14 `pass`; the R6 half of that scenario is tested in group 2)
 - [ ] 1.2 R14 class in `rules/m2.py`, `past_patterns` / `past_markers` / `future_markers` / `past_warning_patterns` in `m2_rules.yaml` (new keys in `KNOWN_PARAMS`, validated), `implemented: true`; tests green
 - [ ] 1.3 Mutation check; `mutations: N tried, N caught`
 
 ## 2. Evidence locator and R6 hidden risk (~1 h)
 
-- [ ] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`, no risk block `not_applicable` with `brak informacji o ryzyku`, only desktop/mobile/tablet evaluated); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
+- [ ] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`, no risk block `not_applicable` with `brak informacji o ryzyku`, only desktop/mobile/tablet evaluated, footnote-only past-performance disclaimer gives R6 `fail`); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
 - [ ] 2.2 `EvidenceLocator` in `models.py`; risk-block detection reusing R3's warning patterns via a YAML anchor; R6 class, `hiding_regions` param; worst viewport wins; tests green
 - [ ] 2.3 Mutation check; `mutations: N tried, N caught`
 
