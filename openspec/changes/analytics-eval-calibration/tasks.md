@@ -78,5 +78,5 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 ## 13. Closing (after groups 11-12 and the rebase onto `analytics/analytics-m1-m3`)
 
 - [x] 13.1 Apply iw-docs-update again (thresholds in `analytics/README.md`, `api/README.md`, `.docs/integration-plan.md` §5 defaults, `analytics/CLAUDE.md` / ADR links, ADR 0316 row, README numbers on the new base) and extend the AI log row; `npx @fission-ai/openspec@2.1.1 validate --all --strict` for this change and `docs-check` clean
-- [ ] 13.2 iw-pr-review on the whole branch (reviewer pass on groups 11-12 and the rebase), fix real findings
-- [ ] 13.3 `/openspec-archive-change` as the last commit, then push the branch and open the PR on base `analytics/analytics-m1-m3` (ADR 0207); never merge
+- [x] 13.2 iw-pr-review on the whole branch (reviewer pass on groups 11-12 and the rebase), fix real findings. Rebased onto `origin/main` bb770a0 (#35 merged). Reviews of 3afb856..a480cb9 and of the fix 681310e; findings 29-35 in `follow-ups.md`. Checks after the last code edit: analytics 913 passed, `api` threshold/findings/resources/settings suites 139 passed, `npx @fission-ai/openspec@2.1.1 validate --all --strict` 18/18, `docs-check` ok, `test-diff-check --base origin/main` no weakened tests, no `print`, `contracts/` untouched
+- [x] 13.3 `/openspec-archive-change` as the last commit, then push the branch and open the PR on base `main` (#35 merged first; ADR 0207); never merge
