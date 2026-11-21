@@ -66,7 +66,7 @@ class QueueSettings:
     lease_ttl: float = 30.0
     requeue_delay: float = 5.0
     failure_threshold: int = 5
-    domain_cooldown: float = 300.0
+    domain_cooldown: float = 600.0
 
     @classmethod
     def from_env(cls) -> "QueueSettings":
