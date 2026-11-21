@@ -41,6 +41,13 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, by default
 - **WHEN** `REGISTRY_CSV` points to a missing file
 - **THEN** the error names the file and `REGISTRY_CSV`
 
+#### Scenario: Hostile page URL and lookalike names
+- **WHEN** the page URL has a backslash, whitespace or control characters in its authority (`https://attacker.net\@alfa-inwestycje.example.com/`)
+- **THEN** no firm SHALL be matched by the page domain, as for links and the publisher
+- **AND** names and aliases SHALL be compared with the text after NFKC and removal of zero-width characters and soft hyphens, so `Ａｌｆａ Inwestycje` and `Alfa​ Inwestycje` match by name
+- **AND** the quote SHALL still be cut from the original text through an offset map; Cyrillic and Greek lookalikes are not folded
+- **AND** the fuzzy match SHALL need a ratio of at least 88: `Amega Kaital` (exactly 88 against `Omega Kapital`) matches, `Amga Kaital` does not
+
 #### Scenario: Foreign legal form stripped
 - **WHEN** the registry holds `Admiral Markets AS` and the text mentions `Admiral Markets`
 - **THEN** that firm is matched by name with confidence at least 0.9
