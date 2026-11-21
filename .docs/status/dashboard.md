@@ -20,5 +20,5 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 
 ## Blockers and open decisions
 
-- Compose has no REST backend yet: the dashboard runs against `contracts/mock-server` started by hand (see `web/README.md`). Deliberate until real data exists (Kacper, Sat): the dashboard is built on the mock data and the real api is swapped in at the end, before the demo. Team-wide entry in `.docs/STATUS.md`.
+- `docker compose up` starts the api service (`api/compose.yaml`), but the web container's nginx does not proxy `/api` to it yet, so the dashboard in compose shows its error states. The dashboard runs against `contracts/mock-server` started by hand (see `web/README.md`). Deliberate until real data exists (Kacper, Sat): the dashboard is built on the mock data and the real api is swapped in at the end, before the demo. Team-wide entry in `.docs/STATUS.md`.
 - Root `README.md` exists; its Quick Start is pending the deployment ADR. Per-service READMEs are stubs.

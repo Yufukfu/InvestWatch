@@ -22,7 +22,7 @@ docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts
 docker run --rm -p 127.0.0.1:8000:8000 iw-mock-server
 ```
 
-The mock endpoints stay until we have sensible data. The mock emits a new finding every `MOCK_REPLAY_INTERVAL_S` (10 s) while the dashboard is connected, so toasts appear on their own. It accepts Socket.IO only from origins in `MOCK_CORS_ORIGINS` (default includes `http://localhost:5173`): a dev server on another port needs `-e MOCK_CORS_ORIGINS='*'`, or the live badge falls back to `Brak połączenia na żywo`. A browser that ran the old mock mode on the same origin keeps its service worker until you unregister it (DevTools, Application, Service Workers). Compose does not start a REST backend yet, so `docker compose up` alone shows only the dashboard's error states.
+The mock endpoints stay until we have sensible data. The mock emits a new finding every `MOCK_REPLAY_INTERVAL_S` (10 s) while the dashboard is connected, so toasts appear on their own. It accepts Socket.IO only from origins in `MOCK_CORS_ORIGINS` (default includes `http://localhost:5173`): a dev server on another port needs `-e MOCK_CORS_ORIGINS='*'`, or the live badge falls back to `Brak połączenia na żywo`. A browser that ran the old mock mode on the same origin keeps its service worker until you unregister it (DevTools, Application, Service Workers). `docker compose up` starts the api service too (`api/compose.yaml`, included by the root `compose.yaml`), but the web container's nginx does not proxy `/api` to it yet, so the dashboard in compose shows only its error states.
 In docker the app is served by unprivileged nginx behind the gateway: `docker compose up --build` from the repo root, then https://localhost:8443.
 
 ## API client (contract-first)

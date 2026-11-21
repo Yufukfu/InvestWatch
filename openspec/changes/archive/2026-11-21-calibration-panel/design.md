@@ -10,7 +10,7 @@ See proposal.md. Rules for the panel are in `.claude/rules/web-dashboard.md` ("C
 - **State in the page component:** the module and the selected index are local UI state in `CalibrationPage`. They are not in the URL, because a preview is not a shareable view. The `key` is module plus current threshold, so a save or module switch resets the slider to the new current point.
 - **Body of the PUT:** taken from `GET /settings/thresholds` with one module replaced. The panel never invents the other modules' values. Save stays disabled until the settings have loaded.
 - **Lazy-loaded section**, like the trend. Recharts lives in the lazy chunk, and the calibration chunk reuses it.
-- **Comparison display:** the current value is shown beside the selected one (`FP 23 → 12`). The arrow direction comes from comparing two returned numbers, and no new metric is derived.
+- **Comparison display:** each metric shows the selected point's value, with the current point's value beside it as `obecnie N` (for example `FP 0`, `obecnie 5`). Both numbers are returned by `GET /calibration`; no arrow or delta is derived, and no new metric is computed.
 
 ## Risks / Trade-offs
 
