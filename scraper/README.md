@@ -18,6 +18,18 @@ docker run --rm --network iw-scraper-test -e REDIS_URL=redis://iw-scraper-test-r
 
 The ingest tests also need real PostgreSQL, Redis and MinIO, addressed by `IW_TEST_PG_DSN`, `IW_TEST_REDIS_URL`, `IW_TEST_MINIO_ENDPOINT`, `IW_TEST_MINIO_ACCESS_KEY` and `IW_TEST_MINIO_SECRET_KEY`; without them they are skipped, and with `CI` set they fail. The schema they run on is `tests/schema.sql`, a throwaway copy of Damian's `api/migrations` (0001-0003); the service itself never creates tables or the `iw-raw` bucket.
 
+## Author provenance
+
+Analytics routes a post to M2 (published by the firm itself) from `author.handle` and `author.profile_url`, so where they come from decides whether an impersonator can fake a firm post (issue 36). Read from the code on `main`:
+
+| Platform | `author.handle` | `author.profile_url` | Source | Platform-verified |
+|---|---|---|---|---|
+| `web` (every source today) | never set | never set | `parsing.parse_page` returns title, text, canonical URL and links only; `document.build_document` emits no `author` | n/a, the field is absent |
+| any parsed page that carries an `author` | dropped | dropped | `ingest.document.build_document` ignores `author` on the page: markup (`<meta>`, `rel=author`, embedded JSON) is written by the post's author | no, so it is never stored |
+| social (`scraper-v2`, not on `main`) | not yet mapped | not yet mapped | the Telegram parser on `scraper/scraper-v2-social` reads the channel handle as `Channel.handle`, nothing writes it to `author` | decided in that change |
+
+Rule: `author` is set only by a platform collector from the platform's own account data, through an explicit path in that collector's change, never copied from a page's markup. A document without `author` is a valid `ScrapedDocument`; consumers must treat it as "unknown", not "third party". `ingest.validate` only checks that `profile_url` is an http(s) URL, not who wrote it. A positive "verified" flag would need a `scrape_meta` field, which is a contract change (proposal in the PR for issue 36).
+
 ## Configuration
 
 Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; the run that joins the pieces (`scraper-orchestration`) passes the values on, so until it exists the library takes them as parameters. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.

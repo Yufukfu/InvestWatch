@@ -12,13 +12,14 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 
 ## Active OpenSpec changes
 
-- none (`scraper-v1` archived; `scraper-ingest` archived in PR #22)
+- none (`scraper-v1` archived; `scraper-ingest` archived in PR #22; `scraper-author-provenance` for issue 36 is archived in its own PR)
 
 ## Blockers and open decisions
 
 - The first social platform (ADR 0103, criteria only) is decided in `scraper-v2`.
 - Wiring is unassigned: nothing calls `Ingestor`, `sweep` or `Storage.check_bucket` yet, and the v1 `JobErrorSink` is synchronous while `record_error` is async; to be settled in `scraper-orchestration` (follow-up 1 of `scraper-ingest`).
 - Two redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`) and `ingest.errors.redact` (full). Keep the full one and drop the other when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).
+- Issue 36 (author provenance): no collector on `main` sets `author`; the ingest drops it from a page. A `scrape_meta` "author verified" flag would need a contract change and is not proposed in the contract yet.
 - `scrape_meta.scraper` is settled without a contract change: `httpx` plus `scrape_meta.client` (ADR 0101).
 - Playwright is required for sources that must provide `blocks`/`screenshots` (rules R4-R8, R13).
 - Social media: one platform first; which one is open (ADR 0103).

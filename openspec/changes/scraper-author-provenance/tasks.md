@@ -7,7 +7,7 @@
 
 ## 2. Closing
 
-- [ ] 2.1 Apply the `iw-docs-update` skill (`scraper/README.md`, `scraper/CLAUDE.md`, `.docs/integration-plan.md` §3 note, your domain file in `.docs/status/`), run docs-check, add the `iw-ai-log` row
+- [x] 2.1 Apply the `iw-docs-update` skill (`scraper/README.md`, `scraper/CLAUDE.md`, `.docs/integration-plan.md` §3 note, your domain file in `.docs/status/`), run docs-check, add the `iw-ai-log` row
 - [ ] 2.2 Run the `iw-pr-review` skill (security focus) and fix real findings
 
 ## Workflow follow-up
