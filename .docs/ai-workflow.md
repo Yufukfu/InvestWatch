@@ -46,6 +46,7 @@ Known limits: review is a practice, not enforced by a hook; the hook reads only 
 
 | When | Who | What was done with AI | Outcome / lesson |
 |---|---|---|---|
+| Sat ~23:00 | Adam | Had Claude Code deploy the scraper in the compose stack (`scraper-stack`): moved the work to a fresh worktree on `origin/main` when the hook blocked a branch reset, wrote `stack.sh` red first, then the compose file, and found that `seed` stored an invalid cron the scheduler would skip on every tick (fixed test-first); the reviewer showed three checks of `stack.sh` could not go red, all fixed and re-mutated (13 of 13 caught) | A stack check needs a mutation run of its own: a green script that cannot fail proves nothing; one mutation (`replicas`) was caught for the wrong reason (duplicate key) until redone |
 | Sat 11:15 | Damian | Read all 16 HackNation tasks and compared the top candidates (scope, criteria, constraints) | Team picked #InvestWatch |
 | Sat 13:00 | Damian | Summarized the UKNF task, rules and annexes (18 risk-information rules, registry links, advisory definition) | Requirements in one place |
 | Sat 13:40 | Damian | Drafted the integration plan (contracts, REST/WS API, milestones) and the analytics work plan | `.docs/integration-plan.md`, `.docs/analytics-plan.md` |
