@@ -22,11 +22,11 @@ import jsonschema
 import pytest
 import pytest_asyncio
 import redis.asyncio as aioredis
-from arq.connections import RedisSettings, create_pool
+from arq.connections import RedisSettings
 from arq.worker import Worker
 
 from iw_scraper.config import contracts_dir
-from iw_scraper.jobs import QueueSettings, job_function
+from iw_scraper.jobs import ARQ_OPTIONS, QueueSettings, create_queue_pool, job_function
 from iw_scraper.types import JobError, Source
 
 
@@ -229,7 +229,7 @@ async def seeded_source(pool, source):
 @pytest.fixture
 async def redis():
     """A real Redis (REDIS_URL, see scraper/compose.test.yaml), emptied around each test."""
-    pool = await create_pool(RedisSettings.from_dsn(os.environ["REDIS_URL"]))
+    pool = await create_queue_pool(RedisSettings.from_dsn(os.environ["REDIS_URL"]))
     await pool.flushdb()
     yield pool
     await pool.flushdb()
@@ -337,6 +337,7 @@ async def start_worker(store):
             poll_delay=0.02,
             max_jobs=worker_kwargs.pop("max_jobs", 10),
             handle_signals=False,
+            **ARQ_OPTIONS,
             **worker_kwargs,
         )
         task = asyncio.create_task(worker.async_run())

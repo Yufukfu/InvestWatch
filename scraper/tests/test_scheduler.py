@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 
 from conftest import Recorder, make_source
+from iw_scraper.jobs import QUEUE_NAME
 from iw_scraper.scheduler import Scheduler
 from iw_scraper.types import Reason
 
@@ -15,7 +16,7 @@ def scheduler(redis, store, recorder=None, **kwargs):
 
 
 async def queued(redis) -> int:
-    return await redis.zcard("arq:queue")
+    return await redis.zcard(QUEUE_NAME)
 
 
 async def test_a_due_source_gets_one_job(redis, store):
@@ -86,6 +87,7 @@ async def test_an_invalid_cron_is_recorded_once_and_not_scheduled(redis, store):
 
     assert [(e.reason, e.source_id) for e in recorder.errors] == [(Reason.INVALID_REQUEST, A)]
     assert await queued(redis) == 0
+    assert await redis.get(f"iw:scraper:cron-invalid:{A}") == b"not a cron"
 
 
 async def test_a_fixed_cron_is_scheduled_and_a_new_invalid_value_is_recorded_again(redis, store):
@@ -191,7 +193,7 @@ async def test_a_non_utc_clock_is_converted_to_utc_slots(redis, store):
     await scheduler(redis, store).tick(datetime(2026, 11, 21, 13, 5, 20, tzinfo=warsaw))
 
     assert await queued(redis) == 1
-    assert [j.decode() for j in await redis.zrange("arq:queue", 0, -1)] == [f"sched-{A}-20261121T1205Z"]
+    assert [j.decode() for j in await redis.zrange(QUEUE_NAME, 0, -1)] == [f"sched-{A}-20261121T1205Z"]
 
 
 async def test_a_failing_sweep_does_not_stop_ticks_and_a_failing_tick_does_not_stop_the_sweep(redis, store):

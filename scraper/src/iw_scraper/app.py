@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import asyncpg
-from arq.connections import ArqRedis, RedisSettings, create_pool
+from arq.connections import ArqRedis, RedisSettings
 
 from iw_scraper.collect import Collector
 from iw_scraper.config import fetch_settings, proxy_settings, rate_limit_settings, target_settings
@@ -23,7 +23,7 @@ from iw_scraper.ingest.errors import record_error as store_job_error
 from iw_scraper.ingest.pipeline import Ingestor
 from iw_scraper.ingest.publisher import sweep
 from iw_scraper.ingest.storage import Storage
-from iw_scraper.jobs import QueueSettings
+from iw_scraper.jobs import QueueSettings, create_queue_pool
 from iw_scraper.logs import configure_logging
 from iw_scraper.pgstore import PgSourceStore
 from iw_scraper.proxy import ProxyRotator
@@ -108,7 +108,7 @@ async def runtime(redis_url: str):
             secure=os.environ.get("MINIO_SECURE", "false").lower() == "true",
         )
         await storage.check_bucket()
-        redis = await create_pool(RedisSettings.from_dsn(redis_url))
+        redis = await create_queue_pool(RedisSettings.from_dsn(redis_url))
         try:
             proxies, mode, cooldown = proxy_settings()
             ports, internal_hosts, extra_hosts = target_settings()

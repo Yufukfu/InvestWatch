@@ -1,10 +1,12 @@
 import asyncio
+import json
 from datetime import UTC, datetime
 
 import pytest
 from arq.jobs import Job
 
 from conftest import Recorder, make_source
+from iw_scraper.jobs import QUEUE_NAME
 from iw_scraper.scan_requests import ScanRequestConsumer, consumer_name
 from iw_scraper.sources import domain_of
 from iw_scraper.types import JobError, Reason
@@ -29,7 +31,7 @@ async def pending(redis) -> int:
 
 
 async def queued_jobs(redis):
-    return [await Job(j.decode(), redis).info() for j in await redis.zrange("arq:queue", 0, -1)]
+    return [await Job(j.decode(), redis, _queue_name=QUEUE_NAME, _deserializer=json.loads).info() for j in await redis.zrange(QUEUE_NAME, 0, -1)]
 
 
 async def test_a_valid_request_enqueues_one_requested_job_and_is_acknowledged(redis, store):
@@ -39,7 +41,7 @@ async def test_a_valid_request_enqueues_one_requested_job_and_is_acknowledged(re
     await consumer.poll(block=0.2)
 
     jobs = await queued_jobs(redis)
-    assert [(j.function, j.args) for j in jobs] == [("execute_job", (SRC, "example.test", True))]
+    assert [(j.function, tuple(j.args)) for j in jobs] == [("execute_job", (SRC, "example.test", True))]
     assert await pending(redis) == 0
 
 

@@ -2,6 +2,9 @@
 
 from arq.connections import ArqRedis
 
+# Our own keys; arq's `arq:job:` and `arq:result:` prefixes are fixed by the library.
+KEY_PREFIX = "iw:scraper:"
+
 _ACQUIRE_LEASE = """
 local t = redis.call('TIME')
 local now = t[1] * 1000 + math.floor(t[2] / 1000)
@@ -40,7 +43,7 @@ class LeaseSemaphore:
 
     def __init__(self, redis: ArqRedis, name: str, cap: int) -> None:
         self._redis = redis
-        self._key = f"iw:sem:{name}"
+        self._key = f"{KEY_PREFIX}sem:{name}"
         self._cap = cap
 
     async def acquire(self, lease_id: str, ttl: float) -> bool:
@@ -57,7 +60,7 @@ class RunLock:
 
     def __init__(self, redis: ArqRedis, source_id: str, owner: str) -> None:
         self._redis = redis
-        self._key = f"iw:lock:{source_id}"
+        self._key = f"{KEY_PREFIX}lock:{source_id}"
         self._owner = owner
 
     async def acquire(self, ttl: float) -> bool:
@@ -76,8 +79,8 @@ class DomainHealth:
 
     def __init__(self, redis: ArqRedis, domain: str, *, threshold: int, cooldown: float) -> None:
         self._redis = redis
-        self._failures_key = f"iw:domain:{domain}:failures"
-        self._paused_key = f"iw:domain:{domain}:paused"
+        self._failures_key = f"{KEY_PREFIX}domain:{domain}:failures"
+        self._paused_key = f"{KEY_PREFIX}domain:{domain}:paused"
         self._threshold = threshold
         self._cooldown = cooldown
 

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -106,8 +107,8 @@ async def test_a_job_failing_through_all_retries_counts_as_one_domain_failure(re
 
     await run_one(redis, start_worker, scripted([fail(Reason.HTTP_ERROR, 503)], calls), settings)
 
-    assert await redis.exists(f"iw:domain:{DOMAIN}:paused") == 0
-    assert int(await redis.get(f"iw:domain:{DOMAIN}:failures")) == 1
+    assert await redis.exists(f"iw:scraper:domain:{DOMAIN}:paused") == 0
+    assert int(await redis.get(f"iw:scraper:domain:{DOMAIN}:failures")) == 1
 
 
 async def test_consecutive_failed_jobs_pause_the_domain_and_the_next_job_waits(redis, start_worker):
@@ -121,6 +122,7 @@ async def test_consecutive_failed_jobs_pause_the_domain_and_the_next_job_waits(r
         job = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id=f"f{n}")
         assert await job.result(timeout=10, poll_delay=0.05) == "failed"
     paused_at = time.monotonic()
+    assert 0 < await redis.pttl(f"iw:scraper:domain:{DOMAIN}:paused") <= 600
     third = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="f3")
 
     assert await third.result(timeout=10, poll_delay=0.05) == "ok"
@@ -137,7 +139,7 @@ async def test_a_successful_job_resets_the_domain_failure_count(redis, start_wor
     outcome, _ = await run_one(redis, start_worker, run, settings, job_id="b")
 
     assert outcome == "ok"
-    assert await redis.exists(f"iw:domain:{DOMAIN}:failures") == 0
+    assert await redis.exists(f"iw:scraper:domain:{DOMAIN}:failures") == 0
 
 
 async def test_domain_outcome_is_recorded_even_when_the_error_sink_fails(redis, start_worker):
@@ -151,7 +153,7 @@ async def test_domain_outcome_is_recorded_even_when_the_error_sink_fails(redis, 
     with pytest.raises(RuntimeError):
         await job.result(timeout=10, poll_delay=0.05)
 
-    assert int(await redis.get(f"iw:domain:{DOMAIN}:failures")) == 1
+    assert int(await redis.get(f"iw:scraper:domain:{DOMAIN}:failures")) == 1
 
 
 async def test_an_error_the_collector_already_recorded_is_not_recorded_again(redis, start_worker):
@@ -171,3 +173,32 @@ async def test_a_huge_retry_after_is_cut_to_the_configured_maximum(redis, start_
 
     assert outcome == "ok"
     assert 0.35 <= calls[1] - calls[0] < 3.0
+
+
+async def test_job_state_keys_use_the_scraper_prefix(redis, start_worker):
+    calls, seen = [], {}
+
+    async def run_source(source_id, started=None):
+        calls.append(1)
+        await started()
+        if len(calls) == 1:
+            return fail(Reason.HTTP_ERROR, 503)
+        seen["attempts"] = await redis.get("iw:scraper:attempts:job-1")
+        seen["started"] = await redis.exists("iw:scraper:started:job-1")
+        seen["lease"] = await redis.zcard(f"iw:scraper:sem:{DOMAIN}")
+        return AttemptResult(documents=1)
+
+    outcome, _ = await run_one(redis, start_worker, run_source, fast_settings())
+
+    assert (outcome, seen) == ("ok", {"attempts": b"1", "started": 1, "lease": 1})
+
+
+async def test_jobs_and_results_are_stored_as_json(redis, start_worker):
+    await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="queued", _defer_by=3600)
+    assert json.loads(await redis.get("arq:job:queued"))["a"] == [SRC, DOMAIN]
+    assert await redis.zscore("iw:scraper:queue", "queued") is not None
+
+    outcome, _ = await run_one(redis, start_worker, scripted([AttemptResult(documents=1)], []), fast_settings())
+
+    assert outcome == "ok"
+    assert json.loads(await redis.get("arq:result:job-1"))["r"] == "ok"

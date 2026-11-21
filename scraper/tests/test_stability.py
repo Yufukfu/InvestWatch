@@ -5,12 +5,12 @@ import pytest
 from arq.jobs import JobStatus
 
 from conftest import Recorder, fast_settings
-from iw_scraper.jobs import AttemptResult
+from iw_scraper.jobs import QUEUE_NAME, AttemptResult
 from iw_scraper.worker import RunnerSettings, run_worker
 
 SRC = "88888888-8888-4888-8888-888888888888"
 DOMAIN = "example.test"
-LOCK_KEY = f"iw:lock:{SRC}"
+LOCK_KEY = f"iw:scraper:lock:{SRC}"
 
 
 @pytest.fixture
@@ -124,7 +124,7 @@ async def test_a_job_that_times_out_through_all_its_retries_frees_its_lock_and_s
 
     assert await job.result(timeout=10, poll_delay=0.05) == "failed"
     assert await redis.exists(LOCK_KEY) == 0
-    assert await redis.zcard(f"iw:sem:{DOMAIN}") == 0
+    assert await redis.zcard(f"iw:scraper:sem:{DOMAIN}") == 0
 
 
 async def test_the_worker_survives_a_redis_outage_and_resumes_when_it_returns(redis, start_runner, proxy):
@@ -220,13 +220,13 @@ async def test_the_consumer_loop_handles_requests_until_stopped(redis, store):
     await asyncio.sleep(0.3)
     await redis.xadd("iw:scan-requests", {"source_id": SRC, "requested_at": "2026-11-21T10:00:00Z"})
     for _ in range(100):
-        if await redis.zcard("arq:queue"):
+        if await redis.zcard(QUEUE_NAME):
             break
         await asyncio.sleep(0.05)
     stop.set()
     await asyncio.wait_for(task, 5)
 
-    assert await redis.zcard("arq:queue") == 1
+    assert await redis.zcard(QUEUE_NAME) == 1
 
 
 async def test_closing_a_worker_whose_redis_is_a_black_hole_gives_up_after_the_close_timeout(monkeypatch):

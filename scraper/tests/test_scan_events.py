@@ -224,7 +224,7 @@ async def test_finished_is_published_and_the_lock_freed_even_when_the_source_upd
 
     assert await job.result(timeout=5, poll_delay=0.05) == "ok"
     await wait_for(lambda: [e["type"] for e in events] == ["scan.started", "scan.finished"])
-    assert await redis.exists(f"iw:lock:{SRC}") == 0
+    assert await redis.exists(f"iw:scraper:lock:{SRC}") == 0
 
 
 async def test_a_source_deactivated_between_retries_still_gets_its_finished_event(redis, start_worker, store, events):
@@ -264,7 +264,7 @@ async def test_the_lock_is_freed_even_when_publishing_the_failed_finish_fails(re
     job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
     await asyncio.gather(job.result(timeout=5, poll_delay=0.05), return_exceptions=True)
 
-    assert await redis.exists(f"iw:lock:{SRC}") == 0
+    assert await redis.exists(f"iw:scraper:lock:{SRC}") == 0
 
 
 async def test_a_redis_error_after_the_finish_does_not_publish_a_second_finish(redis, start_worker, monkeypatch, events):

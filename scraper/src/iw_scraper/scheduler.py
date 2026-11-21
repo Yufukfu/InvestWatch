@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from arq.connections import ArqRedis
 from croniter import croniter
 
+from iw_scraper.guards import KEY_PREFIX
 from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.types import JobError, Reason
 
@@ -77,7 +78,7 @@ class Scheduler:
 
     @staticmethod
     def _invalid_key(source_id: str) -> str:
-        return f"iw:cron-invalid:{source_id}"
+        return f"{KEY_PREFIX}cron-invalid:{source_id}"
 
     async def _note_invalid_cron(self, source_id: str, cron: str) -> None:
         """Record one job error per invalid value, however many ticks and schedulers see it."""

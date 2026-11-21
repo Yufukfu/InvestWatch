@@ -14,7 +14,7 @@ from arq.connections import RedisSettings
 from arq.worker import Worker
 
 from iw_scraper.config import from_env
-from iw_scraper.jobs import QueueSettings, job_function
+from iw_scraper.jobs import ARQ_OPTIONS, QueueSettings, job_function
 from iw_scraper.supervise import CONNECTION_ERRORS, supervise
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ async def run_worker(
             job_completion_wait=runner.shutdown_deadline,
             retry_jobs=True,  # a job cancelled at the deadline goes back to the queue
             handle_signals=False,
+            **ARQ_OPTIONS,
         )
         drain = asyncio.create_task(_drain_when_stopped(worker, stop))
         try:

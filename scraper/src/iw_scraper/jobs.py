@@ -8,18 +8,19 @@ the collector and the ingest are stubs here and supplied by
 """
 
 import asyncio
+import json
 import logging
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from arq.connections import ArqRedis
+from arq.connections import ArqRedis, RedisSettings, create_pool
 from arq.worker import Function, Retry, func
 from redis.exceptions import RedisError
 
 from iw_scraper.config import from_env
 from iw_scraper.events import derive_status, publish_scan_event
-from iw_scraper.guards import DomainHealth, LeaseSemaphore, RunLock
+from iw_scraper.guards import KEY_PREFIX, DomainHealth, LeaseSemaphore, RunLock
 from iw_scraper.retry import backoff_delay, is_transient
 from iw_scraper.types import Deferral, JobError, Reason
 
@@ -28,6 +29,11 @@ ARQ_MAX_TRIES = 10_000
 ARQ_TIMEOUT_SLACK = 30.0
 ATTEMPTS_KEY_TTL = 24 * 3600
 KEEP_ALIVE_DIVISOR = 3
+
+# arq pickles jobs and results by default; JSON keeps the queue readable and a poisoned Redis from running code.
+# One place for the queue name and serializers: the worker, every pool and the tests share them.
+QUEUE_NAME = f"{KEY_PREFIX}queue"
+ARQ_OPTIONS = {"queue_name": QUEUE_NAME, "job_serializer": lambda data: json.dumps(data).encode(), "job_deserializer": json.loads}
 
 logger = logging.getLogger(__name__)
 _rng = random.Random()
@@ -61,6 +67,16 @@ class QueueSettings:
     @classmethod
     def from_env(cls) -> "QueueSettings":
         return from_env(cls)
+
+
+async def create_queue_pool(settings: RedisSettings) -> ArqRedis:
+    """The arq pool that enqueues onto our queue with our serializers."""
+    return await create_pool(
+        settings,
+        default_queue_name=ARQ_OPTIONS["queue_name"],
+        job_serializer=ARQ_OPTIONS["job_serializer"],
+        job_deserializer=ARQ_OPTIONS["job_deserializer"],
+    )
 
 
 def job_function(settings: QueueSettings) -> Function:
@@ -132,7 +148,7 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
 
     if result.deferral:
         await _requeue(lock, cfg, max(0.0, (result.deferral.until - datetime.now(UTC)).total_seconds()))
-    attempts_key = f"iw:attempts:{job_id}"
+    attempts_key = f"{KEY_PREFIX}attempts:{job_id}"
     if result.error and is_transient(result.error.reason, result.http_status):
         failures = await redis.incr(attempts_key)
         await redis.expire(attempts_key, ATTEMPTS_KEY_TTL)
@@ -159,7 +175,7 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
 
 
 def _started_key(job_id: str) -> str:
-    return f"iw:started:{job_id}"
+    return f"{KEY_PREFIX}started:{job_id}"
 
 
 async def _finish_failed(ctx: dict, source_id: str, requested: bool) -> None:
