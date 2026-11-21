@@ -493,6 +493,28 @@ def test_postgres_size_is_measured_in_the_database(pg_url):
     backend.close()
 
 
+def test_pipeline_m1_and_m3_round_trip(backend, finding_validator):
+    """analytics-m1-m3: the real pipeline's M1 + M3 findings (advertiser, S-ids, metadata evidence) survive storage."""
+    from investwatch_analytics.config import Settings
+    from investwatch_analytics.pipeline import analyze
+    from investwatch_analytics.registry import Registry
+    from investwatch_analytics.rules.engine import Catalogue
+
+    backend.seed(columns(source_kind="third_party", platform="instagram", url="https://www.instagram.com/p/S1/",
+                         text="Konto mam w EuroTrade Markets. Moja grupa: co tydzień mówię, co kupić z akcji WIG20."),
+                 {"author": {"name": "Ola", "handle": "@trader_ola", "profile_url": "https://www.instagram.com/trader_ola/"}})
+    doc = load(backend)
+    findings = analyze(doc, registry=Registry.from_csv(Settings.from_env().registry_csv), catalogue=Catalogue.load(),
+                       now=NOW)
+    assert [f.module for f in findings] == ["M1", "M3"]
+    backend.store.save_findings(doc, findings)
+    stored = {f.module: f for f in backend.store.findings_for_document(DOC_ID)}
+    for f in findings:
+        got = stored[f.module]
+        assert got.advertiser == f.advertiser and got.rules == f.rules and got.score == f.score
+        assert list(finding_validator.iter_errors(got.to_contract())) == []
+
+
 def test_postgres_cap_counts_the_uncompressed_payload(pg_url):
     """A highly compressible payload is tiny on disk (TOAST) but huge once loaded: it must still hit the cap."""
     backend = PostgresBackend(pg_url)
