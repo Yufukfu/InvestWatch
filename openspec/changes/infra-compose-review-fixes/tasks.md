@@ -8,9 +8,9 @@
 
 ## 2. Smoke checks that can fail, portability
 
-- [ ] 2.1 Failing tests: `only_gateway_published` requires the gateway to publish a port; `anonymous_denied` sets the bucket public with root, reruns `minio-init`, then expects 403
-- [ ] 2.2 Replace every `sed -i` with a portable helper and `timeout` with a fallback that works without it; no behaviour change on Linux or Git Bash
-- [ ] 2.3 Mutation check (remove `mc anonymous set none` from `infra/minio/init.sh`; drop the gateway's `ports:`); record `mutations: N tried, N caught`
+- [x] 2.1 Failing tests: `only_gateway_published` requires the gateway to publish a port; `anonymous_denied` sets the bucket public with root, reruns `minio-init`, then expects 403
+- [x] 2.2 Replace every `sed -i` with a portable helper and `timeout` with a fallback that works without it; no behaviour change on Linux or Git Bash
+- [x] 2.3 Mutation check (remove `mc anonymous set none` from `infra/minio/init.sh`; drop the gateway's `ports:`); mutations: 3 tried, 3 caught (no `anonymous set none`, gateway without `ports:`, `sedi` that never moves its temp file). Both strengthened checks passed on the real infra first, so the red proof is these mutants
 
 ## 3. Docs and ADRs
 

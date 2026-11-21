@@ -24,6 +24,13 @@ PASSES=0
 log() { printf '%s\n' "$*" >&2; }
 pass() { PASSES=$((PASSES + 1)); log "PASS  $*"; }
 fail() { FAILS=$((FAILS + 1)); log "FAIL  $*"; }
+# Portable to macOS: BSD sed has no GNU `sed -i`, and `timeout` is not installed by default.
+sedi() { # sedi <sed args...> <file>: in-place edit through a temp file
+  local f=${!#} n=$(($# - 1)); sed "${@:1:n}" "$f" >"$f.sedi" && mv "$f.sedi" "$f"
+}
+with_timeout() { # with_timeout <seconds> <cmd...>: `timeout` when available, plain otherwise
+  local s=$1; shift; if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"; else "$@"; fi
+}
 check() { # check "<name>" cmd...  (passes when cmd exits 0)
   local name=$1; shift
   if "$@" >"$TMP/last.out" 2>&1; then pass "$name"; else fail "$name"; sed 's/^/      /' "$TMP/last.out" | tail -n 15 >&2; fi
@@ -45,7 +52,7 @@ trap cleanup EXIT
 new_env() {
   local p=$1 f="$TMP/$1.env"
   "$ROOT/scripts/init-env.sh" "$f" >/dev/null
-  sed -i -e "s|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=$p|" -e "s|^IW_HTTPS_PORT=.*|IW_HTTPS_PORT=$2|" \
+  sedi -e "s|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=$p|" -e "s|^IW_HTTPS_PORT=.*|IW_HTTPS_PORT=$2|" \
     -e "s|^IW_HTTP_PORT=.*|IW_HTTP_PORT=$3|" "$f"
   echo "$f"
 }
@@ -155,7 +162,7 @@ init_env_crlf() { # a CRLF .env.example (Windows autocrlf) still gets every secr
 requires_secret() {
   local v=$1 file=${2:-$ROOT/compose.yaml} f="$TMP/req-$1.env"
   "$ROOT/scripts/init-env.sh" "$f" >/dev/null
-  sed -i "s|^$v=.*|$v=|" "$f"
+  sedi "s|^$v=.*|$v=|" "$f"
   if docker compose --env-file "$f" -f "$file" config -q 2>"$f.err"; then echo "config succeeded without $v"; return 1; fi
   grep -q "$v" "$f.err" || { cat "$f.err"; return 1; }
 }
@@ -239,9 +246,15 @@ app_scoped() {
   if mcp "$p" "$u" cat t/iw-other-root/secret.txt >/dev/null 2>&1; then echo "app can read another bucket"; return 1; fi
   if echo y | mcp "$p" "$u" pipe t/iw-other-root/w.txt >/dev/null 2>&1; then echo "app can write another bucket"; return 1; fi
 }
+anon_code() { probe "$1_data" sh -c "wget -S -q -O /dev/null http://minio:9000/iw-raw/$OBJ 2>&1 | awk '/HTTP\\//{print \$2; exit}'"; }
 anonymous_denied() {
-  local code; code=$(probe "$1_data" sh -c "wget -S -q -O /dev/null http://minio:9000/iw-raw/$OBJ 2>&1 | awk '/HTTP\\//{print \$2; exit}'")
-  echo "anonymous GET: $code"; [ "$code" = 403 ]
+  local p=$1 code
+  code=$(anon_code "$p"); echo "anonymous GET: $code"; [ "$code" = 403 ] || return 1
+  # A fresh bucket is private anyway, so also prove that minio-init closes one someone made public.
+  mcp "$p" "$(root_url "$p")" anonymous set download t/iw-raw >/dev/null || { echo "could not make the bucket public"; return 1; }
+  code=$(anon_code "$p"); echo "after making it public: $code"; [ "$code" = 200 ] || { echo "control failed"; return 1; }
+  dc "$p" up -d --force-recreate --no-deps minio-init >/dev/null 2>&1; dc "$p" wait minio-init >/dev/null 2>&1 || true
+  code=$(anon_code "$p"); echo "after minio-init again: $code"; [ "$code" = 403 ]
 }
 init_idempotent() {
   local p=$1; dc "$p" up -d --force-recreate --no-deps minio-init >/dev/null 2>&1
@@ -274,7 +287,8 @@ upx() { # upx <project> <https> <http> <extra file> [services...]
 only_gateway_published() {
   local ports; ports=$(docker ps --filter "label=com.docker.compose.project=$1" --format '{{.Label "com.docker.compose.service"}}={{.Ports}}')
   echo "$ports"
-  echo "$ports" | awk -F= '$2 ~ /->/ && $1 != "gateway" {bad=1} END {exit bad}'
+  # Must see the gateway publishing, or an empty listing would pass.
+  echo "$ports" | awk -F= '$1 == "gateway" && $2 ~ /->/ {gw=1} $2 ~ /->/ && $1 != "gateway" {bad=1} END {exit (bad || !gw)}'
 }
 internet_from() { dcx "$1" "$PROBE_FILE" exec -T "$2" wget -q -T 8 -O /dev/null http://example.com/; }
 data_has_no_internet() {
@@ -295,12 +309,12 @@ dev_ports_loopback() {
 DEV_PORTS=(25432 26379 29000) # not the defaults, so a developer's own dev-ports stack can keep running
 up_dev() {
   local p=$1; PROJECTS+=("$p"); new_env "$p" 18448 18085 >/dev/null
-  sed -i -e "s|^IW_DEV_PG_PORT=.*|IW_DEV_PG_PORT=${DEV_PORTS[0]}|" -e "s|^IW_DEV_REDIS_PORT=.*|IW_DEV_REDIS_PORT=${DEV_PORTS[1]}|"     -e "s|^IW_DEV_MINIO_PORT=.*|IW_DEV_MINIO_PORT=${DEV_PORTS[2]}|" "$TMP/$p.env"
+  sedi -e "s|^IW_DEV_PG_PORT=.*|IW_DEV_PG_PORT=${DEV_PORTS[0]}|" -e "s|^IW_DEV_REDIS_PORT=.*|IW_DEV_REDIS_PORT=${DEV_PORTS[1]}|"     -e "s|^IW_DEV_MINIO_PORT=.*|IW_DEV_MINIO_PORT=${DEV_PORTS[2]}|" "$TMP/$p.env"
   dcx "$p" "$DEV_FILE" up -d --wait --wait-timeout 180 postgres redis minio minio-init
 }
 dev_ports_reachable() { # TCP connect from the host to each dev port on 127.0.0.1
   local port; for port in "${DEV_PORTS[@]}"; do
-    timeout 5 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null || { echo "127.0.0.1:$port refused"; return 1; }
+    with_timeout 5 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null || { echo "127.0.0.1:$port refused"; return 1; }
   done
 }
 
@@ -389,7 +403,7 @@ module_waits() {
 }
 init_failure_blocks_module() {
   local p=$1 st
-  sed -i 's|^MINIO_BUCKET=.*|MINIO_BUCKET=Invalid_Bucket|' "$TMP/$p.env" # uppercase: mc mb refuses it
+  sedi 's|^MINIO_BUCKET=.*|MINIO_BUCKET=Invalid_Bucket|' "$TMP/$p.env" # uppercase: mc mb refuses it
   if dcx "$p" "$MODULE_FILE" up -d --wait --wait-timeout 120 module >/dev/null 2>&1; then echo "up succeeded"; return 1; fi
   st=$(docker inspect -f '{{.State.Status}}' "$(dcx "$p" "$MODULE_FILE" ps -aq module)" 2>/dev/null || echo absent)
   echo "module after failed minio-init: $st"; [ "$st" != running ]
