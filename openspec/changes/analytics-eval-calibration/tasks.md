@@ -12,9 +12,9 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 
 ## 2. Counting and metrics (≈ 1 h)
 
-- [ ] 2.1 Failing tests (`tests/test_eval_metrics.py`), one per metric and convention: `confusion(pairs, t)` with a score equal to the threshold (tp at 0.5, fn at 0.55); `precision` (normal, nothing predicted → 1.0); `recall` (normal, no positives → 0.0); `f1` (normal, both 0 → 0.0, from unrounded ratios); rounding to 3 decimals; the grid has 19 values 0.05..0.95 with no float drift; API parity on the rest-api scenario (0.9/0.4 positive, 0.6/0.2 negative → point at 0.5 is 1/1/1/1, 0.5/0.5/0.5); per-rule `strict` vs `review` on `uncertain`; `applicability_errors` both ways; missing rule result counts as not flagged
-- [ ] 2.2 `evaluation/metrics.py`: `GRID`, `confusion`, `ratios`, `curve`, `rule_metrics`; a docstring pointing at the rest-api requirement "Calibration curve" as the source of the conventions; tests green
-- [ ] 2.3 Mutation check on the counting code (`>=` vs `>`, the two zero-division defaults, the rounding, tp/fp swap, uncertain mapping per reading, the not_applicable exclusion); `mutations: N tried, N caught`
+- [x] 2.1 Failing tests (`tests/test_eval_metrics.py`), one per metric and convention: `confusion(pairs, t)` with a score equal to the threshold (tp at 0.5, fn at 0.55); `precision` (normal, nothing predicted → 1.0); `recall` (normal, no positives → 0.0); `f1` (normal, both 0 → 0.0, from unrounded ratios); rounding to 3 decimals; the grid has 19 values 0.05..0.95 with no float drift; API parity on the rest-api scenario (0.9/0.4 positive, 0.6/0.2 negative → point at 0.5 is 1/1/1/1, 0.5/0.5/0.5); per-rule `strict` vs `review` on `uncertain`; `applicability_errors` both ways; missing rule result counts as not flagged
+- [x] 2.2 `evaluation/metrics.py`: `GRID`, `confusion`, `ratios`, `curve`, `rule_metrics`; a docstring pointing at the rest-api requirement "Calibration curve" as the source of the conventions; tests green
+- [x] 2.3 Mutation check on the counting code (`>=` vs `>`, the two zero-division defaults, the rounding, tp/fp swap, uncertain mapping per reading, the not_applicable exclusion); `mutations: 16 tried, 16 caught`
 
 ## 3. Runner and report (≈ 1.5 h)
 
