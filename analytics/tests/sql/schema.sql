@@ -1,7 +1,7 @@
 -- TEST-ONLY FIXTURE. Never run in compose or against a shared database.
 --
 -- Mirrors the tables analytics touches from the API's Alembic migrations (change `api-db-schema`,
--- branch `api/api-v1` at 1be0451): `api/migrations/versions/0001_initial.py` (sources, documents, findings)
+-- branch `api/api-db-schema` at 73680fa, identical to `api/api-v1` 1be0451): `api/migrations/versions/0001_initial.py` (sources, documents, findings)
 -- and the findings indexes of `0002_query_indexes.py`. Column names, types, nullability, defaults,
 -- constraint names and checks are copied as they are. job_errors and calibration_points are left out.
 -- The migrations in api/ are the source of truth (ADR 0303): when they change, update this file and

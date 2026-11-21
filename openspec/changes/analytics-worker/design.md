@@ -34,7 +34,7 @@ No ADR: the irreversible choices (schema ownership, threshold storage, event pro
 
 ## Table shape (reconciled with api-db-schema)
 
-Reconciled in task 2.1 against `api-db-schema` on branch `api/api-v1` at `1be0451`: Alembic revisions `0001_initial` and `0002_query_indexes`, the SQL section of the api README and `findings_upsert()` in the api package's `db/sql.py` (both on that branch). `analytics/tests/sql/schema.sql` mirrors the three tables analytics touches (`sources`, `documents`, `findings`) for the Postgres store tests only. The migration stays the source of truth.
+Reconciled in task 2.1 against `api-db-schema` on branch `api/api-db-schema` at `73680fa` (its own PR; same migrations as `api/api-v1` `1be0451`): Alembic revisions `0001_initial` and `0002_query_indexes`, the SQL section of the api README and `findings_upsert()` in the api package's `db/sql.py` (both on that branch). `analytics/tests/sql/schema.sql` mirrors the three tables analytics touches (`sources`, `documents`, `findings`) for the Postgres store tests only. The migration stays the source of truth.
 
 The worker connects as `iw_app` (`infra/postgres/init/01-app-role.sh` grants CRUD on tables `iw_admin` creates). It reads `documents` and inserts or updates `findings`. It never deletes, and never writes `status` or `note`.
 
@@ -67,7 +67,7 @@ Decided by the coordinating session on Damian's instruction to coordinate the Op
 3. **Finding key:** `(document_id, module)` from `api-db-schema`, not a URL key. A changed page gets a new finding.
 4. **Outbox:** none. Events are at most once.
 5. **Dead-letter stream:** none. Poison messages are logged and acked.
-6. **Test-only DDL:** yes. `analytics/tests/sql/schema.sql` mirrors the `api-db-schema` migration columns from branch `api/api-v1`, says so in its header, and is never run in compose.
+6. **Test-only DDL:** yes. `analytics/tests/sql/schema.sql` mirrors the `api-db-schema` migration columns from branch `api/api-db-schema`, says so in its header, and is never run in compose.
 7. **Health:** a stdlib `/health` on 8001 inside `iw-data` is enough.
 8. **Threshold key format:** a Redis string with JSON `{"M1":0.6,"M2":0.5,"M3":0.7}`, written by the API. A missing key or module falls back to the ADR 0305 defaults.
 

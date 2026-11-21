@@ -18,7 +18,7 @@ The change `analytics-skeleton` gives analytics a pure `analyze(doc, *, registry
 ## Dependencies and assumptions to reconcile
 
 - **`analytics-skeleton` (parent change, not merged):** this change calls `analyze()` and the `ScrapedDocument` and `Finding` models, and loads the registry and catalogue the way that change does. It is applied only after `analytics-skeleton` is merged, and the branch is rebased on it.
-- **`api-v1` / `api-db-schema` (sibling, Alembic, ADR 0303):** provides `documents` and `findings`. Reconciled in task 2.1 against `api/api-v1` at `1be0451` (design §"Table shape"): the upsert key `uq_findings_document_module (document_id, module)`, the replaced-field list, and the `iw_app` grants. The threshold key format (a JSON string written by the API) is agreed by the coordinator. `analytics/tests/sql/schema.sql` mirrors the migration for tests only.
+- **`api-v1` / `api-db-schema` (sibling, Alembic, ADR 0303):** provides `documents` and `findings`. Reconciled in task 2.1 against `api/api-db-schema` at `73680fa` (design §"Table shape"): the upsert key `uq_findings_document_module (document_id, module)`, the replaced-field list, and the `iw_app` grants. The threshold key format (a JSON string written by the API) is agreed by the coordinator. `analytics/tests/sql/schema.sql` mirrors the migration for tests only.
 - **`infra-compose` (sibling):** provides Redis (with AOF, ADR 0305), MinIO, the `iw-data` network the worker joins, and the `REDIS_URL` / `DATABASE_URL` values. The items marked **[reconcile-infra]** in `design.md` must match before task group 5 starts.
 - **`scraper-v1` (A):** publishes to `iw:documents` only after the row is committed. Delivery is at least once, so analytics deduplicates by `document_id`.
 
