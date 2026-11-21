@@ -174,7 +174,7 @@ async def test_robots_refusal_fetches_nothing():
 
 
 async def test_default_cap_reads_two_pages_of_twenty():
-    pages = {**KDP_PAGES, KDP_OLDER: page(KDP_OLDER, load("telegram_rarecryptosignals_before.html"))}
+    pages = {**KDP_PAGES, KDP_OLDER: page(KDP_OLDER, load("telegram_rarecryptosignals_before.html").replace(b"rarecryptosignals", b"kdpwiadomosci"))}
     h = Harness(pages)
 
     result = await run(make(h), h)
@@ -277,7 +277,7 @@ async def test_a_failed_ingest_ends_the_run_and_keeps_what_was_stored():
 
 
 async def test_both_pages_of_a_run_carry_the_one_identity_and_the_run_proxy():
-    pages = {**KDP_PAGES, KDP_OLDER: page(KDP_OLDER, load("telegram_rarecryptosignals_before.html"))}
+    pages = {**KDP_PAGES, KDP_OLDER: page(KDP_OLDER, load("telegram_rarecryptosignals_before.html").replace(b"rarecryptosignals", b"kdpwiadomosci"))}
     h = Harness(pages)
     collector = make(h)
 
@@ -289,7 +289,7 @@ async def test_both_pages_of_a_run_carry_the_one_identity_and_the_run_proxy():
 
 
 async def test_every_page_request_waits_its_turn_at_the_domain_limiter():
-    pages = {**KDP_PAGES, KDP_OLDER: page(KDP_OLDER, load("telegram_rarecryptosignals_before.html"))}
+    pages = {**KDP_PAGES, KDP_OLDER: page(KDP_OLDER, load("telegram_rarecryptosignals_before.html").replace(b"rarecryptosignals", b"kdpwiadomosci"))}
     h = Harness(pages)
 
     await run(make(h), h)

@@ -29,7 +29,9 @@ class TelegramStub:
     def __init__(self) -> None:
         self.pages = {
             CHANNEL: (FIXTURES / "telegram_kdpwiadomosci.html").read_bytes(),
-            OLDER: (FIXTURES / "telegram_rarecryptosignals_before.html").read_bytes(),
+            OLDER: (FIXTURES / "telegram_rarecryptosignals_before.html").read_bytes().replace(
+                b"rarecryptosignals", b"kdpwiadomosci"  # the saved page of another channel, relabelled to this one
+            ),
         }
         self.requests: list[str] = []
 
@@ -87,7 +89,7 @@ async def test_a_telegram_source_yields_documents_with_objects_and_announcements
         assert len(rows) == TEXT_POSTS
         assert {(r["platform"], r["source_kind"]) for r in rows} == {("other", "third_party")}
         assert all(r["url"].startswith("https://t.me/") and len(r["content_hash"]) == 64 for r in rows)
-        payload = json.loads(rows[0]["payload"])
+        payload = json.loads(next(r for r in rows if r["url"] == "https://t.me/kdpwiadomosci/5187")["payload"])  # page one
         assert payload["scrape_meta"]["network"] == "telegram"
         assert payload["author"]["handle"] == "@kdpwiadomosci" and payload["author"]["followers"] == 45700
         assert all([await storage.exists(r["html_object_key"]) for r in rows])

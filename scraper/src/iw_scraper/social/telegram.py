@@ -11,10 +11,10 @@ from iw_scraper.social.model import Channel, Link, Post
 from iw_scraper.types import Reason
 
 _MULTIPLIERS = {"K": 1_000, "M": 1_000_000}
-_COUNT = re.compile(r"^(\d+(?:\.\d+)?)([KM])?$", re.IGNORECASE)
+_COUNT = re.compile(r"^([0-9]+(?:\.[0-9]+)?)([KM])?$", re.IGNORECASE)
 _WEB_SCHEMES = {"http", "https"}
 NETWORK = "telegram"
-_BEFORE_QUERY = re.compile(r"before=\d+")
+_BEFORE_QUERY = re.compile(r"before=[0-9]+")
 _CHANNEL_URL = re.compile(r"^https://t\.me/s/[A-Za-z0-9_]{5,32}$")
 
 
@@ -67,10 +67,13 @@ def _links(text_element: html.HtmlElement, base: str) -> tuple[Link, ...]:
     return tuple(found.values())
 
 
-def _post(wrap: html.HtmlElement, base: str) -> tuple[Post | None, bool]:
-    """(the post, True) when the wrapper holds a post; the post is None when it has no text."""
+def _post(wrap: html.HtmlElement, base: str, handle: str) -> tuple[Post | None, bool]:
+    """(the post, True) when the wrapper holds a post; the post is None when it has no text.
+
+    A post whose `data-post` is not `<this channel>/<digits>` is not a post of this channel and is ignored.
+    """
     ids = wrap.xpath(".//div[@data-post]/@data-post")
-    if not ids or not ids[0].rsplit("/", 1)[-1].isdigit():
+    if not ids or not re.fullmatch(rf"{re.escape(handle)}/[0-9]+", ids[0], re.IGNORECASE):
         return None, False
     texts = wrap.xpath(
         f".//*[{_has_class('tgme_widget_message_text')} and not(ancestor::a[{_has_class('tgme_widget_message_reply')}])]"
@@ -106,7 +109,7 @@ def _older_url(href: str | None, final_url: str) -> str | None:
         return None
     resolved, current = urlsplit(urljoin(final_url, href)), urlsplit(final_url)
     same_channel = (
-        resolved.scheme == "https" and resolved.hostname == "t.me" and resolved.path.startswith("/s/")
+        resolved.scheme == "https" and resolved.netloc == "t.me" and resolved.path.startswith("/s/")
         and resolved.path.lower() == current.path.lower() and _BEFORE_QUERY.fullmatch(resolved.query) is not None
     )
     return resolved.geturl() if same_channel else None
@@ -120,25 +123,26 @@ def parse(body: bytes, final_url: str) -> Channel:
         raise ParseFailure(Reason.PARSE_ERROR, f"markup not processable: {type(exc).__name__}") from exc
 
     title = _first_text(root, "tgme_channel_info_header_title")
-    handle = _first_text(root, "tgme_channel_info_header_username")
+    header_handle = _first_text(root, "tgme_channel_info_header_username")
+    handle = urlsplit(final_url).path.rsplit("/", 1)[-1]  # the source's channel, not text from the page
     posts: list[Post] = []
     skipped = 0
     wraps = root.xpath(f"//div[{_has_class('tgme_widget_message_wrap')}]")
     for wrap in wraps:
-        post, is_post = _post(wrap, final_url)
+        post, is_post = _post(wrap, final_url, handle)
         if post is not None:
             posts.append(post)
         elif is_post:
             skipped += 1
-    if title is None and handle is None and not posts and not skipped:
+    if title is None and header_handle is None and not posts and not skipped:
         raise ParseFailure(Reason.PARSE_ERROR, "page has neither a channel header nor posts")
 
     older = root.xpath(f"//a[{_has_class('tme_messages_more')} and @href and not(@data-after)]/@href")
     return Channel(
         network=NETWORK,
         title=title,
-        handle=handle,
-        profile_url=f"https://t.me/{handle.removeprefix('@')}" if handle else None,
+        handle=f"@{handle}",
+        profile_url=f"https://t.me/{handle}",
         followers=_followers(root),
         posts=tuple(posts),
         skipped=skipped,

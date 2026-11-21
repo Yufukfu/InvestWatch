@@ -193,6 +193,7 @@ class Collector:
                 "social page of %s: %d posts with text, %d skipped without text, %d new",
                 domain, len(channel.posts), channel.skipped, inserted,
             )
+            # nothing new (already stored, or a page of posts without text) ends the run: no older page is requested
             if inserted == 0 or channel.older_url is None or seen >= self._social_max_posts:
                 return AttemptResult(documents=stored)
             url = channel.older_url

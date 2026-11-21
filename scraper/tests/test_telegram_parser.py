@@ -37,24 +37,24 @@ def channel_page(counter: str | None = "1.5K", posts: str = "", older: str | Non
     return (
         '<html><body><div class="tgme_channel_info"><div class="tgme_channel_info_header">'
         '<div class="tgme_channel_info_header_title"><span dir="auto">Kanał</span></div>'
-        '<div class="tgme_channel_info_header_username"><a href="https://t.me/kanalx">@kanalx</a></div></div>'
+        '<div class="tgme_channel_info_header_username"><a href="https://t.me/SubeTradingPL">@SubeTradingPL</a></div></div>'
         f"{counters}</div>{more}{posts}</body></html>"
     ).encode()
 
 
 def text_post(post_id: int, text: str) -> str:
     return (
-        f'<div class="tgme_widget_message_wrap"><div class="tgme_widget_message" data-post="kanalx/{post_id}">'
+        f'<div class="tgme_widget_message_wrap"><div class="tgme_widget_message" data-post="SubeTradingPL/{post_id}">'
         f'<div class="tgme_widget_message_text js-message_text">{text}</div>'
-        f'<a class="tgme_widget_message_date" href="https://t.me/kanalx/{post_id}">'
+        f'<a class="tgme_widget_message_date" href="https://t.me/SubeTradingPL/{post_id}">'
         f'<time datetime="2026-11-20T09:15:00+00:00">09:15</time></a></div></div>'
     )
 
 
 IMAGE_POST = (
-    '<div class="tgme_widget_message_wrap"><div class="tgme_widget_message" data-post="kanalx/7">'
-    '<a class="tgme_widget_message_photo_wrap" href="https://t.me/kanalx/7"></a>'
-    '<a class="tgme_widget_message_date" href="https://t.me/kanalx/7">'
+    '<div class="tgme_widget_message_wrap"><div class="tgme_widget_message" data-post="SubeTradingPL/7">'
+    '<a class="tgme_widget_message_photo_wrap" href="https://t.me/SubeTradingPL/7"></a>'
+    '<a class="tgme_widget_message_date" href="https://t.me/SubeTradingPL/7">'
     '<time datetime="2026-11-20T09:15:00+00:00">09:15</time></a></div></div>'
 )
 
@@ -144,7 +144,7 @@ def test_short_channel_has_no_older_link():
 
 
 def test_page_of_image_only_posts_has_no_documents():
-    channel = parse(channel_page(posts=IMAGE_POST + IMAGE_POST.replace("kanalx/7", "kanalx/8")), SUBE_URL)
+    channel = parse(channel_page(posts=IMAGE_POST + IMAGE_POST.replace("SubeTradingPL/7", "SubeTradingPL/8")), SUBE_URL)
 
     assert channel.posts == ()
     assert channel.skipped == 2
@@ -164,9 +164,11 @@ def test_page_that_is_not_a_channel_is_a_parse_error():
     assert failure.value.reason is Reason.PARSE_ERROR
 
 
-def stored_document(post_index: int = 0, fixture: str = "telegram_subetradingpl.html") -> tuple[dict, dict]:
+def stored_document(
+    post_index: int = 0, fixture: str = "telegram_subetradingpl.html", url: str = SUBE_URL
+) -> tuple[dict, dict]:
     """(the page dict the collector hands to ingest, the full document ingest builds from it)."""
-    channel = parse(load(fixture), SUBE_URL)
+    channel = parse(load(fixture), url)
     page = build_page(channel, channel.posts[post_index], http_status=200)
     document = build_document(
         page, SOURCE, fetched_at=FETCHED, duration_ms=120, proxy=None, author=build_author(channel)
@@ -227,16 +229,18 @@ def test_links_keep_their_text():
 
 
 def test_stored_html_is_the_post_only():
-    page, _ = stored_document(fixture="telegram_kdpwiadomosci.html")
+    page, _ = stored_document(fixture="telegram_kdpwiadomosci.html", url="https://t.me/s/kdpwiadomosci")
 
     assert 'data-post="kdpwiadomosci/5179"' in page["html"]
     assert "kdpwiadomosci/5180" not in page["html"]
 
 
-def test_channel_without_a_header_gives_null_author_fields():
+def test_channel_without_a_header_takes_handle_and_profile_from_the_source_url():
     channel = parse(channel_page(posts=text_post(5, "Cześć")).replace(b"tgme_channel_info_header", b"x"), SUBE_URL)
 
-    assert build_author(channel) == {"name": None, "handle": None, "profile_url": None, "followers": 1500}
+    assert build_author(channel) == {
+        "name": None, "handle": "@SubeTradingPL", "profile_url": "https://t.me/SubeTradingPL", "followers": 1500,
+    }
 
 
 def test_post_with_only_whitespace_and_line_breaks_has_no_text():
@@ -292,7 +296,7 @@ def test_a_counter_that_is_not_subscribers_gives_null_followers():
 
 
 def test_message_without_a_numeric_id_is_ignored():
-    page = channel_page(posts=text_post(5, "Cześć")).replace(b"kanalx/5", b"kanalx/abc")
+    page = channel_page(posts=text_post(5, "Cześć")).replace(b"SubeTradingPL/5", b"SubeTradingPL/abc")
 
     channel = parse(page, SUBE_URL)
 
@@ -316,13 +320,13 @@ def test_timestamp_with_an_offset_is_converted_to_utc():
     assert build_page(channel, channel.posts[0], http_status=200)["published_at"] == "2026-11-20T07:15:00+00:00"
 
 
-@pytest.mark.parametrize("href", ["https://evil.example/kanalx/5", "https://t.me/kanalx/6", "javascript:alert(1)"])
+@pytest.mark.parametrize("href", ["https://evil.example/SubeTradingPL/5", "https://t.me/SubeTradingPL/6", "javascript:alert(1)"])
 def test_permalink_off_t_me_or_for_another_message_is_replaced_by_the_data_post_url(href):
-    page = channel_page(posts=text_post(5, "Cześć").replace("https://t.me/kanalx/5", href))
+    page = channel_page(posts=text_post(5, "Cześć").replace("https://t.me/SubeTradingPL/5", href))
 
     channel = parse(page, SUBE_URL)
 
-    assert channel.posts[0].permalink == "https://t.me/kanalx/5"
+    assert channel.posts[0].permalink == "https://t.me/SubeTradingPL/5"
 
 
 @pytest.mark.parametrize(
@@ -379,3 +383,25 @@ def test_the_page_dict_never_carries_an_author():
     channel = parse(load("telegram_subetradingpl.html"), SUBE_URL)
 
     assert "author" not in build_page(channel, channel.posts[0], http_status=200)
+
+
+def test_page_text_cannot_change_the_author_handle():
+    page = channel_page(posts=text_post(5, "Cześć")).replace(b"@SubeTradingPL", b"@kdpwiadomosci")
+
+    author = build_author(parse(page, SUBE_URL))
+
+    assert (author["handle"], author["profile_url"]) == ("@SubeTradingPL", "https://t.me/SubeTradingPL")
+
+
+@pytest.mark.parametrize("data_post", ["otherchannel/5", "SubeTradingPL/5\nx", "SubeTradingPL/\u0665"])
+def test_a_post_that_is_not_of_this_channel_is_ignored(data_post):
+    page = channel_page(posts=text_post(5, "Cześć")).replace(b"SubeTradingPL/5", data_post.encode())
+
+    assert parse(page, SUBE_URL).posts == ()
+
+
+@pytest.mark.parametrize("href", ["https://t.me:80/s/SubeTradingPL?before=9", "https://x@t.me/s/SubeTradingPL?before=9"])
+def test_older_link_with_a_port_or_userinfo_is_dropped(href):
+    page = channel_page(posts=text_post(5, "Cześć"), older=href)
+
+    assert parse(page, SUBE_URL).older_url is None
