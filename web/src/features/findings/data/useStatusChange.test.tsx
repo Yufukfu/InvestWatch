@@ -23,11 +23,22 @@ describe('useStatusChange', () => {
     expect(result.current.error).toBeUndefined();
   });
 
+  it.each([
+    [404, 'zgłoszenie już nie istnieje.'],
+    [409, 'zgłoszenie zmieniło się w międzyczasie, odśwież widok.'],
+    [500, 'błąd serwera, spróbuj ponownie.'],
+  ])('maps HTTP %i to a Polish message', async (code, message) => {
+    server.use(http.patch('http://localhost/api/findings/:id', () => HttpResponse.json({ error: 'x' }, { status: code })));
+    const { result } = renderHook(() => useStatusChange(detail.id), { wrapper: storeWrapper() });
+    act(() => result.current.save({ status: 'closed' }));
+    await waitFor(() => expect(result.current.error?.message).toBe(message));
+  });
+
   it('exposes the API error message on a 422', async () => {
     server.use(http.patch('http://localhost/api/findings/:id', () => HttpResponse.json({ error: 'invalid status' }, { status: 422 })));
     const { result } = renderHook(() => useStatusChange(detail.id), { wrapper: storeWrapper() });
     act(() => result.current.save({ status: 'closed' }));
-    await waitFor(() => expect(result.current.error).toBe('invalid status'));
+    await waitFor(() => expect(result.current.error).toEqual({ message: 'serwer odrzucił tę wartość.', detail: 'invalid status' }));
     expect(result.current.saved).toBe(false);
   });
 
@@ -35,7 +46,7 @@ describe('useStatusChange', () => {
     server.use(http.patch('http://localhost/api/findings/:id', () => HttpResponse.error()));
     const { result } = renderHook(() => useStatusChange(detail.id), { wrapper: storeWrapper() });
     act(() => result.current.save({ status: 'closed' }));
-    await waitFor(() => expect(result.current.error).toBe('brak połączenia z serwerem'));
+    await waitFor(() => expect(result.current.error).toEqual({ message: 'brak połączenia z serwerem.', detail: undefined }));
   });
 
   it('a successful change refetches the findings list and the summary', async () => {

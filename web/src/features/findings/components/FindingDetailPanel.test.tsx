@@ -180,6 +180,38 @@ describe('FindingDetailPanel', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps Tab inside the panel (modal)', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const close = screen.getByRole('button', { name: 'Zamknij' });
+    const all = dialog.querySelectorAll<HTMLElement>('a[href], button, summary');
+    const last = all[all.length - 1];
+    expect(last).not.toBe(close);
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    // Tab in the middle is left to the browser.
+    const middle = screen.getByRole('link', { name: /Otwórz źródło/ });
+    middle.focus();
+    fireEvent.keyDown(middle, { key: 'Tab' });
+    expect(middle).toHaveFocus();
+  });
+
+  it('does not close on Escape inside a field that holds text', () => {
+    const onClose = vi.fn();
+    render(<FindingDetailPanel {...base} onClose={onClose} detail={detail()} statusEditor={<textarea aria-label="n" defaultValue="" />} />);
+    const box = screen.getByLabelText('n') as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: 'niezapisana notatka' } });
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.change(box, { target: { value: '' } });
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the status editor slot', () => {
     render(<FindingDetailPanel {...base} detail={detail()} statusEditor={<p>edytor</p>} />);
     expect(screen.getByText('edytor')).toBeInTheDocument();

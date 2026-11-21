@@ -10,6 +10,7 @@ type Props = {
   selectedId: string | undefined;
   onSelect: (id: string) => void;
   onReset: () => void;
+  onFirstPage: () => void;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -35,9 +36,19 @@ function SortHeader({ label, field, sort, onSort }: { label: string; field: Sort
 }
 
 // Scraped content is untrusted: every value is rendered as React text, never as HTML.
-export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect, onReset, isLoading, isFetching, isError }: Props) {
+export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect, onReset, onFirstPage, isLoading, isFetching, isError }: Props) {
   if (isError) return <p className="state" role="alert">Nie udało się pobrać zgłoszeń.</p>;
   if (isLoading || (isFetching && !rows) || !rows) return <p className="state" role="status">Ładowanie…</p>;
+  // Rows can be empty with total > 0 on a page past the end (old link, or the last row changed status).
+  if (rows.length === 0 && (total ?? 0) > 0)
+    return (
+      <div className="state state-empty" role="status">
+        <p>Na tej stronie nie ma już zgłoszeń.</p>
+        <button type="button" className="btn" onClick={onFirstPage}>
+          Wróć do pierwszej strony
+        </button>
+      </div>
+    );
   if (rows.length === 0)
     return (
       <div className="state state-empty" role="status">
@@ -50,7 +61,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
   return (
     <>
       <p className="findings-count">{findingsCount(total ?? rows.length)}</p>
-      <div className="table-scroll">
+      <div className="table-scroll" aria-busy={isFetching}>
         <table className="findings">
           <thead>
             <tr>
@@ -65,7 +76,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
           </thead>
           <tbody>
             {rows.map((f) => (
-              <tr key={f.id} aria-selected={f.id === selectedId} className={f.id === selectedId ? 'selected' : undefined}>
+              <tr key={f.id} aria-current={f.id === selectedId ? 'true' : undefined} className={f.id === selectedId ? 'selected' : undefined}>
                 <td>
                   <RiskBadge level={f.riskLevel} />
                 </td>

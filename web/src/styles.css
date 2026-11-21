@@ -186,3 +186,5 @@ button.link:hover { color: #1e40af; }
 .status-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .status-actions p { margin: 0; }
 .saved { color: #14532d; font-weight: 600; }
+.save-error p { margin: 0; }
+.table-scroll[aria-busy='true'] { opacity: 0.6; transition: opacity 0.15s; }

@@ -101,7 +101,7 @@ describe('FindingsPage', () => {
     const select = await within(dialog).findByLabelText('Status');
     fireEvent.change(select, { target: { value: 'confirmed' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
-    await waitFor(() => expect(within(dialog).getByLabelText('Status')).toHaveValue('confirmed'));
+    await waitFor(() => expect(within(dialog).getByText('Potwierdzone', { selector: 'dd' })).toBeInTheDocument());
     expect(saved.status).toBe('confirmed');
     const row = screen.getByRole('button', { name: findings.items.find((i) => i.id === detail.id)!.title }).closest('tr')!;
     await waitFor(() => expect(row).toHaveTextContent('Potwierdzone'));
@@ -114,7 +114,9 @@ describe('FindingsPage', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('transition not allowed');
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.');
+    expect(within(dialog).getByText('transition not allowed')).toBeInTheDocument();
     expect(within(dialog).getByText('Nowe', { selector: 'dd' })).toBeInTheDocument();
   });
 });

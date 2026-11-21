@@ -7,17 +7,27 @@ export type StatusChangeState = {
   save: (patch: StatusPatch) => void;
   isSaving: boolean;
   saved: boolean;
-  error: string | undefined;
+  error: SaveError | undefined;
 };
 
-// The API's own message when it sends one (`{ error }`), otherwise a generic Polish one.
-function errorText(error: unknown): string {
-  if (typeof error === 'object' && error !== null) {
-    const data = 'data' in error ? (error as { data?: unknown }).data : undefined;
-    if (typeof data === 'object' && data !== null && 'error' in data && typeof data.error === 'string') return data.error;
-    if ('status' in error && error.status === 'FETCH_ERROR') return 'brak połączenia z serwerem';
-  }
-  return 'nieznany błąd';
+export type SaveError = { message: string; detail: string | undefined };
+
+const BY_STATUS: Record<number, string> = {
+  400: 'serwer odrzucił tę wartość.',
+  404: 'zgłoszenie już nie istnieje.',
+  409: 'zgłoszenie zmieniło się w międzyczasie, odśwież widok.',
+  422: 'serwer odrzucił tę wartość.',
+};
+
+// A Polish message chosen by HTTP status; the API's own `{ error }` text is kept as a separate detail
+// (it is English), so the alert itself never mixes languages.
+function toSaveError(error: unknown): SaveError {
+  const e = (typeof error === 'object' && error !== null ? error : {}) as { status?: unknown; data?: unknown };
+  const data = e.data as { error?: unknown } | undefined;
+  const detail = typeof data === 'object' && data !== null && typeof data.error === 'string' ? data.error : undefined;
+  if (e.status === 'FETCH_ERROR') return { message: 'brak połączenia z serwerem.', detail };
+  const message = typeof e.status === 'number' ? (BY_STATUS[e.status] ?? 'błąd serwera, spróbuj ponownie.') : 'nieznany błąd.';
+  return { message, detail };
 }
 
 // Not optimistic: the status on screen changes only after the API answers (web-dashboard rules).
@@ -27,6 +37,6 @@ export function useStatusChange(id: string): StatusChangeState {
     save: (body) => void patch({ id, body }),
     isSaving: isLoading,
     saved: isSuccess,
-    error: isError ? errorText(error) : undefined,
+    error: isError ? toSaveError(error) : undefined,
   };
 }

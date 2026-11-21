@@ -46,6 +46,7 @@ export function FindingsPage() {
         selectedId={f.selectedId}
         onSelect={f.select}
         onReset={f.resetFilters}
+        onFirstPage={() => f.setFilters({ page: 1 })}
         isLoading={f.isLoading}
         isFetching={f.isFetching}
         isError={f.isError}

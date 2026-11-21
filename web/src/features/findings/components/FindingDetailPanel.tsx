@@ -21,6 +21,8 @@ type Props = {
   statusEditor?: ReactNode;
 };
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
 const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
 function IssueItem({ rule, signal }: { rule: RuleView; signal: boolean }) {
@@ -233,6 +235,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
 // Side panel with the finding detail. Scraped text is rendered as React text only.
 export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClose, statusEditor }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
 
   // Focus moves into the panel on open and back to where it was on close.
   useEffect(() => {
@@ -244,7 +247,11 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
   // Escape closes from anywhere, also after a save re-rendered the form and focus fell back to <body>.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // Escape in a field that holds text belongs to that field (unsaved note, search box).
+      const t = e.target;
+      if ((t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement) && t.value !== '') return;
+      onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -258,10 +265,26 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
 
   return (
     <aside
+      ref={panelRef}
       className="detail"
       role="dialog"
-      aria-modal="false"
+      aria-modal="true"
       aria-labelledby="detail-title"
+      onKeyDown={(e) => {
+        // Modal: Tab cycles inside the panel, the page behind the backdrop is out of reach.
+        if (e.key !== 'Tab' || !panelRef.current) return;
+        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }}
     >
       <div className="detail-header">
         <h2 id="detail-title">{detail && !isError ? detail.title : 'Szczegóły zgłoszenia'}</h2>

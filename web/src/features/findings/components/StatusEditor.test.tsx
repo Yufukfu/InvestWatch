@@ -54,8 +54,12 @@ describe('StatusEditor', () => {
   });
 
   it('shows the API error and the saved confirmation', () => {
-    const { rerender } = render(<StatusEditor {...base} error="invalid status" onSave={vi.fn()} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się zapisać zmiany: invalid status');
+    const { rerender } = render(
+      <StatusEditor {...base} error={{ message: 'serwer odrzucił tę wartość.', detail: 'invalid status' }} onSave={vi.fn()} />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.');
+    expect(screen.getByText('Odpowiedź serwera:')).toBeInTheDocument();
+    expect(screen.getByText('invalid status')).toHaveAttribute('lang', 'en');
     rerender(<StatusEditor {...base} saved onSave={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('Zapisano.');
   });

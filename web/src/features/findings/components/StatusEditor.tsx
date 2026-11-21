@@ -8,7 +8,7 @@ type Props = {
   onSave: (patch: { status?: FindingStatus; note?: string | null }) => void;
   isSaving: boolean;
   saved: boolean;
-  error: string | undefined;
+  error: { message: string; detail: string | undefined } | undefined;
 };
 
 // Any of the five statuses may be chosen; the contract defines no transition graph, the API decides.
@@ -53,7 +53,16 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
         <button type="submit" className="btn btn-primary" disabled={isSaving || (!statusChanged && !noteChanged)}>
           {isSaving ? 'Zapisywanie…' : 'Zapisz'}
         </button>
-        {error && <p role="alert">Nie udało się zapisać zmiany: {error}</p>}
+        {error && (
+          <div className="save-error">
+            <p role="alert">Nie udało się zapisać zmiany: {error.message}</p>
+            {error.detail && (
+              <p className="muted">
+                Odpowiedź serwera: <span lang="en">{error.detail}</span>
+              </p>
+            )}
+          </div>
+        )}
         {saved && !error && (
           <p role="status" className="saved">
             Zapisano.

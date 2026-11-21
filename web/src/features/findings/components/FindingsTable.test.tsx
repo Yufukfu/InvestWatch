@@ -17,6 +17,7 @@ const row = (over: Partial<FindingRow> = {}): FindingRow => ({
 
 const props = {
   total: 2,
+  onFirstPage: vi.fn(),
   sort: '-detected_at' as const,
   onSort: vi.fn(),
   onSelect: vi.fn(),
@@ -84,7 +85,8 @@ describe('FindingsTable', () => {
     render(<FindingsTable {...props} rows={[row(), row({ id: '2', title: 'Drugi' })]} onSelect={onSelect} selectedId="2" />);
     fireEvent.click(screen.getByRole('button', { name: 'Obietnica zysku' }));
     expect(onSelect).toHaveBeenCalledWith('1');
-    expect(screen.getByRole('button', { name: 'Drugi' }).closest('tr')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'Drugi' }).closest('tr')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: 'Obietnica zysku' }).closest('tr')).not.toHaveAttribute('aria-current');
   });
 
   it('sorts by score and by time from the column headers', () => {
@@ -132,8 +134,24 @@ describe('FindingsTable', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
   });
 
-  it('marks the table busy while new rows load', () => {
+  it('shows the loading text while the first rows of a new query load', () => {
     render(<FindingsTable {...props} rows={undefined} isFetching />);
     expect(screen.getByText('Ładowanie…')).toBeInTheDocument();
+  });
+
+  it('marks the table busy while it refreshes', () => {
+    const { rerender } = render(<FindingsTable {...props} rows={[row()]} isFetching />);
+    expect(screen.getByRole('table').parentElement).toHaveAttribute('aria-busy', 'true');
+    rerender(<FindingsTable {...props} rows={[row()]} />);
+    expect(screen.getByRole('table').parentElement).toHaveAttribute('aria-busy', 'false');
+  });
+
+  it('a page past the end is not "no matches": it offers the first page', () => {
+    const onFirstPage = vi.fn();
+    render(<FindingsTable {...props} rows={[]} total={9} onFirstPage={onFirstPage} />);
+    expect(screen.queryByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Na tej stronie nie ma już zgłoszeń.');
+    fireEvent.click(screen.getByRole('button', { name: 'Wróć do pierwszej strony' }));
+    expect(onFirstPage).toHaveBeenCalledTimes(1);
   });
 });
