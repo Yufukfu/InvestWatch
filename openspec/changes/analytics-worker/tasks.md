@@ -38,5 +38,5 @@ Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this b
 
 ## 6. Closing
 
-- [ ] 6.1 Apply the iw-docs-update skill (`analytics/README.md` run and env section, `analytics/CLAUDE.md` if a rule is easy to get wrong, the analytics row of `.docs/STATUS.md`, `docs-check` clean) and add the iw-ai-log row
+- [ ] 6.1 Apply the iw-docs-update skill (already added: the `iw:events` envelope rule in `analytics/CLAUDE.md` and `.docs/analytics-plan.md` §12.2, asked for by the api-v1 session; `analytics/README.md` run and env section, `analytics/CLAUDE.md` if a rule is easy to get wrong, the analytics row of `.docs/STATUS.md`, `docs-check` clean) and add the iw-ai-log row
 - [ ] 6.2 Run the iw-pr-review skill and fix real findings

@@ -195,7 +195,10 @@ analytics/
       m2.py           – rule results → Finding (Polish title and summary)
     pipeline.py       – document → findings (pure function, no I/O)
     storage.py        – store interface + Postgres (documents/findings) + in-memory store for tests
-    events.py         – publish to `iw:events` (Redis Pub/Sub) + no-op publisher
+    events.py         – publish to `iw:events` (Redis Pub/Sub) + no-op publisher; every message is the
+                        envelope {type, emitted_at (UTC ISO), data} with data exactly {id, module, score,
+                        title, url, platform} (no risk_level from analytics) – the API relay silently drops
+                        anything else (integration-plan §6)
     worker.py         – Redis Stream consumer (consumer group)
     cli.py            – analyze a JSON file without any infrastructure
   tests/
