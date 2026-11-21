@@ -15,6 +15,20 @@ from ..preprocessing import Sentence
 OVERLAP_SENTENCES = 4
 
 
+def _next_start(sentences: Sequence[Sentence], i: int, nxt: int, *, chunk_chars: int, overlap: int) -> int:
+    """Back up from sentence `nxt` by at most `overlap` sentences, keeping the overlap within half a chunk and
+    the next chunk able to hold sentence `nxt`; never back to `i` or earlier (the chunk must add new text)."""
+    k = nxt
+    while (
+        k - 1 > i
+        and nxt - (k - 1) <= overlap
+        and sentences[nxt - 1].end - sentences[k - 1].start <= chunk_chars // 2
+        and sentences[nxt].end - sentences[k - 1].start <= chunk_chars
+    ):
+        k -= 1
+    return k
+
+
 @dataclass(frozen=True)
 class Chunk:
     start: int
@@ -30,13 +44,21 @@ def split_chunks(
     max_chunks: int,
     overlap: int = OVERLAP_SENTENCES,
 ) -> tuple[list[Chunk], bool]:
-    """(the first `max_chunks` chunks, whether text was left out)."""
+    """(the first `max_chunks` chunks, whether text was left out).
+
+    Every chunk ends later than the previous one. The overlap is up to `overlap` sentences but at most half a
+    chunk, so long sentences still advance by about half a chunk per request (group 6 review).
+    """
+    if chunk_chars < 1:
+        raise ValueError("chunk_chars must be at least 1")
     out: list[Chunk] = []
     i, n = 0, len(sentences)
     while i < n and len(out) <= max_chunks:
         s = sentences[i]
         if s.end - s.start > chunk_chars:
             for a in range(s.start, s.end, chunk_chars):
+                if len(out) > max_chunks:
+                    break
                 b = min(a + chunk_chars, s.end)
                 out.append(Chunk(a, b, text[a:b]))
             i += 1
@@ -47,5 +69,5 @@ def split_chunks(
         out.append(Chunk(s.start, sentences[j].end, text[s.start:sentences[j].end]))
         if j == n - 1:
             break
-        i = max(i + 1, j + 1 - overlap)
+        i = _next_start(sentences, i, j + 1, chunk_chars=chunk_chars, overlap=overlap)
     return out[:max_chunks], len(out) > max_chunks

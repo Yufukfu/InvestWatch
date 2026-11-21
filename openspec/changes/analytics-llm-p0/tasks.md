@@ -36,7 +36,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 - [x] 6.1 Failing tests: injection scenario (tags neutralized to `[document]`, exactly one block at the edges), ignore rule in the system message, `prompt_version` changes when a question changes and is stable otherwise; chunking scenarios (short text one chunk, four-sentence overlap on the border, over-long sentence cut, `LLM_MAX_CHUNKS` truncation logged as `llm_truncated`, every chunk a substring of `doc.text`)
 - [x] 6.2 `llm/prompt.py` (system template, `module_context`, checks list, output schema, `prompt_version = "v1:" + sha256[:12]`), `llm/chunking.py` on `pre.sentences`; tests green
-- [x] 6.3 Mutation check; `mutations: 14 tried, 14 caught` (two redundant guards removed from `split_chunks` instead of being tested)
+- [x] 6.3 Mutation check; `mutations: 14 tried, 14 caught` (two redundant guards removed from `split_chunks` instead of being tested); review fixes (follow-ups R45-R49): `mutations: 11 tried, 11 caught`
 
 ## 7. Response validation, quote verification, chunk merge (~1 h)
 

@@ -110,3 +110,14 @@ Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14
 | R42 | review group 5 | `trust_env` defaulted to on (proxy, netrc, CA bundle from the environment) | `fix-here`: `trust_env=False` |
 | R43 | review group 5, declined | 400/404/422 count toward the breaker; one oversized prompt rejected by Ollama could open it | `new-item`: revisit with real Ollama behaviour in task 12.4 |
 | R44 | review group 5, declined | Transitive deps of httpx are not pinned; `pyproject.toml` lists no runtime deps | `wont-fix`: same pattern as the other services; pip-audit runs on the resolved set |
+
+## Review findings, group 6 (focus: security)
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R45 | review group 6 | With long sentences the 4-sentence overlap advanced one sentence per chunk (4 chunks covered ~23% of a long page), and before a long sentence it produced duplicate subset chunks | `fix-here`: overlap capped at half a chunk, every chunk must end later than the previous one (`_next_start`); spec, design and ADR 0310 updated |
+| R46 | review group 6 | Look-alike tags escaped neutralizing: fullwidth/angle-quote brackets, fullwidth letters, zero-width or soft-hyphen inside `document`, `&lt;`/`&#60;` entities, newline or 9+ spaces inside the tag | `fix-here`: widened `_TAG` (one gap and an optional slash-with-gap, so it stays linear) |
+| R47 | review group 6 | `prompt_version` covered only the system message; a changed chunk size could serve answers for different chunk text | `fix-here`: `USER_FORMAT` is hashed into the version; the chunk span goes into the cache key (group 10, design §7) |
+| R48 | review group 6 | `split_chunks` had no guard for `chunk_chars < 1` and built every slice of a huge sentence before the cap | `fix-here` |
+| R49 | review group 6 | Two checks with the same rule id kept input order | `fix-here`: sorted by (rule id, question, allowed); the engine also never sends a rule id twice (group 8) |
+| R50 | review group 6, declined | Whether a 4B Gemma obeys "ignore instructions"; a random-nonce delimiter instead of the fixed tag | `wont-fix`: the defence is that only deferred checks reach the model and quotes are verified; the spec fixes the tag |

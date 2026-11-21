@@ -24,7 +24,7 @@ For a chunk that fails: taking the worst of the chunks that did succeed biases t
 
 Option 3:
 
-- **Chunk size and split:** `LLM_CHUNK_CHARS`, 9000 by default (about 3k tokens of Polish), split on `pre.sentences`, with consecutive chunks overlapping by 4 sentences (R3 `window` plus `borderline_margin`). A single longer sentence is cut at the limit.
+- **Chunk size and split:** `LLM_CHUNK_CHARS`, 9000 by default (about 3k tokens of Polish), split on `pre.sentences`, with consecutive chunks overlapping by up to 4 sentences (R3 `window` plus `borderline_margin`), capped at half a chunk; every chunk ends later than the previous one. A single longer sentence is cut at the limit.
 - **Chunk cap:** `LLM_MAX_CHUNKS`, 4 by default. Text beyond the cap is not sent, the log says `llm_truncated`, and the rules still cover the full text.
 - **Merge:** per check, worst chunk wins (`fail` > `uncertain` > `pass` > `not_applicable`), and ties go to the earliest chunk. If any chunk of a module's call fails, all of that module's LLM verdicts are dropped.
 - **Timeouts and budget:**
@@ -42,4 +42,5 @@ Rationale: the Ollama `/v1` limitation means option 1 can lose text silently on 
 - A long legal page is judged on its first four chunks only by the LLM. The rules still see all of it, and the log records the truncation.
 - With a dead endpoint, a document costs at most one timeout until the breaker opens, and then nothing for the cooldown.
 - If the infra smoke run shows a larger Ollama default, or the gold set shows that smaller chunks judge better, `LLM_CHUNK_CHARS` changes by env. This ADR is superseded only if the split strategy itself changes.
+- With very long sentences a fixed 4-sentence overlap would advance by one sentence per request, so four chunks would cover only about a quarter of a long page; the half-chunk cap keeps the advance at about half a chunk (found in the group 6 review of `analytics-llm-p0`).
 - `.docs/analytics-plan.md` §7 is updated in the same PR with these defaults.
