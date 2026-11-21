@@ -4,7 +4,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 1. Agreements and ADR
 
-- [ ] 1.1 Measure with evidence: build a throwaway image with the pinned Playwright, Chromium and its system libraries; record size, browser version (its major against `CHROME_VERSION`, design decision 4), checksum source, and whether Chromium's sandbox starts as a non-root user with `cap_drop: [ALL]`, `no-new-privileges` and a read-only root filesystem. Write ADR 0105 (renderer as a separate image and service, options A/B/C of design decision 1, hardening, the DNS-rebinding residual risk, three navigations per document) and list it in `.docs/decisions/README.md`; docs-check clean
+- [x] 1.1 Measure with evidence: build a throwaway image with the pinned Playwright, Chromium and its system libraries; record size, browser version (its major against `CHROME_VERSION`, design decision 4), checksum source, and whether Chromium's sandbox starts as a non-root user with `cap_drop: [ALL]`, `no-new-privileges` and a read-only root filesystem. Write ADR 0105 (renderer as a separate image and service, options A/B/C of design decision 1, hardening, the DNS-rebinding residual risk, three navigations per document) and list it in `.docs/decisions/README.md`; docs-check clean
 - [x] 1.2 Damian answered both questions in issue #34 (2026-11-21): the `legal` word list and `region` never null are folded into the spec and design; `occluded` stays deferred, as a nullable boolean in v2. Nothing in groups 2-7 waits
 
 ## 2. A confined, bounded render with screenshots (desktop and mobile)
