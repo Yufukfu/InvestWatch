@@ -103,7 +103,17 @@ def test_phone_numbers_are_fictional(items):
 
 def test_every_line_names_its_basis_and_is_synthetic_or_uknf(items):
     assert all(i.basis.strip() for i in items)
-    assert {i.origin for i in items} <= {"synthetic", "uknf-sample"}
+    assert {i.origin for i in items} <= {"synthetic", "uknf-sample", "zasob-example"}
+
+
+ZASOB_QUOTE = "w pełni bezpieczna – spełniamy rygorystyczne wymogi nadzorcze KNF"
+
+
+def test_zasob_examples_quote_zasob(items):
+    examples = [i for i in items if i.origin == "zasob-example"]
+    assert examples, "no line uses a phrasing quoted in ZASÓB"
+    assert any(ZASOB_QUOTE in i.document.text for i in examples)
+    assert all(i.basis.startswith("ZASÓB") for i in examples)
 
 
 def test_hard_cases_are_about_a_third(items):

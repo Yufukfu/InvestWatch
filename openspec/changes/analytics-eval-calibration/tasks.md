@@ -58,7 +58,25 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 - [x] 9.2 `api/src/investwatch_api/routes/calibration.py`: combine counts per threshold, recompute ratios with the existing `curve` conventions; response shape unchanged; `api` suite, lint and type check green
 - [x] 9.3 Mutation check (sum vs replace, `labeled_samples` sum, off-grid filter, stored-only path); `mutations: 5 tried, 4 caught`: the off-grid filter was equivalent (`curve` reads only grid thresholds) and was removed. `api` suite: 238 passed, 2 failed in `test_relay.py` (`test_redis_outage_and_recovery`, `test_redis_down_at_start_up`, TCP-proxy outage tests; relay code untouched by this change; they also fail when run alone on this Windows machine, not checked on CI)
 
-## 10. Closing
+## 11. ZASÓB examples (≈ 0.5 h)
+
+- [x] 11.1 Failing tests: `zasob-example` loads like `synthetic` and is listed in the origin error; the committed gold set has a `zasob-example` line with ZASÓB's R18 sentence and every such line has a ZASÓB `basis`
+- [x] 11.2 `ORIGINS` gains `zasob-example`; two lines: `m2-zasob-r18-example` (R18 sentence verbatim after a return claim) and `m2-zasob-r6-legal-section` (risk only in a "Legal" section below the fold); README says no official sample set was available; tests green
+- [x] 11.3 Mutation check (origin removed from `ORIGINS`, the R18 quote changed); `mutations: 2 tried, 2 caught`
+
+## 12. Default thresholds from the evaluation (≈ 1.25 h)
+
+- [ ] 12.1 Failing tests (`tests/test_eval_thresholds.py`, runner and CLI tests): `recommended_threshold` = best F1, higher threshold on a tie, null when the best F1 is 0; `--write-thresholds` writes the file and keeps a module without a recommendation; the committed `analytics/eval/thresholds.json` equals a fresh rules-only run; `api` `DEFAULTS` and `events.DEFAULT_THRESHOLDS` equal the file; the FP/FN scenario uses the recommended threshold
+- [ ] 12.2 Runner, `__main__.py` (`--write-thresholds`), `eval/thresholds.json`, `api/src/investwatch_api/thresholds.py` `DEFAULTS`, `analytics/src/investwatch_analytics/events.py` `DEFAULT_THRESHOLDS`; ADR 0316 with its README row; tests green in both modules
+- [ ] 12.3 Mutation check (tie direction, null on zero F1, the write path, each copy); `mutations: N tried, N caught`
+
+## 10. Closing (first pass)
 
 - [x] 10.1 Apply the iw-docs-update skill (`analytics/README.md` evaluation section with the latest rules-only numbers per module, `strict` as headline; `api/README.md` calibration note; `.docs/analytics-plan.md` §8 gold line shape and how it runs; `.docs/integration-plan.md` §5 calibration sentence (gold set is a file, labels and gold combined); ADR 0312 row; `.docs/STATUS.md` and `.docs/status/*` left to the coordinating session; `docs-check` clean) and add the iw-ai-log row. Done: `analytics/README.md`, `api/README.md`, `.docs/analytics-plan.md` §8, `.docs/integration-plan.md` §5, `.docs/INDEX.md` row, ADR 0312 (group 1), AI log row
 - [x] 10.2 Run the iw-pr-review skill and fix real findings. Deterministic checks green after the last edit (analytics suite, `openspec validate --all --strict` 15/15, `docs-check`, `test-diff-check --base 225e9cf` no weakened tests, `pip-audit` clean, no `print`); three reviewer passes covered the whole range (groups 1-2, 3-5, 6-9), every finding verified, fixes in 1a8012b, cd3b13b and the label commit, rows 1-12 and 22-28 in `follow-ups.md`. PR body drafted for the coordinating session. Archive (`/openspec-archive-change`) is held until the branch sits on its final base (see the report)
+
+## 13. Closing (after groups 11-12 and the rebase onto `analytics/analytics-m1-m3`)
+
+- [ ] 13.1 Apply iw-docs-update again (thresholds in `analytics/README.md`, `api/README.md`, `.docs/integration-plan.md` §5 defaults, `analytics/CLAUDE.md` / ADR links, ADR 0316 row, README numbers on the new base) and extend the AI log row; `npx @fission-ai/openspec@2.1.1 validate --all --strict` for this change and `docs-check` clean
+- [ ] 13.2 iw-pr-review on the whole branch (reviewer pass on groups 11-12 and the rebase), fix real findings
+- [ ] 13.3 `/openspec-archive-change` as the last commit, then push the branch and open the PR on base `analytics/analytics-m1-m3` (ADR 0207); never merge

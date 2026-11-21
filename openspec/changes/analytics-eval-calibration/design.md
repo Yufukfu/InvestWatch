@@ -80,7 +80,15 @@ Damian's decision: Opis §3 asks for the whole stack with one command, and the j
 
 Damian's decision: the panel must never collapse to one or two labels. `GET /api/calibration` computes the label curve as today and, when the module also has a stored run, adds the run's `tp/fp/fn/tn` to the label counts per threshold (both use the same grid; a stored point at a threshold outside the grid is ignored), recomputes `precision`, `recall` and `f1` with the same conventions, and returns `labeled_samples` = labels + run samples. With only one source it returns that source unchanged. No query parameter (the contract is frozen) and no response change. A source switch (`source=gold|labels|both`) is a follow-up if Kacper's panel wants it.
 
-### 13. ADR 0312
+### 13. Default thresholds from the evaluation
+
+Damian's decision on follow-up 17 (rules-only M3 never reached its 0.7 default). The report gives each evaluated module a `recommended_threshold`: the grid threshold with the highest module-curve F1, the higher one on a tie, so precision wins; none when the best F1 is 0. `--write-thresholds` writes them to `analytics/eval/thresholds.json`, committed. That file is the one source: the API image cannot read files from `analytics/` (separate build context), so `api` keeps `DEFAULTS` as a copy, and so does `events.DEFAULT_THRESHOLDS` (the analytics fallback when the key is missing), and `tests/test_eval_thresholds.py` fails when either copy or the file differs from a fresh rules-only run. A rule change that moves a module's best F1 therefore fails the build until someone runs `--write-thresholds` and copies the values: that is the intended coupling. The stored run has no threshold column (no schema change); the API could recompute the best point from the stored points if needed later. The defaults apply only when the key is missing (`SET NX`), so a running stack keeps its thresholds. ADR 0316 supersedes ADR 0305's default values only.
+
+### 14. ZASÓB examples
+
+`origin: zasob-example` marks lines built around a phrasing that ZASÓB quotes itself: R18's example sentence verbatim, and R6's risk "w sekcji Legal". The Opis PDF quotes no ad phrasing. They are labeled like any other line.
+
+### 15. ADR 0312
 
 Decisions 2, 4, 6, 7 (deterministic run id), 11 and 12 are recorded as ADR 0312 "Gold-set evaluation feeds the calibration panel" (fictional eval registry, strict/review readings, API-parity counting, one-shot service). Written in task group 1 as `Status: accepted`, effective when the PR merges.
 

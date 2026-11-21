@@ -73,9 +73,10 @@ def test_blank_lines_between_items_are_skipped(tmp_path):
     assert [(i.id, i.line) for i in items] == [("a", 1), ("b", 4)]
 
 
-def test_uknf_sample_origin_loads_like_synthetic(tmp_path):
-    item = load_gold(write(tmp_path, line(origin="uknf-sample")), M2_ONLY)[0]
-    assert item.origin == "uknf-sample"
+@pytest.mark.parametrize("origin", ["uknf-sample", "zasob-example"])
+def test_other_origins_load_like_synthetic(tmp_path, origin):
+    item = load_gold(write(tmp_path, line(origin=origin)), M2_ONLY)[0]
+    assert item.origin == origin
 
 
 # ---- failure paths -------------------------------------------------------------------------------
@@ -148,7 +149,7 @@ def test_duplicate_id_names_both_lines(tmp_path):
 
 
 @pytest.mark.parametrize(("field", "value", "message"), [
-    ("origin", "scraped", "origin: 'scraped' is not one of synthetic, uknf-sample"),
+    ("origin", "scraped", "origin: 'scraped' is not one of synthetic, uknf-sample, zasob-example"),
     ("basis", "", "basis: must be a non-empty string"),
     ("hard_case", 3, "hard_case: must be a string"),
     ("labels", {}, "labels: unknown field"),

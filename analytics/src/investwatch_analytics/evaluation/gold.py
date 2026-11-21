@@ -18,7 +18,7 @@ from pydantic import ValidationError
 from ..models import ScrapedDocument
 from .known_ids import MODULES, Catalogues, known_ids
 
-ORIGINS = ("synthetic", "uknf-sample")
+ORIGINS = ("synthetic", "uknf-sample", "zasob-example")
 DOC_LABELS = ("negative", "positive")
 RULE_LABELS = ("fail", "not_applicable", "pass")
 ITEM_FIELDS = {"id", "origin", "basis", "hard_case", "document", "expect"}

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Gold-set file
-The gold set SHALL be `analytics/eval/gold.jsonl`, one JSON object per line with a unique `id`, an `origin` (`synthetic` or `uknf-sample`), a `basis` naming the criterion it was written from, an optional `hard_case` text, a `document` that is a valid `ScrapedDocument` v1 (`.docs/integration-plan.md` §3), and `expect`: a mapping from module (`M1`, `M2`, `M3`) to `{label, rules}`, where `label` is `positive` or `negative` and `rules` maps a rule or signal id of that module's catalogue to `fail`, `pass` or `not_applicable`. Synthetic documents SHALL name only fictional firms, handles and domains and SHALL contain no real person's personal data. The gold set SHALL NOT read or modify `contracts/mocks/`.
+The gold set SHALL be `analytics/eval/gold.jsonl`, one JSON object per line with a unique `id`, an `origin`, a `basis` naming the criterion it was written from, an optional `hard_case`, a `document` that is a valid `ScrapedDocument` v1 (`.docs/integration-plan.md` §3), and `expect`: module (`M1`, `M2`, `M3`) to `{label, rules}`. `label` SHALL be `positive` or `negative`; `rules` SHALL map a rule or signal id of that module to `fail`, `pass` or `not_applicable`.
 
 #### Scenario: One document labeled for two modules
 - **WHEN** a line has `expect` with `M1` positive and `M3` positive
@@ -19,24 +19,27 @@ The gold set SHALL be `analytics/eval/gold.jsonl`, one JSON object per line with
 - **WHEN** the committed gold set is loaded
 - **THEN** each of R1-R18 (R12a and R12b separately) has at least one `fail` and one `pass` label under M2, whether implemented or not
 
+### Requirement: Gold-set origins and privacy
+`origin` SHALL be `synthetic` (written by us), `zasob-example` (built around a phrasing quoted in the ZASÓB or Opis documents) or `uknf-sample` (official sample material, none available so far). All three SHALL be loaded and scored the same way, with no code change to add one. Documents SHALL name only fictional firms, handles and domains, SHALL hold no real person's personal data, and the gold set SHALL NOT read or modify `contracts/mocks/`.
+
 #### Scenario: Fictional firms only
 - **WHEN** the committed gold set and `analytics/eval/registry.csv` are loaded
-- **THEN** no firm in `analytics/eval/registry.csv` shares a name, alias or domain with the runtime registry under `analytics/registry/` (which `analytics-knf-registry` fills with real KNF firms), and every `document.author` handle is in the fictional-handles list of the labeling guide (README in `analytics/eval/`)
+- **THEN** no firm in `analytics/eval/registry.csv` shares a name, alias or domain with the runtime registry under `analytics/registry/`, and every `document.author` handle is in the fictional-handles list of the labeling guide (README in `analytics/eval/`)
+
+#### Scenario: ZASÓB phrasing
+- **WHEN** the committed gold set is loaded
+- **THEN** at least one `zasob-example` line contains ZASÓB's R18 example "w pełni bezpieczna – spełniamy rygorystyczne wymogi nadzorcze KNF", and every `zasob-example` line has a `basis` starting with "ZASÓB"
+
+#### Scenario: UKNF sample item
+- **WHEN** a line has `origin: uknf-sample`
+- **THEN** it is validated and scored like a synthetic line, and the report counts it under `origin` `uknf-sample`
 
 ### Requirement: Gold-set validation before analysis
-The evaluation SHALL read and validate the whole gold set before analyzing any document. It SHALL stop with exit code 2, without analyzing or writing anything, when the file is missing, has no labeled line, has a line that is not valid JSON, has a `document` that fails `ScrapedDocument` validation, names a module outside M1/M2/M3, uses a label outside the allowed values, repeats an `id`, or uses a rule or signal id that is not a known id of that module (the loaded catalogue of that module plus the static stage-2 id list: M2 R1-R11, R12a, R12b, R13-R18; M1 S1.1-S1.7; M3 S3.1-S3.8). Each error SHALL name the line number, the gold `id` when known and the field, and SHALL NOT quote document text. A label for a known id that the loaded catalogue marks `implemented: false`, or that the loaded catalogue does not contain, SHALL be valid. Items with `origin: uknf-sample` SHALL be loaded and scored like synthetic items, with no code change.
+The evaluation SHALL validate the whole gold set before analyzing any document, and SHALL exit 2 without analyzing or writing anything when the file is missing or has no labeled line, a line is not valid JSON or repeats a key, a `document` fails `ScrapedDocument` validation, a module or label is outside the allowed values, an `id` repeats, or a rule id is not a known id of its module. Each error SHALL name the line number, the gold `id` when known and the field, never document text.
 
 #### Scenario: Empty gold set
 - **WHEN** the gold file is empty or holds only blank lines
 - **THEN** the run exits 2 with "no labeled document", the report is not printed and no `calibration_points` row is written
-
-#### Scenario: Unknown rule id
-- **WHEN** a line labels `R19` (or `S1.9`) under its module
-- **THEN** the run exits 2 naming that line, that id and the module, and no document is analyzed
-
-#### Scenario: Rule id of another module
-- **WHEN** a line labels `R3` under `M1`
-- **THEN** the run exits 2 naming the line, `R3` and `M1`
 
 #### Scenario: Unknown module
 - **WHEN** a line has `expect` with key `M4`
@@ -50,20 +53,31 @@ The evaluation SHALL read and validate the whole gold set before analyzing any d
 - **WHEN** two lines share the `id` `m2-r3-window-edge`
 - **THEN** the run exits 2 naming both line numbers
 
+#### Scenario: Duplicate key
+- **WHEN** a line's `expect.M2.rules` names `R3` twice
+- **THEN** the run exits 2 naming `expect.M2.rules.R3` as a duplicate key
+
+### Requirement: Known rule and signal ids
+The known ids of a module SHALL be the ids in its loaded catalogue plus the static stage-2 list (M2 R1-R11, R12a, R12b, R13-R18; M1 S1.1-S1.7; M3 S3.1-S3.8). A known id that the loaded catalogue marks `implemented: false` SHALL be reported `not_implemented`, and a known id missing from the loaded catalogue `not_in_build`; both SHALL be valid labels.
+
+#### Scenario: Unknown rule id
+- **WHEN** a line labels `R19` (or `S1.9`) under its module
+- **THEN** the run exits 2 naming that line, that id and the module, and no document is analyzed
+
+#### Scenario: Rule id of another module
+- **WHEN** a line labels `R3` under `M1`
+- **THEN** the run exits 2 naming the line, `R3` and `M1`
+
 #### Scenario: Label for a signal not in this build
 - **WHEN** a line labels `S1.2: fail` under M1 and this build has no M1 catalogue
 - **THEN** the run continues and the report lists `S1.2` as `not_in_build`
-
-#### Scenario: UKNF sample item
-- **WHEN** a line has `origin: uknf-sample`
-- **THEN** it is validated and scored like a synthetic line, and the report counts it under `origin` `uknf-sample`
 
 #### Scenario: Label for a rule not implemented yet
 - **WHEN** a line labels `R5: fail` and `R5` has `implemented: false`
 - **THEN** the run continues and the report lists `R5` as `not_implemented` with its label counts
 
 ### Requirement: Module curve with the API's counting
-For each module with labels, the evaluation SHALL pair each labeled document's label with the score of that module's finding for the document, using 0.0 when the pipeline produced no finding of that module. On the thresholds 0.05, 0.10, ..., 0.95 it SHALL count `tp`, `fp`, `fn`, `tn` with a positive prediction meaning `score >= threshold`, and compute `precision`, `recall` and `f1` with the conventions of the rest-api requirement "Calibration curve" (precision 1.0 when nothing is predicted positive, recall 0.0 without positives, f1 0.0 when both are 0, each rounded to 3 decimals).
+For each module with labels, the evaluation SHALL pair each labeled document's label with that module's finding score for it (0.0 when there is no finding of that module). On the thresholds 0.05, 0.10, ..., 0.95 it SHALL count `tp`, `fp`, `fn`, `tn` with a positive prediction meaning `score >= threshold`, and compute `precision`, `recall` and `f1` with the conventions of the rest-api calibration requirements.
 
 #### Scenario: Same numbers as the API
 - **WHEN** a module has positives with scores 0.9 and 0.4 and negatives with scores 0.6 and 0.2
@@ -81,12 +95,42 @@ For each module with labels, the evaluation SHALL pair each labeled document's l
 - **WHEN** no document of a module has a score at or above 0.95
 - **THEN** the 0.95 point has `precision 1.0`, `recall 0.0` and `f1 0.0`
 
+### Requirement: Recommended threshold
+For each evaluated module the report SHALL give `recommended_threshold`: the grid threshold with the highest `f1` of the module curve, the higher threshold on a tie. When the best `f1` is 0, the module SHALL have no recommended threshold.
+
+#### Scenario: Best F1 wins
+- **WHEN** a module's curve has `f1` 0.70 at 0.25 and 0.67 at 0.3
+- **THEN** `recommended_threshold` is 0.25
+
+#### Scenario: Tie goes to the higher threshold
+- **WHEN** a module's curve has its best `f1` 0.889 at every threshold from 0.4 to 0.65
+- **THEN** `recommended_threshold` is 0.65
+
+#### Scenario: Nothing found
+- **WHEN** every point of a module has `f1` 0
+- **THEN** `recommended_threshold` is null
+
 #### Scenario: Thresholds move FP and FN
 - **WHEN** the committed gold set is evaluated rules-only
-- **THEN** for each evaluated module of M1 (0.6), M2 (0.5) and M3 (0.7), the point at the default threshold differs in `fp` or `fn` from the point 0.2 below it or the point 0.2 above it
+- **THEN** for each evaluated module, the point at its recommended threshold differs in `fp` or `fn` from the point 0.2 below it or 0.2 above it
+
+### Requirement: Default thresholds from the evaluation
+`analytics/eval/thresholds.json` SHALL hold the recommended threshold per module from a rules-only run of the committed gold set, and SHALL be the one source of the default thresholds: the API's defaults (written to `iw:settings:thresholds` only when the key is missing) and the analytics fallback defaults SHALL equal it. A key that is already set SHALL be left unchanged.
+
+#### Scenario: Committed defaults match the evaluation
+- **WHEN** the committed gold set is evaluated rules-only on this build
+- **THEN** each module's `recommended_threshold` equals its value in `analytics/eval/thresholds.json`
+
+#### Scenario: Copies match the file
+- **WHEN** the API defaults and the analytics fallback defaults are read
+- **THEN** both equal `analytics/eval/thresholds.json`
+
+#### Scenario: Writing the file
+- **WHEN** the evaluation runs with `--write-thresholds`
+- **THEN** `analytics/eval/thresholds.json` holds the run's recommended thresholds, and a module without one keeps its previous value
 
 ### Requirement: Per-rule and per-signal metrics
-For each rule or signal with labels, the report SHALL give `tp`, `fp`, `fn`, `tn`, `precision`, `recall` and `f1` in two readings: `strict`, where a predicted `uncertain` counts as not flagged, and `review`, where it counts as flagged; plus the count of predicted `uncertain` and of `applicability_errors` (gold `not_applicable` with a predicted applicable result, or the reverse). Gold `fail` SHALL be a positive and gold `pass` a negative; gold `not_applicable` SHALL NOT enter the confusion counts. Rules with `implemented: false` SHALL be listed as `not_implemented`, and known ids missing from the loaded catalogue as `not_in_build`, both without metrics.
+For each labeled rule or signal the report SHALL give `tp`, `fp`, `fn`, `tn`, `precision`, `recall` and `f1` in two readings, `strict` (a predicted `uncertain` counts as not flagged) and `review` (it counts as flagged), plus counts of `uncertain` and of `applicability_errors`. Gold `fail` SHALL be a positive and `pass` a negative; gold `not_applicable` SHALL stay out of the counts.
 
 #### Scenario: Uncertain in both readings
 - **WHEN** `S1.5` is labeled `fail` on a document and the rules-only result is `uncertain`
@@ -101,31 +145,15 @@ For each rule or signal with labels, the report SHALL give `tp`, `fp`, `fn`, `tn
 - **THEN** that label counts as not flagged in both readings
 
 ### Requirement: Stored calibration run
-With `--db`, the evaluation SHALL write one run to `calibration_points`: one `computed_at` (UTC) for all rows and one `run_id` per evaluated module, 19 rows per evaluated module with `module`, `threshold`, `tp`, `fp`, `fn`, `tn`, `precision`, `recall`, `f1` and `labeled_samples` (the number of gold documents labeled for that module), all in one transaction. For a rules-only run, a module's `run_id` SHALL be a UUID derived from the gold-set content hash, the pipeline version, the module and its computed points; per module the evaluation SHALL write nothing when the module's latest stored run already has that `run_id`, SHALL move `computed_at` of existing rows with that `run_id` to now when another run is newer, and SHALL insert the rows otherwise. An `--llm` run SHALL get a random UUID v4 and always be inserted. A run in which a gold document failed analysis SHALL NOT be stored. The rows SHALL be what `GET /api/calibration` returns for that module when it has no analyst labels. Without `--db` it SHALL NOT connect to a database.
+With `--db`, the evaluation SHALL write in one transaction 19 rows per evaluated module to `calibration_points`, with one `computed_at` for the run, one `run_id` per module, and `labeled_samples` = gold documents labeled for that module. They SHALL be what `GET /api/calibration` returns when the module has no analyst labels. A run in which a gold document failed analysis SHALL NOT be stored. Without `--db` it SHALL NOT connect to a database.
 
 #### Scenario: API serves the stored run
 - **WHEN** the evaluation runs with `--db` and M2 has no labeled findings
 - **THEN** `GET /api/calibration?module=M2` returns the run's 19 points in ascending threshold, with the same counts, ratios and `f1`, and its `labeled_samples`
 
-#### Scenario: Restart with the same gold set
-- **WHEN** the evaluation runs with `--db` twice on the same code and gold set
-- **THEN** the second run writes no row, the report says `unchanged` per module, and the exit code is 0
-
-#### Scenario: Gold set changed
-- **WHEN** one gold label changes between two runs with `--db`
-- **THEN** the second run inserts a new run with a different `run_id`, which the API returns
-
-#### Scenario: Another module changed
-- **WHEN** only M3's points change between two runs with `--db`, or the second run uses `--module M2`
-- **THEN** M2 is reported `unchanged` and gets no new rows
-
 #### Scenario: Crashed gold document
 - **WHEN** the pipeline raises on one gold document during a run with `--db`
 - **THEN** nothing is stored, the report lists that gold id under `analysis_errors`, and the exit code is 1
-
-#### Scenario: Rolled-back code
-- **WHEN** run A is stored, then run B, then the code that produced A runs again
-- **THEN** no row is inserted, A's rows get the new `computed_at`, and the API returns A's points
 
 #### Scenario: Database down
 - **WHEN** the database is unreachable or the insert fails
@@ -139,6 +167,25 @@ With `--db`, the evaluation SHALL write one run to `calibration_points`: one `co
 - **WHEN** the evaluation runs without `--db`
 - **THEN** it opens no database connection and exits 0 on a valid gold set
 
+### Requirement: Idempotent stored run
+For a rules-only run, a module's `run_id` SHALL be a UUID derived from the gold-set content hash, the pipeline version, the module and its points. Per module the evaluation SHALL write nothing when the module's latest stored run has that `run_id`, SHALL move `computed_at` of existing rows with that `run_id` to now when another run is newer, and SHALL insert otherwise. An `--llm` run SHALL get a random UUID v4 and always be inserted.
+
+#### Scenario: Restart with the same gold set
+- **WHEN** the evaluation runs with `--db` twice on the same code and gold set
+- **THEN** the second run writes no row, the report says `unchanged` per module, and the exit code is 0
+
+#### Scenario: Gold set changed
+- **WHEN** one gold label changes between two runs with `--db`
+- **THEN** the second run inserts a new run with a different `run_id`, which the API returns
+
+#### Scenario: Another module changed
+- **WHEN** only M3's points change between two runs with `--db`, or the second run uses `--module M2`
+- **THEN** M2 is reported `unchanged` and gets no new rows
+
+#### Scenario: Rolled-back code
+- **WHEN** run A is stored, then run B, then the code that produced A runs again
+- **THEN** no row is inserted, A's rows get the new `computed_at`, and the API returns A's points
+
 ### Requirement: Module that never ran
 A module that has at least one gold label but no finding on any gold document SHALL be reported with status `not_run`, SHALL get no `calibration_points` rows, and SHALL make the run exit 1 after the other modules are reported and stored. A module with no gold labels SHALL NOT be evaluated and SHALL NOT affect the exit code.
 
@@ -151,11 +198,11 @@ A module that has at least one gold label but no finding on any gold document SH
 - **THEN** `GET /api/calibration?module=M1` still returns the older run
 
 ### Requirement: Deterministic rules-only run
-By default the evaluation SHALL run the pipeline rules-only with the gold registry `analytics/eval/registry.csv`, and two runs on the same code and gold set SHALL print the same report except `run_id` and `computed_at`. `--llm` SHALL use the LLM judge configured by `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`; without them it SHALL exit 2. When the judge fails for a document, that document SHALL be analyzed rules-only and the report SHALL count the documents analyzed without the model.
+By default the evaluation SHALL run the pipeline rules-only with the gold registry `analytics/eval/registry.csv`, and two runs on the same code and gold set SHALL print the same report except `computed_at`. `--llm` SHALL use the LLM judge configured by `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`, and SHALL exit 2 without them or in a build without a judge. A document whose judge call fails SHALL be analyzed rules-only and counted in the report.
 
 #### Scenario: Two rules-only runs
 - **WHEN** the evaluation runs twice without `--llm`
-- **THEN** both reports are byte-identical after removing `run_id` and `computed_at`
+- **THEN** both reports are byte-identical after removing `computed_at`
 
 #### Scenario: LLM requested but not configured
 - **WHEN** `--llm` is given and `LLM_BASE_URL` is empty
@@ -165,8 +212,15 @@ By default the evaluation SHALL run the pipeline rules-only with the gold regist
 - **WHEN** `--llm` is given and every judge call fails
 - **THEN** the run completes rules-only and the report says all documents ran without the model
 
-### Requirement: Command line and compose service
-The evaluation SHALL run as `python -m investwatch_analytics.evaluation` and as `python analytics/eval/run.py`, with `--gold`, `--registry`, `--db`, `--llm` and `--module` options, the JSON report on stdout and JSON logs on stderr, and exit codes 0 (ok), 1 (a module `not_run`), 2 (invalid input or configuration) and 3 (database write failed). `analytics/compose.yaml` SHALL define a one-shot service `analytics-eval` in the default stack (no profile) that runs it rules-only with `--db` after `api-migrate` completes, on the data network only, without restarting.
+### Requirement: Command line
+The evaluation SHALL run as `python -m investwatch_analytics.evaluation` and as `python analytics/eval/run.py`, with `--gold`, `--registry`, `--db`, `--llm`, `--module` and `--write-thresholds`, the JSON report on stdout and JSON logs on stderr, and exit codes 0 (ok), 1 (a module `not_run` or a crashed gold document), 2 (invalid input or configuration) and 3 (database write failed).
+
+#### Scenario: Restricted module list
+- **WHEN** the run uses `--module M2`
+- **THEN** only M2 is evaluated and stored, and labels of other modules are still validated
+
+### Requirement: One-shot compose service
+`analytics/compose.yaml` SHALL define a one-shot service `analytics-eval` in the default stack (no profile) that runs the evaluation rules-only with `--db` after `api-migrate` completes, on the data network only, without restarting.
 
 #### Scenario: Fresh stack has a curve
 - **WHEN** the stack starts with `docker compose up` on an empty database
@@ -175,7 +229,3 @@ The evaluation SHALL run as `python -m investwatch_analytics.evaluation` and as 
 #### Scenario: Restart of the stack
 - **WHEN** the stack is stopped and started again with `docker compose up`
 - **THEN** `analytics-eval` exits 0 and `calibration_points` has no new rows
-
-#### Scenario: Restricted module list
-- **WHEN** the run uses `--module M2`
-- **THEN** only M2 is evaluated and stored, and labels of other modules are still validated
