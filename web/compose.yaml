@@ -15,6 +15,7 @@ services:
       resources:
         limits: { cpus: "0.5", memory: 128M }
 
+# Project-scoped: <project>_edge. Run alone with the stack's project name:
+#   docker compose -p investwatch --env-file .env -f web/compose.yaml up
 networks:
-  edge:
-    name: iw-edge
+  edge: {}
