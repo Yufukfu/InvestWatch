@@ -22,7 +22,7 @@ The scraper SHALL validate every document against the `ScrapedDocument` v1 schem
 - **THEN** no row is inserted and a job error with reason `empty_text` is recorded
 
 ### Requirement: Deduplicate by content hash
-The scraper SHALL compute `content_hash` as the sha256 of the normalised text (Unicode NFC, every run of whitespace collapsed to one space, leading and trailing whitespace removed; case is preserved) and SHALL NOT insert a second document with the same `content_hash` for the same `source_id`.
+The scraper SHALL compute `content_hash` as the sha256 (lowercase hex, of the UTF-8 bytes) of the normalised text (Unicode NFC, every run of whitespace collapsed to one space, leading and trailing whitespace removed; case is preserved; compatibility characters such as ligatures, superscripts and full-width forms are NOT folded, which NFKC would do) and SHALL NOT insert a second document with the same `content_hash` for the same `source_id`.
 
 #### Scenario: Rerun of unchanged page
 - **WHEN** the same page is collected twice with identical text
@@ -47,6 +47,14 @@ The scraper SHALL compute `content_hash` as the sha256 of the normalised text (U
 #### Scenario: Insert fails for another reason
 - **WHEN** the HTML was uploaded and the insert then fails with an error other than a duplicate
 - **THEN** a job error with reason `storage_error` is recorded, and the uploaded object is removed if the insert certainly did not commit; if the insert may have committed (a dropped connection, a timeout, a cancellation) the object is kept and logged as `possible_orphan`, so that no document row points at a missing object
+
+#### Scenario: Compatibility characters are kept
+- **WHEN** a page has the text `"ﬁnanse"`, `"m²"` or `"１２３%"` (ligature, superscript, full-width digits)
+- **THEN** its `content_hash` is the sha256 of exactly that text, which differs from the hash of `"finanse"`, `"m2"` or `"123%"`
+
+#### Scenario: Canonically equivalent text
+- **WHEN** two pages differ only in composed versus decomposed form (`"é"` and `"é"`)
+- **THEN** their `content_hash` values are equal
 
 ### Requirement: Store raw HTML in object storage
 The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_id}.html` and set `html_object_key` accordingly. At startup the scraper SHALL check that the bucket exists and fail with a clear error if it does not; it SHALL NOT create it (the stack's `minio-init` does, and the app user may lack that permission). If the upload fails the document SHALL NOT be inserted. A page that has no HTML SHALL NOT be inserted either.
