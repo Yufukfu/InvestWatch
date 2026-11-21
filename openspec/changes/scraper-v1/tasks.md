@@ -34,7 +34,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 ## 5. Source selection and target guards
 
 - [ ] 5.1 Failing tests, then selection of collectable `web` sources over source records with `source_kind` copied from the record and `schedule_cron = null` as manual only; the selection scenarios pass
-- [ ] 5.2 Failing tests, then the URL guard (`http(s)` only, host allow-list with `www.` equivalence for redirects and scraped links); the allow-list, redirect, apex-to-www and non-http scenarios pass
+- [ ] 5.2 Failing tests, then the URL guard (`http(s)` only, host allow-list with `www.` equivalence for redirects and scraped links); the allow-list, redirect, apex-to-www and non-http scenarios pass; `ALLOWED_PORTS` (default `80,443`, scheme default ports, redirect hops and scraped links included) with the non-web-port, default-port and configured-port scenarios
 - [ ] 5.3 Failing tests, then the address guard (own DNS resolution, refused ranges incl. IPv6 and mapped forms, compose names, connect to the checked address); the internal-address and DNS-change scenarios pass with a fake resolver
 - [ ] 5.4 Mutation check; `mutations:`
 
