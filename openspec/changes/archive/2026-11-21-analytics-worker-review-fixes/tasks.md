@@ -36,4 +36,4 @@
 ## 4. Closing
 
 - [x] 4.1 Apply the iw-docs-update skill (own `.docs/status/platform.md` section, `docs-check` clean) and add the iw-ai-log row
-- [ ] 4.2 Run the iw-pr-review skill and fix real findings
+- [x] 4.2 Run the iw-pr-review skill and fix real findings (two reviewer passes: the first found the open second-review items, a compressed-size cap and two wording overclaims; the second found two more super-linear paths, task 5.5; all fixed or dispositioned in `follow-ups.md`)
