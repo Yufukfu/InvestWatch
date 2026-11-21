@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { FindingRow } from '../model';
+import type { FindingRow, FindingStatus } from '../model';
 import { FindingsTable } from './FindingsTable';
 
 const row = (over: Partial<FindingRow> = {}): FindingRow => ({
@@ -24,6 +24,22 @@ describe('FindingsTable', () => {
     expect(screen.getByText('Fałszywy alarm')).toBeInTheDocument();
     expect(screen.getAllByText('instagram')).toHaveLength(2);
     expect(screen.getAllByText('M2')).toHaveLength(2);
+  });
+
+  it.each<[FindingStatus, string]>([
+    ['new', 'Nowe'],
+    ['in_review', 'W analizie'],
+    ['confirmed', 'Potwierdzone'],
+    ['false_positive', 'Fałszywy alarm'],
+    ['closed', 'Zamknięte'],
+  ])('labels status %s as "%s"', (status, label) => {
+    render(<FindingsTable rows={[row({ status })]} isLoading={false} isError={false} />);
+    expect(screen.getByRole('cell', { name: label })).toBeInTheDocument();
+  });
+
+  it('shows the raw status for a value outside the contract', () => {
+    render(<FindingsTable rows={[row({ status: 'archived' as FindingStatus })]} isLoading={false} isError={false} />);
+    expect(screen.getByRole('cell', { name: 'archived' })).toBeInTheDocument();
   });
 
   it('shows the loading text', () => {

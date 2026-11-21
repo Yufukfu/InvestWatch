@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import summary from '../../../mocks/fixtures/summary.json';
 import { server } from '../../../test/setup';
+import { useGetStatsSummaryQuery } from '../../../api/generated';
 import { storeWrapper } from '../../../test/store';
 import { useSummary } from './useSummary';
 
@@ -29,17 +30,13 @@ describe('useSummary', () => {
     expect(result.current).toEqual({ total: summary.total, highRisk: 0, newCount: 0 });
   });
 
-  it('stays undefined when the request fails', async () => {
-    let hit = false;
-    server.use(
-      http.get('http://localhost/api/stats/summary', () => {
-        hit = true;
-        return HttpResponse.error();
-      }),
-    );
-    const { result } = renderHook(() => useSummary(), { wrapper: storeWrapper() });
-    await waitFor(() => expect(hit).toBe(true));
-    await new Promise((r) => setTimeout(r, 50));
-    expect(result.current).toBeUndefined();
+  it('stays undefined once the request has failed', async () => {
+    server.use(http.get('http://localhost/api/stats/summary', () => HttpResponse.error()));
+    // Read the query status next to the hook so the test waits for the failure instead of sleeping.
+    const { result } = renderHook(() => ({ summary: useSummary(), query: useGetStatsSummaryQuery() }), {
+      wrapper: storeWrapper(),
+    });
+    await waitFor(() => expect(result.current.query.isError).toBe(true));
+    expect(result.current.summary).toBeUndefined();
   });
 });

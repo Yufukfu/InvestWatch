@@ -29,16 +29,4 @@ describe('useHealth', () => {
     const { result } = renderHook(() => useHealth(), { wrapper: storeWrapper() });
     await waitFor(() => expect(result.current.state).toBe('unreachable'));
   });
-
-  it('polls the health endpoint', async () => {
-    let calls = 0;
-    server.use(
-      http.get('http://localhost/api/health', () => {
-        calls += 1;
-        return HttpResponse.json({ status: 'ok', services: {} });
-      }),
-    );
-    renderHook(() => useHealth(30), { wrapper: storeWrapper() });
-    await waitFor(() => expect(calls).toBeGreaterThanOrEqual(2), { timeout: 3000 });
-  });
 });

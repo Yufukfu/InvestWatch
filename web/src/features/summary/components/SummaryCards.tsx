@@ -1,4 +1,4 @@
-export type SummaryCounts = { total: number; highRisk: number; newCount: number };
+import type { SummaryCounts } from '../model';
 
 export function SummaryCards({ summary }: { summary: SummaryCounts | undefined }) {
   if (!summary) return null;

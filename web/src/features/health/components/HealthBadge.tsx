@@ -1,4 +1,4 @@
-export type HealthState = 'loading' | 'ok' | 'degraded' | 'down' | 'unreachable';
+import type { HealthState } from '../model';
 
 const LABEL: Record<HealthState, string> = {
   loading: 'Sprawdzanie…',
@@ -11,7 +11,7 @@ const LABEL: Record<HealthState, string> = {
 export function HealthBadge({ state }: { state: HealthState }) {
   return (
     <span className={`badge badge-${state}`} role="status">
-      {LABEL[state]}
+      {LABEL[state] ?? state}
     </span>
   );
 }

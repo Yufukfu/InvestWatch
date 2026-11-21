@@ -1,5 +1,5 @@
 import { useGetStatsSummaryQuery } from '../../../api/generated';
-import type { SummaryCounts } from '../components/SummaryCards';
+import type { SummaryCounts } from '../model';
 
 export function useSummary(): SummaryCounts | undefined {
   const { data } = useGetStatsSummaryQuery();

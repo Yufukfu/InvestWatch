@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { HealthBadge, type HealthState } from './HealthBadge';
+import type { HealthState } from '../model';
+import { HealthBadge } from './HealthBadge';
 
 describe('HealthBadge', () => {
   it.each<[HealthState, string]>([
@@ -14,5 +15,10 @@ describe('HealthBadge', () => {
     const badge = screen.getByRole('status');
     expect(badge).toHaveTextContent(label);
     expect(badge).toHaveClass(`badge-${state}`);
+  });
+
+  it('shows the raw value for a status outside the contract instead of an empty badge', () => {
+    render(<HealthBadge state={'maintenance' as HealthState} />);
+    expect(screen.getByRole('status')).toHaveTextContent('maintenance');
   });
 });
