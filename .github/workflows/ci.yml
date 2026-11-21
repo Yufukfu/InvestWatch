@@ -29,8 +29,17 @@ jobs:
           OPENSPEC_TELEMETRY: "0"
 
   python:
-    name: Python services
+    name: Python services (${{ matrix.python }})
     runs-on: ubuntu-latest
+    # api needs Python 3.13 (`requires-python`), the other services run on 3.12 like their images.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.12"
+            services: "analytics scraper"
+          - python: "3.13"
+            services: "api"
     # Throwaway services for the tests that need real PostgreSQL, Redis and MinIO. Each suite names its own
     # variables and decides whether a missing service skips or fails: api skips without `TEST_DATABASE_ADMIN_URL`,
     # analytics without `CONTRACTS_DIR`, the scraper tests read `IW_TEST_*` (they fail when `CI` is set, which GitHub
@@ -63,7 +72,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
       # `services:` cannot pass `server /data`, so MinIO is started here, on the digest the stack pins (PR #18).
       # Docker's port proxy accepts the connection and then resets it while MinIO starts, which curl only
       # retries with `--retry-all-errors` (`--retry-connrefused` covers refusals alone).
@@ -76,19 +85,29 @@ jobs:
             || { docker logs iw-test-minio; exit 1; }
       - name: Test and audit each Python service that has a requirements.txt
         shell: bash
+        env:
+          SERVICES: ${{ matrix.services }}
+          ALL_SERVICES: analytics scraper api  # every matrix entry above; the guard below keeps this list honest
         run: |
           set -euo pipefail
-          pip install pip-audit pytest
+          # A service with a requirements.txt that no matrix entry lists would go untested and still be green.
+          all_services=" $ALL_SERVICES "
           for req in */requirements.txt; do
             [ -f "$req" ] || continue
-            dir=$(dirname "$req")
+            case "$all_services" in *" $(dirname "$req") "*) ;; *) echo "::error::$(dirname "$req") is not in the python matrix"; exit 1;; esac
+          done
+          pip install pip-audit pytest
+          for dir in $SERVICES; do
+            [ -f "$dir/requirements.txt" ] || continue
             echo "::group::$dir"
-            pip install -r "$req"
-            pip-audit -r "$req"
+            pip install -r "$dir/requirements.txt"
+            pip-audit -r "$dir/requirements.txt"
             if [ -f "$dir/requirements-dev.txt" ]; then
               pip install -r "$dir/requirements-dev.txt"
               pip-audit -r "$dir/requirements-dev.txt"
             fi
+            # a package that builds (analytics) is installed so a test can run `python -m <package>`
+            if grep -q '^\[build-system\]' "$dir/pyproject.toml" 2>/dev/null; then pip install --no-deps -e "$dir"; fi
             if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q -rs); fi
             echo "::endgroup::"
           done
