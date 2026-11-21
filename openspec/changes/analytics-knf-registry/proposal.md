@@ -1,0 +1,43 @@
+# Proposal
+
+**Stage 3 (etap 3).** This change depends on PR #26 `analytics-worker` (with its review fixes, `analytics-worker-review-fixes`) landing on `main` first. It is applied only after that, and its branch `analytics/analytics-knf-registry` is rebased on it. It interacts with the stage-2 change `analytics-m1-m3` (Dependencies below), which may land before or after it.
+
+## Why
+
+Analytics matches documents against a fictional registry of three `*.example.com` firms (`analytics/registry/seed.csv`). On real pages, R1 (firm in the KNF register) and the routing to M1 and M3 are therefore meaningless: every real brokerage house is "not in the registry", so its own pages go to M3 instead of M2, and a finfluencer's ad for a real broker is never an M1 finding. Kacper flagged this as the biggest gap in his review of PR #26. The challenge defines "firma inwestycyjna" by exactly the five KNF lists linked in annexes 1 and 2, so the registry must be those lists.
+
+## What Changes
+
+- **KNF loader** (`.docs/analytics-plan.md` §3): a one-off CLI `python -m investwatch_analytics.knf` that reads the four KNF list pages (brokerage houses, banks conducting brokerage activity, branches of foreign investment firms, foreign investment firms without a branch) and checks that the summary page still links them. The pages are server-rendered HTML with `?page=N` pagination and no download or API (`evidence.md`). It writes the CSV columns `Registry.from_csv` already reads (`id, name, aliases, type, country, website_domains, source_url`), plus a sidecar `knf.meta.json` (fetch time, record count per list, source URLs, loader version).
+- **Stable ids**: uuid5 of the normalized current name in a fixed InvestWatch namespace, because KNF shows no register number, KRS, NIP or LEI on the lists. When KNF lists a former name (`<strike>`) that had an id in the previous CSV, the firm keeps that id. These are UUIDs that pass the contract's `uuid` pattern; using v5 rather than v4 for registry ids is recorded in ADR 0311.
+- **Aliases**: the core name without legal forms (a longer list of Polish and EU legal forms than today), the bank's brokerage-unit line (`Biuro Maklerskie mBank`), abbreviations in brackets (`PKO BP`), `DM` forms, Polish case forms of the legal-form words (`Domu Maklerskiego …`, part of skeleton follow-up #12), former names, and trade names from `Dodatkowe informacje`. Aliases that are too short, generic, or shared by two firms are dropped, and the loader reports them.
+- **Domains**: from `Dodatkowe informacje` of the no-branch list (about 155 of 712 firms), without supervisor sites and social hosts. Domestic firms have no domain on KNF, so `website_domains` stays empty for them unless the optional hand-curated supplement (task group 4, an open question for Damian) fills it.
+- **Duplicates and drift**: the same name twice in one list, or on both foreign lists, becomes one firm, with the type taken by a fixed precedence. A page that cannot be fetched, a changed layout, or a reload that loses more than half of a list fails without writing, so the committed CSV stays as it was.
+- **Committed real registry**: `analytics/registry/knf.csv` (about 750 firms) and `knf.meta.json` are committed. The KNF legal note allows reuse with the source and a link, and the build and start-up must not depend on knf.gov.pl (on-premise, offline demo, deterministic tests and evaluation). Refreshing means running the loader by hand and committing the diff. Generating at build or start-up was rejected (design decision 2).
+- **Default registry**: the code default and the container default of `REGISTRY_CSV` become `registry/knf.csv`. `seed.csv` stays unchanged as the test and mock fixture: tests name it explicitly, and its ids still match `contracts/mocks`. The worker's warning for the fictional seed (from the PR #26 review fixes) stays and now fires only when someone points `REGISTRY_CSV` at the seed. The worker also logs the registry's provenance at start-up and warns when `knf.meta.json` is missing or older than 30 days.
+- **Matching at real scale**: with 750 firms instead of 3, name matching uses one combined pattern per pass instead of one regex per alias per firm. Fuzzy matching only runs for cores of at least two words or eight letters, so that a generic core (`Wise`, `EXT`) does not match ordinary words (skeleton follow-up #11). A size budget test guards the matching time.
+- **Out of scope**: the KNF public warnings list (`registry_warnings`, M3 signal S3.7). It is one 819 KB page of free text where domains are easy to extract but entity names are not, so it gets its own change (design, Non-goals). Also out of scope: firms whose licence was revoked (a separate KNF page) and `FirmRef.authorized` (it stays `True`, which the current lists justify), a `registry_firms` database table (the CSV stays the source; the plan's table is not needed by any consumer), inflection of firm core names beyond the legal-form words, scheduled refreshes, any change to `contracts/` (the mocks are a test double and stay untouched), and `.docs/STATUS.md` and the status files, which the coordinator updates.
+- **Owner**: Damian (`analytics/`).
+- **Contracts**: none touched. `Finding.firm.registry_id` and `registry_type` already allow any UUID and the four types. No REST route or event changes.
+
+## Dependencies
+
+- **PR #26 `analytics-worker` and its review fixes (stage 1, unmerged):** must land first. This change edits `config.py` (the default path and `uses_seed_registry`), `worker.py` (provenance log at start-up), `analytics/Dockerfile` and `analytics/compose.yaml` (the container default), all added by that PR.
+- **`analytics-m1-m3` (stage 2, local branch, unmerged):** independent but overlapping. It matches link hosts (`Registry.match_links`, `firm_on_host`) and publisher identity (`modules/advertiser.py`: profile or page host in `website_domains`, normalized handle equal to a name, core or alias) against the registry. With the real registry these become meaningful only where domains exist. Link-host M1 detection therefore works for the foreign no-branch firms that list domains and for any domestic firm added by the curated supplement (group 4). Handle identity now compares against about 750 firms and many more aliases, which is why the alias filters (short, generic, shared) matter for it too. Both changes edit `registry.py`: m1-m3 adds methods, and this change changes `_LEGAL_FORMS`, the pattern build and the fuzzy guard. Whichever lands second rebases. Neither modifies the other's requirements in `document-analysis`: this change modifies only "Firm registry matching", and m1-m3 modifies "Routing to modules" and "M2 finding assembly". m1-m3's routing rule that keeps foreign firms out of M1 unless the content targets Poland depends on `registry_type`, which the loader now sets from the real lists.
+- **`analytics-llm-p0` and the other stage-3 branches:** no overlap in files or requirements.
+
+## Capabilities
+
+### New Capabilities
+- `knf-registry-loader`: fetching and parsing the KNF lists, stable ids, aliases, domains, duplicates, drift and failure handling, the committed CSV with its provenance, and the default registry at start-up.
+
+### Modified Capabilities
+- `document-analysis`: "Firm registry matching" gains the matching guards for a registry of real size (a fuzzy guard for short or generic cores, legal forms of foreign firms, a matching-time budget). It also names `registry/knf.csv` as the default and `registry/seed.csv` as the fixture.
+
+## Impact
+
+- New code: `analytics/src/investwatch_analytics/knf/` (`__main__.py` CLI, `fetch.py`, `parse.py`, `build.py`), with the Python standard library only (`urllib.request`, `html.parser`, `uuid`). No new dependency.
+- Changed: `registry.py` (legal forms, combined patterns, fuzzy guard), `config.py` (default `registry/knf.csv`), `worker.py` (provenance log), `analytics/Dockerfile` and `analytics/compose.yaml` (container default), `analytics/.env.example`.
+- New data: `analytics/registry/knf.csv`, `analytics/registry/knf.meta.json`, the optional `analytics/registry/knf_domains_manual.csv`. Test fixtures: trimmed HTML snapshots under `analytics/tests/fixtures/knf/`.
+- Tests: `test_knf_parse.py`, `test_knf_build.py`, `test_knf_cli.py`, plus additions to `test_registry.py` and `test_worker_config.py`. Unit tests never touch the network: fetching sits behind a function the tests replace with the saved snapshots.
+- Docs: `analytics/registry/README.md` (both files, attribution, refresh), `analytics/README.md` (`REGISTRY_CSV` default), `.docs/analytics-plan.md` §3 (CSV instead of a table, fallback), ADR 0311, and the AI log row.

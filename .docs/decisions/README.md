@@ -25,6 +25,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0306](0306-object-storage-image.md) | Object storage and Redis images: Chainguard MinIO build, Redis 8 from the ECR mirror | accepted (takes effect when the `infra-compose` PR merges) |
 | [0307](0307-database-driver-and-table-layout.md) | Database driver (psycopg 3) and table layout (columns + JSONB, dedup and upsert keys) (depends on [0303](0303-database-schema-ownership.md)) | accepted (takes effect when the `api-db-schema` PR merges) |
 | [0308](0308-m3-s34-gate.md) | M3 gate: a recommendation of instruments alone lifts the 0.4 cap ("may indicate" advice, personalisation unconfirmed) | accepted (takes effect when PR #35 merges) |
+| [0311](0311-knf-registry-source-and-ids.md) | KNF registry: HTML lists parsed by a manual loader, committed `registry/knf.csv`, uuid5 firm ids | accepted (takes effect when the `analytics-knf-registry` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
