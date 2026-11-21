@@ -4,11 +4,18 @@ import { useRealtime } from './data/useRealtime';
 
 // Mounted once (in the header): owns the app's only Socket.IO connection.
 export function AlertsPage() {
-  const { connection, alerts, dismiss, open, hold, release } = useRealtime();
+  const { connection, alerts, announcement, dismiss, open, hold, release } = useRealtime();
   return (
     <>
       <LiveBadge connection={connection} />
-      <AlertToasts alerts={alerts} onOpen={open} onDismiss={dismiss} onHold={hold} onRelease={release} />
+      <AlertToasts
+        alerts={alerts}
+        announcement={announcement}
+        onOpen={open}
+        onDismiss={dismiss}
+        onHold={hold}
+        onRelease={release}
+      />
     </>
   );
 }
