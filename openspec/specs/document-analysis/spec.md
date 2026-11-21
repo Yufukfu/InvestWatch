@@ -88,8 +88,19 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL m
 - **WHEN** `REGISTRY_CSV` points to a missing file
 - **THEN** the error names the file and `REGISTRY_CSV`
 
+#### Scenario: Hostile page URL and lookalike names
+- **WHEN** the page URL has a backslash, whitespace or control characters in its authority (`https://attacker.net\@alfa-inwestycje.example.com/`)
+- **THEN** no firm SHALL be matched by the page domain, as for links and the publisher
+- **AND** names and aliases SHALL be compared with the text after NFKC and removal of zero-width characters and soft hyphens, so `Ａｌｆａ Inwestycje` and `Alfa​ Inwestycje` match by name
+- **AND** the quote SHALL still be cut from the original text through an offset map; Cyrillic and Greek lookalikes are not folded
+- **AND** the fuzzy match SHALL need a ratio of at least 88: `Amega Kaital` (exactly 88 against `Omega Kapital`) matches, `Amga Kaital` does not
+
 ### Requirement: Routing to modules
-Analytics SHALL route by publisher identity and registry result, not by `source_kind` alone (design decisions 1-2). The publisher is a registry firm when the author's `profile_url` host or a non-social page host is one of the firm's `website_domains` (equal or subdomain), or the author handle (plain ASCII, leading `@` removed, separators kept) equals a name, core name or alias of the firm with diacritics folded and whitespace removed.
+Analytics SHALL route by publisher identity and registry result, not by `source_kind` alone (design decisions 1-2). The publisher is a registry firm when the author's `profile_url` host or a non-social page host is one of the firm's `website_domains` (equal or subdomain). A handle alone SHALL NOT make the publisher a registered firm.
+
+#### Scenario: Handle like a firm's name on another platform
+- **WHEN** a `third_party` TikTok post by `@alfainwestycje` (no profile or page on the firm's domain) names Alfa Inwestycje
+- **THEN** an M1 finding is returned and no M2 finding, with S1.6 `uncertain`
 
 #### Scenario: Firm's own page
 - **WHEN** a `firm_own` document on a registered firm's domain is analyzed
@@ -325,3 +336,8 @@ Preprocessing and the rules-only checks SHALL run in time linear in the length o
 #### Scenario: Many claim and warning sentences
 - **WHEN** the text repeats `Zysk 5%. Ryzyko straty.` 8 000 times, or a fee stem such as `prowizj` 8 000 times in one word
 - **THEN** the full M2 analysis finishes in under three seconds, and R3's ±2 sentence window gives the same result as before
+
+#### Scenario: Megabyte of hostile text
+- **WHEN** 1 MB of `"1,"`, of zero-width characters or of one-letter words is analyzed
+- **THEN** routing and the M1/M3 rules SHALL see at most the first 200 000 characters, with every evidence quote a substring of the original text
+- **AND** the whole analysis costs about no more than for the first 200 000 characters, while M2 rules still see the whole text
