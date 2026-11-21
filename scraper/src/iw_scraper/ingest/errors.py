@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import string
 import uuid
 
 import asyncpg
@@ -58,13 +59,18 @@ def redact(detail: str) -> str:
     """
     if len(detail) > _MAX_REDACT_INPUT:
         detail = detail[:_MAX_REDACT_INPUT]
-        head, space, _partial = detail.rpartition(" ")
-        detail = head if space else detail
+        last_gap = max(detail.rfind(ch) for ch in string.whitespace)
+        detail = detail[: max(last_gap, 0)]  # no whitespace at all: nothing can be told apart from a secret
     detail = _BARE_USERINFO.sub("***@", detail)
     detail = _BEARER.sub("Bearer ***", detail)
     detail = _AUTH_HEADER.sub(r"\1\2***", detail)
     detail = _mask_secret_pairs(detail)
     return detail[:_MAX_DETAIL]
+
+
+def _short_source_id(source_id: str) -> str:
+    # redact first, cap after: capping first could cut the "@" that marks a userinfo and leave its password
+    return redact(source_id)[:_MAX_SOURCE_ID_IN_DETAIL]
 
 
 def _source_uuid(source_id: str | None) -> tuple[uuid.UUID | None, str]:
@@ -77,16 +83,15 @@ def _source_uuid(source_id: str | None) -> tuple[uuid.UUID | None, str]:
     try:
         return uuid.UUID(source_id), ""
     except ValueError:
-        return None, f"(source_id={source_id[:_MAX_SOURCE_ID_IN_DETAIL]}) "
+        return None, f"(source_id={_short_source_id(source_id)}) "
 
 
 async def record_error(pool: asyncpg.Pool, error: JobError) -> None:
     """Write one `job_errors` row and one JSON log line."""
     source_uuid, prefix = _source_uuid(error.source_id)
     detail = redact(prefix + error.detail)
-    log.warning(
-        json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": None if error.source_id is None else redact(error.source_id[:_MAX_SOURCE_ID_IN_DETAIL]), "detail": detail})
-    )
+    logged_id = None if error.source_id is None else _short_source_id(error.source_id)
+    log.warning(json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": logged_id, "detail": detail}))
     async with pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO job_errors (id, source_id, reason, detail) VALUES ($1, $2, $3, $4)",

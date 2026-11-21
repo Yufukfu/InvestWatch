@@ -54,7 +54,7 @@ async def test_credentials_are_not_recorded(pool, detail, secret):
 
 
 async def test_long_detail_is_capped(pool):
-    await record_error(pool, JobError(Reason.HTTP_ERROR, "x" * 5000, None))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "word " * 1000, None))
     assert len((await rows(pool))[0]["detail"]) == 300
 
 
@@ -131,10 +131,28 @@ def test_a_secret_nested_after_a_harmless_pair_is_still_redacted(detail, secret)
     assert secret not in redact(detail)
 
 
-def test_a_secret_cut_by_the_input_bound_does_not_survive_as_a_fragment():
-    # the '@' that would mark the credential lies past the bound; the half-cut token must not be stored
-    detail = "token=" + "x" * 1970 + " https://user:sup3rsecret@host.example"
-    assert "sup3r" not in redact(detail)
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "https://user:" + "p" * 2100 + "@host",  # no whitespace at all
+        "ab\tuser:" + "p" * 1995 + "\t@host",  # tab, not a space
+        "ok user:" + "p" * 2100 + "@host",  # the marker lies past the bound
+    ],
+)
+def test_a_secret_cut_by_the_input_bound_does_not_survive_as_a_fragment(detail):
+    assert "ppp" not in redact(detail)
+
+
+async def test_a_userinfo_cut_in_a_long_source_id_does_not_leak(pool):
+    source_id = "user:hunter2" + "x" * 100 + "@host.example"
+    await record_error(pool, JobError(Reason.INVALID_REQUEST, "d", source_id))
+    assert "hunter2" not in (await rows(pool))[0]["detail"]
+
+
+async def test_a_userinfo_cut_in_a_long_source_id_does_not_leak_into_the_log(pool, caplog):
+    with caplog.at_level("WARNING", logger="iw_scraper.ingest"):
+        await record_error(pool, JobError(Reason.INVALID_REQUEST, "d", "user:hunter2" + "x" * 100 + "@host.example"))
+    assert "hunter2" not in caplog.text
 
 
 def test_text_before_a_cut_token_is_kept():
