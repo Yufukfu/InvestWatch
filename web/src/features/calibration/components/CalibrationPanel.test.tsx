@@ -114,6 +114,16 @@ describe('CalibrationPanel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Nie zapisano progu: serwer odrzucił wartość.');
   });
 
+  it('marks the selected threshold apart from the current one, once when they are equal', () => {
+    setup({ index: i70 });
+    expect(document.querySelectorAll('.recharts-reference-line')).toHaveLength(2);
+  });
+
+  it('draws one marker when the selection is the current threshold', () => {
+    setup({ index: i50 });
+    expect(document.querySelectorAll('.recharts-reference-line')).toHaveLength(1);
+  });
+
   it('draws the chart with a text alternative', () => {
     setup({ index: i70 });
     expect(screen.getByRole('img', { name: /Precyzja i czułość/ })).toBeInTheDocument();

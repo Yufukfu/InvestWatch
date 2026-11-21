@@ -45,7 +45,7 @@ main > * { min-width: 0; }
 /* Panels */
 .panel, .trend { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
 .trend { margin: 0; }
-.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .panel-header h2, .trend-header h2 { margin: 0; font-size: 19px; }
 
 /* Health badge */
@@ -216,7 +216,7 @@ button.link:hover { color: #1e40af; }
 .threshold-row input[type='range'] { accent-color: var(--accent); min-height: 0; padding: 0; border: 0; }
 .threshold-selected { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) { .threshold-row { grid-template-columns: 1fr auto; } .threshold-row input[type='range'] { grid-column: 1 / -1; } }
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 8px 0 16px; }
 .metric { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
 .metric-label { color: var(--muted); font-weight: 600; }
 .metric-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }

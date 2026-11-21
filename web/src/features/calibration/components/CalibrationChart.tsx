@@ -17,10 +17,12 @@ export function CalibrationChart({ points, current, selected, size }: Props) {
     <LineChart width={width} height={height} data={points} accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 4, left: 0 }}>
       <CartesianGrid stroke="#e5e7eb" vertical={false} />
       <XAxis dataKey="threshold" type="number" domain={[0, 1]} ticks={[0, 0.2, 0.4, 0.6, 0.8, 1]} tickFormatter={(v: number) => v.toFixed(1)} />
-      <YAxis domain={[0, 1]} tickFormatter={pct} width={44} />
+      <YAxis domain={[0, 1]} tickFormatter={pct} width={52} />
       <Tooltip formatter={(v) => pct(Number(v))} labelFormatter={(v) => `próg ${Number(v).toFixed(2)}`} />
       <ReferenceLine x={current} stroke="#6b7280" strokeDasharray="4 3" label={{ value: 'obecny', position: 'insideTopLeft', fill: '#374151', fontSize: 13 }} />
-      <ReferenceLine x={selected} stroke="#1d4ed8" strokeWidth={2} label={{ value: 'wybrany', position: 'insideTopRight', fill: '#1d4ed8', fontSize: 13 }} />
+      {selected !== current && (
+        <ReferenceLine x={selected} stroke="#1d4ed8" strokeWidth={2} label={{ value: 'wybrany', position: 'insideTopRight', fill: '#1d4ed8', fontSize: 13 }} />
+      )}
       <Line type="monotone" dataKey="precision" name="Precyzja" stroke="#b45309" strokeWidth={2} dot={false} isAnimationActive={false} />
       <Line type="monotone" dataKey="recall" name="Czułość" stroke="#047857" strokeDasharray="6 3" strokeWidth={2} dot={false} isAnimationActive={false} />
     </LineChart>
