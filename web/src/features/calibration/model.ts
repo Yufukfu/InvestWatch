@@ -29,11 +29,12 @@ export function nearestIndex(points: CalibrationPoint[], threshold: number): num
   return best;
 }
 
-// Label side of the two markers: the lower threshold's label goes left, the higher one's right,
-// so the two labels never sit on top of each other whichever threshold is larger.
+// Label side of the two markers. Recharts anchors `insideTopRight` at the line's end, so its text runs
+// left, and `insideTopLeft` at its start, so its text runs right. The lower threshold's label runs left
+// and the higher one's right, so the two point apart whichever threshold is larger.
 export type LabelSide = 'insideTopLeft' | 'insideTopRight';
 export function markerSides(current: number, selected: number): { current: LabelSide; selected: LabelSide } {
   return current <= selected
-    ? { current: 'insideTopLeft', selected: 'insideTopRight' }
-    : { current: 'insideTopRight', selected: 'insideTopLeft' };
+    ? { current: 'insideTopRight', selected: 'insideTopLeft' }
+    : { current: 'insideTopLeft', selected: 'insideTopRight' };
 }

@@ -27,3 +27,9 @@
 - [x] 4.5 One pl-PL formatter module (`format.ts`) for thresholds and percentages, in the panel, the chart and the table; the sample count reads `Liczba oznaczonych próbek: N`; the colon after `najbliższy punkt` is removed. Tests updated to `0,70` notation.
 - [x] 4.6 Docs: `web/README.md` and `.docs/status/dashboard.md` describe the api service in compose and the missing `/api` proxy in the web container; archived `design.md` describes the `obecnie` comparison; the AI log row for `calibration-panel` counts five survivors (as `tasks.md` does) and a row for this round is added.
 - [x] 4.7 `finding.updated` debounce and the other out-of-scope items are recorded in `follow-ups.md`.
+
+## 5. Round 2
+
+- [x] 5.1 Failing test first: `markerSides` gives the lower marker `insideTopRight` and the higher `insideTopLeft`, because Recharts runs `insideTopRight` text left of its line and `insideTopLeft` text right of it (review round 2, item 1; the round 1 mapping pointed the labels at each other). mutations: 1 tried, 1 caught (the round 1 mapping).
+- [x] 5.2 Main merged in: `web/README.md` and `.docs/status/dashboard.md` take main's compose text (the gateway routes `/api` and `/socket.io` to the api service), which replaces the wrong "error states" sentence (review round 2, item 2). `finding.updated` keeps main's filtered-list refetch and still invalidates `calibration`; a hook test pins it. mutations: 1 tried, 1 caught (`calibration` dropped from the tags).
+- [x] 5.3 Archived `calibration-panel/design.md` no longer describes the panel `key` (review round 2, item 2).

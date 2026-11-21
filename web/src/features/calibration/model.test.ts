@@ -4,9 +4,11 @@ import { markerSides, nearestIndex } from './model';
 const pts = [0.3, 0.5, 0.7].map((threshold) => ({ threshold, tp: 0, fp: 0, fn: 0, tn: 0, precision: 0, recall: 0 }));
 
 describe('markerSides', () => {
-  it('puts the lower marker label on the left and the higher one on the right', () => {
-    expect(markerSides(0.5, 0.7)).toEqual({ current: 'insideTopLeft', selected: 'insideTopRight' });
-    expect(markerSides(0.7, 0.5)).toEqual({ current: 'insideTopRight', selected: 'insideTopLeft' });
+  // Recharts anchors an `insideTopRight` label at its line's end (text runs left) and `insideTopLeft`
+  // at its start (text runs right): the lower marker gets TopRight so the two labels point apart.
+  it('turns the two marker labels away from each other', () => {
+    expect(markerSides(0.5, 0.7)).toEqual({ current: 'insideTopRight', selected: 'insideTopLeft' });
+    expect(markerSides(0.7, 0.5)).toEqual({ current: 'insideTopLeft', selected: 'insideTopRight' });
   });
 });
 
