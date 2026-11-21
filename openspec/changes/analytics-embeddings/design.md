@@ -151,7 +151,7 @@ Why not embedding similarity for dedup: it needs a vector index (Redis 8 without
    - the key already exists → skip, and log `high_risk_suppressed` with reason `neardup`;
    - a Redis error → send (fail open).
 
-   `finding.created` is always sent. The claim is per module and is taken only when an alert is about to be sent, so a low-score original does not block a high-score copy. The claim comes before the PUBLISH, so a PUBLISH failure right after it loses that group's alert. This matches the existing at-most-once rule ("Publishing failure does not lose findings"). The change sits in `events.py` (`publish_findings(saved, groups=None)`) and is a MODIFIED requirement in `finding-events`.
+   `finding.created` is always sent. The claim is per module and is taken only when an alert is about to be sent, so a low-score original does not block a high-score copy. The claim comes before the PUBLISH, so a PUBLISH failure right after it loses that group's alert. This matches the existing at-most-once rule ("Publishing failure does not lose findings"). The change sits in `events.py` (`publish_findings(saved, groups=None)`) and is a MODIFIED requirement in `finding-events`. Known cost: one scam template that names different impersonated firms forms one group, so only the first firm's finding alerts. The later ones are still stored and announced with `finding.created`.
 
 Groups are not merged transitively. A document that matches two groups joins the one with the higher Jaccard. That keeps the writes O(1), and it is an accepted error.
 

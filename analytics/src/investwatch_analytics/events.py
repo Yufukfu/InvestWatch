@@ -125,17 +125,18 @@ class Publisher:
     def _send_one(self, event: dict[str, Any]) -> None:
         raise NotImplementedError
 
-    def _events_for(self, saved: Sequence[SavedFinding],
-                    groups: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
-        events: list[dict[str, Any]] = []
+    def _events_for(self, saved: Sequence[SavedFinding]) -> list[tuple[dict[str, Any], Finding | None]]:
+        """Planned events in order; a `finding.high_risk` carries its finding, so the send loop can claim the
+        near-dup alert right before sending it (a failed PUBLISH then burns at most that one claim)."""
+        events: list[tuple[dict[str, Any], Finding | None]] = []
         for item in saved:
             if item.outcome != "created":
                 continue
             threshold = self._thresholds()[item.finding.module]
             emitted_at = self._clock()
-            events.append(make_event("finding.created", item.finding, emitted_at))
-            if item.finding.score >= threshold and self._may_alert(item.finding, groups):
-                events.append(make_event("finding.high_risk", item.finding, emitted_at))
+            events.append((make_event("finding.created", item.finding, emitted_at), None))
+            if item.finding.score >= threshold:
+                events.append((make_event("finding.high_risk", item.finding, emitted_at), item.finding))
         return events
 
     def publish_findings(self, saved: Sequence[SavedFinding],
@@ -149,17 +150,20 @@ class Publisher:
         events were not all sent.
         """
         sent: list[dict[str, Any]] = []
-        events: list[dict[str, Any]] | None = None
+        events: list[tuple[dict[str, Any], Finding | None]] | None = None
+        position = 0
         try:
-            events = self._events_for(saved, groups)
-            for event in events:
+            events = self._events_for(saved)
+            for position, (event, gated) in enumerate(events):
+                if gated is not None and not self._may_alert(gated, groups):
+                    continue
                 self._send_one(event)
                 sent.append(event)
         except redis.RedisError as exc:
             if events is None:  # thresholds could not be read, so nothing was sent
                 unsent = [s.finding.id for s in saved if s.outcome == "created"]
             else:
-                unsent = list(dict.fromkeys(e["data"]["id"] for e in events[len(sent):]))
+                unsent = list(dict.fromkeys(e["data"]["id"] for e, _ in events[position:]))
             log.warning(
                 "event publish failed; findings stay committed",
                 extra={"reason": "publish_failed", "finding_ids": unsent, "sent": len(sent), "error": str(exc)},

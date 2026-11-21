@@ -33,3 +33,7 @@
 | R27 | review group 6 | a redelivered original reported a similarity to a document of another group | `fix-here` |
 | R28 | review group 6 | determinism only checked in one process; estimate-dependent tests had no preconditions; long-text test timing only | `fix-here`: golden signature and bucket key, precondition asserts, shingle-count bound |
 | R29 | review group 6 | two workers observing near-identical documents at the same instant can both become originals | `wont-fix`: one missed grouping and possibly one extra alert, no corruption (MULTI/EXEC pipeline) |
+| R30 | review group 8a | all claims of a save were taken before any PUBLISH, so a failed publish could silence whole groups for the TTL | `fix-here`: the claim is taken right before its own `finding.high_risk` |
+| R31 | review group 8a | the claim TTL is a constant, not `NEARDUP_TTL_S` | `fix-here` in group 9: the worker passes `alert_ttl_s=NEARDUP_TTL_S` (task 9.1) |
+| R32 | review group 8a | no-groups tests did not prove Redis is untouched | `fix-here` |
+| R33 | review group 8a, PLAUSIBLE | one scam template naming different impersonated firms forms one group, so only the first firm alerts | `docs`: design §5 names it; per-firm claims would need the firm in the key, a product call for Damian |

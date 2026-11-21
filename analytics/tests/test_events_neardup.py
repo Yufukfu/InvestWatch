@@ -147,3 +147,73 @@ def test_noop_publisher_makes_the_same_decisions(r):
     redis_pub, noop = RedisPublisher(r, clock=clock), NoopPublisher(clock=clock)
     for item in [created(), created(doc=COPY_DOC), created(doc=THIRD_DOC, module="M3")]:
         assert redis_pub.publish_findings([item], groups=GROUP) == noop.publish_findings([item], groups=GROUP)
+
+
+# ---- review fixes (group 8a) ------------------------------------------------------------------
+
+OTHER_ORIG = "66666666-6666-4666-8666-666666666666"
+OTHER_COPY = "77777777-7777-4777-8777-777777777777"
+TWO_GROUPS = {ORIG_DOC: ORIG_DOC, COPY_DOC: ORIG_DOC, OTHER_ORIG: OTHER_ORIG, OTHER_COPY: OTHER_ORIG}
+
+
+class FailingPublish(fakeredis.FakeRedis):
+    fail_next = 0
+
+    def publish(self, channel, message):
+        if self.fail_next:
+            self.fail_next -= 1
+            raise redis.ConnectionError("down")
+        return super().publish(channel, message)
+
+
+def test_failed_publish_burns_no_claim_it_did_not_reach(caplog):
+    r = FailingPublish(decode_responses=True)
+    pub = RedisPublisher(r, clock=clock)
+    r.fail_next = 1   # the very first PUBLISH (finding.created of ORIG_DOC) fails
+    with caplog.at_level(logging.WARNING):
+        assert pub.publish_findings([created(), created(doc=OTHER_ORIG, fid="88888888-8888-4888-8888-888888888888")],
+                                    groups=TWO_GROUPS) == []
+    assert not r.keys("iw:neardup:v1:alerted:*")
+    rec = [x for x in caplog.records if getattr(x, "reason", None) == "publish_failed"]
+    assert rec and len(rec[0].finding_ids) == 2
+    later = pub.publish_findings([created(doc=OTHER_COPY)], groups=TWO_GROUPS)
+    assert [t for t, _ in types(later)] == ["finding.created", "finding.high_risk"]
+
+
+def test_no_groups_leaves_redis_alone(pub, r):
+    a = created()
+    pub.publish_findings([a])
+    sent = pub.publish_findings([a])
+    assert [t for t, _ in types(sent)] == ["finding.created", "finding.high_risk"]
+    assert not r.keys("iw:neardup:v1:alerted:*")
+
+
+def test_document_without_group_leaves_redis_alone(pub, r):
+    pub.publish_findings([created()], groups={COPY_DOC: ORIG_DOC})
+    assert not r.keys("iw:neardup:v1:alerted:*")
+
+
+class FailingSecondPublish(fakeredis.FakeRedis):
+    calls = 0
+    armed = False
+
+    def publish(self, channel, message):
+        if self.armed:
+            self.calls += 1
+            if self.calls == 2:
+                raise redis.ConnectionError("down")
+        return super().publish(channel, message)
+
+
+def test_unsent_ids_skip_suppressed_alerts(caplog):
+    r = FailingSecondPublish(decode_responses=True)
+    pub = RedisPublisher(r, clock=clock)
+    pub.publish_findings([created()], groups=TWO_GROUPS)          # claims ORIG group
+    r.armed = True
+    other = created(doc=OTHER_ORIG, fid="88888888-8888-4888-8888-888888888888")
+    copy = created(doc=COPY_DOC)
+    with caplog.at_level(logging.WARNING):
+        sent = pub.publish_findings([copy, other], groups=TWO_GROUPS)
+    assert types(sent) == [("finding.created", copy.finding.id)]
+    rec = [x for x in caplog.records if getattr(x, "reason", None) == "publish_failed"]
+    assert rec[0].finding_ids == [other.finding.id]
