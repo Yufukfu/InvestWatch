@@ -165,12 +165,13 @@ rules:
     params:
       # A past-performance sentence: a return figure plus a past marker (or a year <= the fetch year
       # with no future marker in the sentence).
-      figure_patterns:
+      # Past-performance detector shared with R12a and R12b (anchors `pp_*`, ADR 0315): an edit here changes all three.
+      figure_patterns: &pp_figure
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
       # Past results in any unit (coordinator answer, follow-up R9): an amount next to return vocabulary.
-      amount_patterns:
+      amount_patterns: &pp_amount
         - '\b\d+(?:[.,]\d+)?\s?(?:zł|PLN|EUR|USD|€|\$)'
-      amount_return_patterns:
+      amount_return_patterns: &pp_amount_return
         - '\bzysk\w*'
         - '\bzarobi\w*'
         - '\bwypracowa\w*'
@@ -180,11 +181,11 @@ rules:
         - '\b(?:profit|return|gain)\w*'
       figure_exclude_patterns: *return_figure_exclude
       # R14 only: percentages that are not returns (share of clients or accounts, bonuses).
-      figure_extra_exclude_patterns:
+      figure_extra_exclude_patterns: &pp_figure_exclude
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
         - '\bbonus\w*\s+(?:\w+\s+)?\d+(?:[.,]\d+)?\s?%'
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
-      past_patterns:
+      past_patterns: &pp_past
         - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
         - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
         - '\bosiągn(?:ął|ęła|ęło|ęli|ęły|ęliśmy)\b'
@@ -197,7 +198,7 @@ rules:
         - '\bw\s+(?:zeszłym|ubiegłym|poprzednim)\s+(?:roku|kwartale|miesiącu)'
         - '\bpast performance\b'
         - '\b(?:returned|delivered|gained|grew)\b'
-      future_patterns:
+      future_patterns: &pp_future
         - '\bspodziewa\w*'
         - '\bprognoz\w*'
         - '\bbędzie\w*'

@@ -4,15 +4,15 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
 
 ## 1. ReDoS guard and the shared past-performance detector (~1 h)
 
-- [ ] 1.1 Write the failing tests. In `tests/test_regex_safety.py`:
+- [x] 1.1 Write the failing tests. In `tests/test_regex_safety.py`:
   - The loader rejects `(\w+\s*)+niż`, `(?:a*)*` and `(.+)+` in a `*_patterns` list and in `negation_before`, and the error names the rule and the key.
   - The loader accepts `(?:\w+\s+){0,3}` and `.{0,80}?`.
   - A parser-shape test fails loudly if `re._parser` and `sre_parse` are both missing.
   - Timing: every catalogue pattern and every module-level regex in `rules/m2.py` is searched over five 20 000-character adversarial inputs, and each search takes at most 0.2 s.
 
   In addition, the R14 tests run unchanged against a `_PastPerformance` base.
-- [ ] 1.2 Add the nested-unbounded-repeat lint to `_check_params` in `rules/engine.py`. Move R14's detector into `_PastPerformance` in `rules/m2.py`, and anchor R14's detector lists in `m2_rules.yaml` (`&pp_figure`, `&pp_amount`, `&pp_amount_return`, `&pp_figure_exclude`, `&pp_past`, `&pp_future`). If an existing pattern is rejected, fix it and log it in `follow-ups.md`. Tests green.
-- [ ] 1.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 1.2 Add the nested-unbounded-repeat lint to `_check_params` in `rules/engine.py`. Move R14's detector into `_PastPerformance` in `rules/m2.py`, and anchor R14's detector lists in `m2_rules.yaml` (`&pp_figure`, `&pp_amount`, `&pp_amount_return`, `&pp_figure_exclude`, `&pp_past`, `&pp_future`). If an existing pattern is rejected, fix it and log it in `follow-ups.md`. Tests green.
+- [x] 1.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (lint: each guard, the nesting flag, lazy repeats, descent into branches; a quadratic module regex the lint cannot see is caught by the timing test; the moved detector: past and future markers, the year boundary, the amount conjunct). No shipped M1-M3 pattern was rejected. The timing test takes the best of 3 runs per search, so a loaded runner's pause is not a red.
 
 ## 2. R16 tax information (~45 min)
 

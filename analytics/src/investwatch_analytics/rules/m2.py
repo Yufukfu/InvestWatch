@@ -178,17 +178,19 @@ _YEAR = re.compile(
 )
 
 
-@register
-class R14PastPerformanceDisclaimer(Rule):
-    """ZASÓB R14: a clear disclaimer must be present; no proximity requirement (unlike R3).
+NO_PAST_PERFORMANCE = "Materiał nie prezentuje wyników historycznych."
 
-    A footnote-only disclaimer passes: its placement is R6's ("ryzyko ukryte w przypisach").
+
+class _PastPerformance(Rule):
+    """One past-performance detector for R12a, R12b and R14 (ADR 0315: they never disagree on the trigger).
+
+    A sentence presents past performance with a past marker (or a year <= the fetch year and no future marker)
+    and a return figure: a percentage that is not a fee or tax, or an amount next to return vocabulary. The
+    parameter lists are YAML anchors on R14 (`pp_*`), aliased in R12a and R12b.
     """
 
-    rule_id = "R14"
-
     @cached_property
-    def _p(self) -> dict:
+    def _pp(self) -> dict:
         p = self.spec.params
         return {
             "figure": compile_patterns(p.get("figure_patterns", [])),
@@ -198,14 +200,12 @@ class R14PastPerformanceDisclaimer(Rule):
             "amount_return": _one_of(p.get("amount_return_patterns", [])),
             "past": _one_of(p.get("past_patterns", [])),
             "future": _one_of(p.get("future_patterns", [])),
-            "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
-            "footnote": tuple(p.get("footnote_markers", [])),
         }
 
-    def _is_past_performance(self, sentence: str, fetch_year: int) -> bool:
+    def is_past_performance(self, sentence: str, fetch_year: int) -> bool:
         """A return figure AND a past marker. The marker is checked first: it is cheap, while the figure check
         runs every exclusion over the sentence (adversarial-input timing, tests/test_redos.py)."""
-        p = self._p
+        p = self._pp
         if any(m.search(sentence) for m in p["past"]):
             past = True
         elif any(f.search(sentence) for f in p["future"]):
@@ -219,13 +219,35 @@ class R14PastPerformanceDisclaimer(Rule):
         # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
         return any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
 
+    def past_performance(self, ctx: Context) -> list:
+        """The past-performance sentences of the document, in order."""
+        fetch_year = ctx.doc.fetched_at.year
+        return [s for s in ctx.pre.sentences if self.is_past_performance(s.text, fetch_year)]
+
+
+@register
+class R14PastPerformanceDisclaimer(_PastPerformance):
+    """ZASÓB R14: a clear disclaimer must be present; no proximity requirement (unlike R3).
+
+    A footnote-only disclaimer passes: its placement is R6's ("ryzyko ukryte w przypisach").
+    """
+
+    rule_id = "R14"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
+            "footnote": tuple(p.get("footnote_markers", [])),
+        }
+
     def evaluate(self, ctx: Context) -> RuleResult:
         p = self._p
         sentences = ctx.pre.sentences
-        fetch_year = ctx.doc.fetched_at.year
-        claims = [s for s in sentences if self._is_past_performance(s.text, fetch_year)]
+        claims = self.past_performance(ctx)
         if not claims:
-            return self.result("not_applicable", None, "Materiał nie prezentuje wyników historycznych.")
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
         disclaimers = [s for s in sentences if any(d.search(s.text) for d in p["disclaimer"])]
         if not disclaimers:
             return self.result(
