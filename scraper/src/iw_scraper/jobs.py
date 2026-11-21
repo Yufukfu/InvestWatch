@@ -32,6 +32,7 @@ ATTEMPTS_KEY_TTL = 24 * 3600
 # arq rejects a job id whose result is still stored: this is what de-duplicates a replayed schedule slot, so it
 # is pinned and stays far longer than the scheduler's catch-up window
 RESULT_TTL = 3600.0
+FINISHED_KEY_TTL = int(RESULT_TTL)  # never outlives arq's own duplicate-id guard, so a re-enqueued id runs again
 KEEP_ALIVE_DIVISOR = 3
 
 # arq pickles jobs and results by default; JSON keeps the queue readable and a poisoned Redis from running code.
@@ -162,11 +163,12 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
     cfg: QueueSettings = ctx["settings"]
     job_id = ctx["job_id"]
 
-    if (status := await redis.get(_finished_key(job_id))) is not None:
-        # a connection dropped after the outcome was published: only the clean-up is left, never a second run
+    if (stored := await redis.get(_finished_key(job_id))) is not None:
+        # a connection dropped after the outcome was decided: only the event and the clean-up are left, never a second run
+        status = await _replay_finish(ctx, source_id, stored)
         await redis.delete(f"{KEY_PREFIX}attempts:{job_id}", _requeues_key(job_id))
         await lock.release()
-        return status.decode() if isinstance(status, bytes) else status
+        return status
 
     source = await ctx["sources"].get(source_id)
     if source is None or not source.collectable:
@@ -237,28 +239,45 @@ def _requeues_key(job_id: str) -> str:
 
 async def _finish_failed(ctx: dict, source_id: str, requested: bool) -> None:
     """End a job that cannot continue: a job that announced its start, or a requested one, ends `failed`."""
-    if await ctx["redis"].exists(_finished_key(ctx["job_id"])):
-        return  # the real outcome is out; a later error must not publish a second finish
-    if await ctx["redis"].exists(_started_key(ctx["job_id"])):
+    if (stored := await ctx["redis"].get(_finished_key(ctx["job_id"]))) is not None:
+        await _replay_finish(ctx, source_id, stored)  # the real outcome is decided; never a second, different finish
+    elif await ctx["redis"].exists(_started_key(ctx["job_id"])):
         await _finish_if_started(ctx, source_id, status="failed", documents=0)
     elif requested:
+        # a requested job owes a finish even if it never started: the marker makes a dropped publish retryable
+        await ctx["redis"].set(_started_key(ctx["job_id"]), 1, ex=ATTEMPTS_KEY_TTL)
+        await _store_outcome(ctx, "failed", 0)
         await publish_scan_event(ctx["redis"], "finished", source_id, documents=0, status="failed")
-        await ctx["redis"].set(_finished_key(ctx["job_id"]), "failed", ex=ATTEMPTS_KEY_TTL)
+        await ctx["redis"].delete(_started_key(ctx["job_id"]))
 
 
 async def _finish_if_started(ctx: dict, source_id: str, *, status: str, documents: int) -> None:
     """Publish `scan.finished` and stamp the source, once, for a job that announced its start."""
     redis: ArqRedis = ctx["redis"]
-    if not await redis.delete(_started_key(ctx["job_id"])):
+    if not await redis.exists(_started_key(ctx["job_id"])):
         return
+    # the outcome is stored before anything goes out, and the start marker stays until the finish is published,
+    # so a connection lost anywhere in between is completed by the retry instead of re-running the collection
+    await _store_outcome(ctx, status, documents)
     try:
         if await ctx["sources"].get(source_id) is not None:
             await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status)
     except Exception:
-        # the marker is gone, so this is the only chance to end the progress bar
         logger.exception("could not stamp the source after its run")
     await publish_scan_event(redis, "finished", source_id, documents=documents, status=status)
-    await redis.set(_finished_key(ctx["job_id"]), status, ex=ATTEMPTS_KEY_TTL)
+    await redis.delete(_started_key(ctx["job_id"]))
+
+
+async def _store_outcome(ctx: dict, status: str, documents: int) -> None:
+    await ctx["redis"].set(_finished_key(ctx["job_id"]), f"{status}:{documents}", ex=FINISHED_KEY_TTL)
+
+
+async def _replay_finish(ctx: dict, source_id: str, stored: bytes | str) -> str:
+    """Complete a finish a dropped connection interrupted: publish it if it is still owed, return the stored status."""
+    status, _, documents = (stored.decode() if isinstance(stored, bytes) else stored).partition(":")
+    if await ctx["redis"].delete(_started_key(ctx["job_id"])):
+        await publish_scan_event(ctx["redis"], "finished", source_id, documents=int(documents or 0), status=status)
+    return status
 
 
 async def _requeue(lock: RunLock, cfg: QueueSettings, delay: float) -> None:
