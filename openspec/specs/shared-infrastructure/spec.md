@@ -1,10 +1,10 @@
-# Spec Delta
+# shared-infrastructure Specification
 
 ## Purpose
-The shared services every module needs (Redis, object storage, an optional local LLM), started by one `docker compose up` next to Postgres and the gateway from [ADR 0202](../../../../../.docs/decisions/0202-deployment-topology.md), isolated per stack, and joined by modules through a fixed contract. Network keys are `data`, `edge` and `egress`; Docker names them `<project>_data`, `<project>_edge` and `<project>_egress`. Names and payloads on Redis and in `iw-raw` are those of `.docs/integration-plan.md` §2 and §6 and ADR 0305. They are not restated here.
 
-## ADDED Requirements
+The shared services every module needs (Redis, object storage, an optional local LLM), started by one `docker compose up` next to Postgres and the gateway from [ADR 0202](../../../.docs/decisions/0202-deployment-topology.md), isolated per stack, and joined by modules through a fixed contract. Network keys are `data`, `edge` and `egress`; Docker names them `<project>_data`, `<project>_edge` and `<project>_egress`. Names and payloads on Redis and in `iw-raw` are those of `.docs/integration-plan.md` §2 and §6 and ADR 0305. They are not restated here.
 
+## Requirements
 ### Requirement: Redis service
 The stack SHALL run a `redis` service that requires a password, persists data with AOF to a named volume, uses `maxmemory-policy noeviction`, reports healthy only when it answers an authenticated `PING`, and is attached only to the internal network `data`.
 
@@ -105,3 +105,4 @@ A module SHALL join the stack by adding its own `<module>/compose.yaml` to the r
 #### Scenario: Infrastructure failure blocks dependants
 - **WHEN** `minio-init` exits non-zero
 - **THEN** `docker compose up` reports the failure and no module service that depends on it is started
+
