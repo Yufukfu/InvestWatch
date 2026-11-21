@@ -31,13 +31,15 @@ jobs:
   python:
     name: Python services
     runs-on: ubuntu-latest
-    # Throwaway services for the tests that need real PostgreSQL, Redis and MinIO. Each suite decides for itself
-    # whether a missing service skips or fails: scraper's conftest fails when `CI` is set (GitHub sets it on every
-    # runner), api skips without `TEST_DATABASE_ADMIN_URL` and analytics skips without `CONTRACTS_DIR`, so both are
-    # set here. The values are test-only, not secrets.
+    # Throwaway services for the tests that need real PostgreSQL, Redis and MinIO. Each suite names its own
+    # variables and decides whether a missing service skips or fails: api skips without `TEST_DATABASE_ADMIN_URL`,
+    # analytics without `CONTRACTS_DIR`, the scraper tests read `IW_TEST_*` (they fail when `CI` is set, which GitHub
+    # does on every runner) or `REDIS_URL`. Set here so none of them skips; `pytest -rs` lists any skip that still
+    # happens. The values are test-only, not secrets.
     env:
       TEST_DATABASE_ADMIN_URL: postgresql://postgres:test@localhost:5432/postgres
       CONTRACTS_DIR: ${{ github.workspace }}/contracts
+      REDIS_URL: redis://localhost:6379/0
       IW_TEST_PG_DSN: postgresql://postgres:test@localhost:5432/iw
       IW_TEST_REDIS_URL: redis://localhost:6379/0
       IW_TEST_MINIO_ENDPOINT: localhost:9000
@@ -87,7 +89,7 @@ jobs:
               pip install -r "$dir/requirements-dev.txt"
               pip-audit -r "$dir/requirements-dev.txt"
             fi
-            if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q); fi
+            if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q -rs); fi
             echo "::endgroup::"
           done
 
