@@ -24,9 +24,12 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 Requires Docker with Compose v2.20+.
 
 ```bash
-./scripts/init-env.sh          # creates .env with random passwords (never committed)
-docker compose up --build      # postgres, gateway, web
+./scripts/init-env.sh          # creates .env with random secrets (never committed)
+docker compose up --build      # postgres, redis, minio (bucket iw-raw), gateway, web
+docker compose --profile llm up -d   # optional: local Gemma (gemma3:4b via Ollama, several GB download)
 ```
+
+The LLM is a hosted OpenAI-compatible model by default (a mentor-approved exception to the on-premise rule, [ADR 0304](.docs/decisions/0304-llm-serving.md)); the `llm` profile is the local open-model fallback. Infrastructure, networks and the joining contract for new modules: [`infra/README.md`](infra/README.md).
 
 Open https://localhost:8443 (local certificate: see [`infra/README.md`](infra/README.md)). Until `api` exists the dashboard shows "Brak połączenia z API"; for UI work without it, run `web/` in mock mode ([`web/README.md`](web/README.md)).
 
