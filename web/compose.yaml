@@ -1,4 +1,5 @@
-# web/ deployment unit. Runs on its own (docker compose -f web/compose.yaml up) or through the root compose.yaml.
+# web/ deployment unit. Runs through the root compose.yaml, or on its own with the stack's project name
+# (docker compose -p investwatch --env-file .env -f web/compose.yaml up) so it joins <project>_edge.
 # Only reachable through the gateway: no host port is published.
 services:
   web:
@@ -15,6 +16,7 @@ services:
       resources:
         limits: { cpus: "0.5", memory: 128M }
 
+# Project-scoped: <project>_edge. Run alone with the stack's project name:
+#   docker compose -p investwatch --env-file .env -f web/compose.yaml up
 networks:
-  edge:
-    name: iw-edge
+  edge: {}

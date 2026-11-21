@@ -29,25 +29,101 @@ jobs:
           OPENSPEC_TELEMETRY: "0"
 
   python:
-    name: Python services
+    name: Python services (${{ matrix.python }})
     runs-on: ubuntu-latest
+    # api needs Python 3.13 (`requires-python`), the other services run on 3.12 like their images.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.12"
+            services: "contracts analytics scraper"
+          - python: "3.13"
+            services: "api"
+    # Throwaway services for the tests that need real PostgreSQL, Redis and MinIO. Each suite names its own
+    # variables and decides whether a missing service skips or fails: api skips without `TEST_DATABASE_ADMIN_URL`,
+    # analytics without `CONTRACTS_DIR`, the scraper tests read `IW_TEST_*` (they fail when `CI` is set, which GitHub
+    # does on every runner) or `REDIS_URL`. Set here so none of them skips; `pytest -rs` lists any skip that still
+    # happens. The values are test-only, not secrets.
+    env:
+      TEST_DATABASE_ADMIN_URL: postgresql://postgres:test@localhost:5432/postgres
+      CONTRACTS_DIR: ${{ github.workspace }}/contracts
+      REDIS_URL: redis://localhost:6379/0
+      IW_TEST_PG_DSN: postgresql://postgres:test@localhost:5432/iw
+      IW_TEST_REDIS_URL: redis://localhost:6379/0
+      IW_TEST_MINIO_ENDPOINT: localhost:9000
+      IW_TEST_MINIO_ACCESS_KEY: testuser
+      IW_TEST_MINIO_SECRET_KEY: testpass-123456
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: iw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d iw" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: public.ecr.aws/docker/library/redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
+      # `services:` cannot pass `server /data`, so MinIO is started here, on the digest the stack pins (PR #18).
+      # Docker's port proxy accepts the connection and then resets it while MinIO starts, which curl only
+      # retries with `--retry-all-errors` (`--retry-connrefused` covers refusals alone).
+      - name: Start MinIO for tests
+        run: |
+          docker run -d --name iw-test-minio -p 9000:9000 \
+            -e MINIO_ROOT_USER="$IW_TEST_MINIO_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$IW_TEST_MINIO_SECRET_KEY" \
+            cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec server /data
+          curl -fsS --retry 30 --retry-all-errors --retry-delay 1 --max-time 5 http://localhost:9000/minio/health/ready \
+            || { docker logs iw-test-minio; exit 1; }
       - name: Test and audit each Python service that has a requirements.txt
         shell: bash
+        env:
+          SERVICES: ${{ matrix.services }}
+          ALL_SERVICES: contracts analytics scraper api  # every matrix entry above; the guard below keeps this list honest
         run: |
           set -euo pipefail
-          pip install pip-audit pytest
+          # A service with a requirements.txt that no matrix entry lists would go untested and still be green.
+          all_services=" $ALL_SERVICES "
           for req in */requirements.txt; do
             [ -f "$req" ] || continue
-            dir=$(dirname "$req")
+            case "$all_services" in *" $(dirname "$req") "*) ;; *) echo "::error::$(dirname "$req") is not in the python matrix"; exit 1;; esac
+          done
+          pip install pip-audit pytest
+          for dir in $SERVICES; do
+            if [ ! -f "$dir/requirements.txt" ]; then
+              echo "::notice::$dir is in the matrix but has no requirements.txt on this branch, so it is skipped"
+              continue
+            fi
             echo "::group::$dir"
-            pip install -r "$req"
-            pip-audit -r "$req"
-            if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q); fi
+            if [ "$dir" = scraper ]; then
+              # The TLS client needs a pinned native library that only scraper/Dockerfile installs (noble-tls would
+              # fetch an unpinned release through the GitHub API at run time and fail on the rate limit), so the
+              # suite runs in its own test image, on the host network to reach the services above.
+              pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt
+              docker build -f scraper/Dockerfile --target test -t iw-scraper:test .
+              docker run --rm --network host -e CI -e REDIS_URL -e IW_TEST_PG_DSN -e IW_TEST_REDIS_URL \
+                -e IW_TEST_MINIO_ENDPOINT -e IW_TEST_MINIO_ACCESS_KEY -e IW_TEST_MINIO_SECRET_KEY \
+                iw-scraper:test pytest -q -rs
+              echo "::endgroup::"
+              continue
+            fi
+            pip install -r "$dir/requirements.txt"
+            pip-audit -r "$dir/requirements.txt"
+            if [ -f "$dir/requirements-dev.txt" ]; then
+              pip install -r "$dir/requirements-dev.txt"
+              pip-audit -r "$dir/requirements-dev.txt"
+            fi
+            # a package that builds (analytics) is installed so a test can run `python -m <package>`
+            if grep -q '^\[build-system\]' "$dir/pyproject.toml" 2>/dev/null; then pip install --no-deps -e "$dir"; fi
+            if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q -rs); fi
             echo "::endgroup::"
           done
 

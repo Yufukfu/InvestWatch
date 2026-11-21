@@ -26,7 +26,7 @@ Three modules, three owners. Kacper defined the repository layout (root [`README
 | `web/` | Kacper | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
 | `contracts/` | Damian | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
 | `api/` | Damian | shared database schema (Alembic), REST API, Socket.IO gateway | [`api/CLAUDE.md`](api/CLAUDE.md) |
-| `infra/` | Kacper | shared infrastructure: Postgres, HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
+| `infra/` | Kacper | shared infrastructure: Postgres, Redis, object storage (MinIO), optional Ollama (`--profile llm`), HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 
 `api/` (Damian) was added by the `api-db-schema` change as ADR 0302 planned; every new service directory gets a `CLAUDE.md` first, and `docs-check` enforces it.
 

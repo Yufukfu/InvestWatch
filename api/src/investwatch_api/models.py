@@ -1,0 +1,119 @@
+"""Request bodies of contracts/openapi.yaml. Copied from the archived mock server (design decision 2)."""
+
+from __future__ import annotations
+
+from typing import Literal
+from uuid import UUID
+
+from pydantic import (BaseModel, ConfigDict, Field, HttpUrl, StrictFloat, StrictInt, TypeAdapter, ValidationError,
+                      field_validator, model_validator)
+
+Module = Literal["M1", "M2", "M3"]
+RiskLevel = Literal["high", "medium", "low"]
+Viewport = Literal["desktop", "tablet", "mobile"]
+Platform = Literal["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"]
+SourceKind = Literal["firm_own", "third_party", "unknown"]
+Status = Literal["new", "in_review", "confirmed", "false_positive", "closed"]
+STATUSES = ("new", "in_review", "confirmed", "false_positive", "closed")
+
+_Unit = StrictFloat | StrictInt
+
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+def _no_nul(value):
+    if isinstance(value, str) and "\x00" in value:
+        raise ValueError("must not contain NUL characters")  # Postgres rejects NUL in text
+    return value
+
+
+class FindingPatch(_Strict):
+    status: Status | None = None
+    note: str | None = Field(default=None, max_length=10_000)  # the mock server's limit
+
+    _note = field_validator("note")(_no_nul)
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if not self.model_fields_set:
+            raise ValueError("at least one of status, note is required")
+        if "status" in self.model_fields_set and self.status is None:
+            raise ValueError("status cannot be null")
+        return self
+
+
+class Thresholds(_Strict):
+    M1: _Unit = Field(ge=0, le=1)
+    M2: _Unit = Field(ge=0, le=1)
+    M3: _Unit = Field(ge=0, le=1)
+
+
+_HTTP_URL = TypeAdapter(HttpUrl)
+
+
+def _http_url_as_sent(value):
+    """Validate as an http(s) URL without credentials, but keep the string exactly as sent (no normalising)."""
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise ValueError("url must be a string")
+    # HttpUrl strips spaces, drops tabs and newlines and reads "\\" as "/" before it validates; the string we store
+    # is the raw one, so reject anything a parser could read differently (whitespace, controls, DEL, backslash).
+    if any(ord(c) <= 0x20 or ord(c) == 0x7F or c == "\\" for c in value):
+        raise ValueError("url must not contain whitespace, control characters or backslashes")
+    try:
+        parsed = _HTTP_URL.validate_python(value)
+    except ValidationError:
+        raise ValueError("url must be an http or https URL") from None
+    if parsed.username or parsed.password:
+        raise ValueError("url must not contain credentials")
+    return value
+
+
+def _unique_modules(value):
+    if value is not None and len(set(value)) != len(value):
+        raise ValueError("target_modules must not repeat a module")  # contract: uniqueItems
+    return value
+
+
+class SourceCreate(_Strict):
+    name: str = Field(min_length=1, max_length=200)
+    platform: Platform
+    url: str
+    source_kind: SourceKind
+    target_modules: list[Module] = Field(min_length=1)
+    schedule_cron: str | None = Field(default=None, max_length=100)
+    active: bool = True
+
+    _modules = field_validator("target_modules")(_unique_modules)
+    _url = field_validator("url")(_http_url_as_sent)
+    _text = field_validator("name", "schedule_cron")(_no_nul)
+
+
+class SourcePatch(_Strict):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    platform: Platform | None = None
+    url: str | None = None
+    source_kind: SourceKind | None = None
+    target_modules: list[Module] | None = Field(default=None, min_length=1)
+    schedule_cron: str | None = Field(default=None, max_length=100)
+    active: bool | None = None
+
+    _modules = field_validator("target_modules")(_unique_modules)
+    _url = field_validator("url")(_http_url_as_sent)
+    _text = field_validator("name", "schedule_cron")(_no_nul)
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if not self.model_fields_set:
+            raise ValueError("at least one field is required")
+        nulls = [k for k in self.model_fields_set if getattr(self, k) is None and k != "schedule_cron"]
+        if nulls:
+            raise ValueError(f"cannot be null: {', '.join(sorted(nulls))}")
+        return self
+
+
+class ScanRequest(_Strict):
+    source_id: UUID

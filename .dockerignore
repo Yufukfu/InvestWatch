@@ -1,0 +1,12 @@
+scraper/tests/__pycache__
+__pycache__
+.pytest_cache
+.git
+node_modules
+*.tmp
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv
+**/*.pem
+**/*.key

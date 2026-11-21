@@ -44,10 +44,10 @@ Decisions from the team sync:
                      LLM endpoint (OpenAI-compatible API: hosted, or local Gemma via Ollama) ◀── analytics
 ```
 
-Services in `docker-compose.yml` (single `docker compose up` command):
-`postgres`, `redis`, `minio`, `scraper`, `scheduler`, `analytics`, `api`, `dashboard` (+ `ollama` behind a compose profile, the local LLM fallback from ADR 0304).
+Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
+`postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then `scraper`, `scheduler`, `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
-Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `docker-compose.yml` and `.env.example` at the root.
+Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
 ## 2. Integration points
 
@@ -121,7 +121,8 @@ Minimum required for analytics to work: `id, platform, url, fetched_at, text, so
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
 Table `sources` (managed by the scraper, editable from the dashboard):
-`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at`.
+`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at, last_run_status (ok|partial|failed|running)`.
+The scraper writes only `last_run_at` and `last_run_status`. `documents_count` in the `Source` contract ([`source.schema.json`](../contracts/schemas/source.schema.json)) is not a column: the API counts the source's `documents` rows on read (total, not the last job).
 
 ## 4. Contract: `Finding` (analytics → database → API)
 
@@ -184,9 +185,9 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
-| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level` |
+| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults 0.6 / 0.5 / 0.7 written when missing); analytics reads the same key (ADR 0305) |
 | GET / POST / PATCH | `/sources` | list and edit sources |
-| POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`) |
+| POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`). The scraper owns the consumer side: its consumer group on `iw:scan-requests` runs the scan and publishes `scan.started` / `scan.finished` on `iw:events` (§6). Until the scraper reads the stream, the request is queued and nothing runs |
 | GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
 | GET | `/health` | service status (for the demo) |
 
@@ -194,14 +195,14 @@ Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed
 
 ## 6. Real-time events
 
-Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`):
+Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/socket.io`, same origin through the gateway). Each message is `{ "type", "emitted_at", "data" }` (`contracts/schemas/events.schema.json`); the API forwards `data` unchanged under the event name `type` and drops messages that fail the schema (only a log warning, so a producer bug shows up as missing alerts). For `finding.created` / `finding.high_risk`, `data` is exactly `{ id, module, score, title, url, platform }` plus an optional `risk_level`, no other keys:
 
 | Event | Payload | When |
 |---|---|---|
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
 | `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
-| `finding.updated` | `{ id, status }` | status change (sync between tabs) |
-| `scan.started` / `scan.finished` | `{ source_id, documents }` | scan progress bar |
+| `finding.updated` | `{ id, status }` | published by the API on `iw:events` after `PATCH /findings/{id}` commits (status or note change; sync between tabs) |
+| `scan.started` / `scan.finished` | `{ source_id, documents, status }`: `documents` = new documents of that job (integer or null), `status` = `ok\|partial\|failed` or null ([`events.schema.json`](../contracts/schemas/events.schema.json)) | scan progress bar |
 
 ## 7. Shared conventions
 

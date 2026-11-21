@@ -7,8 +7,10 @@ own databases and app role and drops them afterwards; without the variable the d
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import sys
 import secrets
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -19,6 +21,10 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 from psycopg import sql
 from sqlalchemy.engine import make_url
+
+if sys.platform == "win32":
+    # psycopg's async mode cannot run on the Proactor loop (Windows default); containers run Linux.
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS_DIR = REPO_ROOT / "contracts"
@@ -138,3 +144,45 @@ def app_engine(migrated_db: TempDatabase):
         for table in ("findings", "documents", "job_errors", "sources", "calibration_points"):
             conn.execute(text(f"DELETE FROM {table}"))
     engine.dispose()
+
+
+@pytest.fixture
+def redis_clean():
+    """URL of the test Redis, emptied before the test (TEST_REDIS_URL; skipped when unset)."""
+    import redis as redis_sync
+
+    from apiutil import redis_url
+
+    url = redis_url()
+    client = redis_sync.Redis.from_url(url)
+    client.flushdb()
+    client.close()
+    return url
+
+
+@pytest.fixture
+def objects():
+    from apiutil import FakeObjectStore
+
+    return FakeObjectStore()
+
+
+@pytest.fixture
+def client(app_engine, migrated_db, redis_clean, objects):
+    """TestClient on empty tables, a clean Redis and a fake object store."""
+    from fastapi.testclient import TestClient
+
+    from apiutil import make_services
+    from investwatch_api.app import create_app
+
+    app = create_app(lambda: make_services(migrated_db.app_url, redis_clean, objects))
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture
+def seeded(client, migrated_db):
+    """The mock sources, documents and findings from contracts/mocks, inserted as the app role."""
+    from apiutil import seed_mocks
+
+    return seed_mocks(migrated_db.app_url)
