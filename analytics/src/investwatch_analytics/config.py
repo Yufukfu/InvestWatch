@@ -122,6 +122,8 @@ def _positive_number(env: Mapping[str, str], key: str, default: float, *, intege
 
 
 _LOCAL_HOSTS = {"ollama", "localhost", "127.0.0.1", "::1"}
+#: The LLM client's connect timeout (llm/client.py CONNECT_TIMEOUT_S): the budget check leaves room for it.
+CONNECT_MARGIN_S = 3.0
 
 
 def _check_base_url(url: str, *, has_key: bool) -> None:
@@ -194,9 +196,11 @@ class LlmSettings:
             breaker_failures=int(_positive_number(env, "LLM_BREAKER_FAILURES", 3, integer=True)),
             breaker_cooldown_s=_positive_number(env, "LLM_BREAKER_COOLDOWN_S", 60),
         )
-        if claim_min_idle_ms is not None and s.doc_budget_s * 1000 >= claim_min_idle_ms:
+        # The budget is checked between requests, so one request (connect + read) can overrun it: keep that margin.
+        if claim_min_idle_ms is not None and (s.doc_budget_s + CONNECT_MARGIN_S) * 1000 >= claim_min_idle_ms:
             # Otherwise a second consumer XAUTOCLAIMs a message still being judged (ADR 0310).
             raise ConfigError(
-                f"LLM_DOC_BUDGET_S ({s.doc_budget_s:g} s) must be below CLAIM_MIN_IDLE_MS ({claim_min_idle_ms} ms)"
+                f"LLM_DOC_BUDGET_S ({s.doc_budget_s:g} s) plus {CONNECT_MARGIN_S:g} s must be below "
+                f"CLAIM_MIN_IDLE_MS ({claim_min_idle_ms} ms)"
             )
         return s

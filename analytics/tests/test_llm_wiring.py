@@ -211,3 +211,29 @@ def test_worker_main_builds_the_judge_from_env(monkeypatch):
     with pytest.raises(Built):
         worker.main(env)
     assert isinstance(seen["judge"], HttpJudge) and seen["judge"].model_name == "gemma3:4b"
+
+
+# ---- whole-branch review fixes ------------------------------------------------------------------------
+
+
+def test_judge_from_env_for_the_evaluation(monkeypatch):
+    """gold-set-evaluation `--llm` looks up `investwatch_analytics.llm.judge_from_env`."""
+    from investwatch_analytics import llm
+    from investwatch_analytics.llm.judge import HttpJudge
+
+    monkeypatch.setenv("LLM_BASE_URL", "http://ollama:11434/v1")
+    monkeypatch.setenv("LLM_MODEL", "gemma3:4b")
+    judge = llm.judge_from_env()
+    assert isinstance(judge, HttpJudge) and judge.model_name == "gemma3:4b"
+    monkeypatch.setenv("LLM_BASE_URL", "")
+    assert llm.judge_from_env() is None
+
+
+def test_evaluation_report_names_the_model(monkeypatch):
+    from investwatch_analytics.evaluation import runner
+
+    class J:
+        model_name = "gemma3:4b"
+
+    assert runner.judge_model_name(J()) == "gemma3:4b"
+    assert runner.judge_model_name(None) is None

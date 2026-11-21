@@ -66,8 +66,11 @@ def test_budget_must_stay_below_claim_idle():
     env["LLM_DOC_BUDGET_S"] = "60"
     with pytest.raises(ConfigError, match="LLM_DOC_BUDGET_S"):
         LlmSettings.from_env(env, claim_min_idle_ms=60000)
-    env["LLM_DOC_BUDGET_S"] = "59.5"
-    assert LlmSettings.from_env(env, claim_min_idle_ms=60000).doc_budget_s == 59.5
+    env["LLM_DOC_BUDGET_S"] = "57.5"  # plus the 3 s connect timeout is still over 60 s: refused
+    with pytest.raises(ConfigError, match="LLM_DOC_BUDGET_S"):
+        LlmSettings.from_env(env, claim_min_idle_ms=60000)
+    env["LLM_DOC_BUDGET_S"] = "56.5"
+    assert LlmSettings.from_env(env, claim_min_idle_ms=60000).doc_budget_s == 56.5
 
 
 def test_key_never_in_config_errors():

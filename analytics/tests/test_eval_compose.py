@@ -19,6 +19,17 @@ def test_service_uses_the_analytics_image():
     assert SERVICE["image"] == COMPOSE["services"]["analytics"]["image"]
 
 
+def test_only_the_worker_builds_the_shared_image():
+    # Two `build:` sections on one tag race at export ("image ... already exists" with the containerd store).
+    assert "build" in COMPOSE["services"]["analytics"]
+    assert "build" not in SERVICE
+
+
+def test_worker_build_context_does_not_depend_on_the_first_compose_file():
+    # `-f infra/compose.yaml -f ... -f analytics/compose.yaml` resolves paths from infra/; `.` would point there.
+    assert COMPOSE["services"]["analytics"]["build"] == "../analytics"
+
+
 def test_service_runs_the_evaluation_with_db_rules_only():
     assert SERVICE["command"] == ["python", "-m", "investwatch_analytics.evaluation", "--db"]
     assert not any(k.startswith("LLM_") for k in SERVICE.get("environment", {}))
@@ -33,6 +44,14 @@ def test_service_waits_for_the_migration_and_postgres():
     assert deps["api-migrate"]["condition"] == "service_completed_successfully"
     assert deps["postgres"]["condition"] == "service_healthy"
     assert "redis" not in deps
+
+
+def test_worker_waits_for_the_evaluation_without_requiring_it():
+    # `up --wait` checks a service nobody depends on for "running or healthy": the one-shot fails it either way
+    # ("no healthcheck configured" while it runs, "exited (0)" once done). A completed_successfully dependant makes
+    # --wait check completion instead (like api-migrate); required: false still starts the worker if the run fails.
+    dep = COMPOSE["services"]["analytics"]["depends_on"]["analytics-eval"]
+    assert dep == {"condition": "service_completed_successfully", "required": False}
 
 
 def test_service_is_on_the_data_network_only():

@@ -80,3 +80,25 @@ async def test_collectable_lists_active_web_sources_with_or_without_a_cron(pool)
     ids = {s.id for s in await PgSourceStore(pool).collectable()}
 
     assert ids == {scheduled, manual}
+
+
+CHANNEL = "https://t.me/s/kdpwiadomosci"
+
+
+async def test_a_telegram_channel_is_schedulable_and_collectable(pool):
+    channel = await add(pool, platform="other", url=CHANNEL)
+    web = await add(pool)
+
+    store = PgSourceStore(pool)
+
+    assert {s.id for s in await store.schedulable()} == {channel, web}
+    assert {s.id for s in await store.collectable()} == {channel, web}
+
+
+async def test_a_row_of_platform_other_on_a_host_without_a_collector_is_not_listed(pool):
+    await add(pool, platform="other", url="https://example.com/s/kdpwiadomosci")
+
+    store = PgSourceStore(pool)
+
+    assert [s.id for s in await store.schedulable()] == []
+    assert [s.id for s in await store.collectable()] == []

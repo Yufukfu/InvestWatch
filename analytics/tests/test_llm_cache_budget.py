@@ -181,7 +181,7 @@ def test_remaining_budget_caps_the_request_timeout(stub_llm):
     judge.begin_document()
     start = time.perf_counter()
     out = ask(judge)
-    assert out.status == "unavailable" and time.perf_counter() - start < 2.0
+    assert out.status == "budget_exhausted" and time.perf_counter() - start < 2.0
 
 
 def test_pipeline_starts_a_budget_per_document(stub_llm, monkeypatch):
@@ -262,3 +262,43 @@ def test_build_judge_passes_the_redis_client():
     r = fakeredis.FakeRedis(decode_responses=True)
     j = build_judge(LlmSettings.from_env({"LLM_BASE_URL": "http://ollama:11434/v1", "LLM_MODEL": "m"}), redis=r)
     assert j._cache is not None
+
+
+def test_timeout_cut_short_by_the_budget_is_budget_exhausted_not_a_breaker_failure(stub_llm, caplog):
+    import time
+
+    caplog.set_level(logging.INFO)
+    stub_llm.default = Reply(sleep_s=2)
+    judge = make(stub_llm.base_url, LLM_TIMEOUT_S="20", LLM_DOC_BUDGET_S="0.4", LLM_BREAKER_FAILURES="1",
+                 clock=time.monotonic)
+    judge.begin_document()
+    out = ask(judge)
+    assert out.status == "budget_exhausted"
+    assert any(getattr(rec, "reason", None) == "llm_budget_exhausted" for rec in caplog.records)
+    assert judge._open_until is None  # a healthy but slow endpoint must not open the breaker
+
+
+def test_a_plain_timeout_with_budget_left_counts_for_the_breaker(stub_llm):
+    import time
+
+    stub_llm.default = Reply(sleep_s=2)
+    judge = make(stub_llm.base_url, LLM_TIMEOUT_S="0.4", LLM_DOC_BUDGET_S="30", LLM_BREAKER_FAILURES="1",
+                 clock=time.monotonic)
+    judge.begin_document()
+    assert ask(judge).status == "unavailable" and judge._open_until is not None
+
+
+def test_early_timeout_with_budget_left_counts_for_the_breaker(stub_llm):
+    """A connect timeout (3 s) is an endpoint failure even when the read timeout was shortened by the budget."""
+    from investwatch_analytics.llm.client import LlmUnavailable
+
+    clock = Clock()
+    judge = make(stub_llm.base_url, clock=clock, LLM_TIMEOUT_S="60", LLM_DOC_BUDGET_S="40", LLM_BREAKER_FAILURES="1")
+
+    def connect_timeout(*a, **k):
+        clock.t += 3  # only 3 of the 40 s budget used
+        raise LlmUnavailable("timeout after 3 s", timeout=True)
+
+    judge._client.complete = connect_timeout
+    judge.begin_document()
+    assert ask(judge).status == "unavailable" and judge._open_until is not None

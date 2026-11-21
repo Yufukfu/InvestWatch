@@ -1,12 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import findings from './test/fixtures/findings.json';
 import summary from './test/fixtures/summary.json';
 import { server } from './test/setup';
 import { makeStore } from './test/store';
+
+vi.mock('socket.io-client', async () => (await import('./test/inertSocket')).inertSocketModule);
 
 // A fresh store per test so RTK Query cache does not leak between scenarios.
 function renderApp() {
@@ -43,6 +45,15 @@ describe('App (against contract mocks)', () => {
     const findingsTable = document.querySelector('table.findings');
     expect(findingsTable).not.toBeNull();
     expect(trend.compareDocumentPosition(findingsTable!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('mounts the calibration panel (lazy-loaded) after the findings', async () => {
+    renderApp();
+    const heading = await screen.findByRole('heading', { name: 'Kalibracja progów' }, { timeout: 4000 });
+    expect(await screen.findByRole('slider', { name: 'Próg dla M2' }, { timeout: 4000 })).toBeInTheDocument();
+    const findingsTable = document.querySelector('table.findings');
+    expect(findingsTable).not.toBeNull();
+    expect(findingsTable!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders markup in scraped text literally, never as HTML', async () => {
