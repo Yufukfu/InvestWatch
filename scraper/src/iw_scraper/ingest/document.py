@@ -19,8 +19,21 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(normalise_text(text).encode("utf-8")).hexdigest()
 
 
+def parse_timestamp(value: str) -> datetime:
+    """An RFC 3339 `date-time`, as the contract's `format` allows it: a lowercase `t` or `z` is fine, `fromisoformat` is not."""
+    return datetime.fromisoformat(value.upper())
+
+
 def _iso_utc(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _scrape_meta(from_page: object, duration_ms: int, proxy: str | None) -> dict:
+    """What the parser put there stays; the fetch facts are added, and `scraper` defaults to `httpx` (ADR 0101)."""
+    meta = dict(from_page) if isinstance(from_page, dict) else {}
+    meta.update(duration_ms=duration_ms, proxy=proxy)
+    meta.setdefault("scraper", "httpx")
+    return meta
 
 
 def build_document(page: dict, source: Source, *, fetched_at: datetime, duration_ms: int, proxy: str | None) -> dict:
@@ -36,7 +49,7 @@ def build_document(page: dict, source: Source, *, fetched_at: datetime, duration
         platform=source.platform,
         source_kind=source.source_kind,
         fetched_at=_iso_utc(fetched_at),
-        scrape_meta={"scraper": "httpx", "duration_ms": duration_ms, "proxy": proxy},
+        scrape_meta=_scrape_meta(page.get("scrape_meta"), duration_ms, proxy),
     )
     if isinstance(doc.get("text"), str):
         doc["content_hash"] = content_hash(doc["text"])

@@ -6,6 +6,7 @@ from typing import Literal
 
 import asyncpg
 
+from iw_scraper.ingest.document import parse_timestamp
 from iw_scraper.types import JobError
 
 
@@ -32,7 +33,7 @@ _PAYLOAD_KEYS = ("author", "links", "media", "screenshots", "blocks", "scrape_me
 
 
 def _timestamp(value: str | None) -> datetime | None:
-    return datetime.fromisoformat(value) if value else None
+    return parse_timestamp(value) if value else None
 
 
 async def is_duplicate(pool: asyncpg.Pool, source_id: str, content_hash: str) -> bool:
@@ -57,7 +58,7 @@ async def insert_document(pool: asyncpg.Pool, doc: dict) -> IngestResult:
             doc["source_kind"],
             doc["url"],
             doc.get("canonical_url"),
-            datetime.fromisoformat(doc["fetched_at"]),
+            parse_timestamp(doc["fetched_at"]),
             _timestamp(doc.get("published_at")),
             doc.get("http_status"),
             doc.get("lang"),

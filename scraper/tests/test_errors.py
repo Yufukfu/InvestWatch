@@ -181,3 +181,27 @@ async def test_a_huge_non_uuid_source_id_does_not_push_the_detail_out(pool):
     await record_error(pool, JobError(Reason.INVALID_REQUEST, "real-detail-text", "s" * 1000))
     stored = (await rows(pool))[0]
     assert "real-detail-text" in stored["detail"]
+
+
+@pytest.mark.parametrize(
+    "detail,secret",
+    [
+        ("headers {'Authorization': 'Token abc123'}", "abc123"),
+        ('headers {"Authorization": "abc123"}', "abc123"),
+        ("authorization=abc123", "abc123"),
+        ("{'Proxy-Authorization': 'Digest username=u, response=abc'}", "response=abc"),
+        ("{'Cookie': 'cf_clearance=abc123'}", "abc123"),
+        ("{'Set-Cookie': 'sid=abc123; Path=/'}", "abc123"),
+        ("proxy http://user:s3cret@[2001:db8::1]:3128 failed", "s3cret"),
+    ],
+)
+def test_auth_headers_in_dict_json_and_equals_form_and_ipv6_userinfo_are_masked(detail, secret):
+    assert secret not in redact(detail)
+
+
+def test_the_plain_header_form_still_masks_to_the_end_of_the_line():
+    assert redact("Authorization: Token abc123") == "Authorization: ***"
+
+
+def test_names_that_only_contain_a_secret_word_by_accident_are_left_alone():
+    assert redact("AuthenticationError: bypass the cache") == "AuthenticationError: bypass the cache"

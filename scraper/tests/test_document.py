@@ -111,3 +111,27 @@ def test_nfc_equivalent_text_has_the_same_hash():
 @pytest.mark.parametrize("raw,expected", [("  a \t\n b  ", "a b"), ("", ""), (" x ", "x")])
 def test_normalise_text(raw, expected):
     assert normalise_text(raw) == expected
+
+
+def test_a_scrape_meta_key_the_page_supplied_survives_and_the_fetch_facts_are_added(source):
+    meta = build(source, PAGE | {"scrape_meta": {"client": "chrome_146", "duration_ms": 1}})["scrape_meta"]
+    assert meta == {"client": "chrome_146", "scraper": "httpx", "duration_ms": 120, "proxy": "proxy-1"}
+
+
+def test_a_scraper_value_the_page_supplied_is_kept(source):
+    assert build(source, PAGE | {"scrape_meta": {"scraper": "playwright"}})["scrape_meta"]["scraper"] == "playwright"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("url", "javascript:alert(1)"),
+        ("canonical_url", "javascript:alert(1)"),
+        ("canonical_url", "data:text/html,x"),
+        ("author", {"name": "a", "profile_url": "javascript:alert(1)"}),
+    ],
+)
+def test_a_non_web_url_scheme_is_schema_invalid(source, field, value):
+    error = check_document(build(source, PAGE | {field: value}))
+    assert error is not None and error.reason is Reason.SCHEMA_INVALID
+    assert "http or https" in error.detail

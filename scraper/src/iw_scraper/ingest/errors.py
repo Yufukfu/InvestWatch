@@ -22,11 +22,11 @@ _MAX_SOURCE_ID_IN_DETAIL = 80
 # password containing "@" or "/" is covered), bearer tokens, auth headers (the rest of the line), and
 # name=value / "name": "value" pairs whose NAME looks secret. The pair pattern does not mention the secret words:
 # it finds `name sep value` and the name is judged in code, which keeps the regex free of nested repetition.
-_BARE_USERINFO = re.compile(r"\b[^\s/:@]+:\S*@(?=[\w.-]+)")
+_BARE_USERINFO = re.compile(r"\b[^\s/:@]+:\S*@(?=[\w.\[-])")  # a host, an IP, or `[` of an IPv6 literal
 _BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
 _AUTH_HEADER = re.compile(r"(?i)\b(authorization|proxy-authorization|cookie|set-cookie)(\s*:\s*).*")
 _PAIR = re.compile(r"([\w-]+[\"']?)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)")
-_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase")
+_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase", "authorization", "cookie")
 # short names are matched as whole `-`/`_` separated words, or `bypass` and `AuthenticationError` would be masked
 _SECRET_NAME_WORDS = frozenset({"pass", "pw", "auth"})
 

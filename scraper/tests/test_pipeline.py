@@ -201,8 +201,11 @@ class HungRedis:
         await asyncio.Event().wait()  # never answers
 
 
-@pytest.mark.parametrize("failure", [ValueError("bad timestamp"), asyncpg.InterfaceError("pool closed"), RuntimeError("boom")])
-async def test_any_failure_after_the_upload_removes_the_object_and_records_an_error(
+@pytest.mark.parametrize(
+    "failure",
+    [ValueError("bad timestamp"), asyncpg.InterfaceError("pool closed"), asyncpg.DataError("bad argument"), asyncpg.UniqueViolationError("clash")],
+)
+async def test_a_failure_that_certainly_did_not_commit_removes_the_object_and_records_an_error(
     pool, storage, redis_client, stream_name, seeded_source, monkeypatch, failure
 ):
     async def failing_insert(*_args):
@@ -215,7 +218,58 @@ async def test_any_failure_after_the_upload_removes_the_object_and_records_an_er
     assert await reasons(pool) == ["storage_error"]
 
 
-async def test_cancellation_between_upload_and_insert_removes_the_object(
+@pytest.mark.parametrize(
+    "failure",
+    [RuntimeError("boom"), OSError("reset"), ConnectionResetError("reset"), asyncpg.ConnectionDoesNotExistError("connection was closed"),
+        asyncpg.QueryCanceledError("cancelled"), asyncpg.AdminShutdownError("shutting down")],
+)
+async def test_a_failure_that_may_have_committed_keeps_the_object_and_records_an_error(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch, failure
+):
+    async def failing_insert(*_args):
+        raise failure
+
+    monkeypatch.setattr(pipeline, "insert_document", failing_insert)
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source)
+    assert result.outcome == "failed"
+    assert len(await storage.list_keys()) == 1  # an orphan object is harmless; a dangling key is not
+    assert await reasons(pool) == ["storage_error"]
+
+
+@pytest.mark.parametrize("lost_reply", [ConnectionResetError("reply lost"), asyncio.CancelledError()])
+async def test_a_lost_reply_after_the_commit_leaves_the_object_the_row_points_at(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch, lost_reply
+):
+    real_insert = pipeline.insert_document
+
+    async def commit_then_lose_the_reply(pool_, doc):
+        await real_insert(pool_, doc)
+        raise lost_reply
+
+    monkeypatch.setattr(pipeline, "insert_document", commit_then_lose_the_reply)
+    try:
+        await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source)
+    except asyncio.CancelledError:
+        pass
+    async with pool.acquire() as conn:
+        key = await conn.fetchval("SELECT html_object_key FROM documents")
+    assert key is not None
+    assert key in await storage.list_keys()
+
+
+@pytest.mark.parametrize("html", [None, ""])
+async def test_a_page_without_html_records_a_parse_error_and_stores_nothing(
+    pool, storage, redis_client, stream_name, seeded_source, html
+):
+    page = {key: value for key, value in PAGE.items() if key != "html"} | ({} if html is None else {"html": html})
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, page)
+    assert result.outcome == "failed"
+    assert await doc_count(pool) == 0
+    assert await storage.list_keys() == []
+    assert await reasons(pool) == ["parse_error"]
+
+
+async def test_cancellation_during_the_insert_keeps_the_object(
     pool, storage, redis_client, stream_name, seeded_source, monkeypatch
 ):
     started = asyncio.Event()
@@ -230,7 +284,7 @@ async def test_cancellation_between_upload_and_insert_removes_the_object(
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert await storage.list_keys() == []
+    assert len(await storage.list_keys()) == 1  # the insert may already have committed
 
 
 async def test_nul_character_in_text_fails_cleanly_after_the_upload(
@@ -299,3 +353,10 @@ async def test_text_that_cannot_be_encoded_is_a_recorded_schema_error(pool, stor
     assert result.outcome == "failed"
     assert result.error.reason is Reason.SCHEMA_INVALID
     assert await reasons(pool) == ["schema_invalid"]
+
+
+async def test_a_lowercase_z_timestamp_the_schema_accepts_is_stored(pool, storage, redis_client, stream_name, seeded_source):
+    page = PAGE | {"published_at": "2026-11-21T10:00:00z"}
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, page)
+    assert result.outcome == "inserted"
+    assert (await doc_row(pool, result.document_id))["published_at"] == datetime(2026, 11, 21, 10, 0, tzinfo=timezone.utc)

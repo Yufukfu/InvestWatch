@@ -14,6 +14,19 @@ from iw_scraper.types import JobError, Reason, Source
 
 log = logging.getLogger("iw_scraper.ingest")
 
+# An insert error after which the row certainly does not exist: the server answered with an error to a statement
+# that autocommit then rolled back, or the client refused the arguments before sending anything. Anything else
+# (a dropped connection, a timeout, a cancel) may have come after the commit; deleting the object then would leave
+# a committed row whose `html_object_key` points at nothing, which is worse than an orphan object.
+_UNSURE_POSTGRES_ERRORS = (asyncpg.exceptions.PostgresConnectionError, asyncpg.exceptions.OperatorInterventionError)
+_REFUSED_BEFORE_SENDING = (asyncpg.InterfaceError, ValueError, TypeError, KeyError)
+
+
+def _certainly_not_committed(exc: BaseException) -> bool:
+    if isinstance(exc, asyncpg.PostgresError):
+        return not isinstance(exc, _UNSURE_POSTGRES_ERRORS)
+    return isinstance(exc, _REFUSED_BEFORE_SENDING)
+
 
 class Ingestor:
     """Parsed page -> validated, deduplicated row + raw HTML in MinIO + event on the stream.
@@ -43,24 +56,24 @@ class Ingestor:
         except Exception as exc:  # nothing is uploaded yet; any failure here is a recorded storage error
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"dedup check failed: {exc}", source_id))
 
-        key = None
         html = page.get("html")
-        if html is not None:
-            try:
-                key = await self.storage.put_html(doc["id"], html)
-            except Exception as exc:  # the minio client raises S3Error, urllib3 and OS errors alike
-                return await self._fail(JobError(Reason.STORAGE_ERROR, f"upload failed: {exc}", source_id))
-            doc["html_object_key"] = key
+        if not html:  # the spec stores the HTML of every page; a parser that drops it must show up, not pass silently
+            return await self._fail(JobError(Reason.PARSE_ERROR, "page has no html", source_id))
+        try:
+            key = await self.storage.put_html(doc["id"], html)
+        except Exception as exc:  # the minio client raises S3Error, urllib3 and OS errors alike
+            return await self._fail(JobError(Reason.STORAGE_ERROR, f"upload failed: {exc}", source_id))
+        doc["html_object_key"] = key
 
         try:
             result = await insert_document(self.pool, doc)
-        except asyncio.CancelledError:
-            await self._remove_object(key)  # e.g. the orchestrator's timeout: do not leave the upload behind
+        except asyncio.CancelledError as exc:  # e.g. the orchestrator's timeout
+            await self._discard_object(key, exc)
             raise
         except Exception as exc:
-            # whatever went wrong after the upload (driver, pool, a value the schema let through), the object
-            # goes and the failure is recorded; it must never escape with an orphan behind it
-            await self._remove_object(key)
+            # whatever went wrong after the upload (driver, pool, a value the schema let through) is recorded and
+            # never escapes; the object goes only if the row certainly was not committed
+            await self._discard_object(key, exc)
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"insert failed: {exc}", source_id))
 
         if result.outcome == "duplicate":
@@ -82,9 +95,13 @@ class Ingestor:
             # published but unmarked: the sweep may publish it again, which consumers deduplicate
             log.warning(json.dumps({"event": "mark_published_failed", "document_id": document_id, "error": redact(str(exc))}))
 
-    async def _remove_object(self, key: str | None) -> None:
-        if key is None:
+    async def _discard_object(self, key: str, exc: BaseException) -> None:
+        if _certainly_not_committed(exc):
+            await self._remove_object(key)
             return
+        log.warning(json.dumps({"event": "possible_orphan", "key": key, "error": redact(f"{type(exc).__name__}: {exc}")}))
+
+    async def _remove_object(self, key: str) -> None:
         try:
             await self.storage.remove(key)
         except Exception as exc:
