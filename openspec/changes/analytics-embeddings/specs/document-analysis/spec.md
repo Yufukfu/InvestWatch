@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Investment topic gate
-After preprocessing and before routing, analytics SHALL decide whether a document is investment-related (`.docs/analytics-plan.md` §2 step 2). Its core signal is dictionary hits: the terms of `gate_terms.yaml` (stems or phrases on word boundaries) matched against the normalized text, lowercased and with diacritics stripped. A registry firm match SHALL count as a hit. The gate SHALL drop a document only when it has no hit and the similarity rescue does not apply.
+After preprocessing and before any module runs, analytics SHALL decide whether a document is investment-related (`.docs/analytics-plan.md` §2 step 2). Its core signal is dictionary hits: the terms of `gate_terms.yaml` (stems or phrases on word boundaries) matched against the normalized text, lowercased and with diacritics stripped. A registry firm match SHALL count as a hit. The gate SHALL drop a document only when it has no hit and the similarity rescue does not apply.
 
 #### Scenario: Investment post passes on the dictionary
 - **WHEN** a `third_party` post says `Zainwestuj w CFD na forex, zyski 20% miesięcznie`

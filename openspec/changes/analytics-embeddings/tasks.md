@@ -41,13 +41,16 @@ Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is
 
 ## 7. Pipeline wiring and `model.embedder` (~45 min)
 
-- [ ] 7.1 Failing tests: `analyze(..., embedder=None, neardup=None)` behaves exactly as before (existing pipeline tests unchanged); order empty → embed → gate → near-dup → route; "Embedder recorded on findings" scenarios (used, cached counts as used, wrong size → null) with findings valid against `contracts/validate.py finding`; embedder down → dictionary-only gate and `model.embedder = null`; empty text makes no embeddings request; off-topic third-party post returns `[]` with the `off_topic` log; `firm_own` still embedded (for `model.embedder`) but not gated
-- [ ] 7.2 `pipeline.py` and `Context` extra (embedder model, near-dup result), M2 builder sets `model.embedder` (M1/M3 builders too if `analytics-m1-m3` has landed); tests green
-- [ ] 7.3 Mutation check; `mutations: N tried, N caught`
+- [x] 7.1 Failing tests (`tests/test_pipeline_embeddings.py`): `analyze(..., embedder=None, neardup=None)` behaves exactly as before (existing pipeline tests unchanged); order empty → route → gate → embed → near-dup → modules (design §6); "Embedder recorded on findings" scenarios (used, cached counts as used, wrong size → null) with findings valid against `contracts/validate.py finding`; embedder down → dictionary-only gate and `model.embedder = null`; empty text makes no embeddings request; off-topic third-party post returns `[]` with the `off_topic` log; `firm_own` still embedded (for `model.embedder`) but not gated
+- [x] 7.2 `pipeline.py`: `analyze_document() -> Analysis`, `analyze()` as its findings, `Gate`; `model.embedder` and the summary sentence applied to the built findings (no builder or `Context` change, design §6); tests green
+- [x] 7.3 Mutation check, together with 8b.1-8b.2 (summary sentence); `mutations: 17 tried, 17 caught` (first run 12 of 16: tests added for a registry firm without vocabulary, an original that carries a URL, and a spy on the `analyze()` wrapper; the vector check before setting `model.embedder` was redundant with the outcome's model and was simplified)
 
 ## 8. Near-dup alert suppression, summary sentence, gate counter (~45 min)
 
-Split on the coordinator's instruction: 8a (alert claim in `events.py`, standalone) now; 8b (summary sentence and gate counter, which need the pipeline) with the wiring later.
+Split on the coordinator's instruction: 8a (alert claim in `events.py`, standalone) first; 8b (summary sentence with group 7, gate counter with group 9) on the merged base.
+
+- [x] 8b.1 Failing tests: sentence plural forms (2-4, 5+, 12-14, 22, 102, 112), no sentence for no index, a lone member, the original (also with a URL) or a missing URL; a repost's findings name the original's URL once and keep their own `url`
+- [x] 8b.2 `pipeline.neardup_sentence()` applied in `analyze_document`; tests green (mutations counted in 7.3)
 
 - [x] 8a.1 Failing tests (`tests/test_events_neardup.py`): every `finding-events` delta scenario with fakeredis and `NoopPublisher`, plus two findings of one group in one save and the claim key TTL
 - [x] 8a.2 `events.py` `publish_findings(saved, groups=None)`, `alert_key()`, `RedisPublisher._claim` (`SET NX EX`), fail-open claim errors (`neardup_claim_failed`), in-memory claims in `NoopPublisher`; tests green

@@ -161,20 +161,20 @@ Groups are not merged transitively. A document that matches two groups joins the
 
 ### 6. Wiring
 
-- `analyze(doc, *, registry, catalogue, now, new_id, judge=None, embedder=None, neardup=None)`. The order is:
+- `analyze_document(doc, *, registry, catalogue, now, new_id, signals, judge, gate=None, embedder=None, neardup=None) -> Analysis` returns the findings plus the gate decision, the near-dup group and the embedding outcome, which the worker needs for the counter and the alert claim. `analyze(...)` keeps its signature and returns `analyze_document(...).findings` (CLI, evaluation, existing tests). Every new argument is off by default, like `judge`. The order is:
   1. preprocess, and skip on `empty_text`;
-  2. embed if an embedder is set (any `source_kind`, so `model.embedder` is honest and the vector is cached);
-  3. gate, unless `firm_own` bypasses it;
-  4. near-dup, if an index is set;
-  5. route;
-  6. modules;
-  7. set `model.embedder` and append the near-dup sentence.
+  2. route (pure, no I/O): the gate reuses its registry match as a dictionary hit;
+  3. gate, unless `firm_own` bypasses it: a drop logs `off_topic` and returns before any model call;
+  4. embed (`pre.normalized`, `pre.content_hash`), only for documents that passed;
+  5. near-dup `observe(doc.id, pre.normalized, doc.url)`, so off-topic text never enters the index;
+  6. the route's own skip reason, or the modules;
+  7. each built finding gets `model.embedder` (the outcome's model, set only when a vector was used) and the near-dup summary sentence.
 
-  `embedder` is an `Embedder` protocol (`embed(text, content_hash) -> EmbedOutcome(vector | None, model, status)`). `neardup` is a `NearDupIndex` protocol (`observe(document_id, normalized_text, url) -> NearDupResult | None`).
-- The finding builders (M2 now, M1/M3 when `analytics-m1-m3` lands) get the embedder model and the near-dup result through `Context`. That is one additive field, `ctx.pre_extras`, so no builder signature changes.
+  Step 7 runs on the built findings (`model_copy`), so the M1/M2/M3 builders and `Context` are unchanged. That keeps this change out of files other changes own.
+- `embedder` is an `Embedder` protocol (`embed(text, content_hash) -> EmbedOutcome(vector | None, model, status)`). `neardup` is a `NearDupIndex` (`observe(document_id, normalized_text, url) -> NearDupResult | None`). Neither raises.
 - `embeddings.build_embedder(settings, redis=None)` returns `None` when disabled. `neardup.build_index(settings, redis)` returns `None` without Redis.
-- **Worker:** it builds both at start, logs `embed_mode: local|remote|disabled`, and passes them to `analyze`.
-- **CLI:** it builds the embedder (no cache) when `EMBED_BASE_URL` is set. `--no-embed` forces it off. No near-dup index. `--no-gate` is not added, because `GATE_ENABLED=false` covers it.
+- **Worker:** it builds the gate, the embedder (with a separate cache client, 1 s socket timeout) and the near-dup index from env at start, and logs `embed_mode: local|remote|disabled`. Per message it calls `analyze_document`, counts the gate decision in `iw:stats:gate`, and passes `{document_id: group_id}` to `publish_findings`. The publisher's claim TTL is `NEARDUP_TTL_S`.
+- **CLI:** it builds the gate and the embedder (no cache) when `EMBED_BASE_URL` is set. `--no-embed` forces it off. No near-dup index. `--no-gate` is not added, because `GATE_ENABLED=false` covers it.
 - **Compose:** `analytics/compose.yaml` passes `EMBED_*`, `GATE_*` and `NEARDUP_*` from the root `.env`. `ollama` is on `data`, which the worker already joins. No new network.
 - **Config errors** use the existing `ConfigError` with exit 2.
 
