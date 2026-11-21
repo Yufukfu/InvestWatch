@@ -102,9 +102,11 @@ def to_uri(url: str) -> str:
 
 
 def _web_url(base: str, href: str) -> str | None:
-    """`href` resolved against `base` if it is an http(s) URL; None for anything else or a hostile value."""
+    """`href` resolved against `base` if it is an http(s) URI; None for anything else or a hostile value."""
     try:
         resolved = to_uri(urljoin(base, href))
+        if not resolved.isascii():  # `to_uri` could not encode it (an invalid IDN host): not a valid URI
+            return None
         return resolved if urlsplit(resolved).scheme in _WEB_SCHEMES else None
     except ValueError:  # e.g. `http://[` raises "Invalid IPv6 URL"; one bad value must not fail the page
         return None

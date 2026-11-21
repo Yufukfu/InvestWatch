@@ -244,3 +244,12 @@ def test_a_stray_percent_is_escaped_and_a_real_escape_is_not():
 @pytest.mark.parametrize("url", ["http://[", "https://ż..pl/x", f"https://{'ż' * 64}.pl/"])
 def test_a_url_that_cannot_be_encoded_comes_back_unchanged(url):
     assert to_uri(url) == url
+
+
+def test_a_canonical_and_a_link_with_an_invalid_idn_host_are_not_kept():
+    body = '<html><head><link rel="canonical" href="https://ż..pl/x"></head><body><a href="https://ż..pl/y">x</a>x</body></html>'.encode()
+
+    page = parse_page(body, HTML, "https://example.pl/a")
+
+    assert page.canonical_url == "https://example.pl/a"
+    assert page.links == ()
