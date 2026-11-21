@@ -16,9 +16,9 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 
 ## 3. Scan and ack without a model (`--mine`, `--review-requested`)
 
-- [ ] 3.1 Write the failing tests `scan.test.mjs` on saved `gh` fixtures: new review, nothing new, closed PR dropped, review request, new head sha after my review, draft PR skipped, `gh` not authenticated and rate-limit errors exit non-zero with state unchanged
-- [ ] 3.2 Implement `lib/gh.mjs` (argv only, no shell, JSON out), `lib/scan.mjs` and the `scan` and `ack` commands in `watch.mjs`; verify the tests pass and `node watch.mjs scan --mine --json` runs against this repository
-- [ ] 3.3 Mutation check: `has this sha been reviewed`, draft filter, state-newer-than comparison. `mutations: _ tried, _ caught`
+- [x] 3.1 Write the failing tests `scan.test.mjs` on saved `gh` fixtures: new review, nothing new, closed PR dropped, review request, new head sha after my review, draft PR skipped, `gh` not authenticated and rate-limit errors exit non-zero with state unchanged
+- [x] 3.2 Implement `lib/gh.mjs` (argv only, no shell, JSON out), `lib/scan.mjs` and the `scan` and `ack` commands in `watch.mjs`; verify the tests pass and `node watch.mjs scan --mine --json` runs against this repository
+- [x] 3.3 Mutation check: `has this sha been reviewed`, draft filter, state-newer-than comparison. `mutations: 22 tried, 22 caught`
 
 ## 4. Headless run
 
