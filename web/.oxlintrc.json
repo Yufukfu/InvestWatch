@@ -25,7 +25,7 @@
             ],
             "patterns": [
               {
-                "group": ["**/api", "**/api/**", "**/data", "**/data/**", "**/store", "**/store.ts"],
+                "group": ["**/api", "**/api/**", "../data", "../data/**", "../../*/data", "../../*/data/**", "**/features/*/data", "**/features/*/data/**", "**/*Page", "**/store", "**/store.ts"],
                 "message": "Presentational components take props only (ADR 0204). Read data in features/<name>/data/ and pass it down from the page."
               }
             ]

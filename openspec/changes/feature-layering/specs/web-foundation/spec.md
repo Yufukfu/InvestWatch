@@ -19,7 +19,7 @@ Dashboard feature components SHALL render only from their props, with no store, 
 
 #### Scenario: Data hook when the API is unreachable
 - **WHEN** a feature's data hook runs and the API request fails
-- **THEN** it reports an error state instead of throwing, and the page shows the error message
+- **THEN** it does not throw: health and findings report an error state that the component shows, and the summary reports no data so its cards are not rendered (unchanged behaviour)
 
 ### Requirement: Layering enforced by lint
 `npm run lint` SHALL fail when a presentational feature component imports the API client, a data hook or the store.

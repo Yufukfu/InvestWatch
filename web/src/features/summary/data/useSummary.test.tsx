@@ -30,9 +30,16 @@ describe('useSummary', () => {
   });
 
   it('stays undefined when the request fails', async () => {
-    server.use(http.get('http://localhost/api/stats/summary', () => HttpResponse.error()));
+    let hit = false;
+    server.use(
+      http.get('http://localhost/api/stats/summary', () => {
+        hit = true;
+        return HttpResponse.error();
+      }),
+    );
     const { result } = renderHook(() => useSummary(), { wrapper: storeWrapper() });
-    await new Promise((r) => setTimeout(r, 100));
+    await waitFor(() => expect(hit).toBe(true));
+    await new Promise((r) => setTimeout(r, 50));
     expect(result.current).toBeUndefined();
   });
 });
