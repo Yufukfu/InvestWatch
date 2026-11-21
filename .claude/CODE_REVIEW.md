@@ -21,7 +21,7 @@ Criteria only. Stages are in `SDLC.md`, the commands in `.claude/skills/iw-pr-re
 4. No debug output left (`console.log` in JS/TS is hook-blocked; Python uses the logger, checked in review) and no `.env` or credentials tracked.
 5. Every out-of-scope finding and every "declined to judge" item has a disposition in `follow-ups.md`.
 6. The PR body names every behaviour change a teammate would notice, one line each, and any `IW_*` escape that was used; it is re-checked after any fix push.
-7. A human gave a fresh go-ahead to push and to open the PR.
+7. The push goes to the agent's own feature branch, never `main` and never with `--force`. A human approves and merges the PR; an agent does neither.
 
 ## Signals worth checking
 
