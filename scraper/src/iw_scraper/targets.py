@@ -19,6 +19,11 @@ from iw_scraper.ratelimit import host_key
 from iw_scraper.types import Reason, Source
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}
+RESOLVE_TIMEOUT_SECONDS = 5.0  # a resolver that does not answer is a transport failure, not a stalled worker
+
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")  # carries an IPv4 address in its last 32 bits
+_V4_COMPATIBLE = ipaddress.ip_network("::/96")  # deprecated, same layout
+_IETF_PROTOCOL_V4 = ipaddress.ip_network("192.0.0.0/24")  # holds `192.0.0.9`, which `is_global` calls global
 
 Resolver = Callable[[str], Awaitable[list[str]]]
 
@@ -75,11 +80,31 @@ def _parse_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None
         return None
 
 
-def _require_public(address: ipaddress.IPv4Address | ipaddress.IPv6Address, host: str) -> None:
-    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
-        address = address.ipv4_mapped  # `::ffff:127.0.0.1` is 127.0.0.1
+def _embedded_ipv4(address: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
+    """The IPv4 address an IPv6 one stands for (mapped, 6to4, NAT64, IPv4-compatible), if any."""
+    if address.ipv4_mapped:
+        return address.ipv4_mapped  # `::ffff:127.0.0.1` is 127.0.0.1
+    if address.sixtofour:
+        return address.sixtofour
+    if address in _NAT64 or address in _V4_COMPATIBLE:
+        return ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
+    return None
+
+
+def _in_refused_range(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     # not global covers loopback, private, link-local, unique-local, unspecified and shared (100.64/10) ranges
     if not address.is_global or address.is_multicast:
+        return True
+    if isinstance(address, ipaddress.IPv4Address):
+        return address in _IETF_PROTOCOL_V4
+    return address.is_site_local
+
+
+def _require_public(address: ipaddress.IPv4Address | ipaddress.IPv6Address, host: str) -> None:
+    candidates = [address]
+    if isinstance(address, ipaddress.IPv6Address) and (embedded := _embedded_ipv4(address)):
+        candidates.append(embedded)  # a translator would carry the request to that IPv4 address
+    if any(_in_refused_range(candidate) for candidate in candidates):
         raise _refuse(f"address not allowed for host {host}")
 
 
@@ -98,7 +123,7 @@ class AddressGuard:
         if name in self._internal or "." not in name:  # a bare name is a compose service or `localhost`
             raise _refuse(f"internal host name: {name}")
         try:
-            answers = await self._resolver(name)
+            answers = await asyncio.wait_for(self._resolver(name), RESOLVE_TIMEOUT_SECONDS)
         except OSError as exc:
             raise FetchFailure(Reason.HTTP_ERROR, f"DNS lookup failed: {type(exc).__name__}") from None
         if not answers:

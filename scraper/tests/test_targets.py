@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from iw_scraper.config import target_settings
@@ -7,6 +9,7 @@ from iw_scraper.targets import AddressGuard, UrlGuard, select_sources, target_gu
 from iw_scraper.types import Reason, Source
 
 PUBLIC = "93.184.216.34"
+PUBLIC_HEX = "5db8:d822"  # the same address in the last 32 bits of an IPv6 one
 
 
 def source(url: str = "https://example.pl/", *, active=True, platform="web", cron="0 * * * *", kind="official", id="s") -> Source:
@@ -212,6 +215,8 @@ async def test_a_public_address_passes_and_is_the_one_to_connect_to():
         "127.0.0.1", "::1", "10.0.0.5", "169.254.169.254", "::ffff:127.0.0.1", "0.0.0.0", "::",
         "192.168.1.1", "172.16.0.1", "fe80::1", "fc00::1", "fd12:3456::1", "224.0.0.1", "ff02::1",
         "100.64.0.1", "::ffff:10.0.0.5", "::ffff:169.254.169.254",
+        "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "64:ff9b::a00:5", "2002:7f00:1::", "2002:a9fe:a9fe::",
+        "::127.0.0.1", "::10.0.0.5", "fec0::1", "192.0.0.9", "192.0.0.1", f"2002:{PUBLIC_HEX}::",
     ],
 )
 async def test_an_internal_answer_is_refused(address):
@@ -222,6 +227,26 @@ async def test_an_ipv4_mapped_public_address_is_still_public():
     mapped = f"::ffff:{PUBLIC}"
 
     assert await AddressGuard(Resolver([mapped])).check("example.pl") == mapped
+
+
+@pytest.mark.parametrize("address", [f"64:ff9b::{PUBLIC_HEX}", "2606:4700::1111"])
+async def test_a_translated_public_address_and_a_public_ipv6_address_pass(address):
+    assert await AddressGuard(Resolver([address])).check("example.pl") == address
+
+
+class Hung:
+    async def __call__(self, host: str) -> list[str]:
+        await asyncio.sleep(3600)
+        return []
+
+
+async def test_a_resolver_that_never_answers_is_a_transport_failure(monkeypatch):
+    monkeypatch.setattr("iw_scraper.targets.RESOLVE_TIMEOUT_SECONDS", 0.2)
+
+    with pytest.raises(FetchFailure) as caught:
+        await asyncio.wait_for(AddressGuard(Hung()).check("example.pl"), 2)  # the outer limit only stops a mutant
+
+    assert caught.value.reason is Reason.HTTP_ERROR
 
 
 async def test_an_answer_that_is_not_an_address_is_refused():

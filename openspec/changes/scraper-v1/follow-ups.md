@@ -30,3 +30,8 @@ Out-of-scope review findings and "declined to judge" items, one disposition each
 | Lua scripts on the pinned Redis version | review of b3f9d3d, declined to judge | docs | tests ran against `redis:7`; the compose Redis image is pinned by `scraper-orchestration` |
 | Scraped `canonical_url` and `links` are checked by `UrlGuard` directly, but nothing yet fetches them | task 5.2 | docs | v1 fetches one URL per run; the guard is tested on both |
 | The address guard resolves with the scraper's own DNS even behind a proxy, which resolves again | task 5.3 | wont-fix | accepted in `design.md` (SSRF residual risk): `PROXY_LIST` is operator-controlled |
+| NAT64, 6to4, IPv4-compatible and site-local IPv6 literals, and `192.0.0.9`, passed the address guard | review of 229c532, finding 1 | fix-here | confirmed on CPython 3.12.16; the embedded IPv4 is unwrapped and rechecked, `fec0::/10` and `192.0.0.0/24` are refused |
+| `getaddrinfo` had no timeout | review of 229c532, finding 4 | fix-here | `RESOLVE_TIMEOUT_SECONDS`, a timeout is `http_error` |
+| Behind a proxy the guard still resolves locally, and the proxy resolves again | review of 229c532, finding 2 | wont-fix | accepted in `design.md`; the local lookup is the check, not the connection |
+| `UrlGuard`, `AddressGuard` and `target_guard` have no caller in `src/` | review of 229c532, finding 3 | docs | wiring a run (selection, guards, robots, limiter, gate, fetch) is `scraper-orchestration`; every piece takes the guard as a parameter and is tested through it |
+| `www.` and the bare host count as one host | review of 229c532, finding 5 | wont-fix | required by the spec ("apex to www") |
