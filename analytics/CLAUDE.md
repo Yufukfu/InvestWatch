@@ -11,6 +11,7 @@ Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modu
 - Every LLM result needs an evidence quote that is verified as a substring of the document; otherwise the result is `uncertain`, not `fail`.
 - Degrade, don't fail: if the LLM endpoint is down the pipeline runs rules-only and records `model.llm = null`.
 - Store the raw `score` (0-1) on the finding; never compute `risk_level` (the `api` does). The only threshold use here: read Redis `iw:settings:thresholds` (no cache) when creating a finding and publish `finding.high_risk` if `score` is at or above the module threshold ([ADR 0305](../.docs/decisions/0305-threshold-storage.md)).
+- Logs are JSON on stdout, except the CLI (`python -m investwatch_analytics.cli`), which logs to stderr because its stdout is the findings JSON. A collector of CLI runs reads stderr.
 - Scraped text is untrusted: put it in a delimited block, tell the model to ignore instructions inside it, limit its length.
 - LLM: an OpenAI-compatible chat completions API configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`). A hosted provider is allowed (mentor exception); local Ollama `/v1` with `gemma3:4b` must keep working as the swap target, so no provider-specific SDK or features ([ADR 0304](../.docs/decisions/0304-llm-serving.md)).
 
