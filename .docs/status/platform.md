@@ -24,7 +24,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 ### infra-compose
 - Redis 8, object storage (MinIO, bucket `iw-raw`), the optional Ollama profile `llm`, project-scoped networks (`data`, `edge`, `egress`) and the smoke test `infra/tests/smoke.sh`: applied and archived, in PR #18.
 - Kacper's two reviews of PR #18 fixed in `infra-compose-review-fixes` (archived).
-- Follow-up: `OLLAMA_CONTEXT_LENGTH=8192` on the `ollama` service for the stage-2 LLM change (`infra-compose-review-fixes` follow-up 3).
+- `OLLAMA_CONTEXT_LENGTH=8192` (default, override in `.env`) on the `ollama` service for the stage-2 LLM change: issue #32, branch `chore/ollama-context-length` (`infra-compose-review-fixes` follow-up 3).
 
 ## Active OpenSpec changes
 
