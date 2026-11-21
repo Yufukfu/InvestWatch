@@ -8,6 +8,7 @@ const deps = (over = {}) => ({
   headIsPushed: () => false,
   staged: () => [],
   activeChanges: () => ['scraper-v1'],
+  now: () => new Date('2026-11-21T13:00:00+01:00'),
   ...over,
 });
 
@@ -103,6 +104,32 @@ test('markdown inside a service directory needs no spec', () => {
 test('docs-only commits need no spec', () => {
   const d = deps({ staged: () => [{ file: '.docs/ai-workflow.md', added: ['x'] }], activeChanges: () => [] });
   assert.equal(evaluate('git commit -m x', d), null);
+});
+
+const AFTER_FREEZE = () => new Date('2026-11-21T14:31:00+01:00');
+const schemaEdit = [{ file: 'contracts/schemas/finding.schema.json', added: ['{}'] }];
+
+test('contract files are editable before the Sat 14:30 freeze', () => {
+  assert.equal(evaluate('git commit -m x', deps({ staged: () => schemaEdit })), null);
+});
+
+test('denies a contract change after the freeze, unless IW_CONTRACT_CHANGE=1', () => {
+  const d = deps({ staged: () => schemaEdit, now: AFTER_FREEZE });
+  assert.match(evaluate('git commit -m x', d), /contracts are frozen/);
+  assert.equal(evaluate('IW_CONTRACT_CHANGE=1 git commit -m x', d), null);
+});
+
+test('the freeze starts exactly at 14:30', () => {
+  const at = (t) => deps({ staged: () => schemaEdit, now: () => new Date(t) });
+  assert.equal(evaluate('git commit -m x', at('2026-11-21T14:29:59+01:00')), null);
+  assert.match(evaluate('git commit -m x', at('2026-11-21T14:30:00+01:00')), /contracts are frozen/);
+});
+
+test('markdown under contracts/ and other directories are unaffected by the freeze', () => {
+  const doc = deps({ staged: () => [{ file: 'contracts/README.md', added: ['x'] }], now: AFTER_FREEZE });
+  assert.equal(evaluate('git commit -m x', doc), null);
+  const other = deps({ staged: () => [{ file: 'scraper/app/a.py', added: ['x'] }], now: AFTER_FREEZE });
+  assert.equal(evaluate('git commit -m x', other), null);
 });
 
 test('non-git commands are ignored', () => {

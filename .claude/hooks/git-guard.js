@@ -7,11 +7,13 @@
  *    amending a commit that is already on a remote.
  *  - `git commit` whose staged diff (a) includes a .env file (secrets stay out of git),
  *    (b) adds a console.log call to non-test JS/TS code (the jury checks for it),
- *    (c) touches service code while no OpenSpec change is active (spec first).
+ *    (c) touches service code while no OpenSpec change is active (spec first),
+ *    (d) changes a non-markdown file under contracts/ at or after the Sat 14:30 freeze.
  *
  *  - `git add` chained in front of `git commit` in one command (the staged diff is not visible yet).
  *
- * Escapes: put IW_ALLOW_GIT=1 (destructive git) or IW_SKIP_SPEC=1 (spec rule) in the command.
+ * Escapes: put IW_ALLOW_GIT=1 (destructive git), IW_SKIP_SPEC=1 (spec rule) or IW_CONTRACT_CHANGE=1
+ * (contract freeze; only with the whole team's agreement and a version bump) in the command.
  * The escapes are plain text an agent can write itself: this guard catches mistakes, it is not a
  * security boundary. Their use should be reported to the human.
  * Limits: quoted strings and heredocs are stripped before matching; `git commit -a` is checked
@@ -25,6 +27,8 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const PROTECTED = ['main'];
+// Contracts v1 freeze (CLAUDE.md hard rule), Sat 14:30 Europe/Warsaw (CET, +01:00).
+const CONTRACT_FREEZE_AT = new Date('2026-11-21T14:30:00+01:00');
 const SERVICE_DIRS = ['scraper', 'analytics', 'web', 'api', 'contracts'];
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/;
 const TEST_FILE = /(?:\.test\.|\.spec\.|(?:^|\/)(?:tests?|__tests__)\/)/;
@@ -86,7 +90,7 @@ function destructiveReason({ sub, args }, branch, headIsPushed) {
 }
 
 /** staged: [{ file, added: string[] }]; activeChanges: names of non-archived OpenSpec changes. */
-function commitReason(staged, activeChanges, skipSpec) {
+function commitReason(staged, activeChanges, skipSpec, contractsFrozen = false) {
   const env = staged.find((s) => ENV_FILE.test(s.file) && !ENV_EXAMPLE.test(s.file));
   if (env) return `${env.file} is staged. Secrets live in untracked .env files; commit .env.example instead.`;
 
@@ -94,6 +98,11 @@ function commitReason(staged, activeChanges, skipSpec) {
     (s) => CODE_FILE.test(s.file) && !TEST_FILE.test(s.file) && s.added.some((l) => /\bconsole\.log\s*\(/.test(l)),
   );
   if (logged) return `console.log added in ${logged.file}. Use the service logger (JSON on stdout).`;
+
+  const contract = contractsFrozen && staged.find((s) => s.file.startsWith('contracts/') && !/\.md$/i.test(s.file));
+  if (contract) {
+    return `${contract.file} is staged but contracts are frozen (since Sat 14:30). A change needs the whole team and a version bump (escape: IW_CONTRACT_CHANGE=1).`;
+  }
 
   const touchesService = staged.some((s) => SERVICE_DIRS.includes(s.file.split('/')[0]) && !/\.md$/i.test(s.file));
   const touchesSpec = staged.some((s) => s.file.startsWith('openspec/changes/') && !s.file.startsWith('openspec/changes/archive/'));
@@ -124,7 +133,8 @@ function evaluate(command, deps) {
   }
   const commit = gits[commitAt];
   const all = commit.args.some((a) => /^-[a-zA-Z]*a/.test(a) && !a.startsWith('--')) || commit.args.includes('--all');
-  return commitReason(deps.staged(all), deps.activeChanges(), /IW_SKIP_SPEC=1/.test(command));
+  const frozen = deps.now() >= CONTRACT_FREEZE_AT && !/IW_CONTRACT_CHANGE=1/.test(command);
+  return commitReason(deps.staged(all), deps.activeChanges(), /IW_SKIP_SPEC=1/.test(command), frozen);
 }
 
 function git(cwd, args) {
@@ -133,6 +143,7 @@ function git(cwd, args) {
 
 function defaultDeps(cwd) {
   return {
+    now: () => new Date(),
     branch: () => { try { return git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(); } catch { return null; } },
     headIsPushed: () => { try { return git(cwd, ['branch', '-r', '--contains', 'HEAD']).trim() !== ''; } catch { return false; } },
     staged: (all) => {

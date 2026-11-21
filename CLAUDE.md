@@ -42,7 +42,7 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 ## Hard rules
 
 - No push, PR or merge without a fresh explicit go-ahead from the human. No `--force`, no amending a pushed commit, nothing straight to `main`.
-- Contracts are frozen after Sat 14:30. Changing one needs the whole team and a version bump.
+- Contracts are frozen after Sat 14:30 (hook-enforced; escape `IW_CONTRACT_CHANGE=1`). Changing one needs the whole team and a version bump.
 - Secrets only in untracked `.env` (`.env.example` is tracked). Never print proxy credentials or keys.
 - No `console.log` in committed JS/TS (hook-enforced); Python uses the logger, not `print`; JSON logs to stdout.
 - Stage and commit in separate tool calls. Never use an `IW_*` escape flag without telling the human.
