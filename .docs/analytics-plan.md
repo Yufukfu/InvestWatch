@@ -48,7 +48,7 @@ Done in change `analytics-knf-registry` ([ADR 0311](decisions/0311-knf-registry-
 - Ids are uuid5 of the normalized name, kept across reloads and KNF renames. Aliases come from stripped legal forms ("Dom Maklerski", "S.A.", "DM", foreign forms), bank brokerage units, abbreviations, former names and trade names. Domains come from KNF's notes on foreign firms and a curated file for Polish firms (`verified_by_human`).
 - Fallback: a failed refresh keeps the committed CSV. `analytics/registry/seed.csv` (4 fictional firms) is the test fixture, not a fallback.
 - R1 passes only on the official name; an alias alone is `uncertain`.
-- M3 bonus, not done: the KNF public warnings list (`registry_warnings`, S3.7) is one page of free text; its own change (`openspec/changes/analytics-knf-registry/evidence.md`).
+- M3 bonus, not done: the KNF public warnings list (`registry_warnings`, S3.7) is one page of free text; its own change (`openspec/changes/archive/2026-11-21-analytics-knf-registry/evidence.md`).
 
 ## 4. Module M1 – finfluencers and third parties
 

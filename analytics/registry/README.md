@@ -11,7 +11,7 @@ Analytics matches documents against the CSV named by `REGISTRY_CSV`. The default
 
 Source: Komisja Nadzoru Finansowego, [www.knf.gov.pl](https://www.knf.gov.pl), the lists under "Podmioty rynku kapitałowego / Firmy inwestycyjne". The KNF legal note allows reuse with the source named and a link. Each row's `source_url` is its KNF list.
 
-What the loader derives, and why: ids are uuid5 of the normalized name, kept across reloads and renames (ADR [0311](../../.docs/decisions/0311-knf-registry-source-and-ids.md)). Aliases are generated from legal forms, bank brokerage units, abbreviations, former names and trade names, without generic words, cities or aliases shared with another firm. Domains come from KNF's notes on foreign firms and from the curated file. The details are in `openspec/changes/analytics-knf-registry/design.md` until that change is archived, then in `openspec/specs/knf-registry-loader/spec.md`.
+What the loader derives, and why: ids are uuid5 of the normalized name, kept across reloads and renames (ADR [0311](../../.docs/decisions/0311-knf-registry-source-and-ids.md)). Aliases are generated from legal forms, bank brokerage units, abbreviations, former names and trade names, without generic words, cities or aliases shared with another firm. Domains come from KNF's notes on foreign firms and from the curated file. The requirements are in `openspec/specs/knf-registry-loader/spec.md`, the design and evidence in `openspec/changes/archive/2026-11-21-analytics-knf-registry/`.
 
 ## Refresh (by hand, never at build or start-up)
 

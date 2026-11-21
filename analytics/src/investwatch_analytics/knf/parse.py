@@ -1,4 +1,4 @@
-"""Parse one KNF list page into raw records (`openspec/changes/analytics-knf-registry/evidence.md`, Format).
+"""Parse one KNF list page into raw records (`openspec/changes/archive/2026-11-21-analytics-knf-registry/evidence.md`, Format).
 
 Records are the `<table>`s inside `<div id="entityTable">`; fields are read by their `th` label text, never by
 CSS class. A cell is a list of lines (split at `<br>`, `<li>`, `<p>`), each line a list of (text, struck) runs,

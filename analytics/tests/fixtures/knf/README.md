@@ -1,6 +1,6 @@
 # KNF page snapshots
 
-Trimmed copies of the real KNF pages, fetched read-only on 2026-11-21 (change `analytics-knf-registry`, see `openspec/changes/analytics-knf-registry/evidence.md`). Each list page keeps the `<div id="entityTable">` block verbatim, pagination included. The site's navigation, scripts and styles are dropped and replaced by a minimal `<html>` shell. `summary.html` keeps only the summary page's links into the investment-firm section.
+Trimmed copies of the real KNF pages, fetched read-only on 2026-11-21 (change `analytics-knf-registry`, see `openspec/changes/archive/2026-11-21-analytics-knf-registry/evidence.md`). Each list page keeps the `<div id="entityTable">` block verbatim, pagination included. The site's navigation, scripts and styles are dropped and replaced by a minimal `<html>` shell. `summary.html` keeps only the summary page's links into the investment-firm section.
 
 | File | Source (under `https://www.knf.gov.pl/podmioty/Podmioty_rynku_kapitalowego/Firmy_inwestycyjne_i_Agenci_firm_inwestycyjnych`) |
 |---|---|
