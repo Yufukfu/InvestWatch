@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD - created by archiving change web-setup. Update Purpose after archive.
+The foundation of the dashboard (`web/`, owner B): an API client generated from the OpenAPI contract, a mock mode over the contract mocks, hardened static delivery behind the HTTPS gateway, and per-module deployment through compose. Feature capabilities (findings, trend, alerts, calibration) build on it.
 
 ## Requirements
 
