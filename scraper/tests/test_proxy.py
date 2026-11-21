@@ -397,3 +397,11 @@ def test_a_quoted_url_holding_an_escaped_quote_is_scrubbed_to_its_end():
 
     assert "token" not in detail and "a\\" not in detail
     assert "refused" in detail
+
+
+def test_an_unterminated_quoted_url_is_scrubbed_to_the_end_of_the_message():
+    message = 'failed to do request: Get "http://x.test/a?token=abc'
+
+    detail = _transport_failure(TLSClientException(message), None).detail
+
+    assert "token" not in detail and "x.test" not in detail

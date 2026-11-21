@@ -26,7 +26,7 @@ from iw_scraper.reporting import redact
 from iw_scraper.types import Deferral, Reason
 
 _log = logging.getLogger(__name__)
-_QUOTED_URL = re.compile(r'"[a-z][a-z0-9+.-]*://(?:[^"\\]|\\.)*"', re.IGNORECASE)  # `\"` stays inside the URL
+_QUOTED_URL = re.compile(r'"[a-z][a-z0-9+.-]*://(?:[^"\\]|\\.)*(?:"|$)', re.IGNORECASE | re.DOTALL)  # `\"` stays inside; no closing quote runs to the end
 DEFAULT_TIMEOUT_SECONDS = DEFAULT_FETCH_TIMEOUT_SECONDS
 DEFAULT_MAX_BYTES = DEFAULT_FETCH_MAX_BYTES
 MAX_REDIRECTS = 5

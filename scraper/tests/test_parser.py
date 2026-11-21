@@ -241,6 +241,6 @@ def test_a_stray_percent_is_escaped_and_a_real_escape_is_not():
     assert to_uri("https://example.pl/a%20b%2") == "https://example.pl/a%20b%252"
 
 
-@pytest.mark.parametrize("url", ["http://[", "https://a..pl/x", f"https://{'ż' * 64}.pl/"])
+@pytest.mark.parametrize("url", ["http://[", "https://ż..pl/x", f"https://{'ż' * 64}.pl/"])
 def test_a_url_that_cannot_be_encoded_comes_back_unchanged(url):
     assert to_uri(url) == url
