@@ -1,9 +1,12 @@
 # Dependency audits
 
-`pip-audit` / `npm audit` results before a merge to `main` ([integration-plan.md](integration-plan.md) §7). Newest first; one row per run.
+Service security notes, the aggregated scan at a milestone or the hand-in, and residual risks that outlive their PR. Per-PR scan results go in the PR body, not here ([ADR 0209](decisions/0209-supply-chain-scanning.md) decision 2, [supply-chain.md](supply-chain.md)). Rows up to 2026-11-22 are from the earlier one-row-per-audit rule. Newest first.
 
 | Date | Module | Command | Result |
 |---|---|---|---|
+| 2026-11-22 | repository (`chore/supply-chain-adr`, ADR 0209) | `gitleaks git` over the full history of `ecb81241da00125e0ae48ba1a77d5dd4eae8f6a6` (Gitleaks v8.28.0, image digest `sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854`, `--redact`; 527 commits scanned, about 7.4 MB, 5 s) | 2 findings, both false positives: rule `generic-api-key` on mock record ids (`key="m2-…"`) in `contracts/mocks/generate_mocks.py` lines 145 and 299 (commit 0893acdc). No secret in history; allowlist entry due with the CI follow-up |
+| 2026-11-21 | repository (`chore/supply-chain-adr`, ADR 0209) | `gitleaks git` over `origin/main` (Gitleaks v8.28.0, image digest `sha256:cdbb7c95…`, `--redact`; commit count not re-recorded: the earlier 276 was not reproduced, `origin/main` is 390 commits at bb770a0; rerun on a named SHA pending) | 2 findings, both false positives: rule `generic-api-key` on mock record ids (`key="m2-…"`) in `contracts/mocks/generate_mocks.py` lines 145 and 299. Not rerun in the review round of 2026-11-21. No secret in history; allowlist entry due with the CI follow-up |
+| 2026-11-21 | web (`chore/supply-chain-adr`) | `npm audit --audit-level=high` in `web/` (npm 10.9.2) | found 0 vulnerabilities |
 | 2026-11-21 | scraper (`scraper-stack`) | `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt` (pip-audit 2.10.1; noble-tls 0.1.9, arq 0.28.0, croniter 7.0.0, redis 5.3.1, asyncpg 0.30.0, minio 7.2.15, lxml 6.1.3) | No known vulnerabilities found |
 | 2026-11-21 | analytics (`analytics-worker-review-fixes`) | `pip-audit -r analytics/requirements.txt -r analytics/requirements-dev.txt` (pip-audit 2.10.1; psycopg[binary] 3.3.9, redis 8.1.0, fakeredis 2.40.0) | No known vulnerabilities found |
 | 2026-11-21 | api (`api-v1`) | `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` (pip-audit 2.10.1; FastAPI 0.165.0, python-socketio 5.18.1, redis 8.1.0, minio 7.2.20) | No known vulnerabilities found |
