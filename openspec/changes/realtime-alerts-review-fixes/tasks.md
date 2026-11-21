@@ -44,3 +44,4 @@
 - [x] 7.4 Mutation check. mutations: 4 tried, 4 caught (no prune in the hook, no prune in the toasts, `release` keeps the id held, `App` without `ToastSlotProvider`).
 - [x] 7.5 ADR 0208: bundle size after the review fixes (review round 3, note).
 - [x] 7.6 Race guard from the group review: the `[alerts]` effect also schedules every shown toast that is neither held nor timed, so a re-arrival that runs between the eviction render and the prune cannot leave a toast without a timer. mutations: 1 tried, 0 caught (the race needs a socket task between a commit and its passive effects, which `act()` cannot produce; traced in code, not reproduced).
+- [x] 7.7 `proposal.md` describes rounds 2 and 3; the approving review's two test gaps are in `follow-ups.md`.

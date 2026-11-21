@@ -17,4 +17,7 @@ Review of PR #40 (`web/realtime-alerts`) by @hen68 requested changes: the toasts
 - Tests pin the patch target, the timers, the dismiss/open order, the app mount, the hover pause through the DOM, `isUuid` and `pushSearch`/`setSearchParam`.
 - Docs: `web/README.md` and `.docs/status/dashboard.md` describe the compose stack as it is now; ADR 0208 gets the measured bundle size and the transitive dependencies.
 
-No new requirements: the behaviour in `openspec/specs/web-alerts/spec.md` stays as written. The toast placement against the detail dialog (review item 2) is not changed here; it waits for a product decision.
+No new requirements: the behaviour in `openspec/specs/web-alerts/spec.md` stays as written. Rounds 2 and 3 (same review thread) add:
+
+- While the detail dialog is open, the toasts render inside it and are still announced (review item 2; answered by @kacpermalczyk: "inside the dialog", "yes, announce it").
+- A toast that goes away (dismissed, opened, pushed out by the cap, moved into or out of the dialog) drops its hold, its timer and its hover/focus reasons, and every shown toast is either held or timed.

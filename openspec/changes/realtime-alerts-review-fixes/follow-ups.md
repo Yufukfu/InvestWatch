@@ -7,3 +7,5 @@ From the group 7 review (`iw-reviewer`, range 5b4e5ff..91b0e0d). One disposition
 | When `AlertsPage` unmounts, `AlertToasts`' cleanup calls `release` after the hook's cleanup, so new 20 s timers are set on an unmounted hook (harmless with React 18) | new-item |
 | A toast that comes back under a pointer that has not moved gets no `mouseenter`, so it is not held | wont-fix: the browser fires no event to react to, and the toast still times out normally |
 | `proposal.md` says the toast placement is not changed here, but tasks 6.1 and 7 change it | docs: refresh the proposal before archiving |
+| Test gap from the approving review: a new arrival must not extend an older toast's time (mutant survives) | new-item |
+| Test gap from the approving review: a hovered toast stays held when another alert arrives (mutant survives) | new-item |
