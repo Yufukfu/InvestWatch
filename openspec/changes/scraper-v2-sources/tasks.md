@@ -17,13 +17,13 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 ## 2. Live check and host guard
 
 - [x] 2.1 Failing test for "Seed hosts need no extra allow-list entries" (guard built from the seeded rows (as `Source` objects) allows each seeded host and refuses a hop to an unlisted host) with `FETCH_EXTRA_HOSTS` empty; passes once the loader's rows feed `UrlGuard.for_sources`
-- [ ] 2.2 Opt-in live check `scraper/tests/test_seed_live.py` (marker `scraper_live`, deselected by default, outside CI): one page request per entry (plus its `robots.txt`) through the production fetch path, fails on redirect to another URL, status other than 200, empty text, block or robots refusal, naming the entry and URLs. Written and committed, **run only after a human go-ahead** (it makes real requests to 8 hosts); paste the output in the PR body
+- [x] 2.2 Opt-in live check `scraper/tests/test_seed_live.py` (marker `scraper_live`, deselected by default, outside CI): one page request per entry (plus its `robots.txt`) through the production fetch path, fails on redirect to another URL, status other than 200, empty text, block or robots refusal, naming the entry and URLs. Written and committed, **run only after a human go-ahead** (it makes real requests to 8 hosts); paste the output in the PR body
 - [x] 2.3 Mutation check; mutations: 9 tried, 9 caught (3 guards of 2.1, 6 assertions of the live helper `check_entry`, tested against fake stages in `test_seed_check_entry.py`; the live run itself is 2.2)
 
 ## 3. Closing
 
 - [x] 3.1 Apply the `iw-docs-update` skill: `scraper/CLAUDE.md` and `scraper/README.md` (the seed step and `scraper/seeds/sources.toml`), `.docs/status/scraper.md` (your row; M3 positives come from `scraper-v2-social` and icobench, the KNF-warnings pick is an optional follow-up), `.docs/INDEX.md` if the router needs a "how do I add a source" line, `docs-check` clean, and the `iw-ai-log` row. No new dependency, so no `pip-audit` row; say so in the PR body
-- [ ] 3.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
+- [x] 3.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
 
