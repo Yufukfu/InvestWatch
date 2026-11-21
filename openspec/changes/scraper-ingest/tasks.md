@@ -8,10 +8,10 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 2. Document build and insert
 
-- [ ] 2.1 Failing tests, then building the full document (`id` UUID v4, `fetched_at`, `scrape_meta` with `duration_ms` and proxy id, `source_id`) from a parsed page; contract-minimum fields present
-- [ ] 2.2 Failing tests, then schema validation against `CONTRACTS_DIR`; the valid and `schema_invalid` scenarios pass (needs `contracts/requirements.txt`)
-- [ ] 2.3 Failing tests, then `content_hash` over the normalised text, a dedup check, and insert with `ON CONFLICT DO NOTHING` returning an `IngestResult`; rerun, whitespace-only, case and changed-page scenarios pass against a real PostgreSQL (throwaway test schema)
-- [ ] 2.4 Mutation check; `mutations:`
+- [x] 2.1 Failing tests, then building the full document (`id` UUID v4, `fetched_at`, `scrape_meta` with `duration_ms` and proxy id, `source_id`) from a parsed page; contract-minimum fields present
+- [x] 2.2 Failing tests, then schema validation against `CONTRACTS_DIR`; the valid and `schema_invalid` scenarios pass (needs `contracts/requirements.txt`)
+- [x] 2.3 Failing tests, then `content_hash` over the normalised text, a dedup check, and insert with `ON CONFLICT DO NOTHING` returning an `IngestResult`; rerun, whitespace-only, case and changed-page scenarios pass against a real PostgreSQL (throwaway test schema)
+- [x] 2.4 Mutation check; `mutations: 11 tried, 11 caught` (one survivor, `is_duplicate` ignoring `source_id`, found a missing test and was caught after adding it)
 
 ## 3. Storage, publish, sweep, error sink
 
