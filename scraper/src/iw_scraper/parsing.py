@@ -1,5 +1,6 @@
 """Generic HTML parser: bytes and headers in, contract fields out, or a `ParseFailure`."""
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from email.message import Message
@@ -71,9 +72,33 @@ def _title(root: html.HtmlElement) -> str | None:
 _URI_SAFE = "%/:=&?~#+!$,;'@()*[]"  # everything `quote` would otherwise escape that a URI may hold, `%` included
 
 
+_BARE_PERCENT = re.compile(r"%(?![0-9A-Fa-f]{2})")
+
+
+def _ascii_netloc(netloc: str) -> str:
+    """`netloc` with a non-ASCII host name in punycode (what `getaddrinfo` would do); userinfo and port stay."""
+    if netloc.isascii():
+        return netloc
+    userinfo, at, hostport = netloc.rpartition("@")
+    host, colon, port = hostport.rpartition(":")
+    if not colon or not port.isdigit():
+        host, colon, port = hostport, "", ""
+    return f"{userinfo}{at}{host.encode('idna').decode('ascii')}{colon}{port}"
+
+
 def to_uri(url: str) -> str:
-    """`url` with raw non-ASCII characters and spaces percent-encoded; existing escapes stay as they are."""
-    return quote(url, safe=_URI_SAFE)
+    """`url` as a URI: a non-ASCII host in punycode, raw non-ASCII characters and spaces elsewhere percent-encoded.
+
+    Existing escapes stay as they are and a stray `%` becomes `%25`. A value it cannot split or encode comes back
+    unchanged, for the guard to refuse.
+    """
+    try:
+        parts = urlsplit(url)
+        netloc = _ascii_netloc(parts.netloc)
+    except ValueError:  # `UnicodeError` is one: an empty or over-long label
+        return url
+    parts = parts._replace(netloc=netloc)
+    return quote(_BARE_PERCENT.sub("%25", parts.geturl()), safe=_URI_SAFE)
 
 
 def _web_url(base: str, href: str) -> str | None:

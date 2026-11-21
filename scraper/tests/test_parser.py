@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from jsonschema import FormatChecker
 
-from iw_scraper.parsing import ParsedPage, ParseFailure, ParserRegistry, parse_page
+from iw_scraper.parsing import ParsedPage, ParseFailure, ParserRegistry, parse_page, to_uri
 from iw_scraper.types import Reason
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -220,3 +220,27 @@ def test_a_parser_registered_for_the_bare_host_serves_the_www_host_and_back():
     assert registry.parse(b"<p>x</p>", HTML, "https://www.knf.gov.pl/a").title == "site"
     with pytest.raises(ValueError):
         registry.register("www.knf.gov.pl", _marker_parser("again"))
+
+
+def test_a_non_ascii_host_goes_out_in_punycode_with_its_port_and_userinfo_kept():
+    assert to_uri("https://zażółć.pl:8443/a b") == "https://xn--za-6ja4f8n1l.pl:8443/a%20b"
+    assert to_uri("https://[::1]:80/ż") == "https://[::1]:80/%C5%BC"
+    assert to_uri("https://u:p@zażółć.pl/x") == "https://u:p@xn--za-6ja4f8n1l.pl/x"
+
+
+def test_a_link_to_a_non_ascii_host_keeps_a_host_the_guard_can_resolve():
+    body = '<a href="https://zażółć.pl/a">x</a><p>x</p>'.encode()
+
+    page = parse_page(body, HTML, "https://example.pl/")
+
+    assert page.links == ("https://xn--za-6ja4f8n1l.pl/a",)
+
+
+def test_a_stray_percent_is_escaped_and_a_real_escape_is_not():
+    assert to_uri("https://example.pl/50%") == "https://example.pl/50%25"
+    assert to_uri("https://example.pl/a%20b%2") == "https://example.pl/a%20b%252"
+
+
+@pytest.mark.parametrize("url", ["http://[", "https://a..pl/x", f"https://{'ż' * 64}.pl/"])
+def test_a_url_that_cannot_be_encoded_comes_back_unchanged(url):
+    assert to_uri(url) == url

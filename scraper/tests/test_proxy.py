@@ -388,3 +388,12 @@ async def test_a_direct_failure_names_no_proxy(stub):
         await fetch(stub.url("/ok"), IDENTITY, None)
 
     assert failure.value.proxy_id is None
+
+
+def test_a_quoted_url_holding_an_escaped_quote_is_scrubbed_to_its_end():
+    message = r'failed to do request: Get "http://x.test/a\"b?token=abc": dial tcp: refused'
+
+    detail = _transport_failure(TLSClientException(message), None).detail
+
+    assert "token" not in detail and "a\\" not in detail
+    assert "refused" in detail
