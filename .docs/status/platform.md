@@ -32,6 +32,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `api-db-schema` and `api-db-schema-review-fixes` archived in PR #15
 - `infra-compose` and `infra-compose-review-fixes` archived in PR #18
 - `analytics-worker` archived; `analytics-worker-review-fixes` (Kacper's PR #26 review) in PR #26
+- `openspec-strict-format` archived in its own PR: 14 requirements across `database-schema`, `document-analysis`, `m2-compliance-rules`, `rest-api` and `shared-infrastructure` brought under OpenSpec 2.1.1's 500-character limit (text moved into scenarios, no behaviour change), so the CI job `Specs and hooks` passes. Its follow-ups name the fixes still due on `analytics-llm-p0` and `analytics-m1-m3`.
 
 ## Blockers and open decisions
 
