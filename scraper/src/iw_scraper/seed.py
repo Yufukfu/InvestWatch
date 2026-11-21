@@ -11,6 +11,8 @@ import json
 import os
 import sys
 import tomllib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -60,6 +62,12 @@ def _contract_values() -> tuple[set[str], set[str], set[str]]:
     )
 
 
+def _is_plain_https_url(url: str) -> bool:
+    parts = urlsplit(url)
+    # userinfo would be stored and echoed in error messages; whitespace is never part of a fetchable URL
+    return parts.scheme == "https" and bool(parts.hostname) and "@" not in parts.netloc and not any(c.isspace() for c in url)
+
+
 def _parse(raw: object) -> SeedEntry:
     """One `[[source]]` table as an entry; raises ValueError with the problem."""
     if not isinstance(raw, dict):
@@ -81,8 +89,8 @@ def _parse(raw: object) -> SeedEntry:
         raise ValueError(f"source_kind {kind!r} is not one of {sorted(kinds)}")
     if not isinstance(targets, list) or not targets or len(set(targets)) != len(targets) or not set(targets) <= modules:
         raise ValueError(f"target_modules must be a non-empty list of distinct values from {sorted(modules)}")
-    if not isinstance(url, str) or urlsplit(url).scheme != "https" or not urlsplit(url).hostname:
-        raise ValueError("url must be an https URL with a host")
+    if not isinstance(url, str) or not _is_plain_https_url(url):
+        raise ValueError("url must be an https URL with a host, without credentials or spaces")
     if cron is not None and (not isinstance(cron, str) or len(cron.split()) != _CRON_FIELDS or not croniter.is_valid(cron)):
         raise ValueError("schedule_cron must be a valid 5-field cron expression")
     return SeedEntry(name, platform, url, kind, tuple(targets), cron)
@@ -129,11 +137,13 @@ def load_seed_dir(directory: Path) -> list[SeedEntry]:
 
 async def seed_knf(pool: asyncpg.Pool, *, cron: str | None = None) -> str | None:
     """The new source's id, or None when the URL was already registered."""
-    row = await pool.fetchrow(_INSERT, KNF_NAME, KNF_URL, cron)
+    async with locked(pool) as connection:
+        row = await connection.fetchrow(_INSERT, KNF_NAME, KNF_URL, cron)
     return str(row["id"]) if row else None
 
 
-_LOCK_KEY = 7_302_011  # a constant for this writer only: it serialises concurrent seed runs (the table has no unique url)
+_DATABASE_ERRORS = (OSError, ValueError, asyncpg.PostgresError, asyncpg.InterfaceError)
+_LOCK_KEY = 7_302_011 # a constant for this writer only: it serialises concurrent seed runs (the table has no unique url)
 _INSERT_SOURCE = """
 INSERT INTO sources (id, name, platform, url, source_kind, target_modules, schedule_cron, active)
 SELECT gen_random_uuid(), $1::text, $2::text, $3::text, $4::text, $5::text[], $6::text, true
@@ -141,11 +151,18 @@ WHERE NOT EXISTS (SELECT 1 FROM sources WHERE url = $3::text)
 """
 
 
+@asynccontextmanager
+async def locked(pool: asyncpg.Pool) -> AsyncIterator[asyncpg.Connection]:
+    """A connection in a transaction that holds the seed lock, so concurrent seed runs take turns."""
+    async with pool.acquire() as connection, connection.transaction():
+        await connection.execute("SELECT pg_advisory_xact_lock($1)", _LOCK_KEY)
+        yield connection
+
+
 async def seed_sources(pool: asyncpg.Pool, entries: list[SeedEntry]) -> tuple[int, int]:
     """(inserted, already present). An entry whose URL has a row is left alone, whatever the dashboard made of that row."""
     inserted = 0
-    async with pool.acquire() as connection, connection.transaction():
-        await connection.execute("SELECT pg_advisory_xact_lock($1)", _LOCK_KEY)
+    async with locked(pool) as connection:
         for entry in entries:
             status = await connection.execute(
                 _INSERT_SOURCE,
@@ -173,15 +190,20 @@ def cron_from(argv: list[str]) -> str | None:
 
 
 async def main() -> None:
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        raise SystemExit("DATABASE_URL is not set")
+    # a driver's message can hold the host, user or part of the DSN: say only what failed
     try:
-        pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=1)
-    except (OSError, ValueError, asyncpg.PostgresError, asyncpg.InterfaceError):
-        # the driver's message can hold the host, user or part of the DSN: say only what failed
+        pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1)
+    except _DATABASE_ERRORS:
         raise SystemExit("cannot connect to the database (check DATABASE_URL)") from None
     try:
         report = await seed_all(pool, cron=cron_from(sys.argv))
     except SeedError as error:
         raise SystemExit(str(error)) from None
+    except _DATABASE_ERRORS:
+        raise SystemExit("the database failed while seeding (check DATABASE_URL and that the schema is migrated)") from None
     finally:
         await pool.close()
     sys.stdout.write(report + "\n")

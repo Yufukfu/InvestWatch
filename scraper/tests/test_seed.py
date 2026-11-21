@@ -4,6 +4,7 @@ import os
 import pytest
 
 from iw_scraper.seed import (
+    _LOCK_KEY,
     KNF_URL,
     SEEDS_DIR,
     SeedEntry,
@@ -127,6 +128,43 @@ async def test_main_registers_the_seed_files_and_prints_the_report(pool, monkeyp
     assert f"sources: inserted {len(ENTRIES)}, already present 0" in capsys.readouterr().out
     assert await pool.fetchval("SELECT count(*) FROM sources WHERE url <> $1", KNF_URL) == len(ENTRIES)
     assert await pool.fetchval("SELECT schedule_cron FROM sources WHERE url = $1", KNF_URL) == "5 4 * * *"
+
+
+@pytest.mark.parametrize("write", [lambda pool: seed_knf(pool), lambda pool: seed_sources(pool, ENTRIES)], ids=["knf", "sources"])
+async def test_a_writer_waits_while_another_seed_run_holds_the_lock(pool, write):
+    async with pool.acquire() as holder, holder.transaction():
+        await holder.execute("SELECT pg_advisory_xact_lock($1)", _LOCK_KEY)
+        pending = asyncio.ensure_future(write(pool))
+
+        done, _ = await asyncio.wait({pending}, timeout=0.5)
+
+        assert not done
+    await asyncio.wait_for(pending, timeout=5)
+
+
+async def test_concurrent_full_runs_leave_one_row_per_url_including_knf(pool, tmp_path):
+    await asyncio.gather(*(seed_all(pool, directory=tmp_path) for _ in range(6)))
+
+    assert await pool.fetchval("SELECT count(*) FROM sources WHERE url = $1", KNF_URL) == 1
+
+
+async def test_a_database_error_after_connecting_exits_with_a_fixed_message(pool, monkeypatch):
+    # the public schema of the test database has no `sources` table, so the first query fails after the connection worked
+    monkeypatch.setenv("DATABASE_URL", os.environ["IW_TEST_PG_DSN"])
+
+    with pytest.raises(SystemExit) as failed:
+        await main()
+
+    assert failed.value.code == "the database failed while seeding (check DATABASE_URL and that the schema is migrated)"
+
+
+async def test_a_missing_database_url_exits_with_a_message(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    with pytest.raises(SystemExit) as failed:
+        await main()
+
+    assert failed.value.code == "DATABASE_URL is not set"
 
 
 async def test_main_exits_with_the_message_of_an_invalid_seed_file(pool, monkeypatch):
