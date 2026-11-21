@@ -208,7 +208,7 @@ test('denies deleting remote refs, pruning, glob refspecs and refspecs the guard
   assert.match(evaluate('git push origin --delete web/trend-chart', deps()), /delet/);
   assert.match(evaluate('git push -d origin web/trend-chart', deps()), /delet/);
   assert.match(evaluate('git push origin :web/trend-chart', deps()), /delet/);
-  assert.match(evaluate('git push --prune origin HEAD', deps()), /prune/);
+  assert.match(evaluate('git push --prune origin HEAD', deps()), /deletes remote branches/);
   assert.match(evaluate('git push origin refs/heads/*:refs/heads/*', deps()), /glob refspec/);
   assert.match(evaluate("git push origin 'refs/heads/*:refs/heads/*'", deps()), /read/);
   assert.match(evaluate('git push origin $(git branch --show-current)', deps()), /read/);
@@ -241,6 +241,109 @@ test('gh pr create may only target this repository', () => {
   assert.match(evaluate('gh pr create --repo Yufukfu/InvestWatch --title x', deps({ originRepo: () => null })), /this repository/);
   assert.equal(evaluate('gh pr create --repo yufukfu/investwatch --title x', deps()), null);
   assert.equal(evaluate('gh pr create --title x --body y', deps()), null);
+});
+
+// ---- second security review of PR 27: every case below was reproduced against the first fix ----
+
+test('push checks take no escape, not even IW_ALLOW_GIT=1 written as a trailing comment', () => {
+  assert.match(evaluate('git push origin HEAD:main # IW_ALLOW_GIT=1', deps()), /push to main/);
+  assert.match(evaluate('git push --force origin scraper/v1 # IW_ALLOW_GIT=1', deps()), /force push/);
+  assert.match(evaluate('IW_ALLOW_GIT=1 git push origin --delete feat-x', deps()), /delet/);
+  assert.equal(evaluate('IW_ALLOW_GIT=1 git reset --hard', deps()), null);
+});
+
+test('push options are an allow-list: abbreviations and unknown options are denied', () => {
+  for (const f of ['--del', '--delet', '--rece=x', '--receive', '--mir', '--al', '--pru', '--tags', '--follow-tags', '--force-if', '--no-thin=x']) {
+    assert.match(evaluate(`git push origin ${f} scraper/v1`, deps()), /push option|force|delet|every branch|prune|redirect/, f);
+  }
+  for (const ok of ['-u', '--set-upstream', '--no-verify', '-v', '-q', '--atomic', '--dry-run', '-n', '-uv']) {
+    assert.equal(evaluate(`git push ${ok} origin scraper/v1`, deps()), null, ok);
+  }
+  assert.equal(evaluate('git push -o ci.skip origin HEAD', deps()), null);
+  assert.equal(evaluate('git push --push-option=ci.skip origin HEAD', deps()), null);
+});
+
+test('a short flag cluster with f is a force push, whatever its position', () => {
+  assert.match(evaluate('git push origin -uf scraper/v1', deps()), /force push/);
+  assert.match(evaluate('git push origin scraper/v1 -fu', deps()), /force push/);
+  assert.match(evaluate('git push -fv origin scraper/v1', deps()), /force push/);
+});
+
+test('quoted or expanded options and subcommands cannot hide a remote redirect', () => {
+  for (const c of [
+    'git -c "remote.origin.pushurl=/x" push origin HEAD',
+    "git -c 'core.sshCommand=x' push origin HEAD",
+    'git config "remote.origin.url" evil',
+    'git "push" evil HEAD',
+    'git pu""sh evil HEAD',
+    'git --config-env=remote.origin.url=X push origin HEAD',
+    'git --config-env remote.origin.url=X push origin HEAD',
+  ]) assert.ok(evaluate(c, deps()), c);
+  assert.equal(evaluate('git config user.name "Kacper"', deps()), null);
+  assert.equal(evaluate('git -C "some dir" status', deps()), null);
+});
+
+test('branch remote settings are remote rewiring too', () => {
+  assert.match(evaluate('git config branch.feat-x.pushRemote evil', deps()), /remote/i);
+  assert.match(evaluate('git config branch.feat-x.remote evil', deps()), /remote/i);
+  assert.equal(evaluate('git config --get branch.feat-x.remote', deps()), null);
+});
+
+test('a push with -C or --git-dir, or chained after checkout or switch, is denied: the branch would be read from the wrong place', () => {
+  assert.match(evaluate('git -C ../other push origin HEAD', deps()), /-C|git-dir|directory/);
+  assert.match(evaluate('git --git-dir=../o/.git push origin HEAD', deps()), /-C|git-dir|directory/);
+  assert.match(evaluate('git switch main && git push origin', deps()), /switch|checkout|chained/);
+  assert.match(evaluate('git checkout main; git push origin', deps()), /switch|checkout|chained/);
+  assert.equal(evaluate('git -C ../other status', deps()), null);
+});
+
+test('git and gh are seen through a path, a subshell and a line continuation', () => {
+  assert.match(evaluate('/usr/bin/git push evil HEAD', deps()), /other than origin/);
+  assert.match(evaluate('(git push evil HEAD)', deps()), /other than origin/);
+  assert.match(evaluate('git push \\\nevil HEAD', deps()), /other than origin/);
+  assert.match(evaluate('git push origin \\\n--force scraper/v1', deps()), /force push/);
+  assert.match(evaluate('/opt/homebrew/bin/gh pr review 9 --approve', deps()), /approv/i);
+});
+
+test('gh pr create may not be redirected by glued flags, global flags or GH_REPO', () => {
+  for (const c of [
+    'gh pr create -Revil/x --title t',
+    'gh pr create -Hevil:x --title t',
+    'gh -R evil/x pr create --title t',
+    'gh --repo evil/x pr create --title t',
+    'GH_REPO=evil/x gh pr create --title t',
+    'gh pr create --repo "evil/x" --title t',
+  ]) assert.match(evaluate(c, deps()), /other than this repository|GH_REPO/, c);
+  assert.equal(evaluate('gh pr create -RYufukfu/InvestWatch --title t', deps()), null);
+  assert.equal(evaluate('gh -R Yufukfu/InvestWatch pr create --title t', deps()), null);
+});
+
+test('gh api that writes is denied, reads stay allowed', () => {
+  for (const c of [
+    'gh api repos/o/r/git/refs/heads/main -X PATCH -f sha=abc',
+    'gh api repos/o/r/contents/x -X PUT -f branch=main',
+    'gh api repos/o/r/merges -f base=main -f head=x',
+    'gh api graphql -F query=@q.graphql',
+    'gh api repos/o/r/pulls/9/reviews --input r.json',
+    'gh api repos/o/r/issues/1/comments -f body=x',
+    'gh api repos/o/r/pulls/9/reviews -f "event=APPR""OVE"',
+    'gh api --method=DELETE repos/o/r/git/refs/heads/x',
+    'gh api -XPOST repos/o/r/issues',
+    'gh api -X GET graphql -f query=x',
+  ]) assert.ok(evaluate(c, deps()), c);
+  for (const c of [
+    'gh api repos/o/r/pulls/9/comments',
+    'gh api repos/o/r/pulls/9/reviews --paginate',
+    'gh api -X GET search/issues -f q=x',
+    'gh api repos/o/r/pulls/9 --jq .title',
+  ]) assert.equal(evaluate(c, deps()), null, c);
+});
+
+test('gh pr review --approve is denied in every spelling, a plain comment is not', () => {
+  for (const c of ['gh pr review 9 -ra', 'gh pr review 9 --approve=true', 'gh pr review 9 -a', 'gh pr review --approve 9']) {
+    assert.match(evaluate(c, deps()), /approv/i, c);
+  }
+  assert.equal(evaluate('gh pr review 9 --comment -b ok', deps()), null);
 });
 
 test('end to end: real hook JSON through the script denies a foreign push and allows a feature push', () => {
