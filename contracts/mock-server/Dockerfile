@@ -1,6 +1,8 @@
 # Build from the contracts/ directory so the schemas and mocks are in the context:
 #   docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts
-FROM python:3.13-slim
+# Official image via the AWS ECR mirror of Docker Hub (avoids anonymous pull rate limits), pinned to the
+# multi-arch index digest so rebuilds are reproducible; bump version and digest together.
+FROM public.ecr.aws/docker/library/python:3.13.18-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
