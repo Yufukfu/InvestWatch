@@ -2,28 +2,28 @@
 
 Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-worker` lands. Groups 5-11 need it merged (worker, `WorkerSettings`, `compose.yaml`). Estimates are for one agent session with tests. If time runs short, cut in the order of `design.md` "Cut plan". No test calls a real LLM: the `stub_llm` fixture (stdlib `ThreadingHTTPServer` on `127.0.0.1:0`) or `FakeJudge` only.
 
-## 1. R14 warning next to past performance (~45 min)
+## 1. R14 past-performance disclaimer (~45 min)
 
-- [ ] 1.1 Failing tests for the R14 scenarios (eurotrade `fail`, warning next to past returns `pass`, forecast `not_applicable` with `fetched_at` year, footnote-only `fail`)
+- [ ] 1.1 Failing tests for the R14 scenarios (eurotrade `fail`, disclaimer next to past returns `pass`, disclaimer far from the claim `pass` (no proximity requirement, ZASÓB), forecast `not_applicable` with `fetched_at` year, footnote-only `fail`)
 - [ ] 1.2 R14 class in `rules/m2.py`, `past_patterns` / `past_markers` / `future_markers` / `past_warning_patterns` in `m2_rules.yaml` (new keys in `KNOWN_PARAMS`, validated), `implemented: true`; tests green
 - [ ] 1.3 Mutation check; `mutations: N tried, N caught`
 
 ## 2. Evidence locator and R6 hidden risk (~1 h)
 
-- [ ] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
+- [ ] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`, no risk block `not_applicable` with `brak informacji o ryzyku`, only desktop/mobile/tablet evaluated); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
 - [ ] 2.2 `EvidenceLocator` in `models.py`; risk-block detection reusing R3's warning patterns via a YAML anchor; R6 class, `hiding_regions` param; worst viewport wins; tests green
 - [ ] 2.3 Mutation check; `mutations: N tried, N caught`
 
 ## 3. R4 risk font size (~45 min)
 
-- [ ] 3.1 Failing tests for the R4 scenarios (alfa `fail` with 9 px / 20 px / 0,45 in the explanation, readable `pass`, no blocks and no risk block `not_applicable`, worst viewport decides with `evidence_locator.viewport`); a unit test for the length-weighted median
+- [ ] 3.1 Failing tests for the R4 scenarios (alfa `fail` with 9 px / 20 px / 0,45 in the explanation, readable `pass`, no blocks `not_applicable`, no risk information `not_applicable` with `brak informacji o ryzyku`, risk text only in an invisible block `not_applicable`, worst viewport decides with `evidence_locator.viewport`); a unit test for the length-weighted median
 - [ ] 3.2 R4 class, `min_ratio` param (number in (0, 1], validated); tests green
 - [ ] 3.3 Mutation check; `mutations: N tried, N caught`
 
 ## 4. R17 and R18, rules-only part (~1 h)
 
 - [ ] 4.1 Failing tests for the rules-only R17/R18 scenarios (explicit approval `fail`, bare mention `pass`, no mention `not_applicable`; same sentence `fail`, neighbouring sentence `uncertain`, neutral legal footer `pass`), plus the catalogue scenario that only R3, R17, R18 carry `llm:` (loader accepts the block; parsing only, no engine change yet)
-- [ ] 4.2 R17, R18 classes; `supervisor_patterns`, `approval_patterns`, `safety_patterns` (shared supervisor dictionary via anchor); `llm:` blocks with Polish questions on R3, R17, R18; `implemented: true`; tests green
+- [ ] 4.2 R17, R18 classes; `supervisor_patterns`, `approval_patterns`, `safety_patterns` (shared supervisor dictionary via anchor); `llm:` blocks with Polish questions on R3, R17, R18; `implemented: true`; catalogue comments on R5, R7, R9 (`not_applicable` with `brak informacji o ryzyku` when there is no risk information) and on R11, R15 (ZASÓB "Flaguje w raporcie": report the detection even when compliant) for the change that builds them; tests green
 - [ ] 4.3 Mutation check; `mutations: N tried, N caught`
 
 ## 5. LLM config and OpenAI-compatible client (~1.5 h, needs `analytics-worker`)
@@ -34,7 +34,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 6. Prompt, delimiting and chunking (~1 h)
 
-- [ ] 6.1 Failing tests: injection scenario (tags neutralized to `[document]`, exactly one block at the edges), ignore rule in the system message, `prompt_version` changes when a question changes and is stable otherwise; chunking scenarios (short text one chunk, two-sentence overlap on the border, over-long sentence cut, `LLM_MAX_CHUNKS` truncation logged as `llm_truncated`, every chunk a substring of `doc.text`)
+- [ ] 6.1 Failing tests: injection scenario (tags neutralized to `[document]`, exactly one block at the edges), ignore rule in the system message, `prompt_version` changes when a question changes and is stable otherwise; chunking scenarios (short text one chunk, four-sentence overlap on the border, over-long sentence cut, `LLM_MAX_CHUNKS` truncation logged as `llm_truncated`, every chunk a substring of `doc.text`)
 - [ ] 6.2 `llm/prompt.py` (system template, `module_context`, checks list, output schema, `prompt_version = "v1:" + sha256[:12]`), `llm/chunking.py` on `pre.sentences`; tests green
 - [ ] 6.3 Mutation check; `mutations: N tried, N caught`
 
@@ -51,10 +51,10 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 - [ ] 8.3 Mutation check; `mutations: N tried, N caught`
 - [ ] 8.4 Tell the `analytics-m1-m3` session (or Damian) that the interface in `llm/judge.py` is frozen, with the commit sha
 
-## 9. R3 borderline refinement (~45 min)
+## 9. R3 borderline proximity refinement (~45 min)
 
-- [ ] 9.1 Failing tests for the R3 LLM scenarios (footnote case deferred → `uncertain` hybrid, vocabulary-only claim deferred → `not_applicable` hybrid, clear fail not deferred, borderline without LLM stays rules-only `fail`); every existing R3 scenario still green
-- [ ] 9.2 R3 `ask_llm` for the two borderline cases (the rule records which case applied while evaluating); tests green
+- [ ] 9.1 Failing tests for the R3 LLM scenarios (near-window case deferred and overturned to `pass` hybrid, warning absent never deferred, footnote-only not deferred, warning farther than the margin not deferred, borderline without LLM stays rules-only `fail`); every existing R3 scenario still green
+- [ ] 9.2 R3 `ask_llm` for the near-window case only (`borderline_margin` param, validated; the rule records the nearest-warning distance while evaluating); tests green
 - [ ] 9.3 Mutation check; `mutations: N tried, N caught`
 
 ## 10. Cache, budget and circuit breaker (~1 h)
@@ -65,8 +65,8 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 11. Per-sentence language and R10 (~1 h)
 
-- [ ] 11.1 Failing tests: `Sentence.lang` scenarios (eurotrade pl / en, `Ryzyko!` none) with the existing preprocessing tests still green; R10 scenarios (eurotrade `fail`, bank `pass`, bilingual `pass`, no warning `not_applicable`, unknown language `uncertain`)
-- [ ] 11.2 `preprocessing.py` (per-sentence guess with a minimum signal), R10 class reusing the warning anchor, `implemented: true`; tests green
+- [ ] 11.1 Failing tests: `Sentence.lang` scenarios (eurotrade pl / en, `Ryzyko!` none) with the existing preprocessing tests still green; R10 scenarios (eurotrade `fail`, bank `pass`, bilingual `pass`, no warning `not_applicable` with `brak informacji o ryzyku`, English legal block does not set the main language, unknown language `uncertain`)
+- [ ] 11.2 `preprocessing.py` (per-sentence guess with a minimum signal), R10 class reusing the warning anchor, main language from non-legal, non-footer blocks when present, `implemented: true`; tests green
 - [ ] 11.3 Mutation check; `mutations: N tried, N caught`
 
 ## 12. Wiring: worker, CLI, compose (~1 h)
@@ -74,7 +74,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 - [ ] 12.1 Failing tests: the worker builds the judge from env with its Redis client and passes it to `analyze`; `llm_mode` logged (`hosted`, `local`, `disabled`); CLI uses the judge when `LLM_BASE_URL` is set (stub), `--no-llm` forces rules-only, CLI output on `contracts/mocks/documents.json` still passes `contracts/validate.py finding` in both modes
 - [ ] 12.2 `worker.py`, `cli.py`, `llm/__init__.build_judge`; `analytics/compose.yaml` passes `LLM_*` and joins `egress` (PR #18 key, no `name:`); `analytics/.env.example` documents every `LLM_*` variable (empty `LLM_BASE_URL` = rules-only; the local values for the `ollama` profile); tests green; `docker compose config` valid with and without `--profile llm`
 - [ ] 12.3 Mutation check; `mutations: N tried, N caught`
-- [ ] 12.4 Manual, outside pytest and optional: one CLI run of `m2-alfa-landing` against the local `ollama` profile (`gemma3:4b`) and one against the hosted endpoint, noting whether both return valid JSON; record the result in the AI log, never in a test
+- [ ] 12.4 Manual, outside pytest: run the CLI on all mock documents against the local `ollama` profile (`gemma3:4b`), the candidate demo default (pending Damian's decision on ADR 0304), and once against the hosted endpoint if one is configured; note whether each returns valid JSON and the latency per document; record the result in the AI log, never in a test
 
 ## 13. Closing
 

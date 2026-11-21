@@ -61,4 +61,5 @@ Rationale, from the evidence above:
 - `analytics-m1-m3` refines S1.4, S1.5, S3.3 and S3.4 by adding `llm:` blocks and passing the judge through `run_rules`. It changes no rule classes. The interface (`SemanticCheck`, `LlmVerdict`, `JudgeOutcome`, `LlmJudge` in `analytics/src/investwatch_analytics/llm/judge.py`) changes only through a new ADR.
 - Editing any prompt text invalidates the cache for that module, which is intended. Swapping the model does too, and ADR 0304 then requires re-running the gold set.
 - `.docs/analytics-plan.md` §7 is updated in the same PR: the object wrapper and `prompt_version` as a hash.
-- If the team later wants the LLM to only confirm or soften a borderline R3 `fail`, never reverse it, that is a merge-policy change inside this contract, not a new ADR (open question 1 in the change design).
+- For R3, "borderline" is only the near-window proximity case. ZASÓB requires that the warning "bezpośrednio towarzyszy" the claim, so an absent or footnote-only warning is never sent to the model (resolved question 1 in the change design). Narrowing or widening a rule's borderline condition is a rule change, not a change to this contract.
+- Which endpoint is the demo default (hosted under ADR 0304's mentor exception, or local Ollama with Gemma per the task text) is outside this ADR. The contract above is identical for both.

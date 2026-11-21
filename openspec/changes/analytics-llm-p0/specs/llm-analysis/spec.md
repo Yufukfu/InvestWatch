@@ -122,7 +122,7 @@ After `LLM_BREAKER_FAILURES` consecutive unavailable outcomes (connection error,
 - **THEN** later documents call the endpoint again
 
 ### Requirement: Chunking with worst chunk wins
-Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into chunks of at most that many characters, consecutive chunks overlapping by two sentences; a single longer sentence SHALL be cut at the limit. At most `LLM_MAX_CHUNKS` chunks SHALL be sent; the rest SHALL be logged as `llm_truncated` and judged by the rules only. Each chunk is one request. Per check the merged verdict SHALL be the worst across chunks (`fail` > `uncertain` > `pass` > `not_applicable`), with its evidence and explanation from that chunk and ties going to the earliest chunk.
+Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into chunks of at most that many characters, consecutive chunks overlapping by four sentences (R3 `window` plus `borderline_margin`); a single longer sentence SHALL be cut at the limit. At most `LLM_MAX_CHUNKS` chunks SHALL be sent; the rest SHALL be logged as `llm_truncated` and judged by the rules only. Each chunk is one request. Per check the merged verdict SHALL be the worst across chunks (`fail` > `uncertain` > `pass` > `not_applicable`), with its evidence and explanation from that chunk and ties going to the earliest chunk.
 
 #### Scenario: Worst chunk wins
 - **WHEN** chunk 1 answers R17 `pass` and chunk 2 answers R17 `fail` with a verified quote from chunk 2
@@ -130,7 +130,7 @@ Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into ch
 
 #### Scenario: Claim and warning on a chunk border
 - **WHEN** a return claim is the last sentence of chunk 1 and its warning is the next sentence
-- **THEN** chunk 2 starts with the last two sentences of chunk 1, so both appear in one request
+- **THEN** chunk 2 starts with the last four sentences of chunk 1, so both appear in one request
 
 #### Scenario: Too long
 - **WHEN** the text needs six chunks and `LLM_MAX_CHUNKS=4`

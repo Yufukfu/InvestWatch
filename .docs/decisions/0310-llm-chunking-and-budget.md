@@ -10,13 +10,13 @@
 
 - **The model.** [ADR 0304](0304-llm-serving.md) makes local `gemma3:4b` on Ollama `/v1` the swap target. That endpoint takes only OpenAI-compatible parameters, so `num_ctx` cannot be set per request, and the server's default context window applies. In Ollama that default is a few thousand tokens, and the server-wide `OLLAMA_CONTEXT_LENGTH` variable raises it. The exact default depends on the Ollama version and is to be verified on the infra smoke run (`infra/tests/smoke.sh`, `SMOKE_LLM=1`). Ollama shortens a prompt that is longer than the window, which would silently cut the text being judged.
 - **The worker.** `analytics-worker` processes one message at a time, synchronously. It XAUTOCLAIMs messages idle longer than `CLAIM_MIN_IDLE_MS` (default 60000) (`openspec/changes/analytics-worker/design.md`, decisions 1 and 6). A document whose LLM calls take longer than that is handed to a second consumer while it is still being processed. The upsert makes that harmless, but it doubles the LLM cost.
-- **The rules.** R3 and R14 look for a warning within ±2 sentences of a claim (`m2_rules.yaml` `window: 2`), so a chunk border must not separate a claim from its warning.
+- **The rules.** R3 looks for a warning within ±2 sentences of a claim (`m2_rules.yaml` `window: 2`), and the LLM judges R3 only for warnings just outside that window, so a chunk border must not separate a claim from its warning.
 
 ## Options considered
 
 1. **Send the whole text, one call per module.** This is the simplest option. On Ollama a long page exceeds the default window and is shortened without an error. On hosted models it costs more on long legal pages, and one slow call can exceed the claim idle time.
 2. **Fixed-size character chunks with no overlap.** This is easy, but it cuts mid-sentence. A claim and its warning can fall in different chunks, and a quote can straddle a border and then fail verification.
-3. **Chunks on sentence boundaries with a 2-sentence overlap, a cap on the number of chunks, worst chunk wins, and a per-document wall-clock budget below the claim idle time.** The overlap matches the rules' ±2 window. The cap and the budget bound the latency. A single unusually long sentence is cut at the limit.
+3. **Chunks on sentence boundaries with a 4-sentence overlap, a cap on the number of chunks, worst chunk wins, and a per-document wall-clock budget below the claim idle time.** The overlap covers R3's ±2 window plus the 2-sentence borderline margin in which the LLM judges R3. The cap and the budget bound the latency. A single unusually long sentence is cut at the limit.
 
 For a chunk that fails: taking the worst of the chunks that did succeed biases the result toward `pass`, because the missing chunk may hold the `fail`. Dropping the module's LLM verdicts falls back to the rules-only result, which is already the defined degradation path ([ADR 0309](0309-llm-prompt-and-cache-contract.md)).
 
@@ -24,7 +24,7 @@ For a chunk that fails: taking the worst of the chunks that did succeed biases t
 
 Option 3:
 
-- **Chunk size and split:** `LLM_CHUNK_CHARS`, 9000 by default (about 3k tokens of Polish), split on `pre.sentences`, with consecutive chunks overlapping by 2 sentences. A single longer sentence is cut at the limit.
+- **Chunk size and split:** `LLM_CHUNK_CHARS`, 9000 by default (about 3k tokens of Polish), split on `pre.sentences`, with consecutive chunks overlapping by 4 sentences (R3 `window` plus `borderline_margin`). A single longer sentence is cut at the limit.
 - **Chunk cap:** `LLM_MAX_CHUNKS`, 4 by default. Text beyond the cap is not sent, the log says `llm_truncated`, and the rules still cover the full text.
 - **Merge:** per check, worst chunk wins (`fail` > `uncertain` > `pass` > `not_applicable`), and ties go to the earliest chunk. If any chunk of a module's call fails, all of that module's LLM verdicts are dropped.
 - **Timeouts and budget:**
@@ -34,7 +34,7 @@ Option 3:
 - **Circuit breaker:** after `LLM_BREAKER_FAILURES` (3) consecutive unavailable outcomes, the judge stops calling for `LLM_BREAKER_COOLDOWN_S` (60). After that, one call is tried again (half-open).
 - **Ollama context window:** infra sets `OLLAMA_CONTEXT_LENGTH=8192` on the `ollama` service (requested from Kacper through the change proposal). A chunk of about 3k tokens, a system prompt of about 1k tokens and the answer fit in it.
 
-Rationale: the Ollama `/v1` limitation means option 1 can lose text silently on the swap target that ADR 0304 obliges us to keep working. The ±2-sentence rule window is the reason for a 2-sentence overlap, rather than an arbitrary character overlap. The worker's 60 s claim idle time is the reason the budget must stay below it. Dropping a module's verdicts on a partial failure reuses the single degradation path instead of inventing a biased partial merge.
+Rationale: the Ollama `/v1` limitation means option 1 can lose text silently on the swap target that ADR 0304 obliges us to keep working. R3's ±2-sentence window plus its 2-sentence borderline margin is the reason for a 4-sentence overlap, rather than an arbitrary character overlap. The worker's 60 s claim idle time is the reason the budget must stay below it. Dropping a module's verdicts on a partial failure reuses the single degradation path instead of inventing a biased partial merge.
 
 ## Consequences
 

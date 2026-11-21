@@ -9,21 +9,22 @@ Stage 2 (etap 2) of analytics. After stage 1, M2 checks only R1-R3 with regexes 
 ## What Changes
 
 - **LLM layer** (`.docs/analytics-plan.md` §7, ADR 0304):
-  - A chat completions client for any OpenAI-compatible endpoint, configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, plus timeouts and limits). It uses no provider SDK, only `httpx`. With `LLM_BASE_URL` unset the LLM is disabled and analytics runs rules-only. Local Ollama `/v1` with `gemma3:4b` works with the same code.
+  - A chat completions client for any OpenAI-compatible endpoint, configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, plus timeouts and limits). It uses no provider SDK, only `httpx`. With `LLM_BASE_URL` unset the LLM is disabled and analytics runs rules-only. Local Ollama `/v1` with `gemma3:4b` works with the same code and is a fully supported, tested path. Whether it becomes the demo default (the task text asks for free, on-premise models only; ADR 0304 has a hosted default under a mentor exception) is pending Damian's decision and not part of this change.
   - One call per document, module and chunk, with `response_format: {"type": "json_object"}` and `temperature: 0`. It asks only about the checks the rules deferred to the LLM. When nothing is deferred, no call is made.
   - Scraped text goes into one `<document>…</document>` block. The system prompt says to ignore instructions inside it. Tag look-alikes in the text are neutralized. The text is split on sentence boundaries into chunks of about 3k tokens, and the worst chunk result wins.
   - Pydantic validation of the response. Every `evidence_quote` must be a verbatim substring of the chunk that was sent and at least 8 characters long, otherwise the result is `uncertain`. Rule ids that were not asked about are dropped.
   - A Redis response cache keyed by `(content_hash, prompt_version, model)`, plus module, chunk and the requested checks. Here `prompt_version` is a hash of the rendered system prompt.
   - Degradation: when the endpoint is down, times out, returns HTTP errors or malformed output, or the per-document budget runs out, the rules-only results are kept. A circuit breaker skips the LLM for a cooldown after repeated failures. `model.llm` names the model only when at least one rule result actually used it, and is `null` otherwise.
 - **Seam for M1/M3:** any catalogue entry, in any module, can declare an `llm:` block (question, when to ask). The engine collects the deferred checks, makes one judge call per module and merges the verdicts into the rule results (`method: llm` or `hybrid`). `analytics-m1-m3` adds `llm:` blocks to its YAML and passes the judge through. It edits no rule classes.
-- **M2 P0 rules** (plan §5), each catalogue entry flipping to `implemented: true`:
-  - R4: risk font size from `blocks`.
+- **M2 P0 rules** (plan §5), with their meaning taken from the challenge criteria document (`doc/ZASÓB … kryteria oceny informacji o ryzyku.docx`, cited as ZASÓB), each catalogue entry flipping to `implemented: true`:
+  - R4: risk font size from `blocks`, against the dominant font size of the material.
   - R6: risk hidden in the footer, legal region or a footnote and not in the viewport on load.
-  - R10: language consistency, which needs a language guess per sentence.
-  - R14: warning next to past performance.
+  - R10: language consistency against the headline and body language (legal and footer blocks excluded), which needs a language guess per sentence.
+  - R14: a clear past-performance disclaimer present in the material, with no proximity requirement.
   - R17: implying supervisory approval. Regex detection, and the LLM judges a supervisor mention that the regexes do not settle.
   - R18: supervision as a safety argument. Regex for the same sentence, and the LLM judges cross-sentence cases.
-  - R3: the LLM refines R3's borderline cases.
+  - R3: the LLM decides only R3's borderline proximity cases (a warning just outside the window), never an absent warning.
+  - R4, R6 and R10 are `not_applicable` with `brak informacji o ryzyku` when the material has no risk information, so R3 alone counts it.
   - The visual rules R4 and R6 return `not_applicable` without `blocks`, never `pass`. Visual results carry `evidence_locator` (`viewport`, `bbox`), a field that is already optional in contract v1.
 - **Wiring:** `analyze(…, judge=None)` stays pure: the judge is injected. The worker builds the judge from env. The CLI uses it when `LLM_BASE_URL` is set and has `--no-llm`. `analytics/compose.yaml` passes the `LLM_*` env and joins the `egress` network for a hosted provider.
 - **Out of scope:**

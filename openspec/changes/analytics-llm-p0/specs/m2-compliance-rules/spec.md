@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Rule catalogue
-The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a/R12b) from `m2_rules.yaml`. Each entry has a Polish name, a severity, a legal basis, its dictionaries, an `implemented` flag and an optional `llm:` block (see the `llm-analysis` capability). Only implemented rules SHALL run. Loading SHALL validate every rule parameter the rules read (pattern lists and `negation_before` compile, `window` and `prominent_sentences` are non-negative integers, `min_ratio` is a number in (0, 1], `labels` and `footnote_markers` are lists of strings, `hiding_regions` is a list of strings) `labels` SHALL be non-empty, unknown parameter keys SHALL be rejected, and the YAML root SHALL be a mapping, so a bad catalogue fails at load and never on the first document. Shared dictionaries MAY be written once with YAML anchors and reused by several rules.
+The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a/R12b) from `m2_rules.yaml`. Each entry has a Polish name, a severity, a legal basis, its dictionaries, an `implemented` flag and an optional `llm:` block (see the `llm-analysis` capability). Only implemented rules SHALL run. Loading SHALL validate every rule parameter the rules read (pattern lists and `negation_before` compile, `window` and `prominent_sentences` are non-negative integers, `min_ratio` is a number in (0, 1], `labels` and `footnote_markers` are lists of strings, `hiding_regions` is a list of strings, `borderline_margin` is a non-negative integer) `labels` SHALL be non-empty, unknown parameter keys SHALL be rejected, and the YAML root SHALL be a mapping, so a bad catalogue fails at load and never on the first document. Shared dictionaries MAY be written once with YAML anchors and reused by several rules.
 
 #### Scenario: Catalogue is complete
 - **WHEN** the catalogue is loaded
@@ -35,7 +35,7 @@ Every rule result with non-null `evidence` SHALL quote a substring of the docume
 - **THEN** its `evidence_locator.viewport` is the viewport of the judged risk block and `bbox` is that block's `bbox`
 
 ### Requirement: R3 risk information next to return claims
-R3 SHALL be `not_applicable` when the text makes no return claim (percent figures, or return vocabulary such as `zysk`, `zarob…`, `stopa zwrotu`). It SHALL pass when every return-claim sentence has a risk warning within the configured sentence window (default ±2). Otherwise it SHALL fail, quoting the first uncovered claim. A warning marked as a footnote (leading `*` or `¹`) SHALL NOT count as next to the claim. A loss denial (`bez ryzyka`, `nie stracisz`) SHALL NOT count as a warning, but a negated exclusion of loss (`nie jest wykluczona utrata`, `nie można wykluczyć straty`, `nie gwarantujemy braku strat`) SHALL. An affirmed exclusion (`wykluczamy straty`, `nie tylko wyklucza straty`, `gwarantujemy brak straty`) is a denial. A denial SHALL NOT swallow a warning that follows it: `bez opłat ryzyko utraty kapitału` still counts as a warning. Plural and `nie ma` denials (`zero ryzyk`, `nie ma ryzyka straty`, `nie istnieje ryzyko utraty`) SHALL NOT count as warnings. R3 SHALL defer to the LLM only in borderline cases: a rules-only `fail` while a warning exists outside the window or only as a footnote, or a rules-only `fail` whose uncovered claim sentences all matched return vocabulary without a percent figure. In those cases a valid LLM verdict SHALL replace the rules-only result; in every other case, and whenever no valid verdict arrives, the rules-only result SHALL stand.
+R3 SHALL be `not_applicable` when the text makes no return claim (percent figures, or return vocabulary such as `zysk`, `zarob…`, `stopa zwrotu`). It SHALL pass when every return-claim sentence has a risk warning within the configured sentence window (default ±2). Otherwise it SHALL fail, quoting the first uncovered claim. A warning marked as a footnote (leading `*` or `¹`) SHALL NOT count as next to the claim. A loss denial (`bez ryzyka`, `nie stracisz`) SHALL NOT count as a warning, but a negated exclusion of loss (`nie jest wykluczona utrata`, `nie można wykluczyć straty`, `nie gwarantujemy braku strat`) SHALL. An affirmed exclusion (`wykluczamy straty`, `nie tylko wyklucza straty`, `gwarantujemy brak straty`) is a denial. A denial SHALL NOT swallow a warning that follows it: `bez opłat ryzyko utraty kapitału` still counts as a warning. Plural and `nie ma` denials (`zero ryzyk`, `nie ma ryzyka straty`, `nie istnieje ryzyko utraty`) SHALL NOT count as warnings. The warning must directly accompany each claim (ZASÓB: "bezpośrednio towarzyszy"); a warning elsewhere on the page SHALL NOT satisfy R3. R3 SHALL defer to the LLM only in the borderline proximity case: a rules-only `fail` where, for every uncovered claim, the nearest non-footnote warning is between `window + 1` and `window + borderline_margin` sentences away (default margin 2). In that case a valid LLM verdict SHALL replace the rules-only result, including `fail` to `pass`. An absent warning, a footnote-only warning, a warning farther than the margin, and every other case SHALL NOT be deferred, and whenever no valid verdict arrives the rules-only result SHALL stand.
 
 #### Scenario: No return claim
 - **WHEN** the text is `Otwórz IKE i inwestuj długoterminowo.`
@@ -69,26 +69,26 @@ R3 SHALL be `not_applicable` when the text makes no return claim (percent figure
 - **WHEN** `Zysk 10% rocznie, bez opłat ryzyko utraty kapitału.`
 - **THEN** R3 is `pass`
 
-#### Scenario: Footnote case goes to the LLM
-- **WHEN** the footnote-only text above is analyzed with a judge and the judge answers R3 `uncertain` with a verified quote
-- **THEN** R3 is `uncertain` with `method: hybrid`
+#### Scenario: Near-window case goes to the LLM
+- **WHEN** `Zarabiaj 9% rocznie.` is followed by two neutral sentences and then `Inwestowanie wiąże się z ryzykiem utraty kapitału.` (distance 3, window 2), and the judge answers R3 `pass` with a verified quote
+- **THEN** R3 is `pass` with `method: hybrid`
 
-#### Scenario: Vocabulary-only claim goes to the LLM
-- **WHEN** the only claim sentence is `Zyskaj dostęp do platformy w 5 minut.` with no warning, and the judge answers R3 `not_applicable`
-- **THEN** R3 is `not_applicable` with `method: hybrid`
+#### Scenario: Warning absent is never deferred
+- **WHEN** the text has `Zysk 15% rocznie.` and no risk vocabulary anywhere, with a judge configured that would answer `pass`
+- **THEN** R3 is `fail` with `method: rule` and no request is sent for R3
 
-#### Scenario: Clear fail is not deferred
-- **WHEN** the text has `Zysk 15% rocznie.` and no risk vocabulary anywhere, with a judge configured
+#### Scenario: Footnote-only warning is not deferred
+- **WHEN** the footnote-only text above is analyzed with a judge configured
 - **THEN** R3 is `fail` with `method: rule` and no request is sent for R3
 
 #### Scenario: Borderline without the LLM
-- **WHEN** the footnote-only text is analyzed and the LLM is unavailable
+- **WHEN** the near-window text is analyzed and the LLM is unavailable
 - **THEN** R3 is `fail` with `method: rule`, as rules-only
 
 ## ADDED Requirements
 
 ### Requirement: R4 risk font size
-R4 SHALL be `not_applicable` when the document has no `blocks`, or no visible block whose text is a risk warning (R3's warning dictionary, denials excluded); it SHALL never be `pass` without `blocks`. For each viewport present it SHALL compare the largest visible risk block's `font_size_px` with the length-weighted median `font_size_px` of the visible blocks of that viewport (weight = text length), and fail when the ratio is below `min_ratio` (default 0.75). The worst viewport SHALL decide the result. The explanation SHALL state both sizes and the ratio; the evidence SHALL be the risk block's text located in the document `text` (or null if it cannot be found there).
+R4 SHALL be `not_applicable` when the document has no `blocks`; it SHALL never be `pass` without `blocks`. When the material has no risk information (R3's warning dictionary, denials excluded) R4 SHALL be `not_applicable` with the explanation `brak informacji o ryzyku`; when risk text exists but no visible block carries it, R4 SHALL be `not_applicable` (visibility is R5). The benchmark is the dominant font size of the material (ZASÓB: "przeważająca wielkość czcionki materiału"). For `desktop`, `mobile` and, when present, `tablet` it SHALL compare the largest visible risk block's `font_size_px` with the length-weighted median `font_size_px` of the visible blocks of that viewport (weight = text length), and fail when the ratio is below `min_ratio` (default 0.75). The worst viewport SHALL decide the result. The explanation SHALL state both sizes and the ratio; the evidence SHALL be the risk block's text located in the document `text` (or null if it cannot be found there).
 
 #### Scenario: Small footer warning
 - **WHEN** `m2-alfa-landing` (blocks 44 px, 20 px and a 9 px risk block on desktop) is analyzed
@@ -102,8 +102,12 @@ R4 SHALL be `not_applicable` when the document has no `blocks`, or no visible bl
 - **WHEN** a document has an empty `blocks` list (`m2-bank-ok`)
 - **THEN** R4 is `not_applicable`
 
-#### Scenario: Blocks without a risk block
-- **WHEN** blocks exist but none contains a risk warning
+#### Scenario: No risk information
+- **WHEN** blocks exist and the material contains no risk warning at all
+- **THEN** R4 is `not_applicable` with the explanation `brak informacji o ryzyku`
+
+#### Scenario: Risk text only in an invisible block
+- **WHEN** the only risk block has `visible: false`
 - **THEN** R4 is `not_applicable`
 
 #### Scenario: Worst viewport decides
@@ -111,7 +115,7 @@ R4 SHALL be `not_applicable` when the document has no `blocks`, or no visible bl
 - **THEN** R4 is `fail` and `evidence_locator.viewport` is `mobile`
 
 ### Requirement: R6 hidden risk information
-R6 SHALL be `not_applicable` without `blocks` or without a risk block; it SHALL never be `pass` without `blocks`. In a viewport a risk block is hidden by placement when its `region` is in `hiding_regions` (default `footer`, `legal`) or its text starts with a footnote marker, and `in_viewport_on_load` is `false`; with that placement and `in_viewport_on_load` missing it is possibly hidden. Per viewport R6 SHALL fail when every risk block is hidden, be `uncertain` when every risk block is hidden or possibly hidden and at least one is possibly hidden, and pass otherwise. The worst viewport SHALL decide. `visible` and `requires_interaction` SHALL NOT affect R6 (they belong to R5 and R7).
+R6 SHALL be `not_applicable` without `blocks`, and `not_applicable` with the explanation `brak informacji o ryzyku` without a risk block; it SHALL never be `pass` without `blocks`. R6 SHALL be evaluated on `desktop`, `mobile` and, when present, `tablet`. In a viewport a risk block is hidden by placement when its `region` is in `hiding_regions` (default `footer`, `legal`) or its text starts with a footnote marker, and `in_viewport_on_load` is `false`; with that placement and `in_viewport_on_load` missing it is possibly hidden. Per viewport R6 SHALL fail when every risk block is hidden, be `uncertain` when every risk block is hidden or possibly hidden and at least one is possibly hidden, and pass otherwise. The worst viewport SHALL decide. `visible` and `requires_interaction` SHALL NOT affect R6 (they belong to R5 and R7).
 
 #### Scenario: Footer only, below the fold
 - **WHEN** `m2-alfa-landing` is analyzed (risk block in `footer`, `in_viewport_on_load: false`, on desktop and mobile)
@@ -133,8 +137,12 @@ R6 SHALL be `not_applicable` without `blocks` or without a risk block; it SHALL 
 - **WHEN** the document has no `blocks`
 - **THEN** R6 is `not_applicable`
 
+#### Scenario: No risk block
+- **WHEN** blocks exist and none is a risk warning
+- **THEN** R6 is `not_applicable` with the explanation `brak informacji o ryzyku`
+
 ### Requirement: R10 language consistency
-R10 SHALL be `not_applicable` when the text has no risk-warning sentence (R3's warning dictionary, denials excluded). The main language SHALL be the length-weighted majority language of the non-warning sentences whose language is known, or the document language guess when none is known. R10 SHALL pass when at least one warning sentence is in the main language, fail quoting the first warning sentence when warnings exist and none is in the main language, and be `uncertain` when no warning sentence has a known language.
+R10 checks that risk information is not given in a language other than the main message (ZASÓB). It SHALL be `not_applicable` with the explanation `brak informacji o ryzyku` when the text has no risk-warning sentence (R3's warning dictionary, denials excluded). The main language SHALL be the dominant language of the headline and body, excluding legal and footer content: with `blocks`, the length-weighted majority language of the visible non-warning blocks whose `region` is not `footer` or `legal` (desktop viewport if present, else the first present); without `blocks`, that of the non-warning sentences whose language is known; in both cases the document language guess when none is known. R10 SHALL pass when at least one warning sentence is in the main language, fail quoting the first warning sentence when warnings exist and none is in the main language, and be `uncertain` when no warning sentence has a known language.
 
 #### Scenario: English warning on a Polish page
 - **WHEN** the `eurotrade` mock is analyzed (Polish copy, warning `Risk warning: CFDs are complex instruments…`)
@@ -150,20 +158,24 @@ R10 SHALL be `not_applicable` when the text has no risk-warning sentence (R3's w
 
 #### Scenario: No warning
 - **WHEN** the text has no risk warning
-- **THEN** R10 is `not_applicable`
+- **THEN** R10 is `not_applicable` with the explanation `brak informacji o ryzyku`
+
+#### Scenario: English legal footer does not set the main language
+- **WHEN** blocks hold a Polish headline and body, a Polish risk warning in `main`, and a long English legal text in `region: legal`
+- **THEN** the main language is `pl` and R10 is `pass`
 
 #### Scenario: Language unknown
 - **WHEN** the only warning sentence is `Ryzyko!` (too short for a language guess)
 - **THEN** R10 is `uncertain`
 
-### Requirement: R14 warning next to past performance
-R14 SHALL be `not_applicable` when no sentence presents past performance: a return figure together with a past marker (a past-tense return verb such as `zarobili`, `wypracował`, `osiągnął`, `przyniósł`; `historyczn…`; `w ostatnich N latach/miesiącach`; or a year not later than the document's `fetched_at` year without a future marker such as `spodziewa`, `prognoz`, `będzie`, `expected`, `will`). It SHALL pass when a past-performance warning (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) is within `window` sentences (default 2) of every such sentence and is not footnote-marked, quoting the warning; otherwise it SHALL fail quoting the first uncovered past-performance sentence.
+### Requirement: R14 past-performance disclaimer
+R14 SHALL be `not_applicable` when no sentence presents past performance: a return figure together with a past marker (a past-tense return verb such as `zarobili`, `wypracował`, `osiągnął`, `przyniósł`; `historyczn…`; `w ostatnich N latach/miesiącach`; or a year not later than the document's `fetched_at` year without a future marker such as `spodziewa`, `prognoz`, `będzie`, `expected`, `will`). ZASÓB requires a clear disclaimer to be present, with no proximity requirement. R14 SHALL pass when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material and at least one occurrence is not footnote-marked, quoting it. It SHALL fail, quoting the first past-performance sentence, when there is no disclaimer or only footnote-marked ones. Distance between the claim and the disclaimer SHALL NOT affect R14.
 
 #### Scenario: Past returns without warning
 - **WHEN** the `eurotrade` mock is analyzed (`Nasi klienci zarobili średnio 34% w 2025 roku.`)
 - **THEN** R14 is `fail` with that sentence as evidence
 
-#### Scenario: Warning next to past returns
+#### Scenario: Disclaimer next to past returns
 - **WHEN** `Fundusz wypracował 12% w 2024 roku.` is followed by `Wyniki historyczne nie są gwarancją przyszłych wyników.`
 - **THEN** R14 is `pass` with the warning as evidence
 
@@ -171,12 +183,16 @@ R14 SHALL be `not_applicable` when no sentence presents past performance: a retu
 - **WHEN** the only figure is in `W 2026 roku spodziewamy się 10% zysku.` and `fetched_at` is in 2026
 - **THEN** R14 is `not_applicable`
 
-#### Scenario: Warning only as a footnote
-- **WHEN** the past-performance sentence is followed by `*Wyniki historyczne nie są gwarancją przyszłych wyników.`
+#### Scenario: Disclaimer far from the claim
+- **WHEN** `Fundusz wypracował 12% w 2024 roku.` is the first sentence and `Wyniki historyczne nie są gwarancją przyszłych wyników.` is the tenth
+- **THEN** R14 is `pass`
+
+#### Scenario: Disclaimer only as a footnote
+- **WHEN** the only disclaimer is `*Wyniki historyczne nie są gwarancją przyszłych wyników.`
 - **THEN** R14 is `fail`
 
 ### Requirement: R17 implying supervisory approval
-R17 SHALL be `not_applicable` when the text does not mention a supervisor (`KNF`, `UKNF`, `Komisja Nadzoru Finansowego`, `ESMA`, `nadzór`/`nadzorowany`, `regulowany`, `licencja`, `supervised`, `regulated by`). It SHALL fail, quoting the sentence, when an approval word (`zatwierdzon…`, `zaaprobowan…`, `aprobat…`, `rekomendowan… przez`, `certyfikat…`, `approved by`, `endorsed by`) is in the same sentence as a mention. Otherwise its rules-only result SHALL be `pass`, quoting the first mention, and it SHALL be deferred to the LLM (`llm.when: always`), which judges whether the wording suggests that the supervisor approves the product.
+Stating supervision alone SHALL NOT be a violation; R17 covers a mention used to suggest approval of the product or service (ZASÓB). R17 SHALL be `not_applicable` when the text does not mention a supervisor (`KNF`, `UKNF`, `Komisja Nadzoru Finansowego`, `ESMA`, `nadzór`/`nadzorowany`, `regulowany`, `licencja`, `supervised`, `regulated by`). It SHALL fail, quoting the sentence, when an approval word (`zatwierdzon…`, `zaaprobowan…`, `aprobat…`, `rekomendowan… przez`, `certyfikat…`, `approved by`, `endorsed by`) is in the same sentence as a mention. Otherwise its rules-only result SHALL be `pass`, quoting the first mention, and it SHALL be deferred to the LLM (`llm.when: always`), which judges whether the wording suggests that the supervisor approves the product.
 
 #### Scenario: Explicit approval
 - **WHEN** the text contains `Produkt zatwierdzony przez KNF.`
@@ -208,6 +224,10 @@ R18 SHALL be `not_applicable` without a supervisor mention (same dictionary as R
 #### Scenario: Neighbouring sentence without the LLM
 - **WHEN** the same text is analyzed rules-only
 - **THEN** R18 is `uncertain`
+
+#### Scenario: ZASÓB example
+- **WHEN** the text contains `Inwestycja w pełni bezpieczna – spełniamy rygorystyczne wymogi nadzorcze KNF.`
+- **THEN** R18 is `fail` with that sentence as evidence
 
 #### Scenario: Neutral legal footer
 - **WHEN** the only mention is `Dom Maklerski podlega nadzorowi Komisji Nadzoru Finansowego.` with no safety word nearby
