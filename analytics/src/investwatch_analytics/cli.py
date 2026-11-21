@@ -25,7 +25,7 @@ from pydantic import ValidationError
 from . import logging_setup
 from .config import Settings
 from .models import ScrapedDocument
-from .pipeline import analyze
+from .pipeline import analyze, default_signal_catalogues
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
 
@@ -47,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         registry = Registry.from_csv(settings.registry_csv)
         catalogue = Catalogue.load()
+        signals = default_signal_catalogues()  # M1/M3 catalogues: a bad YAML fails here, not per document
         raw = json.loads(args.file.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         log.error("cannot read input", extra={"file": str(args.file), "error": str(exc)})
@@ -65,11 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     failed = 0
     for doc in docs:
         try:
-            findings.extend(f.to_contract() for f in analyze(doc, registry=registry, catalogue=catalogue))
+            findings.extend(f.to_contract() for f in analyze(doc, registry=registry, catalogue=catalogue, signals=signals))
         except Exception as exc:  # one bad document must not cost the batch; a bug still shows in the exit code
             failed += 1
             # Type only: exception messages can carry scraped text.
             log.error("analysis failed", extra={"document_id": doc.id, "error_type": type(exc).__name__})
+    # The findings JSON is UTF-8 whatever the console code page (cp1250 on Windows cannot encode an emoji).
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(json.dumps(findings, ensure_ascii=False, indent=2) + "\n")
     return 1 if failed else 0
 
