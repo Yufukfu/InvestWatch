@@ -17,9 +17,9 @@ Precondition: `analytics-skeleton` is merged and this branch is rebased on it. G
 
 ## 3. Events and thresholds
 
-- [ ] 3.1 Failing tests for the `finding-events` scenarios with `fakeredis`: envelope validates against `events.schema.json` (skipped without `CONTRACTS_DIR`), no `risk_level`, persisted id, created-only below the threshold, created then high_risk at an equal score, nothing on update, event id taken from the save result, live threshold change, key missing / malformed falling back to defaults with the logged reason, `publish_failed` on a connection error, no-op publisher records the same events
-- [ ] 3.2 `events.py`: `Publisher` protocol, `RedisPublisher`, `NoopPublisher`, `read_thresholds()` with no cache; pin `redis`, dev `fakeredis`; tests green
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 Failing tests for the `finding-events` scenarios with `fakeredis`: envelope validates against `events.schema.json` (skipped without `CONTRACTS_DIR`), no `risk_level`, persisted id, created-only below the threshold, created then high_risk at an equal score, nothing on update, event id taken from the save result, live threshold change, key missing / malformed falling back to defaults with the logged reason, `publish_failed` on a connection error, no-op publisher records the same events
+- [x] 3.2 `events.py`: `Publisher` protocol, `RedisPublisher`, `NoopPublisher`, `read_thresholds()` with no cache; pin `redis`, dev `fakeredis`; tests green
+- [x] 3.3 Mutation check; `mutations: 23 tried, 23 caught` (the channel-name mutant first survived; a literal contract-name test was added)
 
 ## 4. Worker loop
 
