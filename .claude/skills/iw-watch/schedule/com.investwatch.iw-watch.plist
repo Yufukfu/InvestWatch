@@ -5,7 +5,8 @@
     cp com.investwatch.iw-watch.plist ~/Library/LaunchAgents/
     launchctl load ~/Library/LaunchAgents/com.investwatch.iw-watch.plist
   Stop: launchctl unload ~/Library/LaunchAgents/com.investwatch.iw-watch.plist
-  A login shell (-l) so node, gh and claude are on PATH as in your terminal.
+  A login shell (-l) so node, gh and claude are on PATH as in your terminal; zsh also reads ~/.zshenv,
+  where the IWATCH_* variables go (README.md).
 -->
 <plist version="1.0">
 <dict>
