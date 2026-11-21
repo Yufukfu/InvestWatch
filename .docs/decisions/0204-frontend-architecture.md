@@ -2,41 +2,44 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from the team's discussion (hooks over container components); accepted by: pending approval of the PR
+- Deciders: agent-written from the team's discussion (hooks over container components); accepted by B via PR #11
 
 ## Context
 
-The dashboard (`web/`, owner B) is built against a client generated from the contract ([0201](0201-web-stack-and-generated-client.md)). Today the feature components import the generated hooks directly: `FindingsTable.tsx` calls `useGetFindingsQuery`, `SummaryCards.tsx` calls `useGetStatsSummaryQuery`, `HealthBadge.tsx` calls `useGetHealthQuery`. They also use the generated DTO types (`Finding`, `Status`, `Module`) as their view model.
+The dashboard (`web/`, owner B) is built against a client generated from the contract ([0201](0201-web-stack-and-generated-client.md)). Checked against `web/src` at `main` (`6145997`):
 
-Two things follow from the code, not from preference:
-- `src/api/generated.ts` is produced by `@rtk-query/codegen-openapi` and is RTK-specific (`injectedRtkApi`, `addTagTypes`). Replacing RTK Query means regenerating that file with another generator, and every component that imports it has to change.
-- The feature components are small (21 to 40 lines) and have no tests that mock the store. Features still to come (filters, status change, real-time alerts, calibration panel) will each add more such imports.
+- The three feature components call the generated hooks directly: `FindingsTable.tsx` (40 lines) uses `useGetFindingsQuery`, `SummaryCards.tsx` (21 lines) `useGetStatsSummaryQuery`, `HealthBadge.tsx` (20 lines) `useGetHealthQuery`. `FindingsTable` also reads fields of the generated `Finding` DTO directly.
+- `src/api/generated.ts` is produced by `@rtk-query/codegen-openapi` and is RTK-specific (`injectedRtkApi`, `addTagTypes`). Replacing RTK Query means regenerating it with another generator, and every file that imports it changes.
+- `src/store.ts` and `src/App.test.tsx` also import `investWatchApi` from `./api/generated`. `App.test.tsx` builds a real store (`configureStore` with the API reducer) and wraps `<App/>` in a Provider, so today no component can be tested with props alone.
+- Features still to come (filters, status change, real-time alerts, calibration panel) will each add more such imports.
 
 The web rules already ask for props-driven presentational components ([`.claude/rules/web-dashboard.md`](../../.claude/rules/web-dashboard.md)). This ADR decides where the boundary to the data layer sits.
 
 ## Options considered
 
-1. **Feature data hooks as the boundary.** Each feature has a hook in `features/<name>/data/` that calls the generated hooks, maps the DTOs to the feature's own view-model types, and returns plain values and callbacks (`{ rows, isLoading, error, onStatusChange }`). A page component calls the hook and renders presentational components with props. Only `features/*/data/` and `src/api/` import `generated.ts`.
-2. **Container components.** A container component calls the generated hooks and renders a presentational component with props. The separation is the same as in option 1, but it adds a component level to the tree and needs a container per view, with no further isolation in React 19 (hooks already compose).
-3. **Status quo.** Components call the generated hooks directly and use the DTO types. Lowest code now; a library change touches every component and every new feature repeats the coupling.
+1. **Feature data hooks as the boundary.** Each feature has a hook in `features/<name>/data/` that calls the generated hooks and returns plain values and callbacks (`{ rows, isLoading, error, onStatusChange }`). A page component calls the hook and renders presentational components with props. Only `src/api/`, `src/store.ts`, the test setup and `features/*/data/` import `generated.ts`.
+2. **Container components.** A container component calls the generated hooks and renders a presentational component with props. It gives the same isolation as option 1. The difference is where the data logic lives: in a component, which can only be rendered to be tested and reused, instead of in a hook, which can be tested with `renderHook` and MSW and reused by more than one page.
+3. **Status quo.** Components call the generated hooks directly and use the DTO types. Least code now; a library change touches every component and every new feature repeats the coupling.
 
 ## Decision
 
 Option 1. The layers, from the bottom:
 
-- `src/api/`: the generated client only. It is the only place that knows the library. Nothing outside `features/*/data/` imports it.
-- `src/features/<name>/model.ts`: view-model types owned by the app (for example `FindingRow`), not the generated DTOs.
-- `src/features/<name>/data/use<Name>.ts`: the hook. It is the only place that maps DTOs to view models and calls the generated hooks.
-- `src/features/<name>/components/`: presentational components. They take props and import nothing from `api/`, `data/` or the store.
-- `src/features/<name>/<Name>Page.tsx`: composes a data hook with presentational components. This is the only layer where the two meet.
+- `src/api/`: the generated client and `baseApi.ts`. `src/store.ts` and the test setup also import it, since they build the store.
+- `src/features/<name>/data/use<Name>.ts`: the feature's hook. The only feature code that imports `generated.ts`. Real-time subscriptions live in the same layer, in an `alerts` feature, because they patch the RTK Query cache and need the generated API.
+- `src/features/<name>/model.ts`: app-owned view-model types, **only where the DTO is non-trivial**. `Finding` (with `rules`, `firm`, `advertiser`) gets one. Health and the summary counts are flat, so their hooks return what the component needs and no model or mapper is added.
+- `src/features/<name>/components/`: presentational components. They take props and import nothing from `api/`, `data/` or the store, and do not use the DTO types.
+- `src/features/<name>/<Name>Page.tsx`: calls a data hook and passes the result to presentational components. This plays the role a container would, and it is the only place where the two meet.
 
-The reasoning is the swap test. With option 1, replacing RTK Query means regenerating `src/api/`, rewriting the `data/` hooks and leaving the components and their tests unchanged. With option 3 it means rewriting every component. Option 2 gives the same isolation with an extra component level, and does not fix the library coupling any better than option 1.
+Why hook over container: it is the same separation, but the data logic is a function that composes (several hooks in one page, one hook in several pages) and is tested without rendering. The swap test decides against option 3: with option 1, replacing RTK Query means regenerating `src/api/`, rewriting the `data/` hooks and leaving components and their props tests unchanged; with option 3 it means rewriting every component.
 
-SOLID, applied to this layout: one responsibility per layer (SRP); components depend on props, not on a concrete data source (DIP); new features are new folders, not edits to existing components (OCP). No abstraction is added on top of the generated client beyond the hook.
+Enforcement: not in place today. The change that implements this ADR adds an oxlint `no-restricted-imports` override for `src/features/*/components/**` (no `api/`, no `data/`, no store), so the main claim becomes a CI check. Until it lands, the rule is reviewer discipline, as the web rules say.
+
+Existing tests: `App.test.tsx` stays as an integration test with a real store (an allowed importer). Presentational components get props-only tests.
 
 ## Consequences
 
-- Each feature has a view-model type and a mapping step. This is more code than option 3 and is intentional: it is what keeps the DTOs from leaking into the UI.
+- Findings get a view-model type and a mapping step. That is more code than option 3 and is intentional for the one DTO that is non-trivial; the small features do not get one.
 - Presentational components are tested with props only, without MSW or a store. Data hooks are tested with MSW handlers from `contracts/mocks/`.
-- Existing components (`FindingsTable`, `SummaryCards`, `HealthBadge`) must be moved to this layout. That is a code change under `web/src`, so it needs an OpenSpec change and its own PR (`git-guard` denies service code without an active change). This ADR does not change code.
-- A future library change is limited to `src/api/` and the `data/` hooks; the review rule is that a PR which imports `api/generated` from a component is not ready.
+- The existing components (`FindingsTable`, `SummaryCards`, `HealthBadge`) move to this layout in a separate OpenSpec change and PR (`git-guard` denies service code without an active change). This ADR changes no code.
+- A future library change is limited to `src/api/` and the `data/` hooks.
