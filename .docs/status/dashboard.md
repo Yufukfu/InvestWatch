@@ -13,7 +13,7 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 
 ## Active OpenSpec changes
 
-- `agent-watch` (branch `chore/agent-watch`): the `iw-watch` skill and runner for agent-to-agent hand-offs through GitHub, plus `.github/CODEOWNERS` (owners need the team's OK in review).
+- `agent-watch` (branch `chore/agent-watch`, archived in its PR): the `iw-watch` skill and runner for agent-to-agent hand-offs through GitHub, plus `.github/CODEOWNERS` (owners need the team's OK in review).
 - archived: `web-setup`, `trend-chart`, `trend-chart-review-fixes`, `live-api-data` (`live-api-data` in PR #25)
 
 ## Blockers and open decisions

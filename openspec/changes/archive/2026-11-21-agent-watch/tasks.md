@@ -42,7 +42,7 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 ## 7. Closing tasks
 
 - [x] 7.1 Apply the `iw-docs-update` skill: update `.claude/SDLC.md`, `.docs/ai-workflow.md` and `.docs/INDEX.md` (skill list, the scheduled-watcher flow), `.docs/status/dashboard.md`, add the `iw-ai-log` row, run `docs-check.mjs` clean. No ADR: the push and PR rule is ADR 0207, and the round-cap choice is in `design.md`
-- [ ] 7.2 Run the `iw-pr-review` skill with `focus: security`, fix the real findings, and draft the PR body (it must say that the headless agent pushes and comments under ADR 0207); push and open the PR as ADR 0207 allows
+- [x] 7.2 Run the `iw-pr-review` skill with `focus: security`, fix the real findings, and draft the PR body (it must say that the headless agent pushes and comments under ADR 0207); push and open the PR as ADR 0207 allows
 
 ## Workflow follow-up
 
