@@ -89,4 +89,40 @@ describe('FindingsFilters', () => {
     fireEvent.click(btn);
     expect(onReset).toHaveBeenCalledTimes(1);
   });
+
+  it('reports platform and date changes, and clearing a date', () => {
+    const { onChange } = setup({ dateTo: '2026-11-21' });
+    fireEvent.change(screen.getByLabelText('Platforma'), { target: { value: 'youtube' } });
+    expect(onChange).toHaveBeenLastCalledWith({ platform: 'youtube' });
+    fireEvent.change(screen.getByLabelText('Od dnia'), { target: { value: '2026-11-19' } });
+    expect(onChange).toHaveBeenLastCalledWith({ dateFrom: '2026-11-19' });
+    fireEvent.change(screen.getByLabelText('Do dnia'), { target: { value: '' } });
+    expect(onChange).toHaveBeenLastCalledWith({ dateTo: undefined });
+  });
+
+  it('keeps a trailing space while typing after the search settles', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<FindingsFilters filters={base} onChange={onChange} onReset={vi.fn()} />);
+    const box = screen.getByLabelText('Szukaj');
+    fireEvent.change(box, { target: { value: 'foo ' } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(onChange).toHaveBeenLastCalledWith({ q: 'foo' });
+    rerender(<FindingsFilters filters={{ ...base, q: 'foo' }} onChange={onChange} onReset={vi.fn()} />);
+    expect(box).toHaveValue('foo ');
+    fireEvent.change(box, { target: { value: 'foo bar' } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(onChange).toHaveBeenLastCalledWith({ q: 'foo bar' });
+  });
+
+  it('a reset cancels a pending search and empties the box', () => {
+    const onChange = vi.fn();
+    const onReset = vi.fn();
+    render(<FindingsFilters filters={{ ...base, module: 'M1' }} onChange={onChange} onReset={onReset} />);
+    fireEvent.change(screen.getByLabelText('Szukaj'), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: /Wyczyść filtry/ }));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Szukaj')).toHaveValue('');
+  });
 });

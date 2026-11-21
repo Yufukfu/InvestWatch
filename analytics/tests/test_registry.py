@@ -18,8 +18,11 @@ def registry() -> Registry:
     return Registry.from_csv(SEED)
 
 
-def test_seed_loads_three_fictional_firms(registry):
-    assert {f.id for f in registry.firms} == {ALFA_ID, BANK_ID, EURO_ID}
+ATLANTIC_ID = "5b0c3e9a-7d2f-4a61-9c83-2f6e1a4d8b17"  # foreign_no_branch, for the M1 Polish-targeting filter
+
+
+def test_seed_loads_the_fictional_firms(registry):
+    assert {f.id for f in registry.firms} == {ALFA_ID, BANK_ID, EURO_ID, ATLANTIC_ID}
 
 
 def test_default_registry_path_is_seed(monkeypatch):
@@ -259,3 +262,63 @@ def test_name_without_word_tokens_never_fuzzy_matches(tmp_path):
         encoding="utf-8",
     )
     assert Registry.from_csv(csv).match("Dowolny tekst bez nazwy.", "https://x.example.org/") is None
+
+
+# ---- #35 review 2: confusables and the fuzzy boundary ------------------------------------------------
+
+
+@pytest.mark.parametrize("text, quote", [
+    ("Konto w Ａｌｆａ Inwestycje.", "Ａｌｆａ Inwestycje"),
+    ("Konto w Alfa\u200b Inwestycje.", "Alfa\u200b Inwestycje"),
+    ("Konto w Al\u00adfa Inwestycje.", "Al\u00adfa Inwestycje"),
+])
+def test_fullwidth_and_zero_width_names_match_by_name(registry, text, quote):
+    m = registry.match(text, "https://x.example.org/")
+    assert m is not None and m.method == "name" and m.evidence == quote and quote in text
+    assert registry.find_name(m.firm, text) == quote
+
+
+def test_cyrillic_confusable_is_not_a_name_match(registry):
+    m = registry.match("Konto w \u0410lfa Inwestycje.", "https://x.example.org/")  # Cyrillic A
+    assert m is None or m.method != "name"
+
+
+def _omega() -> Registry:
+    from investwatch_analytics.registry import Firm
+
+    return Registry([Firm(id="9c4b8a1e-2f3d-4e5a-8b6c-7d8e9f0a1b2c", name="Omega Kapital S.A.", type="brokerage_house",
+                          country="PL", aliases=(), domains=(), source_url=None)])
+
+
+def test_fuzzy_ratio_88_matches():
+    m = _omega().match("Konto w Amega Kaital.", "https://x.example.org/")  # ratio exactly 88 against "omega kapital"
+    assert m is not None and m.method == "fuzzy"
+
+
+def test_fuzzy_ratio_below_88_does_not_match():
+    assert _omega().match("Konto w Amga Kaital.", "https://x.example.org/") is None
+
+
+
+def test_fullwidth_registry_name_matches_plain_text():
+    from investwatch_analytics.registry import Firm
+
+    reg = Registry([Firm(id="9c4b8a1e-2f3d-4e5a-8b6c-7d8e9f0a1b2c", name="Ｚｅｔａ Kapitał S.A.", type="brokerage_house",
+                         country="PL", aliases=(), domains=(), source_url=None)])
+    m = reg.match("Konto w Zeta Kapitał.", "https://x.example.org/")
+    assert m is not None and m.method == "name" and m.evidence == "Zeta Kapitał"
+
+
+def test_zero_width_inside_a_fuzzy_name(registry):
+    m = registry.match("Polecam Al\u200bfa Inwestycji.", "https://x.example.org/")
+    assert m is not None and m.method == "fuzzy" and m.firm.name.startswith("Alfa")
+
+
+def test_alias_of_invisible_characters_is_ignored():
+    from investwatch_analytics.registry import Firm
+
+    reg = Registry([Firm(id="9c4b8a1e-2f3d-4e5a-8b6c-7d8e9f0a1b2c", name="Omega Kapital S.A.", type="brokerage_house",
+                         country="PL", aliases=("​", "­"), domains=(), source_url=None)])
+    assert reg.match("!hello", "https://x.example.org/") is None
+    assert reg.match("", "https://x.example.org/") is None
+    assert reg.match("​​", "https://x.example.org/") is None

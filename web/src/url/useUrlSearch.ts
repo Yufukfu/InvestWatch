@@ -15,9 +15,15 @@ function subscribe(onChange: () => void) {
 
 const getSearch = () => window.location.search;
 
-export function pushSearch(next: string): void {
+export type UrlWrite = (next: string, options?: { replace?: boolean }) => void;
+
+// `replace` rewrites the current history entry (a settled text search); a discrete change pushes
+// one, so the back button steps through views, not keystrokes.
+export function pushSearch(next: string, options?: { replace?: boolean }): void {
   if (next === window.location.search) return;
-  window.history.pushState(null, '', `${window.location.pathname}${next}${window.location.hash}`);
+  const url = `${window.location.pathname}${next}${window.location.hash}`;
+  if (options?.replace) window.history.replaceState(null, '', url);
+  else window.history.pushState(null, '', url);
   window.dispatchEvent(new Event(CHANGE));
 }
 
@@ -29,8 +35,8 @@ export function setSearchParam(name: string, value: string): void {
   pushSearch(s ? `?${s}` : '');
 }
 
-export function useUrlSearch(): [string, (next: string) => void] {
+export function useUrlSearch(): [string, UrlWrite] {
   const search = useSyncExternalStore(subscribe, getSearch, getSearch);
-  const push = useCallback((next: string) => pushSearch(next), []);
-  return [search, push];
+  const write = useCallback<UrlWrite>((next, options) => pushSearch(next, options), []);
+  return [search, write];
 }

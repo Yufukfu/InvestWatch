@@ -76,8 +76,8 @@ describe('CalibrationPanel', () => {
     setup({ view: { ...view, currentThreshold: 0.62 }, index: i60, currentIndex: i60 });
     expect(screen.getByText(/obecny próg: 0\.62/)).toBeInTheDocument();
     expect(metric('Fałszywe alarmy (FP)')).toHaveTextContent('najbliższy punkt (0.60):');
-    expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Wróć do obecnego' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Wróć do obecnego' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('omits F1 when the point has none', () => {
@@ -89,11 +89,11 @@ describe('CalibrationPanel', () => {
   it('saves only when the selection differs and warns that it is global', () => {
     setup({ index: i50 });
     const save = screen.getByRole('button', { name: 'Zapisz próg' });
-    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute('aria-disabled', 'true');
     expect(save).toHaveAccessibleDescription(/zmienia poziom ryzyka wszystkich zgłoszeń modułu M2/);
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByText(/zmienia poziom ryzyka wszystkich zgłoszeń modułu M2 i próg alertów/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Wróć do obecnego' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Wróć do obecnego' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('save and reset call back with the selection', () => {
@@ -104,14 +104,26 @@ describe('CalibrationPanel', () => {
     expect(p.onIndex).toHaveBeenCalledWith(i50);
   });
 
+  it('an aria-disabled save or reset does nothing when clicked', () => {
+    const p = setup({ index: i50 });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz próg' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wróć do obecnego' }));
+    expect(p.onSave).not.toHaveBeenCalled();
+    expect(p.onIndex).not.toHaveBeenCalled();
+  });
+
   it('cannot save before the thresholds are known or while saving', () => {
-    setup({ index: i70, canSave: false });
-    expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled();
+    const p = setup({ index: i70, canSave: false });
+    expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz próg' }));
+    expect(p.onSave).not.toHaveBeenCalled();
   });
 
   it('disables the save while saving', () => {
-    setup({ index: i70, isSaving: true });
-    expect(screen.getByRole('button', { name: 'Zapisywanie…' })).toBeDisabled();
+    const p = setup({ index: i70, isSaving: true });
+    expect(screen.getByRole('button', { name: 'Zapisywanie…' })).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisywanie…' }));
+    expect(p.onSave).not.toHaveBeenCalled();
   });
 
   it('confirms a save', () => {

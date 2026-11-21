@@ -169,17 +169,26 @@ function Body({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!changed || !canSave || isSaving}
+            // aria-disabled, not disabled: a disabled button drops keyboard focus to <body>.
+            aria-disabled={!changed || !canSave || isSaving}
             aria-describedby={warningId}
-            onClick={() => onSave(selected.threshold)}
+            onClick={() => {
+              if (changed && canSave && !isSaving) onSave(selected.threshold);
+            }}
           >
             {isSaving ? 'Zapisywanie…' : 'Zapisz próg'}
           </button>
-          {changed && (
-            <button type="button" className="btn" onClick={() => onIndex(currentIndex)}>
-              Wróć do obecnego
-            </button>
-          )}
+          {/* Always rendered: removing the focused button would drop focus to <body>. */}
+          <button
+            type="button"
+            className="btn"
+            aria-disabled={!changed}
+            onClick={() => {
+              if (changed) onIndex(currentIndex);
+            }}
+          >
+            Wróć do obecnego
+          </button>
           {error && <p role="alert">{error}</p>}
           {saved && !error && !changed && (
             <p role="status" className="saved">

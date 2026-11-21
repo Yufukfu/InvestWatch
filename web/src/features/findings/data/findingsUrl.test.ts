@@ -99,4 +99,38 @@ describe('toQueryArg', () => {
   it('sends no empty parameters', () => {
     expect(toQueryArg(DEFAULT_FILTERS)).toEqual({ sort: '-detected_at', page: 1, pageSize: 25 });
   });
+
+describe('serialised parameter names (shared links)', () => {
+  it('writes every filter under its GET /findings name, in a fixed order', () => {
+    const s = serializeUrl(
+      {
+        module: 'M1',
+        status: ['new', 'in_review'],
+        riskLevel: 'high',
+        platform: 'instagram',
+        scoreMin: 0.4,
+        dateFrom: '2026-11-20',
+        dateTo: '2026-11-21',
+        q: 'jan k',
+        sort: '-score',
+        page: 2,
+        pageSize: 10,
+      },
+      '94f686c6-70c3-5ec9-9b6f-c97032c380c6',
+    );
+    expect(s).toBe(
+      '?module=M1&status=new,in_review&risk_level=high&platform=instagram&score_min=0.4&date_from=2026-11-20&date_to=2026-11-21&q=jan+k&sort=-score&page=2&page_size=10&finding=94f686c6-70c3-5ec9-9b6f-c97032c380c6',
+    );
+  });
+
+  it('sends platform, q and page size to the backend', () => {
+    expect(toQueryArg({ ...DEFAULT_FILTERS, platform: 'tiktok', q: 'kurs', pageSize: 50 })).toEqual({
+      platform: 'tiktok',
+      q: 'kurs',
+      sort: '-detected_at',
+      page: 1,
+      pageSize: 50,
+    });
+  });
+});
 });

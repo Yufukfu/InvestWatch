@@ -200,13 +200,20 @@ describe('FindingDetailPanel', () => {
     expect(middle).toHaveFocus();
   });
 
-  it('does not close on Escape inside a field that holds text', () => {
+  it('Escape in a field that holds text moves focus to Zamknij first, the next Escape closes', () => {
     const onClose = vi.fn();
     render(<FindingDetailPanel {...base} onClose={onClose} detail={detail()} statusEditor={<textarea aria-label="n" defaultValue="" />} />);
     const box = screen.getByLabelText('n') as HTMLTextAreaElement;
     fireEvent.change(box, { target: { value: 'niezapisana notatka' } });
+    box.focus();
     fireEvent.keyDown(box, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
+    expect(box).toHaveValue('niezapisana notatka');
+    const close = screen.getByRole('button', { name: 'Zamknij' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    onClose.mockClear();
     fireEvent.change(box, { target: { value: '' } });
     fireEvent.keyDown(box, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -215,5 +222,30 @@ describe('FindingDetailPanel', () => {
   it('renders the status editor slot', () => {
     render(<FindingDetailPanel {...base} detail={detail()} statusEditor={<p>edytor</p>} />);
     expect(screen.getByText('edytor')).toBeInTheDocument();
+  });
+
+  it.each(['//evil.example/x.png', '/other/x.png', '/apix/x.png'])('does not load a screenshot from %s', (url) => {
+    render(<FindingDetailPanel {...base} detail={detail({ screenshotUrl: url })} />);
+    expect(screen.queryByRole('img', { name: /Zrzut ekranu/ })).toBeNull();
+  });
+
+  it('makes the rest of the page inert and locks scroll, and restores both on close', () => {
+    const page = document.createElement('div');
+    document.body.appendChild(page);
+    const { unmount } = render(<FindingDetailPanel {...base} detail={detail()} />);
+    expect(page).toHaveAttribute('inert');
+    expect(screen.getByRole('dialog').closest('[inert]')).toBeNull();
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(page).not.toHaveAttribute('inert');
+    expect(document.body.style.overflow).toBe('');
+    page.remove();
+  });
+
+  it('keeps the last detail with an inline alert when a refetch failed', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} isError />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się odświeżyć szczegółów');
+    expect(screen.getByRole('heading', { level: 2, name: 'Obietnica 18% zysku' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /Naruszenia/ })).toBeInTheDocument();
   });
 });

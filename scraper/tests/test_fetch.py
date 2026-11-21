@@ -106,6 +106,7 @@ async def test_fetch_never_retries(stub):
     failure = await failure_of(stub.url("/down"), IDENTITY, None)
 
     assert failure.reason is Reason.HTTP_ERROR
+    assert failure.http_status == 503
     assert len(stub.requests) == 1
 
 
@@ -251,6 +252,7 @@ async def test_forbidden_and_rate_limited_are_blocked(stub, status):
     failure = await failure_of(stub.url("/b"), IDENTITY, None)
 
     assert failure.reason is Reason.BLOCKED
+    assert failure.http_status == status
     assert str(status) in failure.detail
 
 

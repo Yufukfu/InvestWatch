@@ -23,11 +23,19 @@ export function FindingsFilters({ filters, onChange, onReset }: Props) {
   const [text, setText] = useState(filters.q ?? '');
   const [seenQ, setSeenQ] = useState(filters.q);
 
-  // An external change of q (reset, back button) replaces what is typed; adjusted during render.
+  // An external change of q (back button, shared link) replaces what is typed; adjusted during render.
+  // Our own settled search comes back trimmed, so only resync when it really differs from the box,
+  // or the space the user just typed would be eaten.
   if (seenQ !== filters.q) {
     setSeenQ(filters.q);
-    setText(filters.q ?? '');
+    if (filters.q !== (text.trim() || undefined)) setText(filters.q ?? '');
   }
+
+  const reset = () => {
+    // Emptying the box first makes the debounce effect cancel a pending search.
+    setText('');
+    onReset();
+  };
 
   useEffect(() => {
     const next = text.trim() || undefined;
@@ -150,7 +158,7 @@ export function FindingsFilters({ filters, onChange, onReset }: Props) {
       </fieldset>
       {active > 0 && (
         <div className="filters-actions">
-          <button type="button" className="btn btn-ghost" onClick={onReset}>
+          <button type="button" className="btn btn-ghost" onClick={reset}>
             Wyczyść filtry ({active})
           </button>
         </div>

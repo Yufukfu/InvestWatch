@@ -82,4 +82,55 @@ describe('useFindings', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.rows).toBeUndefined();
   });
+
+  it('requests page 1 with 25 per page by default', async () => {
+    const seen = captureQuery();
+    const { result } = renderHook(() => useFindings(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.rows).toBeDefined());
+    expect(seen[0].get('page')).toBe('1');
+    expect(seen[0].get('page_size')).toBe('25');
+  });
+
+  it('keeps the last rows and total while the next result loads', async () => {
+    let release: () => void = () => undefined;
+    let calls = 0;
+    server.use(
+      http.get('http://localhost/api/findings', async () => {
+        calls += 1;
+        if (calls > 1) await new Promise<void>((r) => (release = r));
+        return HttpResponse.json(findings);
+      }),
+    );
+    const { result } = renderHook(() => useFindings(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.rows).toBeDefined());
+    act(() => result.current.setFilters({ sort: '-score' }));
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.rows).toHaveLength(findings.items.length);
+    expect(result.current.total).toBe(findings.total);
+    act(() => release());
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+  });
+
+  it('a settled search replaces the history entry; other filters push one', async () => {
+    const { result } = renderHook(() => useFindings(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.rows).toBeDefined());
+    const start = window.history.length;
+    act(() => result.current.setFilters({ q: 'jan' }));
+    expect(window.location.search).toBe('?q=jan');
+    expect(window.history.length).toBe(start);
+    act(() => result.current.setFilters({ module: 'M1' }));
+    expect(window.history.length).toBe(start + 1);
+  });
+
+  it('a failed refetch clears the last rows (not shown as current)', async () => {
+    let fail = false;
+    server.use(http.get('http://localhost/api/findings', () => (fail ? HttpResponse.error() : HttpResponse.json(findings))));
+    const { result } = renderHook(() => useFindings(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.rows).toBeDefined());
+    fail = true;
+    act(() => result.current.setFilters({ module: 'M1' }));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.rows).toBeUndefined();
+    expect(result.current.total).toBeUndefined();
+  });
 });

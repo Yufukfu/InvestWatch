@@ -47,19 +47,19 @@ describe('CalibrationPage', () => {
     );
     render(<CalibrationPage chartSize={{ width: 500, height: 240 }} />, { wrapper: storeWrapper() });
     const slider = await screen.findByRole('slider', { name: 'Próg dla M2' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true'));
     fireEvent.change(slider, { target: { value: idx(0.7) } });
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz próg' }));
     await waitFor(() => expect(screen.getByText(/obecny próg: 0\.70/)).toBeInTheDocument());
     expect(body).toEqual({ ...thresholds, M2: 0.7 });
-    expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('a rejected save keeps the current threshold and shows the error', async () => {
     server.use(http.put('http://localhost/api/settings/thresholds', () => HttpResponse.json({ error: 'x' }, { status: 422 })));
     render(<CalibrationPage chartSize={{ width: 500, height: 240 }} />, { wrapper: storeWrapper() });
     const slider = await screen.findByRole('slider', { name: 'Próg dla M2' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true'));
     fireEvent.change(slider, { target: { value: idx(0.7) } });
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz próg' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Nie zapisano progu: serwer odrzucił wartość.');
@@ -88,7 +88,7 @@ describe('CalibrationPage', () => {
     server.use(http.put('http://localhost/api/settings/thresholds', () => HttpResponse.json({ error: 'x' }, { status: 422 })));
     render(<CalibrationPage chartSize={{ width: 500, height: 240 }} />, { wrapper: storeWrapper() });
     const slider = await screen.findByRole('slider', { name: 'Próg dla M2' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true'));
     fireEvent.change(slider, { target: { value: idx(0.7) } });
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz próg' }));
     await screen.findByRole('alert');
