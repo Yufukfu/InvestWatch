@@ -34,7 +34,7 @@ operations:
   apply:
     guidance:
       - Before committing each task group, load and follow the iw-commit-cycle skill (test first, mutation check, stage and commit as separate calls, iw-reviewer once per task group or before a push). Do not implement outside this apply flow.
-      - When all tasks are complete, run /openspec-archive-change as the last commit of the branch, then stop and hand the PR body to the human. Never push or open the PR yourself.
+      - When all tasks are complete, run /openspec-archive-change as the last commit of the branch, then push the branch and open the PR with the iw-pr-review body (never main, never --force). Stop there: the human approves and merges; never merge or approve yourself.
   archive:
     guidance:
       - Archive as the last commit of the PR branch, after the iw-pr-review task is done. Any later code change would need a new change or IW_SKIP_SPEC=1.
