@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investwatch.local/contracts/v1/finding.schema.json",
+  "title": "Finding",
+  "description": "Result of one analytics module (M1, M2 or M3) for one document. Stored in the `findings` table, served by the API. `risk_level` is NOT stored - the API derives it from `score` and the current module threshold.",
+  "type": "object",
+  "required": ["id", "document_id", "module", "score", "status", "title", "url", "platform", "rules", "detected_at", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "#/$defs/uuid" },
+    "document_id": { "$ref": "#/$defs/uuid" },
+    "module": { "$ref": "#/$defs/module" },
+    "score": { "type": "number", "minimum": 0, "maximum": 1, "description": "Raw score; higher = more likely a violation." },
+    "risk_level": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Present only in API responses: high >= threshold, medium >= threshold - 0.2, otherwise low."
+    },
+    "status": { "$ref": "#/$defs/status" },
+    "title": { "type": "string", "description": "Short user-facing title (Polish)." },
+    "summary": { "type": ["string", "null"], "description": "2-3 sentence user-facing rationale (Polish)." },
+    "firm": {
+      "type": ["object", "null"],
+      "description": "Investment firm the material concerns (M1, M2).",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "registry_id": { "anyOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "registry_type": {
+          "type": ["string", "null"],
+          "enum": ["brokerage_house", "brokerage_bank", "foreign_branch", "foreign_no_branch", null]
+        },
+        "authorized": { "type": "boolean" },
+        "match_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "advertiser": {
+      "type": ["object", "null"],
+      "description": "Party publishing or offering the content (M1, M3).",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "handle": { "type": ["string", "null"] },
+        "profile_url": { "type": ["string", "null"], "format": "uri" },
+        "website": { "type": ["string", "null"], "format": "uri" },
+        "in_registry": { "type": "boolean" },
+        "on_warning_list": { "type": ["boolean", "null"], "description": "Entity appears on the KNF public warnings list." }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "description": "M2: results of the 18 UKNF rules (R1-R18); M1/M3: signals (S1.x / S3.x).",
+      "items": { "$ref": "#/$defs/rule_result" }
+    },
+    "content_excerpt": { "type": ["string", "null"], "maxLength": 500 },
+    "url": { "type": "string", "format": "uri" },
+    "platform": { "type": "string", "enum": ["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"] },
+    "note": { "type": ["string", "null"], "description": "Analyst note set via PATCH." },
+    "detected_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "model": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "pipeline_version": { "type": "string" },
+        "llm": { "type": ["string", "null"], "description": "null = rules-only mode (LLM unavailable)." },
+        "embedder": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "module": { "type": "string", "enum": ["M1", "M2", "M3"] },
+    "status": { "type": "string", "enum": ["new", "in_review", "confirmed", "false_positive", "closed"] },
+    "rule_result": {
+      "type": "object",
+      "required": ["rule_id", "name", "result", "severity"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": { "type": "string", "pattern": "^(R([1-9]|1[0-8])|R12[ab]|S[13]\\.[0-9]+)$", "description": "R1-R18 (incl. R12a/R12b) for M2, S1.x for M1, S3.x for M3." },
+        "name": { "type": "string" },
+        "result": { "type": "string", "enum": ["fail", "pass", "not_applicable", "uncertain"], "description": "For M1/M3 signals: fail = signal detected (suspicious)." },
+        "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+        "evidence": { "type": ["string", "null"], "description": "Exact quote from the document (verified substring)." },
+        "evidence_locator": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "viewport": { "type": ["string", "null"], "enum": ["desktop", "tablet", "mobile", null] },
+            "bbox": { "type": ["array", "null"], "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }
+          }
+        },
+        "explanation": { "type": ["string", "null"], "description": "User-facing (Polish)." },
+        "legal_basis": { "type": ["string", "null"] },
+        "method": { "type": ["string", "null"], "enum": ["rule", "llm", "hybrid", null] }
+      }
+    }
+  }
+}

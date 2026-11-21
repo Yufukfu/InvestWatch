@@ -115,6 +115,8 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 }
 ```
 
+Machine-readable versions of all contracts in this document (JSON Schema, OpenAPI, mocks): [`contracts/`](../contracts/README.md).
+
 Minimum required for analytics to work: `id, platform, url, fetched_at, text, source_kind`.
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
@@ -132,10 +134,10 @@ One document can produce 0–3 findings (one per module).
   "module": "M1|M2|M3",
   "score": 0.87,                        // raw score 0–1; the threshold is NOT stored – the API/dashboard applies it
   "status": "new|in_review|confirmed|false_positive|closed",
-  "title": "XTB ad by finfluencer @inwestor_jan without an ad label",
+  "title": "EuroTrade Markets ad by finfluencer @inwestor_jan without an ad label",
   "summary": "2–3 sentence rationale (in Polish – user-facing)",
   "firm": {                             // investment firm the material concerns (M1, M2)
-    "name": "X-Trade Brokers DM S.A.",
+    "name": "EuroTrade Markets Ltd (Polish branch)",   // fictional example
     "registry_id": "uuid | null",
     "registry_type": "brokerage_house|brokerage_bank|foreign_branch|foreign_no_branch|null",
     "authorized": true,

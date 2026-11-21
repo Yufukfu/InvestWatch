@@ -1,0 +1,798 @@
+{
+  "items": [
+    {
+      "id": "94f686c6-70c3-5ec9-9b6f-c97032c380c6",
+      "document_id": "a3c88321-15bf-56e4-8d59-05a9033308c6",
+      "module": "M2",
+      "score": 0.86,
+      "risk_level": "high",
+      "status": "new",
+      "title": "Obietnica 18% zysku z ostrzeżeniem o ryzyku ukrytym w stopce",
+      "summary": "Materiał eksponuje stopę zwrotu 18% i powołuje się na nadzór KNF jako gwarancję bezpieczeństwa. Ostrzeżenie o ryzyku jest w stopce, czcionką 9 px w jasnoszarym kolorze.",
+      "firm": {
+        "name": "Alfa Inwestycje Dom Maklerski S.A.",
+        "registry_id": "facc6bd1-c728-5348-90a4-011b0972fea9",
+        "registry_type": "brokerage_house",
+        "authorized": true,
+        "match_confidence": 0.95
+      },
+      "advertiser": null,
+      "rules": [
+        {
+          "rule_id": "R1",
+          "name": "Identyfikacja firmy",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": "Konto Premium Alfa Inwestycje",
+          "evidence_locator": null,
+          "explanation": "Nazwa firmy jest podana.",
+          "legal_basis": "art. 44 ust. 2 lit. a rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R2",
+          "name": "Oznaczenie reklamy",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Brak oznaczenia materiału jako reklamy.",
+          "legal_basis": "art. 24 ust. 3 MiFID II",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R3",
+          "name": "Informacja o ryzyku",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "Zarabiaj nawet do 18% rocznie na portfelu ETF!",
+          "evidence_locator": null,
+          "explanation": "Obietnica zysku bez ostrzeżenia o ryzyku w bezpośrednim sąsiedztwie.",
+          "legal_basis": "art. 44 ust. 2 lit. b rozp. del. 2017/565",
+          "method": "hybrid"
+        },
+        {
+          "rule_id": "R4",
+          "name": "Rozmiar czcionki ryzyka",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "*Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+          "evidence_locator": null,
+          "explanation": "Ostrzeżenie 9 px przy przeważającej czcionce 20 px (0,45×).",
+          "legal_basis": "art. 44 ust. 2 lit. c rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R5",
+          "name": "Ekspozycja i kontrast ryzyka",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Kontrast ostrzeżenia 1,9:1 (wymagane min. 4,5:1).",
+          "legal_basis": "art. 44 ust. 2 lit. c i e rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R6",
+          "name": "Zakrywanie / ukrywanie ryzyka",
+          "result": "fail",
+          "severity": "high",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Ostrzeżenie wyłącznie w stopce, niewidoczne bez przewijania.",
+          "legal_basis": "art. 44 ust. 2 lit. e rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R8",
+          "name": "Responsywność",
+          "result": "fail",
+          "severity": "low",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Na telefonie ostrzeżenie ma 8 px i jest ucięte.",
+          "legal_basis": "art. 44 ust. 2 lit. g rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R10",
+          "name": "Spójność językowa",
+          "result": "pass",
+          "severity": "low",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": "art. 44 ust. 2 lit. f rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R17",
+          "name": "Zakaz sugerowania aprobaty organu nadzoru",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "Działamy pod nadzorem KNF – Twoje środki są bezpieczne.",
+          "evidence_locator": null,
+          "explanation": "Odwołanie do KNF sugeruje aprobatę produktu.",
+          "legal_basis": "art. 44 ust. 8 rozp. del. 2017/565",
+          "method": "llm"
+        },
+        {
+          "rule_id": "R18",
+          "name": "Nadzór jako argument bezpieczeństwa",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "Działamy pod nadzorem KNF – Twoje środki są bezpieczne.",
+          "evidence_locator": null,
+          "explanation": "Nadzór KNF użyty jako argument bezpieczeństwa inwestycji.",
+          "legal_basis": "art. 44 ust. 8 rozp. del. 2017/565",
+          "method": "llm"
+        }
+      ],
+      "content_excerpt": "Konto Premium Alfa Inwestycje. Zarabiaj nawet do 18% rocznie na portfelu ETF! Dołącz do 50 000 zadowolonych inwestorów. Działamy pod nadzorem KNF – Twoje środki są bezpieczne. Otwórz konto w 5 minut. ",
+      "url": "https://alfa-inwestycje.example.com/konto-premium",
+      "platform": "web",
+      "note": null,
+      "detected_at": "2026-11-21T15:00:40Z",
+      "updated_at": "2026-11-21T15:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "7ee7e1f3-faa9-5c1c-b3af-ee85220e7b2c",
+      "document_id": "3c41441c-40ba-5864-b3e0-03f8bc9acebe",
+      "module": "M1",
+      "score": 0.91,
+      "risk_level": "high",
+      "status": "new",
+      "title": "Finfluencer @inwestor_jan reklamuje EuroTrade Markets z linkiem afiliacyjnym",
+      "summary": "Post promuje konto w EuroTrade Markets z kodem polecającym JAN500. Brak oznaczenia współpracy i jakiejkolwiek informacji o ryzyku.",
+      "firm": {
+        "name": "EuroTrade Markets Ltd (oddział w Polsce)",
+        "registry_id": "2d7456b6-f7b5-52f2-a039-64e250001e24",
+        "registry_type": "foreign_branch",
+        "authorized": true,
+        "match_confidence": 0.95
+      },
+      "advertiser": {
+        "name": "Jan Inwestor",
+        "handle": "@inwestor_jan",
+        "profile_url": "https://www.instagram.com/inwestor_jan/",
+        "in_registry": false
+      },
+      "rules": [
+        {
+          "rule_id": "S1.1",
+          "name": "Wzmianka o firmie z rejestru",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "EuroTrade Markets",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.2",
+          "name": "Link afiliacyjny / kod polecający",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "register?ref=JAN500",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.3",
+          "name": "Oznaczenie współpracy",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Brak #reklama / #współpraca.",
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.4",
+          "name": "Wezwanie do działania",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "link w bio!",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.5",
+          "name": "Treść promocyjna",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "to najlepsza decyzja w moim życiu",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S1.6",
+          "name": "Autor inny niż firma",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "@inwestor_jan",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "Od pół roku gram na forexie w EuroTrade Markets i to najlepsza decyzja w moim życiu 🚀 Z moim linkiem dostaniesz bonus 500 zł na start – link w bio! #forex #inwestowanie #pasywnydochod",
+      "url": "https://www.instagram.com/p/MOCK0001/",
+      "platform": "instagram",
+      "note": null,
+      "detected_at": "2026-11-21T14:00:40Z",
+      "updated_at": "2026-11-21T14:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "2f832a41-72d8-515b-a447-13d24ba96941",
+      "document_id": "007bbcee-0737-5c6d-b9b4-ce56fcbfa8e4",
+      "module": "M3",
+      "score": 0.93,
+      "risk_level": "high",
+      "status": "new",
+      "title": "Podmiot spoza rejestru rekomenduje kupno i sprzedaż konkretnych instrumentów",
+      "summary": "Oferta zawiera spersonalizowane rekomendacje nabycia i zbycia instrumentów finansowych (obligacje, akcje WIG20, ETF) za opłatą. Podmiot nie występuje w rejestrze firm inwestycyjnych KNF.",
+      "firm": null,
+      "advertiser": {
+        "name": "ZłotyKapitał Family Office",
+        "website": "https://zlotykapital-fo.example.com/",
+        "in_registry": false,
+        "on_warning_list": false
+      },
+      "rules": [
+        {
+          "rule_id": "S3.1",
+          "name": "Podmiot spoza rejestru",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "ZłotyKapitał Family Office",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.2",
+          "name": "Słownictwo usług doradczych",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "Family Office",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.3",
+          "name": "Personalizacja",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "dopasujemy portfel do Twojej sytuacji",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S3.4",
+          "name": "Rekomendacja konkretnych instrumentów",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "rekomendujemy kupno obligacji skarbowych i akcji spółek z WIG20 oraz sprzedaż ETF na złoto",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S3.5",
+          "name": "Model odpłatny",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "Abonament 990 zł miesięcznie",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.6",
+          "name": "Kierowanie do Polski",
+          "result": "fail",
+          "severity": "low",
+          "evidence": "990 zł",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "ZłotyKapitał Family Office. Po bezpłatnej konsultacji 1:1 dopasujemy portfel do Twojej sytuacji. W tym kwartale rekomendujemy kupno obligacji skarbowych i akcji spółek z WIG20 oraz sprzedaż ETF na zło",
+      "url": "https://zlotykapital-fo.example.com/oferta",
+      "platform": "web",
+      "note": null,
+      "detected_at": "2026-11-21T13:00:40Z",
+      "updated_at": "2026-11-21T13:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "0a58df37-a2f1-5464-9691-f5f74cea21c5",
+      "document_id": "c99e2a35-eee1-5ee9-b057-b0d707a52cfb",
+      "module": "M2",
+      "score": 0.74,
+      "risk_level": "high",
+      "status": "in_review",
+      "title": "Wyniki historyczne i prognoza bez ostrzeżenia; ryzyko po angielsku za kliknięciem",
+      "summary": "Reklama CFD eksponuje wynik 34% za 2025 r. i zapowiada lepsze wyniki. Ostrzeżenie o ryzyku jest po angielsku i widoczne dopiero po rozwinięciu sekcji.",
+      "firm": {
+        "name": "EuroTrade Markets Ltd (oddział w Polsce)",
+        "registry_id": "2d7456b6-f7b5-52f2-a039-64e250001e24",
+        "registry_type": "foreign_branch",
+        "authorized": true,
+        "match_confidence": 0.95
+      },
+      "advertiser": null,
+      "rules": [
+        {
+          "rule_id": "R1",
+          "name": "Identyfikacja firmy",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": "EuroTrade Markets",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": "art. 44 ust. 2 lit. a rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R3",
+          "name": "Informacja o ryzyku",
+          "result": "uncertain",
+          "severity": "high",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Ostrzeżenie istnieje, ale nie towarzyszy bezpośrednio obietnicy zysku.",
+          "legal_basis": "art. 44 ust. 2 lit. b rozp. del. 2017/565",
+          "method": "llm"
+        },
+        {
+          "rule_id": "R7",
+          "name": "Dostępność za 1 kliknięciem",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Ostrzeżenie widoczne dopiero po rozwinięciu sekcji.",
+          "legal_basis": "art. 44 ust. 2 lit. b i e rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R10",
+          "name": "Spójność językowa",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "Risk warning: CFDs are complex instruments",
+          "evidence_locator": null,
+          "explanation": "Ostrzeżenie w języku angielskim, główny przekaz po polsku.",
+          "legal_basis": "art. 44 ust. 2 lit. f rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R14",
+          "name": "Ostrzeżenie przy wynikach historycznych",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "Nasi klienci zarobili średnio 34% w 2025 roku.",
+          "evidence_locator": null,
+          "explanation": "Brak zastrzeżenia, że wyniki historyczne nie są wiarygodnym wskaźnikiem przyszłych wyników.",
+          "legal_basis": "art. 44 ust. 4 lit. d rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R15",
+          "name": "Prognozy przyszłych wyników",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "W przyszłym roku spodziewamy się jeszcze lepszych wyników.",
+          "evidence_locator": null,
+          "explanation": "Prognoza bez wymaganego ostrzeżenia.",
+          "legal_basis": "art. 44 ust. 6 rozp. del. 2017/565",
+          "method": "llm"
+        }
+      ],
+      "content_excerpt": "Handluj CFD na indeksy z bonusem 500 zł na start! Nasi klienci zarobili średnio 34% w 2025 roku. W przyszłym roku spodziewamy się jeszcze lepszych wyników. Risk warning: CFDs are complex instruments a",
+      "url": "https://eurotrade-markets.example.com/pl/promocje/bonus-cfd",
+      "platform": "web",
+      "note": null,
+      "detected_at": "2026-11-21T11:00:40Z",
+      "updated_at": "2026-11-21T11:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "fa6f1321-221b-59e5-a0cd-67ba3a930f2d",
+      "document_id": "182e5a42-1041-5147-99dc-84d73ed34220",
+      "module": "M1",
+      "score": 0.64,
+      "risk_level": "high",
+      "status": "confirmed",
+      "title": "Oznaczona współpraca @finanse_z_kasia z Alfa Inwestycje DM",
+      "summary": "Post oznaczony jako współpraca, zawiera ostrzeżenie o ryzyku. Do ewidencji współprac firmy.",
+      "firm": {
+        "name": "Alfa Inwestycje Dom Maklerski S.A.",
+        "registry_id": "facc6bd1-c728-5348-90a4-011b0972fea9",
+        "registry_type": "brokerage_house",
+        "authorized": true,
+        "match_confidence": 0.95
+      },
+      "advertiser": {
+        "name": "Finanse z Kasią",
+        "handle": "@finanse_z_kasia",
+        "profile_url": "https://www.instagram.com/finanse_z_kasia/",
+        "in_registry": false
+      },
+      "rules": [
+        {
+          "rule_id": "S1.1",
+          "name": "Wzmianka o firmie z rejestru",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "Alfa Inwestycje DM",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.3",
+          "name": "Oznaczenie współpracy",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "#współpraca",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.5",
+          "name": "Treść promocyjna",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "jak założyłam rachunek maklerski",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S1.6",
+          "name": "Autor inny niż firma",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "@finanse_z_kasia",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "#współpraca z Alfa Inwestycje DM. Pokazuję, jak założyłam rachunek maklerski i kupiłam pierwszy ETF. Pamiętajcie: inwestowanie wiąże się z ryzykiem, możecie stracić część pieniędzy.",
+      "url": "https://www.instagram.com/p/MOCK0002/",
+      "platform": "instagram",
+      "note": null,
+      "detected_at": "2026-11-21T09:00:40Z",
+      "updated_at": "2026-11-21T09:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "ce89bbdc-846a-5fb2-8977-db387c7bd78a",
+      "document_id": "5030107e-63fe-567c-b076-ccfac4197430",
+      "module": "M2",
+      "score": 0.12,
+      "risk_level": "low",
+      "status": "closed",
+      "title": "Materiał IKE – wymogi spełnione",
+      "summary": "Materiał oznaczony jako reklama, z wyraźnym ostrzeżeniem o ryzyku i zastrzeżeniem podatkowym.",
+      "firm": {
+        "name": "Bank Przykładowy S.A. – Biuro Maklerskie",
+        "registry_id": "1deb09a7-047b-507c-89e6-512e8ee99140",
+        "registry_type": "brokerage_bank",
+        "authorized": true,
+        "match_confidence": 0.95
+      },
+      "advertiser": null,
+      "rules": [
+        {
+          "rule_id": "R1",
+          "name": "Identyfikacja firmy",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": "Bank Przykładowy S.A. – Biuro Maklerskie",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": "art. 44 ust. 2 lit. a rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R2",
+          "name": "Oznaczenie reklamy",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": "Reklama.",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": "art. 24 ust. 3 MiFID II",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R3",
+          "name": "Informacja o ryzyku",
+          "result": "pass",
+          "severity": "high",
+          "evidence": "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału.",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": "art. 44 ust. 2 lit. b rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R4",
+          "name": "Rozmiar czcionki ryzyka",
+          "result": "not_applicable",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Brak danych o renderowaniu strony.",
+          "legal_basis": "art. 44 ust. 2 lit. c rozp. del. 2017/565",
+          "method": "rule"
+        },
+        {
+          "rule_id": "R6",
+          "name": "Zakrywanie / ukrywanie ryzyka",
+          "result": "not_applicable",
+          "severity": "high",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Brak danych o renderowaniu strony.",
+          "legal_basis": "art. 44 ust. 2 lit. e rozp. del. 2017/565",
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału. T",
+      "url": "https://bank-przykladowy.example.com/maklerskie/ike",
+      "platform": "web",
+      "note": null,
+      "detected_at": "2026-11-21T07:00:40Z",
+      "updated_at": "2026-11-21T07:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "81afa0ad-6be1-54ba-ab2a-cc53ac48eacb",
+      "document_id": "cdbf5306-1bb9-5d3b-b8b8-bc64f2ed8e88",
+      "module": "M3",
+      "score": 0.81,
+      "risk_level": "high",
+      "status": "in_review",
+      "title": "Płatne sygnały kup/sprzedaj na akcje i CFD od @sygnaly_vip",
+      "summary": "Odpłatne rekomendacje kupna i sprzedaży instrumentów finansowych przez podmiot spoza rejestru.",
+      "firm": null,
+      "advertiser": {
+        "name": "Sygnały VIP",
+        "handle": "@sygnaly_vip",
+        "profile_url": "https://www.instagram.com/sygnaly_vip/",
+        "in_registry": false,
+        "on_warning_list": null
+      },
+      "rules": [
+        {
+          "rule_id": "S3.1",
+          "name": "Podmiot spoza rejestru",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "@sygnaly_vip",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.3",
+          "name": "Personalizacja",
+          "result": "pass",
+          "severity": "high",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Rekomendacje masowe, niespersonalizowane.",
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S3.4",
+          "name": "Rekomendacja konkretnych instrumentów",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "Codziennie mówię, co kupić, a co sprzedać.",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S3.5",
+          "name": "Model odpłatny",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "Dołącz za 199 zł/mies.",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "Grupa VIP – sygnały premium na akcje i CFD. Codziennie mówię, co kupić, a co sprzedać. Ostatni miesiąc +27%! Dołącz za 199 zł/mies.",
+      "url": "https://www.instagram.com/p/MOCK0004/",
+      "platform": "instagram",
+      "note": null,
+      "detected_at": "2026-11-21T05:00:40Z",
+      "updated_at": "2026-11-21T05:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "320f05a2-864a-56bb-8c18-a541ba95efc7",
+      "document_id": "8721cb75-d75c-537f-8981-07a7e2dede3c",
+      "module": "M1",
+      "score": 0.18,
+      "risk_level": "low",
+      "status": "false_positive",
+      "title": "Treść edukacyjna o ETF – brak reklamy firmy",
+      "summary": "Materiał edukacyjny bez wskazania firmy inwestycyjnej i bez linków.",
+      "firm": null,
+      "advertiser": {
+        "name": "Ekonomia na luzie",
+        "handle": "@ekonomia_na_luzie",
+        "profile_url": "https://www.instagram.com/ekonomia_na_luzie/",
+        "in_registry": false
+      },
+      "rules": [
+        {
+          "rule_id": "S1.1",
+          "name": "Wzmianka o firmie z rejestru",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.5",
+          "name": "Treść promocyjna",
+          "result": "pass",
+          "severity": "high",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Treść edukacyjna.",
+          "legal_basis": null,
+          "method": "llm"
+        }
+      ],
+      "content_excerpt": "Czym różni się ETF akumulujący od dystrybuującego? Krótki poradnik bez polecania konkretnych biur maklerskich.",
+      "url": "https://www.instagram.com/p/MOCK0003/",
+      "platform": "instagram",
+      "note": null,
+      "detected_at": "2026-11-20T20:00:40Z",
+      "updated_at": "2026-11-20T20:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "bfaf515e-1f7c-5ece-9ccb-82cadad668d0",
+      "document_id": "72acbb3b-3546-5c9b-9b26-2b29f69ccce9",
+      "module": "M3",
+      "score": 0.22,
+      "risk_level": "low",
+      "status": "false_positive",
+      "title": "Artykuł edukacyjny o family office",
+      "summary": "Brak rekomendacji instrumentów i personalizacji – treść informacyjna.",
+      "firm": null,
+      "advertiser": {
+        "name": "Blog finansowy",
+        "website": "https://blog-finansowy.example.com/",
+        "in_registry": false
+      },
+      "rules": [
+        {
+          "rule_id": "S3.1",
+          "name": "Podmiot spoza rejestru",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "Blog finansowy",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.2",
+          "name": "Słownictwo usług doradczych",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "family office",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.4",
+          "name": "Rekomendacja konkretnych instrumentów",
+          "result": "pass",
+          "severity": "high",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Brak rekomendacji instrumentów.",
+          "legal_basis": null,
+          "method": "llm"
+        }
+      ],
+      "content_excerpt": "Wyjaśniamy, czym jest family office i jak wybrać licencjonowanego doradcę. Nie udzielamy rekomendacji inwestycyjnych.",
+      "url": "https://blog-finansowy.example.com/czym-jest-family-office",
+      "platform": "web",
+      "note": null,
+      "detected_at": "2026-11-20T14:00:40Z",
+      "updated_at": "2026-11-20T14:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    }
+  ],
+  "total": 9,
+  "page": 1,
+  "page_size": 50
+}
