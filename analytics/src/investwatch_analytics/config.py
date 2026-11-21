@@ -204,3 +204,148 @@ class LlmSettings:
                 f"CLAIM_MIN_IDLE_MS ({claim_min_idle_ms} ms)"
             )
         return s
+
+
+# ---- Embeddings, topic gate, near-dup (analytics-embeddings; ADR 0313, 0314) ----------------------
+# A separate block so it merges cleanly with the LLM settings above.
+
+
+def _check_url(url: str, var: str, *, has_key: bool, key_var: str) -> None:
+    """Same rules as `_check_base_url`, naming `var`; the message never quotes the URL (it may carry secrets)."""
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname
+        userinfo = parts.username is not None or parts.password is not None
+    except ValueError:
+        raise ConfigError(f"{var} is not a valid URL") from None
+    if parts.scheme not in ("http", "https") or not host:
+        raise ConfigError(f"{var} must be an http(s) URL with a host, e.g. http://ollama:11434/v1")
+    if userinfo or parts.query or parts.fragment:
+        raise ConfigError(f"{var} must not carry credentials, a query or a fragment (put the key in {key_var})")
+    if has_key and parts.scheme == "http" and host not in _LOCAL_HOSTS:
+        raise ConfigError(f"{var} must use https when {key_var} is set and the host is not local")
+
+
+def _unit_interval(env: Mapping[str, str], key: str, default: float) -> float:
+    """A number in (0, 1]."""
+    value = _positive_number(env, key, default)
+    if value > 1:
+        raise ConfigError(f"{key} must be in (0, 1], got {env.get(key)!r}")
+    return value
+
+
+_TRUE = {"1", "true", "yes", "on"}
+_FALSE = {"0", "false", "no", "off"}
+
+
+def _flag(env: Mapping[str, str], key: str, default: bool) -> bool:
+    raw = (env.get(key) or "").strip().lower()
+    if not raw:
+        return default
+    if raw in _TRUE:
+        return True
+    if raw in _FALSE:
+        return False
+    raise ConfigError(f"{key} must be true or false, got {env.get(key)!r}")
+
+
+@dataclass(frozen=True)
+class EmbedSettings:
+    """OpenAI-compatible `/embeddings` endpoint, env only, local by default (ADR 0313). Empty URL = disabled."""
+
+    base_url: str = ""
+    model: str = "bge-m3"
+    api_key: str = field(default="", repr=False)  # never in a repr, log or error message
+    dim: int = 1024
+    timeout_s: float = 5
+    max_chars: int = 4000
+    cache_ttl_s: int = 604800
+    breaker_failures: int = 3
+    breaker_cooldown_s: float = 60
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.base_url)
+
+    @property
+    def mode(self) -> str:
+        """`local` (Ollama / loopback), `remote`, or `disabled`; logged at worker start."""
+        if not self.enabled:
+            return "disabled"
+        return "local" if (urlsplit(self.base_url).hostname or "") in _LOCAL_HOSTS else "remote"
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None, *, claim_min_idle_ms: int | None = None,
+                 llm_doc_budget_s: float = 0) -> "EmbedSettings":
+        env = os.environ if env is None else env
+        base_url = (env.get("EMBED_BASE_URL") or "").strip()
+        if not base_url:
+            return cls()
+        api_key = (env.get("EMBED_API_KEY") or "").strip()
+        _check_url(base_url, "EMBED_BASE_URL", has_key=bool(api_key), key_var="EMBED_API_KEY")
+        raw_model = env.get("EMBED_MODEL")
+        model = "bge-m3" if raw_model is None else raw_model.strip()
+        if not model:
+            raise ConfigError("EMBED_MODEL must not be empty when EMBED_BASE_URL is set")
+        s = cls(
+            base_url=base_url,
+            model=model,
+            api_key=api_key,
+            dim=int(_positive_number(env, "EMBED_DIM", 1024, integer=True)),
+            timeout_s=_positive_number(env, "EMBED_TIMEOUT_S", 5),
+            max_chars=int(_positive_number(env, "EMBED_MAX_CHARS", 4000, integer=True)),
+            cache_ttl_s=int(_positive_number(env, "EMBED_CACHE_TTL_S", 604800, integer=True)),
+            breaker_failures=int(_positive_number(env, "EMBED_BREAKER_FAILURES", 3, integer=True)),
+            breaker_cooldown_s=_positive_number(env, "EMBED_BREAKER_COOLDOWN_S", 60),
+        )
+        if claim_min_idle_ms is not None and (llm_doc_budget_s + s.timeout_s) * 1000 >= claim_min_idle_ms:
+            # The embedding call adds to the LLM budget; both must end before XAUTOCLAIM (ADR 0310).
+            raise ConfigError(
+                f"LLM_DOC_BUDGET_S + EMBED_TIMEOUT_S ({llm_doc_budget_s + s.timeout_s:g} s) must be below "
+                f"CLAIM_MIN_IDLE_MS ({claim_min_idle_ms} ms)"
+            )
+        return s
+
+
+@dataclass(frozen=True)
+class GateSettings:
+    """Investment topic gate (ADR 0314). `sim_threshold` is used only by the stretch similarity rescue."""
+
+    enabled: bool = True
+    sim_threshold: float = 0.45
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "GateSettings":
+        env = os.environ if env is None else env
+        return cls(enabled=_flag(env, "GATE_ENABLED", True),
+                   sim_threshold=_unit_interval(env, "GATE_SIM_THRESHOLD", 0.45))
+
+
+@dataclass(frozen=True)
+class NearDupSettings:
+    """MinHash near-dup index in Redis (ADR 0314): `num_perm` = `bands` x `rows`."""
+
+    num_perm: int = 128
+    bands: int = 32
+    threshold: float = 0.8
+    max_chars: int = 50000
+    ttl_s: int = 2592000
+
+    @property
+    def rows(self) -> int:
+        return self.num_perm // self.bands
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "NearDupSettings":
+        env = os.environ if env is None else env
+        num_perm = int(_positive_number(env, "NEARDUP_NUM_PERM", 128, integer=True))
+        bands = int(_positive_number(env, "NEARDUP_BANDS", 32, integer=True))
+        if num_perm % bands:  # also rejects bands > num_perm
+            raise ConfigError(f"NEARDUP_BANDS ({bands}) must divide NEARDUP_NUM_PERM ({num_perm})")
+        return cls(
+            num_perm=num_perm,
+            bands=bands,
+            threshold=_unit_interval(env, "NEARDUP_THRESHOLD", 0.8),
+            max_chars=int(_positive_number(env, "NEARDUP_MAX_CHARS", 50000, integer=True)),
+            ttl_s=int(_positive_number(env, "NEARDUP_TTL_S", 2592000, integer=True)),
+        )

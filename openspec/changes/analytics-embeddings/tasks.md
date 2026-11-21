@@ -4,9 +4,9 @@ Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is
 
 ## 1. Embeddings, gate and near-dup config (~30 min)
 
-- [ ] 1.1 Failing tests: the "Env-only embeddings configuration" scenarios (disabled by default, empty `EMBED_MODEL` → `ConfigError` naming it and worker exit 2, `EMBED_DIM=abc` / `EMBED_TIMEOUT_S=0` rejected, key never in the error text); `GATE_ENABLED`, `GATE_SIM_THRESHOLD` in (0, 1], `NEARDUP_*` positive ints with `NEARDUP_NUM_PERM` divisible by `NEARDUP_BANDS`; `(LLM_DOC_BUDGET_S + EMBED_TIMEOUT_S) * 1000 < CLAIM_MIN_IDLE_MS` rejected otherwise
-- [ ] 1.2 `EmbedSettings`, `GateSettings`, `NearDupSettings` in `config.py` (reuse `_positive_int`, add a float helper); tests green
-- [ ] 1.3 Mutation check; `mutations: N tried, N caught`
+- [x] 1.1 Failing tests (worker exit 2 is wired in group 9): the "Env-only embeddings configuration" scenarios (disabled by default, empty `EMBED_MODEL` → `ConfigError` naming it and worker exit 2, `EMBED_DIM=abc` / `EMBED_TIMEOUT_S=0` rejected, key never in the error text); `GATE_ENABLED`, `GATE_SIM_THRESHOLD` in (0, 1], `NEARDUP_*` positive ints with `NEARDUP_NUM_PERM` divisible by `NEARDUP_BANDS`; `(LLM_DOC_BUDGET_S + EMBED_TIMEOUT_S) * 1000 < CLAIM_MIN_IDLE_MS` rejected otherwise
+- [x] 1.2 `EmbedSettings`, `GateSettings`, `NearDupSettings` in `config.py` (reuse `_positive_int`, add a float helper); tests green
+- [x] 1.3 Mutation check; `mutations: 13 tried, 13 caught` (a 14th, dropping `bands > num_perm`, survived as an equivalent mutant; the redundant conjunct was removed)
 
 ## 2. Embeddings client, validation, stub server (~1 h)
 
