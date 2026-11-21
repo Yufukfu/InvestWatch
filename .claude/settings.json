@@ -1,9 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
-    "ask": [
+    "allow": [
       "Bash(git push:*)",
-      "Bash(gh pr create:*)",
+      "Bash(gh pr create:*)"
+    ],
+    "ask": [
       "Bash(gh pr merge:*)",
       "Bash(gh pr ready:*)"
     ]

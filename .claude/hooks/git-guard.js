@@ -17,8 +17,8 @@
  * The escapes are plain text an agent can write itself: this guard catches mistakes, it is not a
  * security boundary. Their use should be reported to the human.
  * Limits: quoted strings and heredocs are stripped before matching; `git commit -a` is checked
- * against `git diff HEAD`; `git commit <paths>` stages those paths and is not seen. Pushes are
- * additionally gated by `permissions.ask` in .claude/settings.json.
+ * against `git diff HEAD`; `git commit <paths>` stages those paths and is not seen. A push of a feature
+ * branch is allowed (ADR 0207); merges stay gated by `permissions.ask` in .claude/settings.json.
  */
 'use strict';
 
