@@ -1,5 +1,5 @@
 # Public Telegram channels the scraper starts with (OpenSpec change scraper-v2-social, design.md decision 13).
-# Read by the seed loader of `scraper-v2-sources` (not on every branch yet) together with every other `*.toml` here: a source whose URL is already in `sources` is left alone.
+# Read by the seed loader (`python -m iw_scraper.seed`) together with every other `*.toml` here: a source whose URL is already in `sources` is left alone.
 # `platform = "other"` because the frozen contract enum has no `telegram` value yet (`scrape_meta.network` says it is Telegram).
 # `source_kind = "unknown"` where the registry status of the publisher cannot be known from the page: analytics routes M3
 # by registry mismatch. schedule_cron is UTC, staggered by ten minutes so the domain's request interval is not hit at once.

@@ -158,6 +158,10 @@ This change SHALL provide the Telegram `sources` rows for the demo, written thro
 - **WHEN** the seed runs twice against the same database
 - **THEN** each channel has exactly one `sources` row
 
+#### Scenario: Seeded channels are scheduled and allowed
+- **WHEN** the channels are seeded and the scheduler lists sources
+- **THEN** each channel with a cron is schedulable, and its host `t.me` is allowed by the URL guard
+
 #### Scenario: Signal channel is an M3 candidate
 - **WHEN** the seed rows are read
 - **THEN** `crypto_sygnaly` and `SubeTradingPL` have `source_kind = unknown` and `target_modules = [M3]`, and `rarecryptosignals` has `source_kind = third_party` and `target_modules = [M1]`
