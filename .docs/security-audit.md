@@ -4,7 +4,7 @@ Dependency and secret scan results before a merge to `main` ([integration-plan.m
 
 | Date | Module | Command | Result |
 |---|---|---|---|
-| 2026-11-21 | repository (`chore/supply-chain-adr`, ADR 0208) | `gitleaks git` over `origin/main` (Gitleaks v8.28.0, image digest `sha256:cdbb7c95…`, 276 commits, `--redact`) | 2 findings, both false positives: rule `generic-api-key` on mock record ids (`key="m2-…"`) in `contracts/mocks/generate_mocks.py` lines 145 and 299. No secret in history; allowlist entry due with the CI follow-up |
+| 2026-11-21 | repository (`chore/supply-chain-adr`, ADR 0208) | `gitleaks git` over `origin/main` (Gitleaks v8.28.0, image digest `sha256:cdbb7c95…`, `--redact`; commit count not re-recorded: the earlier 276 was not reproduced, `origin/main` is 390 commits at bb770a0; rerun on a named SHA pending) | 2 findings, both false positives: rule `generic-api-key` on mock record ids (`key="m2-…"`) in `contracts/mocks/generate_mocks.py` lines 145 and 299. Not rerun in the review round of 2026-11-21. No secret in history; allowlist entry due with the CI follow-up |
 | 2026-11-21 | web (`chore/supply-chain-adr`) | `npm audit --audit-level=high` in `web/` (npm 10.9.2) | found 0 vulnerabilities |
 | 2026-11-21 | analytics (`analytics-worker-review-fixes`) | `pip-audit -r analytics/requirements.txt -r analytics/requirements-dev.txt` (pip-audit 2.10.1; psycopg[binary] 3.3.9, redis 8.1.0, fakeredis 2.40.0) | No known vulnerabilities found |
 | 2026-11-21 | api (`api-v1`) | `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` (pip-audit 2.10.1; FastAPI 0.165.0, python-socketio 5.18.1, redis 8.1.0, minio 7.2.20) | No known vulnerabilities found |
