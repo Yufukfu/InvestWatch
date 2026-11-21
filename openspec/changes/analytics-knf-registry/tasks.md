@@ -19,9 +19,9 @@ Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip 
 
 ## 3. Matching at real scale (≈ 1.5 h)
 
-- [ ] 3.1 Failing tests (`tests/test_registry.py`) for the new and changed scenarios of "Firm registry matching": `Admiral Markets AS` matched by name, the `EXT Ltd` / `Nova AG` short-core cases (no bare-word or fuzzy match; full name matches), `Wise Asets Europe` still fuzzy, a firm without domains never matched by domain, `_LEGAL_FORMS` pinned by a parametrized list, the 1,000-firm / 20,000-character budget under 1 s. All existing seed scenarios stay green unchanged.
-- [ ] 3.2 `registry.py`: longer `_LEGAL_FORMS`, one combined alternation per registry with an alias-to-firm map (same ranking), the short-core guard for bare-word and fuzzy matching, and fuzzy skipped for firms with an exact hit. If `analytics-m1-m3` is on `main`, apply the guard to `_firm_by_handle` and keep its tests green; tests green
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 Failing tests (`tests/test_registry.py`) for the new and changed scenarios of "Firm registry matching": `Admiral Markets AS` matched by name, the short-word cases (`EXT Ltd` / `Nova AG` in lower case never, `Nova AG` and `Otwórz konto w XTB` yes, `mBank` as written, 7 vs 8 letters), `XTB` shared core to the Polish firm, a tie matching neither, `Wise Asets Europe` still fuzzy, a firm without domains never matched by domain, `_LEGAL_FORMS` pinned by a parametrized list, the 1,000-firm / 20,000-character budget under 1 s. All existing seed scenarios stay green unchanged.
+- [x] 3.2 `registry.py`: longer `_LEGAL_FORMS`, one combined alternation per registry with an alias-to-firm map (same ranking), the short-core guard for bare-word and fuzzy matching, and fuzzy skipped for firms with an exact hit. If `analytics-m1-m3` is on `main`, apply the guard to `_firm_by_handle` and keep its tests green; tests green
+- [x] 3.3 Mutation check; `mutations: 14 tried, 14 caught` (first run 12/14: the 7-vs-8-letter boundary and a legal form mid-name got their own tests). Matching 1,000 firms against 20,000 characters: 5.5 s before, 0.3 s after. `analytics-m1-m3` is not on the base yet, so the handle guard is left to whichever change lands second (design decision 9)
 
 ## 4. Curated domains for domestic firms (≈ 1 h)
 
