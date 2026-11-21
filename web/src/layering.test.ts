@@ -43,6 +43,7 @@ beforeAll(() => {
   write(`${c}FromDataBare.tsx`, "import * as data from '../data';\nexport const A = data;\n");
   write(`${c}FromStoreExt.tsx`, "import { store } from '../../../store.ts';\nexport const A = store;\n");
   write(`${c}FromSocketBare.tsx`, "import { io } from 'socket.io-client';\nexport const A = io;\n");
+  write(`${c}FromStoreFolder.tsx`, "import { store } from '../../../store/index';\nexport const A = store;\n");
   write(`${c}FromModel.tsx`, "import type { Row } from '../model';\nexport type A = Row;\n");
   write(`${c}Props.tsx`, "import type { ReactNode } from 'react';\nexport const A = ({ children }: { children: ReactNode }) => children;\n");
   write('src/features/demo/data/useDemo.ts', "import { useGetHealthQuery } from '../../../api/generated';\nexport const useDemo = useGetHealthQuery;\n");
@@ -63,6 +64,7 @@ describe('feature layering (ADR 0204)', () => {
     ['the api folder itself', 'FromApiBare'],
     ['the data folder itself', 'FromDataBare'],
     ['the store with a file extension', 'FromStoreExt'],
+    ['a store folder', 'FromStoreFolder'],
     ['socket.io-client', 'FromSocketBare'],
     ['a page with a file extension', 'FromPageExt'],
     ['a react-redux subpath', 'FromReduxSub'],

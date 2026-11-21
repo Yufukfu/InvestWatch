@@ -27,6 +27,7 @@
                   "**/*Page.*",
                   "**/store",
                   "**/store.*",
+                  "**/store/**",
                   "react-redux",
                   "react-redux/**",
                   "@reduxjs/toolkit",
