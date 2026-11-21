@@ -1,0 +1,9 @@
+[project]
+name = "investwatch-api"
+version = "0.1.0"
+description = "InvestWatch REST API, Socket.IO gateway and owner of the shared database migrations."
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
