@@ -15,5 +15,5 @@
 ## 3. Closing
 
 - [x] 3.1 Run against the contract mock server in headless Chrome: move M2 0.5 to 0.7, save, the risk levels in the list change; console clean in the production build; 375 px without page overflow.
-- [ ] 3.2 Apply the `iw-docs-update` skill (`.docs/status/dashboard.md`, `web/README.md`, `docs-check` clean) and add the `iw-ai-log` row.
+- [x] 3.2 Apply the `iw-docs-update` skill (`.docs/status/dashboard.md`, `web/README.md`, `docs-check` clean) and add the `iw-ai-log` row.
 - [ ] 3.3 Run the `iw-pr-review` skill and fix real findings.
