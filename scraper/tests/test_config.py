@@ -59,6 +59,12 @@ def test_the_url_variable_is_not_overridden_by_a_prefixed_one(monkeypatch):
     assert RunnerSettings.from_env().redis_url == "redis://real:6379/0"
 
 
+def test_the_requeue_cap_is_configurable(monkeypatch):
+    monkeypatch.setenv("SCRAPER_MAX_REQUEUES", "7")
+
+    assert QueueSettings.from_env().max_requeues == 7
+
+
 def test_the_queue_defaults_match_the_web_collection_spec(monkeypatch):
     for name in ("SCRAPER_FAILURE_THRESHOLD", "SCRAPER_DOMAIN_COOLDOWN", "SCRAPER_MAX_RETRY_AFTER"):
         monkeypatch.delenv(name, raising=False)

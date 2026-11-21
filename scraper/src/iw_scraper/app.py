@@ -30,7 +30,7 @@ from iw_scraper.proxy import ProxyRotator
 from iw_scraper.ratelimit import DomainLimiter
 from iw_scraper.scan_requests import ScanRequestConsumer, consumer_name
 from iw_scraper.scheduler import Scheduler
-from iw_scraper.supervise import CONNECTION_ERRORS
+from iw_scraper.supervise import CONNECTION_ERRORS, JOB_CONNECTION_ERRORS
 from iw_scraper.targets import AddressGuard, UrlGuard
 from iw_scraper.types import JobError
 from iw_scraper.worker import RunnerSettings, run_consumer, run_worker
@@ -40,6 +40,13 @@ logger = logging.getLogger(__name__)
 # a lost PostgreSQL connection is retried like a lost Redis one; anything else is a bug and ends the process
 RETRY_ON = (
     *CONNECTION_ERRORS,
+    asyncpg.exceptions.PostgresConnectionError,
+    asyncpg.exceptions.CannotConnectNowError,
+    asyncpg.InterfaceError,
+)
+# what one job requeues itself on: lost connections only, no bare OSError (a full disk is not coming back)
+JOB_RETRY_ON = (
+    *JOB_CONNECTION_ERRORS,
     asyncpg.exceptions.PostgresConnectionError,
     asyncpg.exceptions.CannotConnectNowError,
     asyncpg.InterfaceError,
@@ -159,7 +166,7 @@ async def run_worker_process(stop: asyncio.Event) -> None:
         try:
             await _run_together(
                 stop,
-                run_worker(ctx, queue, runner, stop=stop, retry_on=RETRY_ON),
+                run_worker(ctx, queue, runner, stop=stop, retry_on=RETRY_ON, job_retry_on=JOB_RETRY_ON),
                 run_consumer(consumer, runner, stop=stop, retry_on=RETRY_ON),
             )
         finally:

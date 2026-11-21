@@ -288,3 +288,88 @@ async def test_a_redis_error_after_the_finish_does_not_publish_a_second_finish(r
 
     assert [e["type"] for e in events] == ["scan.started", "scan.finished"]
     assert events[1]["data"]["status"] == "ok"
+
+
+async def test_a_lost_connection_after_the_finish_does_not_publish_the_events_twice(redis, start_worker, events, monkeypatch):
+    import iw_scraper.jobs as jobs
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
+    real_release, broken, calls = jobs.RunLock.release, [], []
+
+    async def release(self):
+        if not broken:
+            broken.append(1)
+            raise RedisConnectionError("redis blip after the finish")
+        await real_release(self)
+
+    monkeypatch.setattr(jobs.RunLock, "release", release)
+
+    async def run_source(source_id, started=None):
+        calls.append(1)
+        await started()
+        return result_of(documents=1)
+
+    start_worker(run_source, Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"
+    await asyncio.sleep(0.3)
+
+    assert (len(calls), [e["type"] for e in events]) == (1, ["scan.started", "scan.finished"])
+    assert await redis.exists(f"iw:scraper:lock:{SRC}") == 0
+
+
+async def test_a_postgres_drop_while_announcing_the_start_still_publishes_started_before_finished(
+    redis, start_worker, store, events
+):
+    import asyncpg
+
+    from iw_scraper.app import JOB_RETRY_ON
+
+    real_mark, broken = store.mark_running, []
+
+    async def mark_running(source_id):
+        if not broken:
+            broken.append(1)
+            raise asyncpg.ConnectionDoesNotExistError("connection was closed")
+        await real_mark(source_id)
+
+    store.mark_running = mark_running
+
+    async def run_source(source_id, started=None):
+        await started()
+        return result_of(documents=1)
+
+    start_worker(run_source, Recorder(), fast_settings(), retry_on=JOB_RETRY_ON)
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"
+    await asyncio.sleep(0.3)
+
+    assert [e["type"] for e in events] == ["scan.started", "scan.finished"]
+
+
+
+async def test_a_lost_connection_after_a_requested_jobs_failed_finish_does_not_publish_it_twice(
+    redis, start_worker, store, events, monkeypatch
+):
+    import iw_scraper.jobs as jobs
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
+    store.sources[SRC] = make_source(SRC, active=False)
+    real_release, broken = jobs.RunLock.release, []
+
+    async def release(self):
+        if not broken:
+            broken.append(1)
+            raise RedisConnectionError("redis blip after the finish")
+        await real_release(self)
+
+    monkeypatch.setattr(jobs.RunLock, "release", release)
+    start_worker(lambda *a, **k: None, Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "failed"  # the re-entry returns the stored status
+    await asyncio.sleep(0.3)
+
+    assert [(e["type"], e["data"]["status"]) for e in events] == [("scan.finished", "failed")]

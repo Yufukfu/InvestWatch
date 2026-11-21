@@ -247,6 +247,7 @@ def fast_settings(**overrides) -> QueueSettings:
         requeue_delay=0.05,
         failure_threshold=5,
         domain_cooldown=0.5,
+        max_requeues=24,
     )
     return QueueSettings(**{**base, **overrides})
 

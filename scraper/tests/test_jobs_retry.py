@@ -5,9 +5,10 @@ from datetime import UTC, datetime, timedelta
 
 import asyncpg
 import pytest
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from conftest import Recorder, fast_settings
-from iw_scraper.app import RETRY_ON
+from iw_scraper.app import JOB_RETRY_ON
 from iw_scraper.guards import DomainHealth
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.types import Deferral, JobError, Reason
@@ -245,7 +246,12 @@ async def test_a_503_retry_after_defers_the_whole_domain_and_not_only_the_failin
     start_worker(run, Recorder(), fast_settings(max_tries=3))
 
     first = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
-    await asyncio.sleep(0.2)  # the first attempt has failed and its job waits for its retry
+    deferred = f"iw:scraper:domain:{DOMAIN}:deferred"
+    for _ in range(200):  # the first attempt has failed and its job waits for its retry
+        if await redis.exists(deferred):
+            break
+        await asyncio.sleep(0.01)
+    assert await redis.exists(deferred)
     second = await redis.enqueue_job("execute_job", OTHER, DOMAIN, _job_id="job-2")
     assert await second.result(timeout=10, poll_delay=0.05) == "ok"
     assert await first.result(timeout=10, poll_delay=0.05) == "ok"
@@ -284,7 +290,7 @@ async def test_a_lost_postgres_connection_before_the_run_requeues_the_job_withou
         return await real_get(source_id)
 
     store.get = flaky_get
-    start_worker(scripted([AttemptResult(documents=1)], calls), Recorder(), fast_settings(max_tries=1), retry_on=RETRY_ON)
+    start_worker(scripted([AttemptResult(documents=1)], calls), Recorder(), fast_settings(max_tries=1), retry_on=JOB_RETRY_ON)
     job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
 
     assert await job.result(timeout=10, poll_delay=0.05) == "ok"
@@ -306,7 +312,7 @@ async def test_a_lost_postgres_connection_mid_run_retries_without_consuming_an_a
         return AttemptResult(documents=2)
 
     recorder = Recorder()
-    start_worker(run_source, recorder, fast_settings(max_tries=1), retry_on=RETRY_ON)
+    start_worker(run_source, recorder, fast_settings(max_tries=1), retry_on=JOB_RETRY_ON)
     job = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
 
     assert await job.result(timeout=10, poll_delay=0.05) == "ok"
@@ -327,10 +333,77 @@ async def test_the_run_lock_outlives_the_requeue_delay_after_a_lost_connection(r
             raise asyncpg.InterfaceError("connection is closed")
         return AttemptResult(documents=1)
 
-    start_worker(run_source, Recorder(), settings, retry_on=RETRY_ON)
+    start_worker(run_source, Recorder(), settings, retry_on=JOB_RETRY_ON)
     first = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
     await asyncio.sleep(0.9)  # past the lease: only the extension for the requeue still holds the lock
     second = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-2")
 
     assert await second.result(timeout=10, poll_delay=0.05) == "coalesced"
     assert await first.result(timeout=10, poll_delay=0.05) == "ok"
+
+
+def lost_connection_then(result, calls, *, times=1, error=ConnectionResetError):
+    """run_source that raises `error` for its first `times` calls, then returns `result`."""
+
+    async def run_source(source_id, started=None):
+        calls.append(1)
+        if len(calls) <= times:
+            raise error("connection lost")
+        return result
+
+    return run_source
+
+
+async def test_a_dependency_that_never_recovers_fails_the_job_after_the_requeue_cap(redis, start_worker, events):
+    calls = []
+    recorder = Recorder()
+    start_worker(lost_connection_then(None, calls, times=10**6), recorder, fast_settings(max_requeues=3))
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+    await asyncio.gather(job.result(timeout=10, poll_delay=0.05), return_exceptions=True)
+    await asyncio.sleep(0.3)
+
+    assert len(calls) == 4  # the first run and three requeues
+    assert [(e["type"], e["data"]["status"]) for e in events] == [("scan.finished", "failed")]
+    assert await redis.exists(f"iw:scraper:lock:{SRC}") == 0
+
+
+async def test_a_dependency_that_recovers_before_the_cap_ends_ok_without_a_failure_event(redis, start_worker, events):
+    calls = []
+    run = lost_connection_then(AttemptResult(documents=1), calls, times=3)
+    start_worker(run, Recorder(), fast_settings(max_requeues=3))
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"
+    await asyncio.sleep(0.2)
+
+    assert [(e["type"], e["data"].get("status")) for e in events] == [("scan.started", None), ("scan.finished", "ok")]
+    assert await redis.exists("iw:scraper:requeues:job-1") == 0
+
+
+async def test_an_os_error_that_is_not_a_lost_connection_is_not_requeued(redis, start_worker):
+    calls = []
+    start_worker(lost_connection_then(None, calls, times=10**6, error=PermissionError), Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
+    await asyncio.gather(job.result(timeout=10, poll_delay=0.05), return_exceptions=True)
+
+    assert len(calls) == 1
+
+
+async def test_redis_as_the_lost_dependency_still_requeues_the_job(redis, start_worker, monkeypatch):
+    import iw_scraper.jobs as jobs
+
+    calls, real_extend, broken = [], jobs.RunLock.extend, []
+
+    async def extend(self, ttl):
+        if calls and not broken:
+            broken.append(1)
+            raise RedisConnectionError("redis went away")
+        return await real_extend(self, ttl)
+
+    monkeypatch.setattr(jobs.RunLock, "extend", extend)
+    run = lost_connection_then(AttemptResult(documents=1), calls, times=1, error=RedisConnectionError)
+    start_worker(run, Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"
+    assert (len(calls), broken) == (2, [1])

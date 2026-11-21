@@ -6,7 +6,7 @@ import pytest
 from arq.jobs import JobStatus
 
 from conftest import Recorder, fast_settings
-from iw_scraper.app import RETRY_ON
+from iw_scraper.app import JOB_RETRY_ON
 from iw_scraper.jobs import QUEUE_NAME, AttemptResult
 from iw_scraper.worker import RunnerSettings, run_worker
 
@@ -31,7 +31,7 @@ async def start_runner(store):
             reconnect_cap=0.5,
             poll_delay=0.02,
         )
-        extra = {} if retry_on is None else {"retry_on": retry_on}
+        extra = {} if retry_on is None else {"job_retry_on": retry_on}
         task = asyncio.create_task(run_worker(ctx, queue or fast_settings(), runner, stop=stop, **extra))
         running.append((task, stop))
         return task, stop
@@ -266,7 +266,7 @@ async def test_the_process_worker_requeues_a_job_whose_postgres_connection_dropp
     async def run_source(source_id, started=None):
         return AttemptResult(documents=1)
 
-    start_runner(run_source, retry_on=RETRY_ON)
+    start_runner(run_source, retry_on=JOB_RETRY_ON)
     job = await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
 
     assert await job.result(timeout=10, poll_delay=0.05) == "ok"
