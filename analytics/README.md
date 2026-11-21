@@ -6,6 +6,7 @@ Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M
 - **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`): S1.5 is always `uncertain`, and S3.3/S3.4 are `uncertain` when the rules find a candidate phrase, `pass` otherwise, until it lands.
 - **Registry:** the default registry is `registry/knf.csv`, the real KNF register of investment firms (749 firms, snapshot of 2026-11-21; change `analytics-knf-registry`). At start-up the worker logs `registry_loaded` with the snapshot date. R1 passes only on a firm's official name; a former or trade name alone makes it `uncertain`. `registry/seed.csv` (4 fictional firms) is the test fixture: it logs a `registry_seed` WARNING if used, and M3 findings then add "(dane demonstracyjne)" (`Registry.demo`: no firm has a `source_url`). Files, source and refresh: [`registry/README.md`](registry/README.md).
 - **Privacy:** rule `evidence` and `advertiser` copy scraped author names, handles, profile and referral links verbatim (cut to 200-300 characters) into `findings`, and the `iw:events` messages carry the title, which names the advertiser, so treat them as personal data taken from public posts.
+- **Evaluation:** gold-set evaluation (change `analytics-eval-calibration`): `eval/gold.jsonl`, `python eval/run.py`, and the one-shot `analytics-eval` service that feeds the calibration panel (section "Gold-set evaluation" below).
 
 ## Modules and routing
 
@@ -32,6 +33,27 @@ docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XADD 
 ```
 
 Per message the worker loads the row, runs the pipeline, saves all findings in one transaction, publishes the events and only then acknowledges (XACK). A redelivery or a second message for the same document updates the finding (`(document_id, module)`) and publishes nothing. A malformed message, a missing row or an invalid document is logged and acknowledged; an unexpected error is retried up to `MAX_DELIVERIES`; a Postgres or Redis outage is retried with backoff and never acknowledged. `GET /health` on port 8001 (inside the stack only) answers 200 or 503 with `redis` / `db` flags. Specs: [`document-stream-worker`](../openspec/specs/document-stream-worker/spec.md), [`finding-storage`](../openspec/specs/finding-storage/spec.md), [`finding-events`](../openspec/specs/finding-events/spec.md); design and review follow-ups: [`openspec/changes/archive/2026-11-21-analytics-worker/`](../openspec/changes/archive/2026-11-21-analytics-worker/design.md).
+
+## Gold-set evaluation (calibration panel)
+
+[`eval/gold.jsonl`](eval/gold.jsonl) holds 67 labeled documents: 33 for M2 (every ZASÓB rule R1-R18 with a violating and a compliant example), 18 for M1 and 18 for M3, about a third of them hard cases. All of them are synthetic and use fictional firms (`doc/` has no sample ads). The labeling rules are in [`eval/README.md`](eval/README.md).
+
+```bash
+.venv/Scripts/python eval/run.py              # JSON report on stdout, rules-only, no database
+.venv/Scripts/python eval/run.py --db         # also store the run in calibration_points (DATABASE_URL)
+docker compose run --rm analytics-eval        # the same in the stack
+```
+
+The one-shot `analytics-eval` service runs `--db` on every `docker compose up`, after `api-migrate`. It stores a module's run only when the gold set, the pipeline version or the results changed, so restarts add nothing. `GET /api/calibration` adds analysts' `confirmed` / `false_positive` labels to that run's counts. The report gives precision, recall and F1 per module on the thresholds 0.05-0.95, counted the same way as the API. Per rule or signal it gives two readings: **`strict` (the headline: `uncertain` counts as not flagged)** and `review` (`uncertain` counts as flagged). Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`, no rows stored for it) or a gold document crashed the pipeline (nothing stored); 2 invalid gold set or configuration; 3 the database write failed.
+
+Latest rules-only numbers, `strict`:
+
+| Build | Module at its default threshold | Rules |
+|---|---|---|
+| this branch (worker base: M2 with R1-R3) | M2 at 0.5: precision 0.8, recall 0.19 (tp 4, fp 1, fn 17, tn 11); at 0.7: tp 0, fn 21 | R1 1.0 / 1.0, R2 1.0 / 0.667, R3 0.714 / 1.0 (precision / recall) |
+| with `analytics-m1-m3` (checked on 6121a06) | M1 at 0.6: precision 1.0, recall 0.8 (tp 8, fn 2, tn 8); M3 at 0.7: recall 0, at 0.5: tp 3, fn 7 | S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only) |
+
+M1 and M3 are `not_run` on this branch until `analytics-m1-m3` is merged, so the service exits 1 and stores only M2. Rules-only M3 never reaches its default 0.7; the open item is in the change's `follow-ups.md`.
 
 ## Run locally (no infrastructure)
 
@@ -88,4 +110,5 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 - `src/investwatch_analytics/rules/m2.py`: R1 firm identification, R2 ad labeling, R3 risk information next to return claims.
 - `src/investwatch_analytics/rules/m1.py`, `rules/m3.py`: the M1/M3 signal classes; `modules/m1.py`, `modules/m3.py`: the M1/M3 findings; `modules/advertiser.py`: publisher identity and `advertiser`; `rules/scoring.py`: the sigmoid score.
 - `src/investwatch_analytics/worker.py`: the stream consumer (`python -m investwatch_analytics.worker`); `storage.py`: the store interface and the Postgres store; `events.py`: `iw:events` publisher and the live threshold read (ADR 0305); `health.py`: `/health`; `testing.py`: test doubles (`InMemoryStore`, `NoopPublisher`), never imported by the worker.
+- `src/investwatch_analytics/evaluation/`: gold-set loader and validation (`gold.py`, `known_ids.py`), metrics with the API's counting (`metrics.py`), runner (`runner.py`), `calibration_points` writer (`store.py`), command line (`__main__.py`); `eval/`: the gold set, its fictional registry and `run.py`.
 - Spec: [`openspec/specs/document-analysis/`](../openspec/specs/document-analysis/spec.md) and [`openspec/specs/m2-compliance-rules/`](../openspec/specs/m2-compliance-rules/spec.md); design and review follow-ups: [`openspec/changes/archive/2026-11-21-analytics-skeleton/`](../openspec/changes/archive/2026-11-21-analytics-skeleton/); plan: [`.docs/analytics-plan.md`](../.docs/analytics-plan.md).

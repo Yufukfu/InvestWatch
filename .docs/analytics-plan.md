@@ -129,10 +129,10 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 
 ## 8. Evaluation and calibration
 
-- **Gold set**: samples from the UKNF USB stick + ~20 hand-made examples per module (positive and negative, including hard cases). File `analytics/eval/gold.jsonl`: `{ document, module, label, rules: {R3: "fail", …} }`.
-- Script `analytics/eval/run.py`: precision / recall / F1 per module and per rule, threshold curve → stored in table `calibration_points` (used by `/api/calibration`).
+- **Gold set** (change `analytics-eval-calibration`, ADR 0312): `analytics/eval/gold.jsonl`, one line per document: `{ id, origin, basis, hard_case?, document, expect: { M2: { label, rules: { R3: "fail", … } } } }`, so one document can be labeled for M1 and M3 at once. `doc/` has no sample ads, so all lines are synthetic with fictional firms (own registry `analytics/eval/registry.csv`); UKNF samples, if they arrive, are added as `origin: uknf-sample` with no code change. Labeling rules: `analytics/eval/README.md`.
+- Script `analytics/eval/run.py` (`python -m investwatch_analytics.evaluation`): precision / recall / F1 per module and per rule (`strict` headline, `review` counts `uncertain` as flagged), threshold curve with the API's counting → with `--db` stored in `calibration_points`, one idempotent run per module. The one-shot `analytics-eval` compose service runs it on every `docker compose up`; `/api/calibration` adds analyst labels to the stored run.
 - Unit tests for P0 rules (pytest, 2–3 cases per rule) – fast feedback loop while tuning dictionaries.
-- In the demo: show how moving the M2 threshold from 0.5 to 0.7 changes the number of alerts and FP/FN.
+- In the demo: show how moving the M2 threshold from 0.5 to 0.7 changes the number of alerts and FP/FN (rules-only gold set on the worker base: tp 4 → 0, fp 1 → 0, fn 17 → 21).
 
 ## 9. Schedule for Damian (Sat 13:30 → Sun 10:30)
 

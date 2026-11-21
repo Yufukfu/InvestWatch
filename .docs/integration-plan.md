@@ -191,7 +191,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
 | GET | `/health` | service status (for the demo) |
 
-Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed` / `false_positive`) and from the **gold set** (UKNF samples + our own labels, table `gold_labels`). This way the threshold slider shows precision and recall changing live.
+Calibration: TP/FP/FN are the sum of findings labeled by analysts (`confirmed` / `false_positive`) and the latest **gold-set** run stored in `calibration_points` by the analytics evaluation (file `analytics/eval/gold.jsonl`, not a table; ADR 0312). This way the threshold slider shows precision and recall changing live, and a few labels never replace the gold curve.
 
 ## 6. Real-time events
 

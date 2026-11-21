@@ -60,5 +60,5 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 
 ## 10. Closing
 
-- [ ] 10.1 Apply the iw-docs-update skill (`analytics/README.md` evaluation section with the latest rules-only numbers per module, `strict` as headline; `api/README.md` calibration note; `.docs/analytics-plan.md` §8 gold line shape and how it runs; `.docs/integration-plan.md` §5 calibration sentence (gold set is a file, labels and gold combined); ADR 0312 row; `.docs/STATUS.md` and `.docs/status/*` left to the coordinating session; `docs-check` clean) and add the iw-ai-log row
+- [x] 10.1 Apply the iw-docs-update skill (`analytics/README.md` evaluation section with the latest rules-only numbers per module, `strict` as headline; `api/README.md` calibration note; `.docs/analytics-plan.md` §8 gold line shape and how it runs; `.docs/integration-plan.md` §5 calibration sentence (gold set is a file, labels and gold combined); ADR 0312 row; `.docs/STATUS.md` and `.docs/status/*` left to the coordinating session; `docs-check` clean) and add the iw-ai-log row. Done: `analytics/README.md`, `api/README.md`, `.docs/analytics-plan.md` §8, `.docs/integration-plan.md` §5, `.docs/INDEX.md` row, ADR 0312 (group 1), AI log row
 - [ ] 10.2 Run the iw-pr-review skill and fix real findings
