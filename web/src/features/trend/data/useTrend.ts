@@ -1,5 +1,5 @@
 import { useGetStatsTrendQuery } from '../../../api/generated';
-import type { TrendBucket, TrendPoint } from '../components/TrendChart';
+import type { TrendBucket, TrendPoint } from '../model';
 
 const NO_POINTS: TrendPoint[] = [];
 

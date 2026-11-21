@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { TrendChart, type TrendBucket } from './components/TrendChart';
+import { TrendChart } from './components/TrendChart';
 import { useTrend } from './data/useTrend';
+import type { TrendBucket } from './model';
 
 export function TrendPage() {
   const [bucket, setBucket] = useState<TrendBucket>('hour');

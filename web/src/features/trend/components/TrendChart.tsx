@@ -1,9 +1,5 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-
-export type TrendBucket = 'hour' | 'day';
-
-// App-owned shape: a count may be absent and is then drawn as 0.
-export type TrendPoint = { t: string; M1?: number; M2?: number; M3?: number };
+import type { TrendBucket, TrendPoint } from '../model';
 
 export type TrendChartProps = {
   points: TrendPoint[];
@@ -27,11 +23,20 @@ const BUCKETS: { value: TrendBucket; label: string }[] = [
   { value: 'day', label: 'Dzień' },
 ];
 
+// Day buckets are UTC days (said in the UI); hour buckets use the viewer's local time.
+const dayFormat = (date: Date) => date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const localDate = (date: Date) => date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
+const localTime = (date: Date) => date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
 function formatTick(t: string, bucket: TrendBucket) {
   const date = new Date(t);
-  return bucket === 'hour'
-    ? date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', timeZone: 'UTC' }); // day buckets are UTC days
+  if (bucket === 'day') return dayFormat(date);
+  return date.getHours() === 0 && date.getMinutes() === 0 ? localDate(date) : localTime(date);
+}
+
+function formatFull(t: string, bucket: TrendBucket) {
+  const date = new Date(t);
+  return bucket === 'day' ? dayFormat(date) : `${localDate(date)}, ${localTime(date)}`;
 }
 
 export function TrendChart({ points, bucket, onBucketChange, isLoading, isError, size }: TrendChartProps) {
@@ -39,12 +44,19 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
   const totals = SERIES.map((s) => ({ ...s, total: data.reduce((sum, p) => sum + p[s.key], 0) }));
   const hasData = totals.some((s) => s.total > 0);
 
+  // accessibilityLayer off: the plot is one image; the table below is its text alternative.
   const chart = (width?: number, height?: number) => (
-    <LineChart width={width} height={height} data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+    <LineChart
+      width={width}
+      height={height}
+      data={data}
+      accessibilityLayer={false}
+      margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
+    >
       <CartesianGrid stroke="#e5e7eb" vertical={false} />
       <XAxis dataKey="t" tickFormatter={(t: string) => formatTick(t, bucket)} minTickGap={24} />
       <YAxis allowDecimals={false} width={32} />
-      <Tooltip labelFormatter={(t) => formatTick(String(t), bucket)} />
+      <Tooltip isAnimationActive={false} labelFormatter={(t) => formatFull(String(t), bucket)} />
       {SERIES.map((s) => (
         <Line
           key={s.key}
@@ -61,7 +73,11 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
 
   let body;
   if (isLoading) {
-    body = <p className="trend-state">Ładowanie wykresu…</p>;
+    body = (
+      <p className="trend-state" role="status">
+        Ładowanie wykresu…
+      </p>
+    );
   } else if (isError) {
     body = (
       <p className="trend-state" role="alert">
@@ -92,10 +108,37 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
               <svg width="28" height="10" aria-hidden="true">
                 <line x1="0" y1="5" x2="28" y2="5" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash} />
               </svg>
-              {s.key}
+              {`${s.key}: ${s.total}`}
             </li>
           ))}
         </ul>
+        {bucket === 'day' && <p className="trend-note">Dni liczone w czasie UTC.</p>}
+        <details className="trend-table">
+          <summary>Pokaż dane w tabeli</summary>
+          <table>
+            <caption>Trend zgłoszeń: dane</caption>
+            <thead>
+              <tr>
+                <th scope="col">Okres</th>
+                {SERIES.map((s) => (
+                  <th key={s.key} scope="col">
+                    {s.key}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((p) => (
+                <tr key={p.t}>
+                  <th scope="row">{formatFull(p.t, bucket)}</th>
+                  {SERIES.map((s) => (
+                    <td key={s.key}>{p[s.key]}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       </>
     );
   }
@@ -104,7 +147,7 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
     <section className="trend" aria-label="Trend zgłoszeń">
       <div className="trend-header">
         <h2>Trend zgłoszeń</h2>
-        <div className="trend-buckets">
+        <div className="trend-buckets" role="group" aria-label="Przedział czasu">
           {BUCKETS.map((b) => (
             <button key={b.value} type="button" aria-pressed={bucket === b.value} onClick={() => onBucketChange(b.value)}>
               {b.label}
