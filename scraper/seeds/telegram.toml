@@ -1,0 +1,38 @@
+# Public Telegram channels the scraper starts with (OpenSpec change scraper-v2-social, design.md decision 13).
+# Read by the seed loader together with every other `*.toml` here: a source whose URL is already in `sources` is left alone.
+# `platform = "other"` because the frozen contract enum has no `telegram` value yet (`scrape_meta.network` says it is Telegram).
+# `source_kind = "unknown"` where the registry status of the publisher cannot be known from the page: analytics routes M3
+# by registry mismatch. schedule_cron is UTC, staggered by ten minutes so the domain's request interval is not hit at once.
+# No entry says that a named channel breaks a rule: a row is a candidate that matches a signal, or a neutral control.
+
+[[source]]
+name = "Rare Crypto Signals (Telegram)"
+platform = "other"
+url = "https://t.me/s/rarecryptosignals"
+source_kind = "third_party"
+target_modules = ["M1"]
+schedule_cron = "15 */6 * * *"
+
+[[source]]
+name = "Crypto Sygnały (Telegram)"
+platform = "other"
+url = "https://t.me/s/crypto_sygnaly"
+source_kind = "unknown"
+target_modules = ["M3"]
+schedule_cron = "25 */6 * * *"
+
+[[source]]
+name = "Sube Trading (Telegram)"
+platform = "other"
+url = "https://t.me/s/SubeTradingPL"
+source_kind = "unknown"
+target_modules = ["M3"]
+schedule_cron = "35 */6 * * *"
+
+[[source]]
+name = "KDP Wiadomości (Telegram, news control)"
+platform = "other"
+url = "https://t.me/s/kdpwiadomosci"
+source_kind = "third_party"
+target_modules = ["M1"]
+schedule_cron = "45 */6 * * *"

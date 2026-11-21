@@ -29,8 +29,8 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 4. Seeds
 
-- [ ] 4.1 Failing tests, then `scraper/seeds/telegram.toml` (`rarecryptosignals` M1 `third_party`, `crypto_sygnaly` and `SubeTradingPL` M3 `unknown`, `kdpwiadomosci` M1 `third_party` control; `platform = other`, `https://t.me/s/<handle>`, staggered `15`/`25`/`35`/`45 */6 * * *`) loaded by the `scraper-v2-sources` directory scan with no loader edit (design decision 13; the `seed_knf` insert pattern only if it is not merged, moved at rebase); "Seeding twice" uses the directory scan; "Seeding twice" and "Signal channel is an M3 candidate" pass against PostgreSQL, and each row validates against `source.schema.json`
-- [ ] 4.2 Mutation check for 4.1 (the idempotency guard and the `source_kind` per row); line reads `mutations: N tried, N caught`
+- [ ] 4.1 Failing tests, then `scraper/seeds/telegram.toml` (`rarecryptosignals` M1 `third_party`, `crypto_sygnaly` and `SubeTradingPL` M3 `unknown`, `kdpwiadomosci` M1 `third_party` control; `platform = other`, `https://t.me/s/<handle>`, staggered `15`/`25`/`35`/`45 */6 * * *`) loaded by the `scraper-v2-sources` directory scan with no loader edit (design decision 13; the `seed_knf` insert pattern only if it is not merged, moved at rebase); "Seeding twice" uses the directory scan; "Seeding twice" and "Signal channel is an M3 candidate" pass against PostgreSQL, and each row validates against `source.schema.json` **Status:** `seeds/telegram.toml` and its row tests are done (`test_telegram_seed.py`); the loader scenario "Seeding twice" through the directory scan waits for `scraper-v2-sources` to be merged (its loader is not on this branch), so this task stays open.
+- [ ] 4.2 Mutation check for 4.1 (the idempotency guard and the `source_kind` per row); line reads `mutations: N tried, N caught` **Status:** rows: mutations: 6 tried, 6 caught (`source_kind`, `target_modules`, cron, URL form, platform); the idempotency guard is the loader's and is mutated after the rebase onto `scraper-v2-sources`.
 
 ## 5. Closing
 
