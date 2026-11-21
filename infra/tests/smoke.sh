@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Smoke test for the shared infrastructure (openspec/changes/infra-compose, spec shared-infrastructure).
+# Smoke test for the shared infrastructure (spec openspec/specs/shared-infrastructure).
 # Runs against throwaway compose projects with their own env file and ports, and removes them
-# (containers, networks, volumes) on exit. Needs only bash and Docker.
+# (containers, networks, volumes) on exit. Needs bash, Docker and Node (already required by the repo setup;
+# used to read `docker compose config --format json`).
 #
 #   infra/tests/smoke.sh                 all groups except the LLM download
 #   infra/tests/smoke.sh parallel redis  selected groups
@@ -215,7 +216,7 @@ app_scoped() {
   if mcp "$p" "$u" admin user list t >/dev/null 2>&1; then echo "app has admin rights"; return 1; fi
   # Another bucket (made with root) must be closed to the app user: catches an object policy on arn:aws:s3:::*.
   mcp "$p" "$(root_url "$p")" mb --ignore-existing t/iw-other-root >/dev/null || { echo "root mb failed"; return 1; }
-  echo x | mcp "$p" "$(root_url "$p")" pipe t/iw-other-root/secret.txt >/dev/null
+  echo x | mcp "$p" "$(root_url "$p")" pipe t/iw-other-root/secret.txt >/dev/null || { echo "root write failed"; return 1; }
   if mcp "$p" "$u" cat t/iw-other-root/secret.txt >/dev/null 2>&1; then echo "app can read another bucket"; return 1; fi
   if echo y | mcp "$p" "$u" pipe t/iw-other-root/w.txt >/dev/null 2>&1; then echo "app can write another bucket"; return 1; fi
 }

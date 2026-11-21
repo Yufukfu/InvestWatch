@@ -25,7 +25,7 @@ Three modules, three owners. B defined the repository layout (root [`README.md`]
 | `analytics/` | C | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
 | `web/` | B | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
 | `contracts/` | C | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
-| `infra/` | B | shared infrastructure: Postgres, HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
+| `infra/` | B | shared infrastructure: Postgres, Redis, object storage (MinIO), optional Ollama (`--profile llm`), HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 
 `api/` (C) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
 
