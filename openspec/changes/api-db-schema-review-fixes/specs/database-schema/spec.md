@@ -16,7 +16,7 @@ Each table SHALL store the scalar fields of its contract as typed columns and SH
 
 #### Scenario: Contract mock round-trips
 - **WHEN** every item of `contracts/mocks/documents.json`, `findings.json` and `sources.json` is inserted and read back into the contract shape
-- **THEN** each read-back object equals the mock item, with explicit nulls compared as given and only keys the contract lets the API derive or omit when null left out, and passes the contract schema
+- **THEN** each read-back object equals the mock item key by key, where a mock null reads back as null or as an absent key, only API-derived keys (`risk_level`, `documents_count`) are left out, and the object passes the contract schema
 
 #### Scenario: Null JSONB field is SQL NULL
 - **WHEN** a finding is inserted with `firm`, `advertiser` and `model` set to null

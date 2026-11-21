@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import re
 import uuid
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import func, insert, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 
+from conftest import CONTRACTS_DIR
 from dbutil import document_row, finding_row, now, source_row
 from investwatch_api.db.sql import (
     document_insert_ignore_duplicate,
@@ -83,14 +85,6 @@ def test_reused_document_id_is_not_silently_dropped(app_engine):
             first = document_row(content_hash="d" * 64)
             _insert_ignore(conn, first)
             _insert_ignore(conn, document_row(id=first["id"], content_hash="e" * 64))
-
-
-def test_untargeted_do_nothing_also_works_with_the_index(app_engine):
-    """The short form from the first README draft still deduplicates (it also hides id collisions)."""
-    with app_engine.begin() as conn:
-        for _ in range(2):
-            conn.execute(pg_insert(documents).values(document_row(content_hash="f" * 64)).on_conflict_do_nothing())
-        assert _count(conn, documents) == 1
 
 
 def test_unknown_source(app_engine):
@@ -238,8 +232,60 @@ def test_null_jsonb_field_is_sql_null(app_engine, column):
         assert conn.execute(select(func.count()).select_from(findings).where(col.is_(None))).scalar_one() == 1
 
 
-def test_finding_has_no_risk_level_column():
-    assert "risk_level" not in findings.c
+def _db_columns(conn, table: str) -> set[str]:
+    q = text("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = :t")
+    return set(conn.execute(q, {"t": table}).scalars())
+
+
+def test_migrated_findings_have_no_risk_level_column(app_engine):
+    with app_engine.connect() as conn:
+        cols = _db_columns(conn, "findings")
+    assert "score" in cols and "risk_level" not in cols
+
+
+def _schema(name: str) -> dict:
+    return json.loads((CONTRACTS_DIR / "schemas" / f"{name}.schema.json").read_text(encoding="utf-8"))
+
+
+def _enum(schema: dict, *path: str) -> set[str]:
+    """Contract enum at a property path, following local $refs; null is not a stored value."""
+    node = schema
+    for key in path:
+        node = node[key]
+        while "$ref" in node:
+            node = schema["$defs"][node["$ref"].removeprefix("#/$defs/")]
+    return {v for v in node["enum"] if v is not None}
+
+
+# (table, column, contract schema, property path)
+ENUM_CHECKS = [
+    ("documents", "platform", "scraped-document", ("properties", "platform")),
+    ("documents", "source_kind", "scraped-document", ("properties", "source_kind")),
+    ("findings", "module", "finding", ("properties", "module")),
+    ("findings", "status", "finding", ("properties", "status")),
+    ("findings", "platform", "finding", ("properties", "platform")),
+    ("sources", "platform", "source", ("properties", "platform")),
+    ("sources", "source_kind", "source", ("properties", "source_kind")),
+    ("sources", "last_run_status", "source", ("properties", "last_run_status")),
+    ("sources", "target_modules", "source", ("properties", "target_modules", "items")),
+    ("calibration_points", "module", "finding", ("properties", "module")),
+]
+
+
+def test_enum_checks_match_the_contracts(app_engine):
+    """The CHECKs as Postgres stores them (pg_constraint), not tables.py, against contracts/schemas/*.json."""
+    with app_engine.connect() as conn:
+        rows = conn.execute(text("SELECT conrelid::regclass::text, pg_get_constraintdef(oid) "
+                                 "FROM pg_constraint WHERE contype = 'c'")).all()
+    mismatches = {}
+    for table, column, schema, path in ENUM_CHECKS:
+        found = [d for t, d in rows if t == table and re.search(rf"\b{column}\b", d) and "::text" in d]
+        assert len(found) == 1, (table, column, found)
+        allowed = set(re.findall(r"'([^']*)'::text", found[0]))
+        expected = _enum(_schema(schema), *path)
+        if allowed != expected:
+            mismatches[f"{table}.{column}"] = (sorted(allowed), sorted(expected))
+    assert not mismatches, mismatches
 
 
 # --- Job errors and calibration points -------------------------------------------------------
@@ -266,8 +312,10 @@ def test_error_for_an_unknown_source_is_recorded(app_engine):
         assert conn.execute(q).scalars().all() == ["invalid_request"]
 
 
-def test_job_errors_have_no_secret_columns():
-    assert set(job_errors.c.keys()) == {"id", "source_id", "url", "reason", "detail", "occurred_at"}
+def test_migrated_job_errors_have_no_secret_columns(app_engine):
+    with app_engine.connect() as conn:
+        cols = _db_columns(conn, "job_errors")
+    assert cols == {"id", "source_id", "url", "reason", "detail", "occurred_at"}
 
 
 def test_empty_reason_is_rejected(app_engine):

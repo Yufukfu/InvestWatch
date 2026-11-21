@@ -26,9 +26,16 @@ def _mock(name):
     return data["items"] if isinstance(data, dict) else data
 
 
-def _without(obj: dict, keys=()) -> dict:
-    """Null-valued keys and API-derived keys are not stored, so they are not compared."""
-    return {k: v for k, v in obj.items() if v is not None and k not in keys}
+def _assert_round_trip(got: dict, mock: dict, derived=()) -> None:
+    """The read-back equals the mock key by key, explicit nulls included: a mock null must come back as
+    null or as an absent key (columns omit nulls in `*_to_contract`, payload keys keep them). Only
+    API-derived keys are left out, and the read-back may not carry a key the mock does not have."""
+    expected = {k: v for k, v in mock.items() if k not in derived}
+    assert set(got) <= set(expected), set(got) - set(expected)
+    assert {k: got.get(k) for k in expected} == expected
+
+
+NULLABLE_JSONB = ("firm", "advertiser", "model")
 
 
 def test_contract_mock_round_trips(app_engine):
@@ -44,19 +51,25 @@ def test_contract_mock_round_trips(app_engine):
         back_s = {r["id"]: source_to_contract(r) for r in conn.execute(select(sources)).mappings()}
         back_d = {r["id"]: document_to_contract(r) for r in conn.execute(select(documents)).mappings()}
         back_f = {r["id"]: finding_to_contract(r) for r in conn.execute(select(findings)).mappings()}
+        # A mock's explicit null must be SQL NULL in the column, not the JSON value null.
+        explicit_nulls = [(f["id"], c) for f in finds for c in NULLABLE_JSONB if c in f and f[c] is None]
+        assert explicit_nulls, "the mocks no longer carry an explicit null JSONB field"
+        for fid, col in explicit_nulls:
+            q = select(findings.c[col].is_(None)).where(findings.c.id == fid)
+            assert conn.execute(q).scalar_one(), (fid, col)
 
     assert len(back_s) == len(srcs) and len(back_d) == len(docs) and len(back_f) == len(finds)
     for s in srcs:
         got = next(v for v in back_s.values() if v["id"] == s["id"])
-        assert _without(got) == _without(s, DERIVED["sources"])
+        _assert_round_trip(got, s, DERIVED["sources"])
         assert_contract_valid("source", {**got, "documents_count": 0})
     for d in docs:
         got = next(v for v in back_d.values() if v["id"] == d["id"])
-        assert _without(got) == _without(d)
+        _assert_round_trip(got, d)
         assert_contract_valid("scraped-document", got)
     for f in finds:
         got = next(v for v in back_f.values() if v["id"] == f["id"])
-        assert _without(got) == _without(f, DERIVED["findings"])
+        _assert_round_trip(got, f, DERIVED["findings"])
         assert_contract_valid("finding", got)
 
 

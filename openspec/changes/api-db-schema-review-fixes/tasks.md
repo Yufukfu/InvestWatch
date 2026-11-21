@@ -12,10 +12,10 @@
 
 ## 3. Tests that can fail
 
-- [ ] 3.1 EXPLAIN the compiled `unpublished_documents()` and findings list statements instead of hand-typed SQL
-- [ ] 3.2 Mock round-trip keeps explicit nulls for nullable fields
-- [ ] 3.3 One test compares the contract enums in `contracts/schemas/*.json` with the CHECK definitions in `pg_constraint`; drop or rename the tests that compare `tables.py` with itself; fix the `alembic check` docstring
-- [ ] 3.4 Mutation check
+- [x] 3.1 EXPLAIN the compiled `unpublished_documents()` and findings list statements instead of hand-typed SQL
+- [x] 3.2 Mock round-trip keeps explicit nulls for nullable fields
+- [x] 3.3 One test compares the contract enums in `contracts/schemas/*.json` with the CHECK definitions in `pg_constraint`; drop or rename the tests that compare `tables.py` with itself; fix the `alembic check` docstring
+- [x] 3.4 Mutation check — mutations: 10 tried, 10 caught (the round-trip mutant first survived because the test edit had not applied; caught after the fix)
 
 ## 4. Non-empty document text
 

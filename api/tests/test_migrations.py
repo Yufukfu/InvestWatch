@@ -47,7 +47,9 @@ def test_downgrade_removes_the_tables(monkeypatch, empty_db):
 
 
 def test_models_match_the_migrations(monkeypatch, empty_db):
-    """`alembic check` finds no difference between db/tables.py and the migrated database."""
+    """`alembic check` finds no difference in tables, columns, types, nullability, indexes and unique
+    constraints between db/tables.py and the migrated database. It does not diff CHECK constraints:
+    test_enum_checks_match_the_contracts and the rejection tests in test_constraints.py cover those."""
     upgrade(monkeypatch, empty_db.admin_url)
     command.check(alembic_config())
 
