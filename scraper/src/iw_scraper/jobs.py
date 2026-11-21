@@ -29,6 +29,9 @@ from iw_scraper.types import Deferral, JobError, Reason
 ARQ_MAX_TRIES = 10_000
 ARQ_TIMEOUT_SLACK = 30.0
 ATTEMPTS_KEY_TTL = 24 * 3600
+# arq rejects a job id whose result is still stored: this is what de-duplicates a replayed schedule slot, so it
+# is pinned and stays far longer than the scheduler's catch-up window
+RESULT_TTL = 3600.0
 KEEP_ALIVE_DIVISOR = 3
 
 # arq pickles jobs and results by default; JSON keeps the queue readable and a poisoned Redis from running code.
@@ -86,6 +89,7 @@ def job_function(settings: QueueSettings) -> Function:
         name="execute_job",
         max_tries=ARQ_MAX_TRIES,
         timeout=settings.attempt_timeout + ARQ_TIMEOUT_SLACK,
+        keep_result=RESULT_TTL,
     )
 
 
