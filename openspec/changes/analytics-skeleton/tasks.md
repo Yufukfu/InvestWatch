@@ -1,0 +1,42 @@
+# Tasks
+
+## 1. Package skeleton, config and models
+
+- [ ] 1.1 Failing test: a `Finding` built from the models validates against `contracts/schemas/finding.schema.json` (skipped without `CONTRACTS_DIR`), every mock document parses, an unknown field is ignored, missing `text` / bad `fetched_at` raise
+- [ ] 1.2 `analytics/pyproject.toml`, pinned `requirements.txt` / `requirements-dev.txt`, `.env.example` (`REGISTRY_CSV`, `LOG_LEVEL`, `CONTRACTS_DIR`), `config.py`, `models.py`, JSON logging setup; `pytest analytics` green
+- [ ] 1.3 Mutation check; `mutations: N tried, N caught`
+
+## 2. Preprocessing
+
+- [ ] 2.1 Failing tests for the preprocessing scenarios (hash equality, `S.A.` split, pl/en guess, empty text)
+- [ ] 2.2 `preprocessing.py`; tests green
+- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+
+## 3. Firm registry
+
+- [ ] 3.1 Failing tests for the registry scenarios (name without legal form, domain, no match, missing/malformed CSV)
+- [ ] 3.2 `registry.py` and `analytics/registry/seed.csv` with the three fictional mock firms; tests green
+- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+
+## 4. Rule engine and R1-R3
+
+- [ ] 4.1 Failing tests for the catalogue, evidence and R1/R2/R3 scenarios
+- [ ] 4.2 `rules/engine.py`, `rules/m2_rules.yaml` (19 entries, R1-R3 implemented), `rules/m2.py`; tests green
+- [ ] 4.3 Mutation check; `mutations: N tried, N caught`
+
+## 5. Router, M2 module and pipeline
+
+- [ ] 5.1 Failing tests for routing and M2 finding assembly (alfa landing, bank OK, unmatched firm, third-party skip, score formula)
+- [ ] 5.2 `modules/router.py`, `modules/m2.py`, `pipeline.py`; tests green
+- [ ] 5.3 Mutation check; `mutations: N tried, N caught`
+
+## 6. CLI
+
+- [ ] 6.1 Failing test: the CLI on `contracts/mocks/documents.json` writes a JSON list of findings that passes `contracts/validate.py finding`
+- [ ] 6.2 `cli.py` (`python -m investwatch_analytics.cli <file>`, accepts an object or a list); tests green; `pip-audit -r analytics/requirements.txt` clean
+- [ ] 6.3 Mutation check; `mutations: N tried, N caught`
+
+## 7. Closing
+
+- [ ] 7.1 Apply the iw-docs-update skill (`analytics/README.md` with how to run, analytics row of `.docs/STATUS.md`, `docs-check` clean) and add the iw-ai-log row
+- [ ] 7.2 Run the iw-pr-review skill and fix real findings
