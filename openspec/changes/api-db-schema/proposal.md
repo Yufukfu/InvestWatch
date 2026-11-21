@@ -7,7 +7,7 @@ Nothing in the stack has tables yet. The scraper cannot insert documents (`scrap
 ## What Changes
 
 - Create the `api/` service directory with `CLAUDE.md` (first, as the root `CLAUDE.md` requires), `README.md`, a Python package `investwatch_api` with pinned dependencies, and Alembic configuration under `api/migrations/`.
-- Add SQLAlchemy 2 table definitions and an initial Alembic revision for the shared tables: `sources`, `documents`, `findings`, `job_errors`, `calibration_points`. Layout and driver are recorded in a new ADR 0306.
+- Add SQLAlchemy 2 table definitions and an initial Alembic revision for the shared tables: `sources`, `documents`, `findings`, `job_errors`, `calibration_points`. Layout and driver are recorded in a new ADR 0307.
 - `documents`: contract scalar fields as columns plus `payload JSONB` for the rest, a unique index on `(source_id, content_hash)` for deduplication, and a `stream_published_at` marker for "published to `iw:documents`" with an index for the republish sweep.
 - `findings`: filterable fields as columns plus JSONB for `firm`, `advertiser`, `rules`, `model`; unique on `(document_id, module)` so a re-scan of the same document updates the finding instead of adding a duplicate. `risk_level` is not stored ([ADR 0305](../../../.docs/decisions/0305-threshold-storage.md)).
 - Add `api/compose.yaml` with a one-shot `api-migrate` service that runs `alembic upgrade head` as `iw_admin`, so scraper and analytics can wait for it. Adding it to the root `include:` is coordinated with the `infra-compose` change (the root file is not edited here).
@@ -32,4 +32,4 @@ Nothing in the stack has tables yet. The scraper cannot insert documents (`scrap
 - New directory `api/` (approved by ADR 0302, which names `api/` and its `CLAUDE.md`; Kacper owns the layout and is told in the PR).
 - Dependencies (pinned, `pip-audit` before merge): `sqlalchemy`, `alembic`, `psycopg[binary]`; tests use `pytest` against a real Postgres 17 from `infra/compose.yaml`.
 - Unblocks `scraper-v1` group 5 (Adam) and the storage step of `analytics-worker` (Damian). Both must use the column names and the conflict rules in `specs/database-schema/spec.md`.
-- Docs: `api/CLAUDE.md`, `api/README.md`, ADR 0306, `.docs/decisions/README.md`, root `CLAUDE.md` services table, `.docs/INDEX.md`, Damian's row in `.docs/STATUS.md` (closing task).
+- Docs: `api/CLAUDE.md`, `api/README.md`, ADR 0307, `.docs/decisions/README.md`, root `CLAUDE.md` services table, `.docs/INDEX.md`, Damian's row in `.docs/STATUS.md` (closing task).

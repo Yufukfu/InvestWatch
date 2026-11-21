@@ -12,7 +12,7 @@ REST API and real-time (Socket.IO) gateway between the shared database and the d
 - Turns each finding's raw `score` into `risk_level` using the module thresholds the calibration panel sets.
 - Relays live events (new findings, high-risk alerts, status changes, scan progress) to the dashboard over Socket.IO, namespace `/events`.
 
-Why it is built this way: [ADR 0302](../.docs/decisions/0302-api-service.md) (separate Python service), [ADR 0303](../.docs/decisions/0303-database-schema-ownership.md) (migrations here), [ADR 0305](../.docs/decisions/0305-threshold-storage.md) (thresholds in Redis), [ADR 0306](../.docs/decisions/0306-database-driver-and-table-layout.md) (driver and tables).
+Why it is built this way: [ADR 0302](../.docs/decisions/0302-api-service.md) (separate Python service), [ADR 0303](../.docs/decisions/0303-database-schema-ownership.md) (migrations here), [ADR 0305](../.docs/decisions/0305-threshold-storage.md) (thresholds in Redis), [ADR 0307](../.docs/decisions/0307-database-driver-and-table-layout.md) (driver and tables).
 
 ## Running it
 

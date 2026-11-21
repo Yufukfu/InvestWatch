@@ -1,4 +1,4 @@
-# 0306. Database driver and table layout
+# 0307. Database driver and table layout
 
 - Status: accepted
 - Date: 2026-11-21

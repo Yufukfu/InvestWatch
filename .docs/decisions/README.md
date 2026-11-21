@@ -18,7 +18,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
 | [0304](0304-llm-serving.md) | How Gemma is served to analytics | accepted (takes effect when PR #3 merges) |
 | [0305](0305-threshold-storage.md) | Where module thresholds live and who emits `finding.high_risk` | accepted (takes effect when PR #3 merges) |
-| [0306](0306-database-driver-and-table-layout.md) | Database driver (psycopg 3) and table layout (columns + JSONB, dedup and upsert keys) (depends on [0303](0303-database-schema-ownership.md)) | accepted (takes effect when the `api-db-schema` PR merges) |
+| [0307](0307-database-driver-and-table-layout.md) | Database driver (psycopg 3) and table layout (columns + JSONB, dedup and upsert keys) (depends on [0303](0303-database-schema-ownership.md)) | accepted (takes effect when the `api-db-schema` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
