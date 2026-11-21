@@ -81,9 +81,10 @@ class FindingPatch(_Strict):
 
 
 class Thresholds(_Strict):
-    M1: float = Field(ge=0, le=1)
-    M2: float = Field(ge=0, le=1)
-    M3: float = Field(ge=0, le=1)
+    # strict: the contract says number, so `true` and "0.5" are 422 (integers still pass)
+    M1: float = Field(ge=0, le=1, strict=True)
+    M2: float = Field(ge=0, le=1, strict=True)
+    M3: float = Field(ge=0, le=1, strict=True)
 
 
 class SourceCreate(_Strict):
@@ -189,8 +190,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         page_size: Annotated[int, Query(ge=1, le=200)] = 50,
     ):
         statuses = None
-        if status:
+        if status is not None:
             statuses = {s.strip() for s in status.split(",") if s.strip()}
+            if not statuses:  # an empty set would silently drop the filter
+                raise RequestValidationError([{"loc": ["query", "status"], "msg": "status list is empty"}])
             unknown = statuses - set(STATUSES)
             if unknown:
                 raise RequestValidationError([{"loc": ["query", "status"], "msg": f"unknown status {sorted(unknown)}"}])
@@ -222,6 +225,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             result.append(f)
 
         key = sort.lstrip("-")
+        result.sort(key=lambda f: f["id"])  # tie-breaker: the sorts are stable, so equal keys stay by id
         result.sort(key=(lambda f: parse_ts(f["detected_at"])) if key == "detected_at" else (lambda f: f["score"]),
                     reverse=sort.startswith("-"))
         start = (page - 1) * page_size

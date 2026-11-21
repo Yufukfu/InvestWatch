@@ -128,3 +128,21 @@ def test_invalid_filter_values_are_422(client, query):
 
     assert r.status_code == 422
     assert "error" in r.json()
+
+
+@pytest.mark.parametrize("query", ["status=,", "status=", "status=%20"])
+def test_blank_status_filter_is_422(client, query):
+    # an empty set would silently drop the filter and return every finding
+    assert client.get(f"/api/findings?{query}").status_code == 422
+
+
+@pytest.mark.parametrize("sort", ["score", "-score", "detected_at", "-detected_at"])
+def test_sort_ties_are_broken_by_id(client, store, sort):
+    # a SQL ORDER BY in the real api/ does not keep insertion order, so the mock must not rely on it
+    for f in store.findings.values():
+        f.update(score=0.5, detected_at="2026-11-21T10:00:00Z")
+    store.findings = dict(reversed(list(store.findings.items())))
+
+    result = items(client, f"sort={sort}&page_size=200")
+
+    assert [i["id"] for i in result] == sorted(store.findings)

@@ -168,3 +168,17 @@ def test_mock_helpers_need_the_admin_header(client, path, headers):
     assert r.status_code == 403
     assert "error" in r.json()
     assert client.get(f"/api/findings/{f['id']}").json()["status"] == "closed"
+
+
+@pytest.mark.parametrize("module", ["M1", "M2", "M3"])
+@pytest.mark.parametrize("value", [True, "0.5"])
+def test_threshold_must_be_a_json_number(client, module, value):
+    body = {"M1": 0.6, "M2": 0.5, "M3": 0.7, module: value}
+    assert client.put("/api/settings/thresholds", json=body).status_code == 422
+
+
+def test_integer_thresholds_are_numbers(client):
+    r = client.put("/api/settings/thresholds", json={"M1": 1, "M2": 0, "M3": 0.7})
+
+    assert r.status_code == 200
+    assert r.json() == {"M1": 1.0, "M2": 0.0, "M3": 0.7}
