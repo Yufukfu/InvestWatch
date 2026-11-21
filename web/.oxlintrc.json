@@ -16,17 +16,25 @@
         "no-restricted-imports": [
           "error",
           {
-            "paths": [
-              { "name": "react-redux" },
-              { "name": "@reduxjs/toolkit" },
-              { "name": "@reduxjs/toolkit/query" },
-              { "name": "@reduxjs/toolkit/query/react" },
-              { "name": "socket.io-client" }
-            ],
             "patterns": [
               {
-                "group": ["**/api", "**/api/**", "../data", "../data/**", "../../*/data", "../../*/data/**", "**/features/*/data", "**/features/*/data/**", "**/*Page", "**/store", "**/store.ts"],
-                "message": "Presentational components take props only (ADR 0204). Read data in features/<name>/data/ and pass it down from the page."
+                "group": [
+                  "**/api",
+                  "**/api/**",
+                  "../**/data",
+                  "../**/data/**",
+                  "**/*Page",
+                  "**/*Page.*",
+                  "**/store",
+                  "**/store.*",
+                  "react-redux",
+                  "react-redux/**",
+                  "@reduxjs/toolkit",
+                  "@reduxjs/toolkit/**",
+                  "socket.io-client",
+                  "socket.io-client/**"
+                ],
+                "message": "Presentational components take props only (ADR 0204): no api/, data/ (any relative path through a folder named data), pages, store, react-redux, @reduxjs/toolkit or socket.io-client. Read data in features/<name>/data/ and pass it down from the page."
               }
             ]
           }
