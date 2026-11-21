@@ -135,3 +135,30 @@ def test_a_non_web_url_scheme_is_schema_invalid(source, field, value):
     error = check_document(build(source, PAGE | {field: value}))
     assert error is not None and error.reason is Reason.SCHEMA_INVALID
     assert "http or https" in error.detail
+
+
+# The one definition of `content_hash` (ADR 0105, `.docs/integration-plan.md` §3): NFC, whitespace collapsed and trimmed,
+# case kept, UTF-8, sha256 hex. The hashes are literals, never computed with the code under test; the stored value feeds the
+# unique dedup index on `documents`, so a change here would turn every stored hash into a miss.
+@pytest.mark.parametrize(
+    "text,folded,expected",
+    [
+        ("ﬁnanse", "finanse", "940eee0cfc77cf748d13d9ebbb2530ff252c93ff9fffdd3114f8b10329e8093a"),  # ligature fi
+        ("m²", "m2", "09c2e207e28b877591a6d65a2e78637bea09fa49d68def18c0419b18ff47ae89"),  # superscript two
+        ("１２３%", "123%", "359a698d899b204c2eab19f1b13a75f203816dd695e6620386819c67b1b62369"),  # full-width digits
+    ],
+)
+def test_compatibility_characters_are_kept_not_folded(text, folded, expected):
+    assert normalise_text(text) == text
+    assert content_hash(text) == expected
+    assert content_hash(text) != content_hash(folded)
+
+
+def test_decomposed_and_composed_text_hash_to_the_literal():
+    assert content_hash("é") == "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"
+    assert content_hash("é") == "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"
+
+
+def test_unicode_whitespace_collapses_to_one_space():
+    assert normalise_text(" a 　\t b ") == "a b"
+    assert content_hash(" a 　b ") == "c8687a08aa5d6ed2044328fa6a697ab8e96dc34291e8c2034ae8c38e6fcc6d65"
