@@ -10,13 +10,16 @@ import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import yaml
 
-from ..models import RULE_ID_PATTERN, Result, RuleResult, ScrapedDocument
+from ..models import RULE_ID_PATTERN, EvidenceLocator, Result, RuleResult, ScrapedDocument
 from ..preprocessing import Preprocessed
 from ..registry import FirmMatch, Registry
+
+if TYPE_CHECKING:
+    from ..llm.judge import LlmJudge
 
 DEFAULT_CATALOGUE = Path(__file__).with_name("m2_rules.yaml")
 #: Shipped catalogue per module (M1/M3 signals: change analytics-m1-m3).
@@ -28,11 +31,20 @@ MODULE_CATALOGUES = {
 #: Rule id prefix each module's catalogue must use.
 _ID_PREFIX = {"M1": "S1.", "M2": "R", "M3": "S3."}
 SEVERITIES = {"high", "medium", "low"}
+# `llm:` block on a catalogue entry (analytics-llm-p0, design §1-2): when the engine may defer to the LLM.
+LLM_WHEN = {"always", "uncertain"}
 # Every rule parameter a rule class reads (rules/m2.py); anything else in the YAML is a typo.
 KNOWN_PARAMS = {
     "labels", "prominent_sentences", "negation_before",
     "window", "claim_patterns", "claim_exclude_patterns", "risk_patterns",
     "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
+    # analytics-llm-p0 (M2 P0 rules)
+    "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
+    "hiding_regions", "figure_extra_exclude_patterns", "min_ratio",
+    "supervisor_patterns", "approval_patterns", "safety_patterns",
+    "supervisor_exclude_patterns", "approval_exclude_patterns", "safety_exclude_patterns",
+    "amount_patterns", "amount_return_patterns",
+    "borderline_margin",
 }
 # M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
 # the plain string lists below must hold non-empty strings.
@@ -57,6 +69,7 @@ class RuleSpec:
     implemented: bool
     params: dict[str, Any] = field(default_factory=dict)
     weight: float = 0.0  # M1/M3 only: the signal's weight in σ(bias + Σ w·x)
+    llm: dict[str, str] | None = None  # {question, when}; None = never sent to the LLM
 
 
 @dataclass(frozen=True)
@@ -76,6 +89,17 @@ class Rule:
     def applies(self, ctx: Context) -> bool:
         return True
 
+    def ask_llm(self, ctx: Context, result: RuleResult) -> bool:
+        """Whether to defer this rules-only result to the LLM (only entries with an `llm:` block are asked).
+
+        `when: always` defers whenever the rule applies, `when: uncertain` (default) only an `uncertain` result.
+        A rule overrides this when its borderline is narrower (R3, R17).
+        """
+        llm = self.spec.llm
+        if llm is None or result.result == "not_applicable":
+            return False
+        return llm["when"] == "always" or result.result == "uncertain"
+
     def evidence_fields(self, ctx: Context) -> list[str]:
         """Document fields an evidence quote may come from; the text only, unless a signal quotes metadata."""
         return [ctx.doc.text]
@@ -83,7 +107,10 @@ class Rule:
     def evaluate(self, ctx: Context) -> RuleResult:  # pragma: no cover - abstract
         raise NotImplementedError
 
-    def result(self, result: Result, evidence: str | None, explanation: str) -> RuleResult:
+    def result(
+        self, result: Result, evidence: str | None, explanation: str,
+        locator: EvidenceLocator | None = None,
+    ) -> RuleResult:
         return RuleResult(
             rule_id=self.spec.id,
             name=self.spec.name,
@@ -93,6 +120,7 @@ class Rule:
             explanation=explanation,
             legal_basis=self.spec.legal_basis,
             method="rule",
+            evidence_locator=locator,
         )
 
 
@@ -177,10 +205,29 @@ class Catalogue:
             if signals and not _number(weight):
                 raise CatalogueError(f"{path}: {rule_id} needs a numeric `weight`")
             params = _check_params(path, rule_id, entry.get("params") or {})
+            llm = _check_llm(path, rule_id, entry.get("llm"))
             seen.add(rule_id)
             specs.append(RuleSpec(rule_id, entry["name"], entry["severity"], entry.get("legal_basis"),
-                                  implemented, params, float(weight) if signals else 0.0))
+                                  implemented, params, weight=float(weight) if signals else 0.0, llm=llm))
         return cls(specs, module=module, bias=float(bias) if signals else 0.0)
+
+
+def _check_llm(path: Path, rule_id: str, block: Any) -> dict[str, str] | None:
+    """`llm: {question: <non-empty string>, when: always | uncertain}`; `when` defaults to `uncertain`."""
+    if block is None:
+        return None
+    if not isinstance(block, dict):
+        raise CatalogueError(f"{path}: {rule_id} llm must be a mapping with `question` and `when`")
+    unknown = sorted(set(block) - {"question", "when"})
+    if unknown:
+        raise CatalogueError(f"{path}: {rule_id} llm has unknown key(s) {', '.join(map(str, unknown))}")
+    question = block.get("question")
+    if not isinstance(question, str) or not question.strip():
+        raise CatalogueError(f"{path}: {rule_id} llm.question must be a non-empty string")
+    when = block.get("when", "uncertain")
+    if not isinstance(when, str) or when not in LLM_WHEN:
+        raise CatalogueError(f"{path}: {rule_id} llm.when must be one of {sorted(LLM_WHEN)}, got {when!r}")
+    return {"question": question.strip(), "when": when}
 
 
 def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
@@ -207,10 +254,16 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
                 re.compile(value)
             except re.error as exc:
                 raise CatalogueError(f"{path}: {rule_id} {key} is an invalid regex ({exc})") from exc
-        if key in ("window", "prominent_sentences") and (
+        if key in ("window", "prominent_sentences", "borderline_margin") and (
             isinstance(value, bool) or not isinstance(value, int) or value < 0
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a non-negative integer")
+        if key == "min_ratio" and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a number in (0, 1]")
+        if key == "hiding_regions" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key.endswith("_patterns") or key == "labels":
             # An empty label becomes a regex that matches anywhere, so R2 would always pass.
             if not isinstance(value, list) or not all(isinstance(v, str) and (v or key != "labels") for v in value):
@@ -223,8 +276,24 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
     return dict(params)
 
 
-def run_rules(catalogue: Catalogue, ctx: Context) -> list[RuleResult]:
+UNVERIFIED = "Nie udało się potwierdzić cytatu w treści dokumentu; wymaga weryfikacji."
+
+
+def run_rules(
+    catalogue: Catalogue,
+    ctx: Context,
+    judge: "LlmJudge | None" = None,
+    *,
+    module: str | None = None,
+    module_context: str = "",
+) -> list[RuleResult]:
+    """Rules first; with a judge, the deferred checks of this module go to the LLM in one call (ADR 0309).
+
+    `module` defaults to the catalogue's own module, so M3 checks are never sent labelled M2.
+    """
+    module = module or catalogue.module
     out = []
+    deferred: list[tuple[int, RuleSpec]] = []
     for spec in catalogue.implemented:
         rule = _RULES[spec.id](spec)
         if not rule.applies(ctx):
@@ -233,10 +302,41 @@ def run_rules(catalogue: Catalogue, ctx: Context) -> list[RuleResult]:
         res = rule.evaluate(ctx)
         if res.evidence is not None and not any(res.evidence in f for f in rule.evidence_fields(ctx)):
             # Safety net (analytics/CLAUDE.md): an unverifiable quote never supports a verdict.
-            res = res.model_copy(update={
-                "result": "uncertain",
-                "evidence": None,
-                "explanation": "Nie udało się potwierdzić cytatu w treści dokumentu; wymaga weryfikacji.",
-            })
+            res = res.model_copy(update={"result": "uncertain", "evidence": None, "explanation": UNVERIFIED})
+        if judge is not None and spec.llm is not None and rule.ask_llm(ctx, res):
+            deferred.append((len(out), spec))
         out.append(res)
+    if deferred:
+        out = _refine(out, deferred, judge, ctx, module=module, module_context=module_context)
+    return out
+
+
+def _refine(
+    out: list[RuleResult],
+    deferred: list[tuple[int, RuleSpec]],
+    judge: "LlmJudge",
+    ctx: Context,
+    *,
+    module: str,
+    module_context: str,
+) -> list[RuleResult]:
+    from ..llm.judge import SemanticCheck
+
+    checks = [SemanticCheck(spec.id, spec.llm["question"]) for _, spec in deferred if spec.llm is not None]
+    outcome = judge.judge(module=module, module_context=module_context, text=ctx.doc.text,
+                          content_hash=ctx.pre.content_hash, sentences=ctx.pre.sentences, checks=checks)
+    out = list(out)
+    for index, spec in deferred:
+        verdict = outcome.verdicts.get(spec.id)
+        if verdict is None:
+            continue  # no valid verdict: the rules-only result stands
+        before = out[index]
+        update = {"result": verdict.result, "evidence": verdict.evidence, "explanation": verdict.explanation,
+                  "method": "hybrid" if before.evidence is not None else "llm"}
+        if verdict.evidence != before.evidence:
+            update["evidence_locator"] = None  # the locator pointed at the rules-only quote
+        if verdict.evidence is not None and verdict.evidence not in ctx.doc.text:
+            # Defence in depth: the judge already verified the quote; never trust it blindly.
+            update.update({"result": "uncertain", "evidence": None, "explanation": UNVERIFIED})
+        out[index] = before.model_copy(update=update)
     return out

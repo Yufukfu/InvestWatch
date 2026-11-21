@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -13,6 +15,17 @@ from ..config import PIPELINE_VERSION
 from ..models import AdvertiserRef, Finding, ModelInfo, RuleResult
 from ..rules import engine
 from ..rules.engine import Catalogue, Context, run_rules
+from .llm_note import llm_model_used, mode_sentence
+
+if TYPE_CHECKING:
+    from ..llm.judge import LlmJudge
+
+#: The module's legal frame for the LLM system prompt (analytics-llm-p0 design §2; annex 3 definition).
+M3_CONTEXT = (
+    "Module M3: an entity outside the KNF register. Investment advice (art. 76 of the Act on Trading in "
+    "Financial Instruments) is a recommendation to buy, sell or hold specific financial instruments, "
+    "based on the client's situation. Financial education alone is not advice."
+)
 from ..rules.m3 import CRYPTO_NOTE, not_found_text
 from ..rules.scoring import capped, sigmoid_score
 from .excerpt import excerpt
@@ -67,10 +80,13 @@ def build_finding(
     now: datetime,
     new_id: Callable[[], str] = lambda: str(uuid.uuid4()),
     rules: list[RuleResult] | None = None,
+    judge: "LlmJudge | None" = None,
 ) -> Finding:
-    rules = run_rules(catalogue, ctx) if rules is None else rules
+    """`rules` may be precomputed (the pipeline gates on them); `judge` is then only used to name the model."""
+    rules = run_rules(catalogue, ctx, judge, module="M3", module_context=M3_CONTEXT) if rules is None else rules
+    llm_model = llm_model_used(rules, judge)
     value, was_capped = score(rules, catalogue)
-    title, summary = _texts(rules, advertiser, was_capped, not_found_text(ctx.registry))
+    title, summary = _texts(rules, advertiser, was_capped, not_found_text(ctx.registry), llm_model=llm_model)
     return Finding(
         id=new_id(),
         document_id=ctx.doc.id,
@@ -87,11 +103,12 @@ def build_finding(
         platform=ctx.doc.platform,
         detected_at=now,
         updated_at=now,
-        model=ModelInfo(pipeline_version=PIPELINE_VERSION, llm=None, embedder=None),
+        model=ModelInfo(pipeline_version=PIPELINE_VERSION, llm=llm_model, embedder=None),
     )
 
 
-def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool, not_found: str) -> tuple[str, str]:
+def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool, not_found: str, *,
+           llm_model: str | None = None) -> tuple[str, str]:
     by_id = {r.rule_id: r for r in rules}
     who = advertiser.handle or advertiser.name or "nieznany podmiot"
 
@@ -130,5 +147,5 @@ def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool,
                      "materiał może jedynie wskazywać na doradztwo inwestycyjne.")
     if present("S3.8"):
         parts.append(f"{CRYPTO_NOTE[0].upper()}{CRYPTO_NOTE[1:]}.")
-    parts.append("Tryb regułowy (bez modelu językowego).")
+    parts.append(mode_sentence(rules, llm_model))
     return title, " ".join(parts)
