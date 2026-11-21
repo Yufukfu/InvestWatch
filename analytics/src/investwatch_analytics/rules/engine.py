@@ -174,7 +174,9 @@ def nested_unbounded_repeat(pattern: str) -> bool:
     def walk(node, inside: bool) -> bool:
         if isinstance(node, _sre_parser.SubPattern):
             return any(walk(item, inside) for item in node.data)
-        if isinstance(node, tuple) and len(node) == 2 and node[0] in _REPEATS:
+        # Identity, not equality: opcodes are named-int singletons, and a class range `[+-9]` is a plain
+        # (43, 57) pair whose first int equals MIN_REPEAT (review of group 1).
+        if isinstance(node, tuple) and len(node) == 2 and any(node[0] is r for r in _REPEATS):
             low, high, body = node[1]
             unbounded = high == _sre_parser.MAXREPEAT
             if unbounded and inside:

@@ -15,8 +15,8 @@ import pytest
 from investwatch_analytics.rules import engine, m2
 from investwatch_analytics.rules.engine import Catalogue, CatalogueError
 
-NESTED = [r"(\w+\s*)+niż", r"(?:a*)*", r"(.+)+", r"(?:x(?:\d+,)+y)+", r"(?:(?:\w+\s+){0,3})+", r"(?:a+?)+"]
-BOUNDED = [r"(?:\w+\s+){0,3}", r".{0,80}?", r"\bwynik\w*\s+(?:\w+\s+){0,2}nie\b", r"(?:ab|cd)+", r"\d+(?:[.,]\d+)?\s?%"]
+NESTED = [r"(\w+\s*)+niż", r"(?:a*)*", r"(.+)+", r"(?:x(?:\d+,)+y)+", r"(?:(?:\w+\s+){0,3})+", r"(?:a+?)+", r"(?:[+-9]+x)+"]
+BOUNDED = [r"(?:\w+\s+){0,3}", r".{0,80}?", r"\bwynik\w*\s+(?:\w+\s+){0,2}nie\b", r"(?:ab|cd)+", r"\d+(?:[.,]\d+)?\s?%", r"[+-9]", r"[,-.]+", "[\x1c- ]"]
 
 
 def write_catalogue(tmp_path, params: dict) -> object:
