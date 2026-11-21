@@ -107,7 +107,8 @@ def test_events_validate_against_contract(r, sub, contracts_dir):
     from jsonschema import Draft202012Validator, FormatChecker
 
     schema = json.loads((contracts_dir / "schemas" / "events.schema.json").read_text(encoding="utf-8"))
-    validator = Draft202012Validator({**schema, "$ref": "#/$defs/event"}, format_checker=FormatChecker())
+    # the whole schema (its oneOf), as the API's Socket.IO relay validates it: a message matching two branches is dropped too
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     RedisPublisher(r, clock=clock).publish_findings([created(score=0.9), created(module="M1", score=0.1)])
     events = sub()
     assert len(events) == 3
