@@ -51,7 +51,7 @@ For a successful fetch the scraper SHALL produce the contract fields `url`, `can
 - **THEN** none of them appears in `links`
 
 ### Requirement: Decode and bound the response body
-The body SHALL be decoded with the charset from the `Content-Type` header or the `<meta>` declaration, so Polish pages in windows-1250 or ISO-8859-2 keep their letters. A response whose `Content-Type` is not HTML is a `parse_error`. A body larger than the configured size cap (default 5 MiB) is a `parse_error`, and the cap is enforced while the body streams, not after download.
+The body SHALL be decoded with the charset from the `Content-Type` header or the `<meta>` declaration, so Polish pages in windows-1250 or ISO-8859-2 keep their letters. A response whose `Content-Type` is not HTML is a `parse_error`. A body larger than the configured size cap (default 5 MiB) is a `parse_error`. The body is streamed to a temporary file, never held whole in memory, and the cap is checked on the transferred size; the request timeout bounds the transfer.
 
 #### Scenario: Polish charset
 - **WHEN** a fixture is served as windows-1250 with the word `żółć`
@@ -62,8 +62,8 @@ The body SHALL be decoded with the charset from the `Content-Type` header or the
 - **THEN** a job error with reason `parse_error` is recorded and no document is produced
 
 #### Scenario: Oversized body
-- **WHEN** a stub server streams a body larger than the cap
-- **THEN** reading stops at the cap, a job error with reason `parse_error` is recorded, and not more than the cap plus one chunk was read
+- **WHEN** a stub server answers with a body larger than the cap
+- **THEN** a job error with reason `parse_error` is recorded, no document is produced and the temporary file is removed
 
 ### Requirement: Add a site without changing the engine
 Page parsing SHALL go through a registry keyed by host. A site module registers a parser for its host; a host with no module uses the generic parser.
@@ -129,7 +129,7 @@ A session is one run (one attempt of one source): it covers the page request, it
 - **THEN** the second attempt sends no cookie from the first and draws its own identity
 
 ### Requirement: Send headers in the order of the user agent's browser
-An identity is a user agent, an ordered header set and a TLS profile of one browser family, taken from the identity table. The scraper SHALL send the profile's headers with the profile's values in the profile's order on every request of the session, and a custom header SHALL NOT reorder or replace profile headers.
+An identity is a user agent, an ordered header set and a TLS profile of one browser family, taken from the identity table, which lists every header to send (headers not listed are appended by the client in its own order) and carries only current browser versions. The scraper SHALL send the profile's headers with the profile's values in the profile's order on every request of the session, and a custom header SHALL NOT reorder or replace profile headers.
 
 #### Scenario: Header order on the wire
 - **WHEN** a request is made with the Chrome identity against a raw-socket stub that records the header lines

@@ -33,8 +33,14 @@ Rationale, from the evidence above: a working in-house Python implementation alr
 
 ## Consequences
 
-- Task 1.5 is a spike on the installed package before any code is written: can `noble-tls` take an explicit header order, follow redirects manually, pin a resolved IP (or does that need a local pinning layer), and stream with a size cap. If it fails a hard requirement of the spec, this ADR is superseded by one choosing `curl_cffi`.
-- The build needs network once (library download); a failed download fails the image build.
+- Spike result (task 1.5, `noble-tls 0.1.9` with `tls-client` 1.18.1, run on macOS arm64 and Python 3.9.6 against a local raw-socket server and `www.knf.gov.pl`; 2026-11-21):
+  - **Header order: works.** `Session(header_order=[...])` sent `accept-language, user-agent, accept` in that order over HTTP/2 (seen on `tls.peet.ws`); headers not listed (`accept-encoding`) are appended at the end, so the identity table must list every header it wants.
+  - **Manual redirects: works.** `allow_redirects=False` returned `302` with `Location`.
+  - **IP pinning: works.** Connecting to `https://<ip>/` with `server_name_overwrite=<host>` and `request_host_override=<host>` returned 200; without the overrides certificate verification failed, so pinning stays safe.
+  - **Size cap: cannot abort mid-stream.** `stream_output_path` writes the whole body to a file (300008 bytes for a 300000-byte body) and offers no early abort, so the cap is checked after the transfer, with the request timeout bounding it (spec adjusted).
+  - **Fingerprint age matters.** KNF reset the connection (`EOF`) for the `CHROME_117` and `CHROME_131` profiles and answered 200 (807 KB page) for `CHROME_146_PSK`. The identity table must carry current profiles and a canary must catch staleness.
+  - **The updater is unsafe for builds.** `download_if_necessary()` always asks `api.github.com` for the latest release (unpinned; unauthenticated calls got HTTP 403 here), so the Dockerfile must instead download a pinned release asset by tag, verify its sha256 and write the `.version` file itself, never calling the updater. Asset names differ per platform (`tls-client-linux-ubuntu-amd64-1.18.1.so`, `tls-client-linux-arm64-1.18.1.so`); `noble-tls` itself notes its Linux naming is untested, so task 2.1 verifies it in the image (Debian/Ubuntu base).
+- Not yet verified: Python 3.12 (spike ran on 3.9.6), checked in task 2.1.
 - Proxy credentials stay in env; `scrape_meta.proxy` holds an identifier only.
 - Fingerprint quality against real targets is untested; task 3.1 includes a manual probe of the first target.
 - The `scrape_meta.scraper` value for this client is open with C (task 1.3); the field is not required by the schema.
