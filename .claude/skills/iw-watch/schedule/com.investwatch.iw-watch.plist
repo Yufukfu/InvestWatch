@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  iw-watch every 2 minutes on macOS. Set the two paths (REPO and the log), then:
+    cp com.investwatch.iw-watch.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.investwatch.iw-watch.plist
+  Stop: launchctl unload ~/Library/LaunchAgents/com.investwatch.iw-watch.plist
+  A login shell (-l) so node, gh and claude are on PATH as in your terminal.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.investwatch.iw-watch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "$HOME/Projects/InvestWatch" &amp;&amp; node .claude/skills/iw-watch/scripts/watch.mjs run --mine --review-requested --limit 2</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>StandardOutPath</key>
+  <string>/tmp/iw-watch.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/iw-watch.log</string>
+</dict>
+</plist>

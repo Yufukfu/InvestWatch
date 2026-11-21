@@ -48,6 +48,8 @@ test('the allow-list for my PR: exact branch push, this PR only, no review, merg
   assert.ok(allow.includes('Bash(gh issue create:*)'));
   assert.ok(allow.includes('Bash(git commit:*)'));
   assert.ok(!allow.some((r) => /git push origin:\*|git push:\*/.test(r)), 'no wildcard push');
+  assert.ok(allow.includes('Bash(npm ci --ignore-scripts:*)'), 'a fresh clone can install the lockfile, without install scripts');
+  assert.ok(!allow.some((r) => /npm (install|i|ci)(:\*|\)| \*)/.test(r) || r === 'Bash(npm ci:*)' || /npm exec|npx:\*/.test(r)), 'no other install path');
   for (const r of allow) {
     assert.ok(!/gh pr (review|merge|ready)|gh api|WebFetch|WebSearch|curl|wget/.test(r), r);
     assert.notEqual(r, 'Bash');

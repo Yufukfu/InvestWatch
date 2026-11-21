@@ -54,6 +54,7 @@ const KIND_TASK = {
   'address-review': ({ item, me, dryRun }) => [
     `Teammates reviewed your PR #${item.pr} (branch \`${item.headRef}\`, checked out here at ${item.headSha.slice(0, 12)}). Address every review item below:`,
     '- Clear and correct: fix it in a commit on this branch. Follow the repository rules (.claude/SDLC.md, iw-commit-cycle: a failing test first when behaviour changes, run the tests you touched, stage and commit in separate commands, Conventional Commits).',
+    '- This is a fresh clone without installed dependencies: in a Node package run `npm ci --ignore-scripts` there first (never `npm install`). If a suite cannot run here, say which and why in the reply.',
     '- You disagree: do not change the code; answer with evidence (file:line, test output).',
     `- Ambiguous, or a product decision: do not guess. List it under "Needs @${me}" in your reply.`,
     dryRun

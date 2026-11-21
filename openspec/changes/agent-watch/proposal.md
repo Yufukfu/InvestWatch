@@ -13,9 +13,11 @@ Three people each run their own Claude agent and hand work to each other through
 - Report-to-owner: when the agent finds a defect in code owned by someone else (for example the backend returns a wrong shape), it opens a GitHub issue assigned to the CODEOWNERS owner instead of editing their code.
 - `--dry-run` keeps every outward result as a draft in the state directory for the human to publish.
 
-Depends on PR #27 (ADR 0207) being merged: the headless push and PR rely on its `permissions.allow` rules and the hardened hook. Until then a headless session is denied the push and the runner falls back to a draft.
+Builds on PR #27 (ADR 0207, merged 2026-11-21): the agent may push its own branch and open a PR, and the hardened hook guards it. The headless runner is narrower still (one branch, one PR per session), since an untrusted clone ignores project allow rules and the runner passes its own.
 
-Out of scope: a Discord bot or any chat integration (the notify hook is a plain command, so a webhook can be plugged in later), merging, approving, webhooks and a public endpoint, any change to `settings.json`, the hook, `CLAUDE.md` or contracts, REST routes or events. Owner: Kacper (tooling, `chore/*`); `CODEOWNERS` touches all three owners' areas, so it needs the team's OK in review.
+- Notifications: a JSON line per notice and an optional command (`IWATCH_NOTIFY_CMD`); `notify-discord.mjs` is a ready one that posts to a Discord channel webhook, so teammates see "done" and "needs you" in the team channel.
+
+Out of scope: a Discord bot that takes commands (the channel only receives notices), merging, approving, webhooks and a public endpoint, any change to `settings.json`, the hook, `CLAUDE.md` or contracts, REST routes or events. Owner: Kacper (tooling, `chore/*`); `CODEOWNERS` touches all three owners' areas, so it needs the team's OK in review.
 
 ## Capabilities
 

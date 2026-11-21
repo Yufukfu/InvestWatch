@@ -61,7 +61,7 @@ The runner SHALL resolve the owner of a path from `.github/CODEOWNERS` with GitH
 
 #### Scenario: Last match wins
 - **GIVEN** `analytics/` is owned by Damian and `analytics/docs/` by Adam, later in the file
-- **WHEN** the owner of `analytics/docs/a.md` is resolved
+- **WHEN** the owner of a file under analytics/docs is resolved
 - **THEN** the result is Adam
 
 #### Scenario: No match or missing file

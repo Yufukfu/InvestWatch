@@ -30,7 +30,10 @@ const READ = [
 // people with write access (scan.mjs TRUSTED); a review of someone else's branch never runs their code.
 const FIX = [
   'Bash(git add:*)', 'Bash(git commit:*)',
+  // a fresh clone has no node_modules: the lockfile only, and no install scripts
+  'Bash(npm ci --ignore-scripts:*)',
   'Bash(node --test:*)', 'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run typecheck:*)',
+  'Bash(npx vitest run:*)', 'Bash(npx tsc:*)',
   'Bash(pytest:*)', 'Bash(python -m pytest:*)', 'Bash(uv run pytest:*)',
   'Bash(openspec validate:*)', 'Bash(node .claude/skills/iw-docs-update/scripts/docs-check.mjs:*)',
 ];

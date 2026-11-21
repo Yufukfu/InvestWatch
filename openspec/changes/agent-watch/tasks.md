@@ -35,8 +35,8 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 
 ## 6. Skill, schedule example and CI
 
-- [ ] 6.1 Write `SKILL.md` (when to use it, session flow with `/loop 2m /iw-watch --mine`, how to handle each item kind, what never to do, how to read a draft) and a `schedule/` example for launchd and cron; verify with `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` and by following the file once on this repository
-- [ ] 6.2 Add `.claude/skills/iw-watch/scripts/*.test.mjs` to the node test step in `.github/workflows/ci.yml`; verify `node --test ".claude/skills/iw-watch/scripts/*.test.mjs"` is green
+- [x] 6.1 Write `SKILL.md` (when to use it, session flow with `/loop 2m /iw-watch --mine`, how to handle each item kind, what never to do, how to read a draft) and a `schedule/` example for launchd and cron; verify with `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` and by following the file once on this repository (also `scripts/notify-discord.mjs`, the Discord webhook notifier: `mutations: 9 tried, 9 caught` with the `npm ci --ignore-scripts` rule)
+- [x] 6.2 Add `.claude/skills/iw-watch/scripts/*.test.mjs` to the node test step in `.github/workflows/ci.yml`; verify `node --test ".claude/skills/iw-watch/scripts/*.test.mjs"` is green
 - [ ] 6.3 Run the end-to-end check on a throwaway branch of this repository: open a PR, leave a review from a second account or fixture, confirm `scan` reports it, a headless run commits a fix, pushes the branch and comments with the marker, and that `gh pr review --approve` is denied in that session; record the PR URL in the PR body
 
 ## 7. Closing tasks
