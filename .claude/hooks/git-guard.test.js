@@ -125,6 +125,25 @@ test('the freeze starts exactly at 14:30', () => {
   assert.match(evaluate('git commit -m x', at('2026-11-21T14:30:00+01:00')), /contracts are frozen/);
 });
 
+test('a quoted mention of the escape in a commit message does not lift the freeze', () => {
+  const d = deps({ staged: () => schemaEdit, now: AFTER_FREEZE });
+  assert.match(evaluate('git commit -m "docs: mention IW_CONTRACT_CHANGE=1"', d), /contracts are frozen/);
+});
+
+test('git commit -a is checked against the freeze too', () => {
+  const d = deps({ staged: (all) => (all ? schemaEdit : []), now: AFTER_FREEZE });
+  assert.match(evaluate('git commit -a -m x', d), /contracts are frozen/);
+  assert.equal(evaluate('git commit -m x', d), null);
+});
+
+test('contract tooling (validator, pins) stays editable after the freeze; mocks and openapi do not', () => {
+  const at = (file) => deps({ staged: () => [{ file, added: ['x'] }], now: AFTER_FREEZE });
+  assert.equal(evaluate('git commit -m x', at('contracts/validate.py')), null);
+  assert.equal(evaluate('git commit -m x', at('contracts/requirements.txt')), null);
+  assert.match(evaluate('git commit -m x', at('contracts/openapi.yaml')), /contracts are frozen/);
+  assert.match(evaluate('git commit -m x', at('contracts/mocks/findings.json')), /contracts are frozen/);
+});
+
 test('markdown under contracts/ and other directories are unaffected by the freeze', () => {
   const doc = deps({ staged: () => [{ file: 'contracts/README.md', added: ['x'] }], now: AFTER_FREEZE });
   assert.equal(evaluate('git commit -m x', doc), null);

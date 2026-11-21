@@ -8,7 +8,7 @@
  *  - `git commit` whose staged diff (a) includes a .env file (secrets stay out of git),
  *    (b) adds a console.log call to non-test JS/TS code (the jury checks for it),
  *    (c) touches service code while no OpenSpec change is active (spec first),
- *    (d) changes a non-markdown file under contracts/ at or after the Sat 14:30 freeze.
+ *    (d) changes contracts/schemas, contracts/mocks or contracts/openapi.yaml at or after the Sat 14:30 freeze.
  *
  *  - `git add` chained in front of `git commit` in one command (the staged diff is not visible yet).
  *
@@ -29,6 +29,8 @@ const { execFileSync } = require('child_process');
 const PROTECTED = ['main'];
 // Contracts v1 freeze (CLAUDE.md hard rule), Sat 14:30 Europe/Warsaw (CET, +01:00).
 const CONTRACT_FREEZE_AT = new Date('2026-11-21T14:30:00+01:00');
+// The frozen contract files; the validator and its pins under contracts/ are tooling.
+const FROZEN_CONTRACT = /^contracts\/(?:schemas\/|mocks\/|openapi\.yaml$)/;
 const SERVICE_DIRS = ['scraper', 'analytics', 'web', 'api', 'contracts'];
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/;
 const TEST_FILE = /(?:\.test\.|\.spec\.|(?:^|\/)(?:tests?|__tests__)\/)/;
@@ -99,7 +101,7 @@ function commitReason(staged, activeChanges, skipSpec, contractsFrozen = false) 
   );
   if (logged) return `console.log added in ${logged.file}. Use the service logger (JSON on stdout).`;
 
-  const contract = contractsFrozen && staged.find((s) => s.file.startsWith('contracts/') && !/\.md$/i.test(s.file));
+  const contract = contractsFrozen && staged.find((s) => FROZEN_CONTRACT.test(s.file));
   if (contract) {
     return `${contract.file} is staged but contracts are frozen (since Sat 14:30). A change needs the whole team and a version bump (escape: IW_CONTRACT_CHANGE=1).`;
   }
@@ -133,7 +135,7 @@ function evaluate(command, deps) {
   }
   const commit = gits[commitAt];
   const all = commit.args.some((a) => /^-[a-zA-Z]*a/.test(a) && !a.startsWith('--')) || commit.args.includes('--all');
-  const frozen = deps.now() >= CONTRACT_FREEZE_AT && !/IW_CONTRACT_CHANGE=1/.test(command);
+  const frozen = deps.now() >= CONTRACT_FREEZE_AT && !/IW_CONTRACT_CHANGE=1/.test(stripQuoted(command));
   return commitReason(deps.staged(all), deps.activeChanges(), /IW_SKIP_SPEC=1/.test(command), frozen);
 }
 
@@ -150,11 +152,11 @@ function defaultDeps(cwd) {
       try {
         const base = all ? 'HEAD' : '--cached';
         const out = [];
-        for (const line of git(cwd, ['diff', base, '-U0', '--no-color']).split('\n')) {
+        for (const line of git(cwd, ['diff', base, '-U0', '--no-color', '--no-renames']).split('\n')) {
           if (line.startsWith('+++ ')) out.push({ file: line.slice(4).replace(/^b\//, ''), added: [] });
           else if (line.startsWith('+') && out.length) out[out.length - 1].added.push(line.slice(1));
         }
-        const names = git(cwd, ['diff', base, '--name-only']).split('\n').filter(Boolean);
+        const names = git(cwd, ['diff', base, '--name-only', '--no-renames']).split('\n').filter(Boolean);
         return names.map((file) => out.find((o) => o.file === file) || { file, added: [] });
       } catch { return []; }
     },

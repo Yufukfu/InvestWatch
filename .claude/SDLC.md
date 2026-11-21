@@ -36,7 +36,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 ## Deterministic guards (`git-guard.js`, tested)
 
-Denies force push, any push to `main` (including `HEAD` and full refs), `--all`/`--mirror`, `reset --hard`, whole-tree checkout, amending a pushed commit, and a `git add` chained in front of a commit; on commit denies a staged `.env`, `console.log` in non-test JS/TS, service code with no active OpenSpec change, and (from Sat 14:30) any non-markdown change under `contracts/` (escape `IW_CONTRACT_CHANGE=1`, only with the whole team's agreement and a version bump). It reads the staged diff at command start, so stage and commit in separate calls. Its escapes are plain text an agent can write: it catches mistakes, not a determined agent, so any use of an `IW_*` escape is reported in the PR body.
+Denies force push, any push to `main` (including `HEAD` and full refs), `--all`/`--mirror`, `reset --hard`, whole-tree checkout, amending a pushed commit, and a `git add` chained in front of a commit; on commit denies a staged `.env`, `console.log` in non-test JS/TS, service code with no active OpenSpec change, and (from Sat 14:30) any change to `contracts/schemas`, `contracts/mocks` or `contracts/openapi.yaml` (escape `IW_CONTRACT_CHANGE=1`, only with the whole team's agreement and a version bump). It reads the staged diff at command start, so stage and commit in separate calls. Its escapes are plain text an agent can write: it catches mistakes, not a determined agent, so any use of an `IW_*` escape is reported in the PR body.
 
 ## Findings triage
 
