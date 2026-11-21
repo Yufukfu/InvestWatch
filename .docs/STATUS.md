@@ -6,7 +6,7 @@ Team-wide state only: milestones and decisions that need the whole team. Module 
 
 | When | Milestone | State |
 |---|---|---|
-| Sat 14:30 | Contracts v1 frozen, compose infra up | contracts: required core frozen, optional fields provisional until Sat 17:00 ([ADR 0301](decisions/0301-contracts-v1.md), accepted); compose infra: Postgres + HTTPS gateway up (Kacper, PR #6), Redis and object storage proposed in `infra-compose` (Damian) |
+| Sat 14:30 | Contracts v1 frozen, compose infra up | contracts: required core frozen, optional fields provisional until Sat 17:00 ([ADR 0301](decisions/0301-contracts-v1.md), accepted); compose infra: Postgres + HTTPS gateway up (Kacper, PR #6); Redis, object storage (MinIO, bucket `iw-raw`) and the optional Ollama profile `llm` in PR #18 (`infra-compose`, Damian) |
 | Sat 17:00 | Integration #1: one real document, end to end | not started |
 | Sat 22:00 | Integration #2: all modules, one source each | not started |
 | Sun 03:00 | Integration #3: calibration, scheduled scans | not started |
