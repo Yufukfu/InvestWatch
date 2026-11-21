@@ -21,11 +21,13 @@ function git(cwd, args, timeout = GIT_TIMEOUT_MS) {
   return { ok: res.status === 0, out: (res.stdout || '').trim() };
 }
 
-function buildMessage({ branch, behind, fetched }) {
+// The branch name is deliberately left out: `gh pr checkout` creates a local branch named by the PR author,
+// so it is attacker-controlled text that would otherwise land in the agent's context.
+function buildMessage({ behind, fetched }) {
   if (!behind) return null;
   const freshness = fetched ? 'just fetched' : 'fetch failed or timed out, using cached refs; may be worse';
   return (
-    `Stale checkout: ${branch} is ${behind} commit(s) behind origin/main (${freshness}). ` +
+    `Stale checkout: this checkout is ${behind} commit(s) behind origin/main (${freshness}). ` +
     'For code questions read origin/main (`git show origin/main:<path>`) or a fresh worktree ' +
     '(iw-implement), not this working tree.'
   );
@@ -40,15 +42,13 @@ function run(rawInput, gitFn = git) {
   }
   const cwd = input.cwd || process.cwd();
 
-  const branchRes = gitFn(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  if (!branchRes.ok) return null;
+  if (!gitFn(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).ok) return null;
 
   const fetched = gitFn(cwd, ['fetch', '--quiet', 'origin', 'main'], FETCH_TIMEOUT_MS).ok;
   const behindRes = gitFn(cwd, ['rev-list', '--count', 'HEAD..origin/main']);
   if (!behindRes.ok) return null;
 
   const message = buildMessage({
-    branch: branchRes.out,
     behind: Number.parseInt(behindRes.out, 10) || 0,
     fetched,
   });

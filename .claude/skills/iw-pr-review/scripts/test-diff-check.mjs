@@ -91,6 +91,11 @@ function countsAt(root, sha, file) {
 }
 
 export function checkTestDiff({ repoRoot = process.cwd(), base = 'origin/main', head = 'HEAD' } = {}) {
+  try {
+    git(repoRoot, ['rev-parse', '--git-dir']);
+  } catch {
+    throw new Error(`repo root "${repoRoot}" is not a git repository`);
+  }
   const baseSha = resolveRef(repoRoot, base, 'base');
   const headSha = resolveRef(repoRoot, head, 'head');
   const mergeBase = git(repoRoot, ['merge-base', baseSha, headSha]).trim();
@@ -103,7 +108,7 @@ export function checkTestDiff({ repoRoot = process.cwd(), base = 'origin/main', 
       flags.push({ kind: 'deleted-test-file', file: before, detail: code === 'D' ? 'test file deleted' : `renamed to ${file}, which is not a test file` });
       continue;
     }
-    if (code !== 'M' && code !== 'R') continue;
+    if (code !== 'M' && code !== 'R' && code !== 'T') continue;
     const was = countsAt(repoRoot, mergeBase, before);
     const now = countsAt(repoRoot, headSha, file);
     if (!was || !now) continue;

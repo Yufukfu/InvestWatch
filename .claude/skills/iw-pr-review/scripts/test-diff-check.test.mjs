@@ -142,6 +142,19 @@ test('commits that landed on the base after the branch point are not blamed on t
   assert.deepEqual(run(root, { head: 'feature' }), []);
 });
 
+test('a test file replaced by a symlink is flagged', () => {
+  const root = makeRepo();
+  fs.rmSync(path.join(root, 'scraper/tests/test_a.py'));
+  fs.symlinkSync('../a.py', path.join(root, 'scraper/tests/test_a.py'));
+  sh(root, 'add', '-A');
+  sh(root, 'commit', '-q', '-m', 'symlink');
+  assert.deepEqual(kinds(run(root)), ['net-removed-assertions:scraper/tests/test_a.py']);
+});
+
+test('a missing repo root is reported as such, not as a bad ref', () => {
+  assert.throws(() => run('/nonexistent/path/for/test'), /repo root/);
+});
+
 test('unsafe or unknown refs throw instead of reaching git as options', () => {
   const root = makeRepo();
   assert.throws(() => run(root, { base: '--output=/tmp/x' }), /unsafe base ref/);
