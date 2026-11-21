@@ -6,7 +6,7 @@
 
 ## Context
 
-Rules R4-R8 and R13 ([analytics-plan.md](../analytics-plan.md) §5) need `blocks` (font size, colour, position, visibility, region) and per-viewport screenshots of a firm's own page ([integration-plan.md](../integration-plan.md) §2-§3). The demo pages (XTB, mBank IKE) are static HTML of 300-600 KB whose layout cannot be recovered from text. Only a browser gives that, and a browser runs hostile page code. Spec: [`openspec/changes/scraper-v3-render/`](../../openspec/changes/scraper-v3-render/).
+Rules R4-R8 and R13 ([analytics-plan.md](../analytics-plan.md) §5) need `blocks` (font size, colour, position, visibility, region) and per-viewport screenshots of a firm's own page ([integration-plan.md](../integration-plan.md) §2-§3). The demo pages (XTB, mBank IKE) are static HTML of 300-600 KB whose layout cannot be recovered from text. Only a browser gives that, and a browser runs hostile page code. Spec: [`openspec/changes/archive/2026-11-22-scraper-v3-render/`](../../openspec/changes/archive/2026-11-22-scraper-v3-render/).
 
 ## Options considered
 

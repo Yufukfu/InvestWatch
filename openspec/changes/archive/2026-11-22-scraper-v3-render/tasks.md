@@ -48,7 +48,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 - [x] 7.1 End-to-end check on docker compose: `scraper/tests/test_e2e_render.py` with the real renderer container (`renderer-e2e`, `--profile e2e`), two synthetic demo pages (`tests/fixtures/demo`; the saved XTB and mBank pages are not in the repository), Collector, Ingestor, Redis, PostgreSQL and MinIO as in `app.py`: each seeded `firm_own` + `M2` source yields 24 schema-valid blocks over desktop, mobile and tablet and three PNGs in `iw-raw`, and a rerun adds no row and no object (2 passed). The `api` screenshot route is not in this stack and was not exercised
 - [x] 7.2 Payload measured on the demo pages: `documents.payload` is 9.2 KB (xtb) and 9.0 KB (mbank) with 24 blocks; a real broker page will have more (cap 600 blocks per viewport, 4000 characters each); `GET /api/findings/{id}` was not measured because `api` is not in this stack
 - [x] 7.3 Docs updated (`scraper/CLAUDE.md`, `scraper/README.md`, `scraper/.env.example`, the conventions skill, `.docs/analytics-plan.md` §5, `.docs/status/scraper.md`, ADR 0107 listed), `docs-check` ok, `pip-audit` on the four requirements files clean and recorded in `.docs/security-audit.md`, `iw-ai-log` row added
-- [ ] 7.4 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
+- [x] 7.4 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Deferred follow-up (not part of this change's done criteria)
 
