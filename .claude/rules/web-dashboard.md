@@ -3,7 +3,7 @@ paths:
   - "web/**"
 ---
 
-# Web dashboard rules (module B)
+# Web dashboard rules (Kacper's module)
 
 Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../../.docs/integration-plan.md) §4 (`Finding`), §5 (REST), §6 (Socket.IO). Calibration: [`.docs/analytics-plan.md`](../../.docs/analytics-plan.md) §8. The mock-first and console rules in [`web/CLAUDE.md`](../../web/CLAUDE.md) also apply.
 

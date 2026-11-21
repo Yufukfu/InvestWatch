@@ -2,11 +2,11 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written; accepted by B via PR
+- Deciders: agent-written; accepted by Kacper via PR
 
 ## Context
 
-The jury scores architecture at 20% (module composition, scalability, openness to extension) and requires one `docker compose up`, open source and on premise. Modules (scraper A, analytics C, api C, web B) must be loosely coupled and deployable separately. The integration plan (§1) lists the services but not how compose is organised; three people edit in parallel, so one shared `docker-compose.yml` would be a merge-conflict hot spot.
+The jury scores architecture at 20% (module composition, scalability, openness to extension) and requires one `docker compose up`, open source and on premise. Modules (scraper Adam, analytics Damian, api Damian, web Kacper) must be loosely coupled and deployable separately. The integration plan (§1) lists the services but not how compose is organised; three people edit in parallel, so one shared `docker-compose.yml` would be a merge-conflict hot spot.
 
 ## Options considered
 
@@ -20,7 +20,7 @@ Entry point: services publishing their own host ports (CORS between origins, sev
 
 Option 2, with a **Caddy gateway** as the only published entry (`https://localhost:8443`, HTTP redirects): `/api/*` and `/socket.io/*` go to `api:8000`, everything else to `web:8080`. The browser sees one origin, so there is no CORS and the Socket.IO connection is same-origin.
 
-Shared infrastructure lives in `infra/compose.yaml` (B):
+Shared infrastructure lives in `infra/compose.yaml` (Kacper):
 
 - **Postgres 17** only on the network `iw-data`, declared `internal` (verified: no host port, no internet from the container). SCRAM authentication. Two roles: `iw_admin` for migrations and ops, and `iw_app` for services (CRUD on tables, no DDL; verified that `CREATE TABLE` is denied).
 - Secrets only in an untracked `.env`, generated randomly by `scripts/init-env.sh`; compose refuses to start without them (`${VAR:?}`).
@@ -33,4 +33,4 @@ Shared infrastructure lives in `infra/compose.yaml` (B):
 - Services call each other over the internal networks by service name; only the gateway is exposed. A deployment outside compose replaces the gateway routes with the platform's ingress without code changes.
 - TLS inside the stack is plain HTTP behind the gateway; mutual TLS between services is out of scope for the hackathon.
 - The local CA certificate must be trusted once per machine (`infra/README.md`), or the browser warns.
-- The integration plan names C as compose owner; with this layout C owns `api/compose.yaml` and `analytics/compose.yaml`, B owns the root include list and `infra/`.
+- The integration plan names Damian as compose owner; with this layout Damian owns `api/compose.yaml` and `analytics/compose.yaml`, Kacper owns the root include list and `infra/`.

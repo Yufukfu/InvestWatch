@@ -1,6 +1,6 @@
 # InvestWatch – Analytics Module Work Plan
 
-Owner: **C**. Input/output contracts: [integration-plan.md](integration-plan.md) (sections 3, 4).
+Owner: **Damian**. Input/output contracts: [integration-plan.md](integration-plan.md) (sections 3, 4).
 Requirement sources: `Opis Wyzwania HackNation UKNF 19.11.pdf`, `ZASÓB DLA UCZESTNIKÓW … kryteria oceny informacji o ryzyku.docx` (18 rules), annexes to topics 1–3.
 
 ## 1. Design principles
@@ -37,7 +37,7 @@ iw:documents ─▶ [1] load + preprocessing ─▶ [2] gate: "is this investmen
 | 4 | decides which modules to run (possibly several) | rules on `source_kind`, `firm.authorized`, author ≠ firm |
 | 5 | merges results, computes `score`, title and summary | rule weights; summary from the LLM (optional) |
 
-## 3. Reference data – firm registry (task for C, start now)
+## 3. Reference data – firm registry (task for Damian, start now)
 
 From annexes 1/2 – five KNF lists:
 brokerage houses, banks conducting brokerage activity, branches of foreign investment firms, foreign investment firms without a branch, (summary page).
@@ -131,19 +131,19 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 - Unit tests for P0 rules (pytest, 2–3 cases per rule) – fast feedback loop while tuning dictionaries.
 - In the demo: show how moving the M2 threshold from 0.5 to 0.7 changes the number of alerts and FP/FN.
 
-## 9. Schedule for C (Sat 13:30 → Sun 10:30)
+## 9. Schedule for Damian (Sat 13:30 → Sun 10:30)
 
 Hours follow the integration milestones (⏳ to be agreed with the team).
 
 | Window | Task | Outcome |
 |---|---|---|
-| 13:30–14:30 | JSON Schema contracts + mocks for B, docker-compose infra (postgres, redis, minio), table migrations; OpenSpec specs for analytics and API | B and A can work independently |
+| 13:30–14:30 | JSON Schema contracts + mocks for Kacper, docker-compose infra (postgres, redis, minio), table migrations; OpenSpec specs for analytics and API | Kacper and A can work independently |
 | 14:30–15:00 | LLM endpoint test (Gemma), choose model size | `LLM_MODEL` decided |
 | 15:00–17:00 | `analytics` skeleton: Redis Stream consumer, preprocessing, KNF registry, rule engine + R1, R2, R3 (regex version), finding writes, event publishing; `api` skeleton with `/findings`, PATCH, Socket.IO | **Integration #1** |
 | 17:00–20:00 | M2: remaining P0 rules (R4, R6, R10, R14, R17, R18) + LLM for R3/R17/R18 | M2 end-to-end |
 | 20:00–22:00 | M1 and M3 (signals + LLM), routing, `/stats/trend` | **Integration #2** |
 | 22:00–01:00 | gold set, `eval/run.py`, `/calibration`, rule tests | **Integration #3** (by 03:00) |
-| 01:00–05:00 | sleep (rotation with A and B – someone always watches the scheduled scans) | |
+| 01:00–05:00 | sleep (rotation with Adam and Kacper – someone always watches the scheduled scans) | |
 | 05:00–08:00 | P1 rules, weight tuning on the gold set, LLM cache, `pip-audit` | feature freeze 08:00 |
 | 08:00–10:30 | README (Quick Start, hardware requirements), AI work log, architecture and results slides, demo rehearsal | submission 10:30 |
 
@@ -162,19 +162,19 @@ P2 rules (R9, R11, R13, OCR, clustering) only if all P0/P1 work is done before 0
 
 ## 11. "AI-assisted development process" criterion (20% of the score)
 
-We use **OpenSpec** (spec-driven development): every change starts as a spec/proposal, contracts in `contracts/` are the single source of truth for both people and AI assistants. Alongside it we keep `.docs/ai-workflow.md` – tools used (Claude Code, OpenSpec), context files (`CLAUDE.md` per service), review rules for generated code, dependency scans, example prompts. C adds an entry at every milestone.
+We use **OpenSpec** (spec-driven development): every change starts as a spec/proposal, contracts in `contracts/` are the single source of truth for both people and AI assistants. Alongside it we keep `.docs/ai-workflow.md` – tools used (Claude Code, OpenSpec), context files (`CLAUDE.md` per service), review rules for generated code, dependency scans, example prompts. Damian adds an entry at every milestone.
 
 ## 12. Analytics service skeleton – implementation plan
 
 **Goal:** Integration #1 (Sat 17:00) – a document taken from the queue goes through the rule-based M2 module (R1–R3), is saved as a finding that matches the contract, and an event is published.
 
-### 12.1 Portability (until the repository structure from B lands)
+### 12.1 Portability (until the repository structure from Kacper lands)
 
 - The whole service lives in one self-contained folder `analytics/` with its own `requirements.txt`, `Dockerfile` and `README.md`.
 - Configuration comes only from environment variables; no paths to other repo folders.
 - The firm registry is loaded from the file given in `REGISTRY_CSV`; rule definitions ship inside the package (YAML).
 - Contract tests look for the schemas under `CONTRACTS_DIR` and are skipped (not failed) when it is not set.
-- Moving into B's layout = one `git mv analytics <new-path>` + the path in `docker-compose.yml`.
+- Moving into Kacper's layout = one `git mv analytics <new-path>` + the path in `docker-compose.yml`.
 
 ### 12.2 Layout
 
@@ -223,4 +223,4 @@ Total ≈ 4 h. Steps 1–6 need no infrastructure and are fully testable locally
 2. **Threshold for `finding.high_risk`:** analytics reads thresholds from the Redis key `iw:settings:thresholds` written by the API, with defaults 0.6 / 0.5 / 0.7 when missing – to be added to the contract.
 3. **KNF registry:** fictional firms in tests to start with; the real KNF page loader is a separate step after the skeleton.
 4. **LLM (Gemma):** outside the skeleton; `model.llm = null` marks rules-only mode.
-5. **OpenSpec:** this plan becomes a change proposal (`proposal.md`, `tasks.md`, spec) once B sets up the structure with OpenSpec.
+5. **OpenSpec:** this plan becomes a change proposal (`proposal.md`, `tasks.md`, spec) once Kacper sets up the structure with OpenSpec.

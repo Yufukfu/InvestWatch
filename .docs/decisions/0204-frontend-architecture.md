@@ -2,11 +2,11 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from the team's discussion (hooks over container components); accepted by B via PR #11
+- Deciders: agent-written from the team's discussion (hooks over container components); accepted by Kacper via PR #11
 
 ## Context
 
-The dashboard (`web/`, owner B) is built against a client generated from the contract ([0201](0201-web-stack-and-generated-client.md)). Checked against `web/src` at `main` (`6145997`):
+The dashboard (`web/`, owner Kacper) is built against a client generated from the contract ([0201](0201-web-stack-and-generated-client.md)). Checked against `web/src` at `main` (`6145997`):
 
 - The three feature components call the generated hooks directly: `FindingsTable.tsx` (40 lines) uses `useGetFindingsQuery`, `SummaryCards.tsx` (21 lines) `useGetStatsSummaryQuery`, `HealthBadge.tsx` (20 lines) `useGetHealthQuery`. `FindingsTable` also reads fields of the generated `Finding` DTO directly.
 - `src/api/generated.ts` is produced by `@rtk-query/codegen-openapi` and is RTK-specific (`injectedRtkApi`, `addTagTypes`). Replacing RTK Query means regenerating it with another generator, and every file that imports it changes.
