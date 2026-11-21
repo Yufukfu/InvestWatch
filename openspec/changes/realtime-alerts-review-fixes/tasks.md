@@ -35,3 +35,11 @@
 
 - [x] 6.1 While the detail dialog is open, the toasts render inside it (in its flow, not floating over Save), so they are reachable by keyboard and inside the Tab trap; a new high-risk alert is still announced there (review item 2; answered by @kacpermalczyk: "inside the dialog", "yes, announce it").
 - [x] 6.2 A toast that unmounts while held (it moves between the header and the dialog) releases its holds (review item 4, follow-up to 6.1).
+
+## 7. Held toasts that go away (round 3)
+
+- [x] 7.1 Failing tests first: a held toast pushed out by the 4-toast cap times out when the same id arrives again; a dismissed toast that was hovered holds again when it comes back; a released toast is no longer held (review round 3, items 1 and 2).
+- [x] 7.2 `useRealtime` forgets the hold and timer of every id no longer shown; `AlertToasts` drops the hover/focus reasons of every id no longer shown (review round 3, items 1 and 2).
+- [x] 7.3 The dialog test renders `<App />`, so removing `ToastSlotProvider` from `App` fails it (review round 3, item 3).
+- [x] 7.4 Mutation check. mutations: 4 tried, 4 caught (no prune in the hook, no prune in the toasts, `release` keeps the id held, `App` without `ToastSlotProvider`).
+- [x] 7.5 ADR 0208: bundle size after the review fixes (review round 3, note).

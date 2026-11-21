@@ -68,6 +68,18 @@ describe('AlertToasts', () => {
     expect(h.onRelease).toHaveBeenCalledWith('x');
   });
 
+  it('forgets the hover of a toast that went away, so it holds again when it comes back', () => {
+    const h = handlers();
+    const { rerender } = render(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
+    fireEvent.mouseEnter(screen.getByRole('group'));
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' }));
+    expect(h.onDismiss).toHaveBeenCalledWith('x');
+    rerender(<AlertToasts alerts={[]} announcement="" {...h} />);
+    rerender(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
+    fireEvent.mouseEnter(screen.getByRole('group'));
+    expect(h.onHold).toHaveBeenCalledTimes(2);
+  });
+
   it('shows label, title, module and score, in the given order, with a decimal comma', () => {
     render(<AlertToasts alerts={[alert(), alert({ id: 'b', title: 'Drugi', module: undefined, score: undefined })]} announcement="" {...handlers()} />);
     const toasts = screen.getAllByRole('group');

@@ -332,4 +332,32 @@ describe('useRealtime', () => {
     act(() => vi.advanceTimersByTime(1));
     expect(result.current.alerts).toEqual([]);
   });
+
+  it('a held toast pushed out by the 4-toast cap is not held when it arrives again', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1) }));
+    act(() => result.current.hold(uid(1)));
+    for (let n = 2; n <= 5; n += 1) act(() => fake.fire('finding.high_risk', { ...brief, id: uid(n) }));
+    expect(result.current.alerts.map((a) => a.id)).not.toContain(uid(1));
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1) }));
+    act(() => vi.advanceTimersByTime(19_999));
+    expect(result.current.alerts.map((a) => a.id)).toContain(uid(1));
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current.alerts.map((a) => a.id)).not.toContain(uid(1));
+  });
+
+  it('a released toast is no longer held: a repeated event restarts its time', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1) }));
+    act(() => result.current.hold(uid(1)));
+    act(() => result.current.release(uid(1)));
+    act(() => vi.advanceTimersByTime(10_000));
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1) }));
+    act(() => vi.advanceTimersByTime(19_999));
+    expect(result.current.alerts).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current.alerts).toEqual([]);
+  });
 });

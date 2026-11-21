@@ -90,6 +90,19 @@ export function useRealtime(): RealtimeState {
     [schedule],
   );
 
+  // A toast pushed out by the cap unmounts without a pointer-leave or blur: forget its hold and timer,
+  // or it would stay held, and never time out, when the same id arrives again.
+  useEffect(() => {
+    const shown = new Set(alerts.map((a) => a.id));
+    for (const id of held.current) if (!shown.has(id)) held.current.delete(id);
+    for (const [id, timer] of timers.current) {
+      if (!shown.has(id)) {
+        clearTimeout(timer);
+        timers.current.delete(id);
+      }
+    }
+  }, [alerts]);
+
   const open = useCallback(
     (id: string) => {
       setSearchParam('finding', id);

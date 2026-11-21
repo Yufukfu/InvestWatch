@@ -70,7 +70,8 @@ describe('alerts and the findings workspace together', () => {
   });
 
   it('while the detail dialog is open, a new high-risk alert is announced and reachable inside the dialog', async () => {
-    renderBoth();
+    // The whole app, so the slot the app provides (ToastSlotProvider in App) is what moves the toasts.
+    render(<App />, { wrapper: storeWrapper() });
     await screen.findByRole('button', { name: findings.items[0].title });
     act(() =>
       fake.fire('finding.high_risk', { id: detail.id, module: 'M1', score: 0.91, title: 'Pierwszy', url: detail.url, platform: 'web' }),

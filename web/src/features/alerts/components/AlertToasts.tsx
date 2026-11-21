@@ -32,6 +32,13 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
     };
   }, [onRelease]);
 
+  // A toast that went (dismissed, opened, pushed out by the cap) gets no pointer-leave or blur either:
+  // drop its reasons, so it holds again if the same id comes back. The hook forgets its own hold.
+  useEffect(() => {
+    const shown = new Set(alerts.map((a) => a.id));
+    for (const id of reasons.current.keys()) if (!shown.has(id)) reasons.current.delete(id);
+  }, [alerts]);
+
   const setReason = (id: string, reason: Reason, on: boolean) => {
     const set = reasons.current.get(id) ?? new Set<Reason>();
     const was = set.size > 0;
