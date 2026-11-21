@@ -32,7 +32,9 @@ cleanup() {
   local p
   for p in "${PROJECTS[@]:-}"; do
     [ -n "$p" ] || continue
-    docker compose -p "$p" --env-file "$TMP/$p.env" -f "$INFRA" --profile llm down -v --remove-orphans >/dev/null 2>&1 || true
+    # Every file any group adds, so networks declared only there (devhost) are removed too.
+    docker compose -p "$p" --env-file "$TMP/$p.env" -f "$INFRA" -f "$PROBE_FILE" -f "$MODULE_FILE" -f "$DEV_FILE" \
+      --profile llm down -v --remove-orphans >/dev/null 2>&1 || true
   done
   rm -rf "$TMP"
 }
@@ -68,11 +70,13 @@ container_ip() { # container_ip <project> <service> <network>
 # ---------------------------------------------------------------- groups
 
 two_stacks_up() {
-  up "$1" 18443 18080 postgres gateway && up "$2" 18444 18081 postgres gateway
+  # probe-egress makes Compose create the egress network too (it only creates networks a started service uses).
+  upx "$1" 18443 18080 "$PROBE_FILE" postgres gateway probe-egress &&
+    upx "$2" 18444 18081 "$PROBE_FILE" postgres gateway probe-egress
 }
 own_networks() {
   local nets n; nets=$(docker network ls --format '{{.Name}}')
-  for n in "$1_data" "$1_edge" "$2_data" "$2_edge"; do
+  for n in "$1_data" "$1_edge" "$1_egress" "$2_data" "$2_edge" "$2_egress"; do
     echo "$nets" | grep -qx "$n" || { echo "missing network $n"; echo "$nets"; return 1; }
   done
 }
@@ -104,6 +108,11 @@ generated_env_complete() {
     val=$(grep -E "^$v=" "$f" | cut -d= -f2-)
     [ ${#val} -ge 32 ] || { echo "$v has ${#val} chars"; return 1; }
   done
+  # Distinct values: a constant generator would pass the length check.
+  local n_all n_uniq
+  n_all=$(grep -E '^[A-Z0-9_]+(_PASSWORD|_SECRET_KEY)=' "$f" | cut -d= -f2- | wc -l)
+  n_uniq=$(grep -E '^[A-Z0-9_]+(_PASSWORD|_SECRET_KEY)=' "$f" | cut -d= -f2- | sort -u | wc -l)
+  [ "$n_all" -eq "$n_uniq" ] || { echo "secrets repeat: $n_uniq distinct of $n_all"; return 1; }
   docker compose --env-file "$f" -f "$ROOT/compose.yaml" config -q
 }
 init_env_no_overwrite() {
@@ -204,6 +213,11 @@ app_scoped() {
   mcp "$p" "$u" ls t/iw-raw/html/ >/dev/null || { echo "app list failed"; return 1; }
   if mcp "$p" "$u" mb t/iw-other >/dev/null 2>&1; then echo "app could create a bucket"; return 1; fi
   if mcp "$p" "$u" admin user list t >/dev/null 2>&1; then echo "app has admin rights"; return 1; fi
+  # Another bucket (made with root) must be closed to the app user: catches an object policy on arn:aws:s3:::*.
+  mcp "$p" "$(root_url "$p")" mb --ignore-existing t/iw-other-root >/dev/null || { echo "root mb failed"; return 1; }
+  echo x | mcp "$p" "$(root_url "$p")" pipe t/iw-other-root/secret.txt >/dev/null
+  if mcp "$p" "$u" cat t/iw-other-root/secret.txt >/dev/null 2>&1; then echo "app can read another bucket"; return 1; fi
+  if echo y | mcp "$p" "$u" pipe t/iw-other-root/w.txt >/dev/null 2>&1; then echo "app can write another bucket"; return 1; fi
 }
 anonymous_denied() {
   local code; code=$(probe "$1_data" sh -c "wget -S -q -O /dev/null http://minio:9000/iw-raw/$OBJ 2>&1 | awk '/HTTP\\//{print \$2; exit}'")
@@ -294,6 +308,12 @@ llm_defined_in_profile() { # the services exist, but only under --profile llm
   case " $(echo $prof) " in *" ollama "*) ;; *) echo "no ollama under --profile llm"; return 1 ;; esac
   case " $(echo $prof) " in *" ollama-pull "*) ;; *) echo "no ollama-pull under --profile llm"; return 1 ;; esac
 }
+llm_networks() { # serving ollama on data only (its API is unauthenticated); the pull one-shot on egress only
+  local nets
+  nets=$(dc "$1" --profile llm config --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s).services;for(const k of ["ollama","ollama-pull"])console.log(k+"="+Object.keys(j[k].networks||{}).sort().join(","))})')
+  echo "$nets" | tr '\n' ' '; echo
+  [ "$nets" = "$(printf 'ollama=data\nollama-pull=egress')" ]
+}
 llm_pull_completes() { # `up --wait` returns while the one-shot still runs: wait for it to exit
   local c st
   dcx "$1" "$PROBE_FILE" --profile llm wait ollama-pull >/dev/null || { echo "ollama-pull exited non-zero"; return 1; }
@@ -317,9 +337,11 @@ pull_fail_isolated() { # a failed pull (an unknown model stands in for an unreac
 
 group_llm() {
   local p="iw-smoke-l-$RUN_ID"
-  check "plain up starts no LLM service and creates no ollama volume" upx "$p" 18449 18086 "$PROBE_FILE" postgres redis probe-data
+  # No service list: a plain `up`, as the spec says, so a missing profile would really start ollama.
+  check "plain up starts no LLM service and creates no ollama volume" upx "$p" 18449 18086 "$PROBE_FILE"
   check "nothing LLM-related after a plain up" no_llm_without_profile "$p"
   check "ollama and ollama-pull exist only under --profile llm" llm_defined_in_profile "$p"
+  check "serving ollama only on data, the pull only on egress" llm_networks "$p"
   if [ "${SMOKE_LLM:-0}" != 1 ]; then log "SKIP  model download (set SMOKE_LLM=1; pulls gemma3:4b, several GB)"; return 0; fi
   check "--profile llm pulls and serves the model" dcx "$p" "$PROBE_FILE" --profile llm up -d --wait --wait-timeout 1500 ollama ollama-pull
   check "ollama-pull runs to completion and exits 0" llm_pull_completes "$p"

@@ -47,7 +47,7 @@ Decisions from the team sync:
 Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
 `postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then `scraper`, `scheduler`, `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
-Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `docker-compose.yml` and `.env.example` at the root.
+Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
 ## 2. Integration points
 

@@ -8,7 +8,8 @@ Shared infrastructure, owned by B (repository layout). Each module has its own `
 | `redis` | Redis 8: stream `iw:documents`, pub/sub `iw:events`, key `iw:settings:thresholds`. AOF on, `noeviction`, password required | `data` only. Local: `docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli'` |
 | `minio` | S3-compatible object storage (MinIO, Chainguard build), bucket `iw-raw` | `data` only, console off |
 | `minio-init` | one-shot: creates the private bucket `iw-raw` and the app user limited to it, then exits 0 | runs on every `up`, idempotent |
-| `ollama`, `ollama-pull` | local LLM fallback `gemma3:4b`, **only with `--profile llm`** | `data` (`http://ollama:11434/v1`); `egress` to download the model |
+| `ollama` | local LLM fallback `gemma3:4b`, **only with `--profile llm`** | `data` only (`http://ollama:11434/v1`): its API has no auth, so it gets no internet |
+| `ollama-pull` | one-shot, profile `llm`: its own loopback-only server pulls the model into the shared volume, then exits | `egress` only |
 | `gateway` | Caddy: the only public entry, TLS, `/api` + `/socket.io` → `api:8000`, `/` → `web:8080` | host `https://localhost:8443` (HTTP 8080 redirects) |
 
 ## Networks

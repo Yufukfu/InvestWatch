@@ -27,7 +27,7 @@ Every service is blocked on shared infrastructure that does not run yet. `main` 
 
 ## Impact
 
-- Files: `infra/compose.yaml`, new `infra/compose.dev-ports.yaml`, new `infra/minio/init.sh`, new `infra/ollama/` (pull helper), `infra/tests/smoke.sh`, `web/compose.yaml` (network names only), root `.env.example`, `scripts/init-env.sh`.
+- Files: `infra/compose.yaml`, new `infra/compose.dev-ports.yaml`, new `infra/minio/init.sh`, `infra/tests/` (`smoke.sh` and test-only compose files), `web/compose.yaml` (network names only), root `.env.example`, `scripts/init-env.sh`.
 - Images (added): `public.ecr.aws/docker/library/redis:8-alpine`, the object-storage and client images from ADR 0306 (pinned by digest), and `docker.io/ollama/ollama` (pinned tag, profile `llm` only).
 - Docs: new ADR `.docs/decisions/0306-object-storage-image.md` and its row in the decisions README; `infra/README.md`, `infra/CLAUDE.md`, root `README.md` Quick Start (LLM profile), `.docs/integration-plan.md` §1 (`docker-compose.yml` becomes the include-based `compose.yaml`, and the object-storage note). `.docs/STATUS.md` is updated by Damian.
 - Unblocks: `scraper-v1` groups 5-6 (real Postgres, MinIO and Redis), the analytics worker and the `api` service.

@@ -54,5 +54,5 @@ Digests, pulled 2026-11-21:
 
 - No doc, contract or mock renames. The hand-in README names both AGPLv3 components, run unmodified as separate services.
 - A pinned Chainguard digest that disappears is a one-line bump to the new `latest` digest. If Chainguard stops publishing, the fallback is option 3 (SeaweedFS).
-- Object storage gets no upstream security fixes. Exposure is limited: `iw-data` only, no host port (except the loopback dev override), bucket-scoped app credentials. Revisit after the hackathon.
+- Object storage gets no upstream security fixes. Exposure is limited: the internal `data` network only, no host port (except the loopback dev override), bucket-scoped app credentials. Revisit after the hackathon.
 - Redis must keep `appendonly yes` for 0305, and `noeviction` so stream entries are never dropped (see `infra-compose` design).

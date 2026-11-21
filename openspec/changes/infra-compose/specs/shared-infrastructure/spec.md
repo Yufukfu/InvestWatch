@@ -55,7 +55,7 @@ Every infrastructure password and key SHALL come from the untracked root `.env`,
 - **THEN** every secret variable in `.env` has a value of at least 32 characters and `docker compose config` succeeds
 
 ### Requirement: Optional local LLM behind a profile
-The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls `gemma3:4b`, both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `data` at `http://ollama:11434/v1`, keep the weights in a named volume, and publish no host port.
+The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls `gemma3:4b`, both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `data` at `http://ollama:11434/v1`, keep the weights in a named volume, publish no host port, and SHALL NOT join a network with internet access. Only the `ollama-pull` one-shot SHALL reach the internet.
 
 #### Scenario: Plain up downloads no weights
 - **WHEN** `docker compose up -d` runs without `--profile llm`
