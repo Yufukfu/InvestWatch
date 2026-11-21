@@ -40,7 +40,7 @@ def test_catalogue_is_complete(catalogue):
     ids = [s.id for s in catalogue.specs]
     assert len(ids) == 19 and len(set(ids)) == 19
     assert all(re.match(RULE_ID_PATTERN, i) for i in ids)
-    assert [s.id for s in catalogue.implemented] == ["R1", "R2", "R3", "R4", "R6", "R12a", "R14", "R15", "R16", "R17", "R18"]
+    assert [s.id for s in catalogue.implemented] == ["R1", "R2", "R3", "R4", "R6", "R12a", "R12b", "R14", "R15", "R16", "R17", "R18"]
 
 
 def _write(tmp_path, body: str) -> Path:

@@ -242,7 +242,41 @@ rules:
         - '\bod\s+(?:początku\s+(?:działalności|istnienia)|uruchomienia|powstania|startu|debiutu)\b'
         - '\bsince\s+(?:inception|launch)\b'
       source_patterns: *source_markers
-  - {id: R12b, name: Wyniki historyczne – waluta i koszty, severity: medium, legal_basis: null, implemented: false}
+  # ZASÓB R12b (art. 44 ust. 4): "ostrzeżenie o wpływie zmian kursów walutowych oraz czy wskazano wpływ prowizji,
+  # opłat i obciążeń na wyniki". The fee statement always applies to past performance; the currency warning only
+  # to results in, or a product denominated in, a currency other than PLN (art. 44 ust. 4 lit. e, Damian), and every
+  # explanation cites lit. e. Same past-performance trigger as R12a and R14 (ADR 0315). Rules-only.
+  - id: R12b
+    name: Wyniki historyczne – waluta i koszty
+    severity: medium
+    legal_basis: art. 44 ust. 4 rozp. del. 2017/565
+    implemented: true
+    params:
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      amount_return_patterns: *pp_amount_return
+      figure_exclude_patterns: *return_figure_exclude
+      figure_extra_exclude_patterns: *pp_figure_exclude
+      past_patterns: *pp_past
+      future_patterns: *pp_future
+      # A statement of the impact of fees, anywhere in the material.
+      fee_patterns:
+        - '\bpo\s+(?:potrąceniu|odliczeniu|uwzględnieniu|pomniejszeniu\s+o)\s+(?:\w+\s+){0,2}(?:opłat|prowizj|koszt|obciąż)\w*'
+        - '\buwzględnia\w*\s+(?:\w+\s+){0,3}(?:opłat|prowizj|koszt|obciąż)\w*'
+        - '\b(?:wynik|stop)\w*\s+(?:\w+\s+){0,2}(?:netto|brutto)\b'
+        - '\b(?:opłat|prowizj|koszt|obciąż)\w*\s+(?:\w+\s+){0,3}(?:obniżaj|pomniejszaj|zmniejszaj|wpływaj)\w*'
+        - '\b(?:net|gross)\s+of\s+(?:fees|charges|costs)\b'
+        - '\b(?:before|after|excluding|including)\s+(?:all\s+)?(?:fees|charges|costs)\b'
+      # Checked in the past-performance sentences; a sentence anywhere that also says "denominowany" counts too.
+      foreign_currency_patterns:
+        - '\b(?:EUR|USD|CHF|GBP|JPY)\b'
+        - '[€$£]'
+        - '\bw\s+(?:euro|dolar\w*|frank\w*|funt\w*|walu(?:cie|tach)\s+obc\w*)\b'
+      currency_warning_patterns:
+        - '\b(?:zmian|wahan|waha)\w*\s+(?:\w+\s+){0,2}kurs\w*\s+walut\w*'
+        - '\bryzyk\w*\s+(?:\w+\s+)?walutow\w*'
+        - '\bcurrency\s+(?:fluctuations?|risk)\b'
+        - '\bexchange\s+rates?\b'
   - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: null, implemented: false}
   # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
   # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").

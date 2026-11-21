@@ -795,3 +795,56 @@ class R12aPeriodAndScope(_PastPerformance):
         decisive = next((c.sentence for c in open_checks if c.status == worst and c.sentence), None)
         listed = "; ".join(f"{c.name}: {_SUB_STATUS[c.status]} ({c.detail})" for c in open_checks)
         return self.result(worst, decisive or claims[0], f"Wyniki historyczne – {listed}.")
+
+
+_DENOMINATED = re.compile(r"\b(?:denominowan\w*|denominated)\b", re.IGNORECASE)
+
+
+@register
+class R12bCurrencyAndCosts(_PastPerformance):
+    """ZASÓB R12b (art. 44 ust. 4): the impact of fees always; a currency warning for non-PLN results only.
+
+    ZASÓB states the currency warning without a condition; art. 44 ust. 4 lit. e requires it only for a
+    currency other than the client's (PLN), so every explanation cites lit. e (Damian, design §5). Rules-only.
+    """
+
+    rule_id = "R12b"
+    LIT_E = "art. 44 ust. 4 lit. e"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "fee": compile_patterns(p.get("fee_patterns", [])),
+            "currency": compile_patterns(p.get("foreign_currency_patterns", [])),
+            "warning": compile_patterns(p.get("currency_warning_patterns", [])),
+        }
+
+    def _foreign(self, text: str) -> bool:
+        return any(c.search(text) for c in self._p["currency"])
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        claims = [s.text for s in self.past_performance(ctx)]
+        if not claims:
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
+        text = ctx.doc.text
+        foreign = next((t for t in claims if self._foreign(t)), None)
+        if foreign is None:  # the product itself is denominated in a foreign currency
+            foreign = next((s.text for s in ctx.pre.sentences if _DENOMINATED.search(s.text) and self._foreign(s.text)), None)
+        fees = any(f.search(text) for f in p["fee"])
+        warned = any(w.search(text) for w in p["warning"])
+        missing = []
+        if not fees:
+            missing.append("informacji o wpływie prowizji, opłat i obciążeń na wyniki")
+        if foreign is not None and not warned:
+            missing.append(f"ostrzeżenia o wpływie zmian kursów walut (wyniki w walucie obcej, {self.LIT_E})")
+        if foreign is None:
+            currency = f"ostrzeżenie walutowe niewymagane – wyniki w PLN ({self.LIT_E})"
+        else:
+            currency = f"ostrzeżenie walutowe zawarte ({self.LIT_E})"
+        if not missing:
+            return self.result("pass", claims[0], f"Wyniki historyczne z informacją o wpływie opłat; {currency}.")
+        quote = foreign if foreign is not None and not warned else claims[0]
+        note = f"; {currency}" if foreign is None else ""
+        return self.result("fail", quote, f"Wyniki historyczne bez {' ani '.join(missing)}{note}.")

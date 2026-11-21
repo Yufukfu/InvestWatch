@@ -405,3 +405,98 @@ def test_r12a_alfa_not_applicable(mock_documents, registry, catalogue):
     r = run_mock(mock_documents, ALFA_ID, registry, catalogue)["R12a"]
     assert r.result == "not_applicable"
     assert r.evidence is None
+
+
+# ---- R12b currency and costs --------------------------------------------------------------------
+
+LIT_E = "art. 44 ust. 4 lit. e"
+FEES = "Wyniki po potrąceniu opłat."
+USD = "Subfundusz USD zyskał 11% w 2025 roku."  # "r." + capital stays one sentence in the splitter
+FX_WARNING = "Zmiany kursów walut mogą zwiększyć lub zmniejszyć wynik."
+
+
+def test_r12b_catalogue_entry(catalogue):
+    spec = catalogue.get("R12b")
+    assert spec.implemented
+    assert spec.legal_basis == "art. 44 ust. 4 rozp. del. 2017/565"
+    assert spec.llm is None  # rules-only
+
+
+def test_r12b_eurotrade_fails_on_fees_only(mock_documents, registry, catalogue):
+    r = run_mock(mock_documents, EUROTRADE_ID, registry, catalogue)["R12b"]
+    assert r.result == "fail"
+    assert r.evidence == "Nasi klienci zarobili średnio 34% w 2025 roku."
+    assert "opłat" in r.explanation
+    assert "kursów walut" not in r.explanation
+    assert f"ostrzeżenie walutowe niewymagane – wyniki w PLN ({LIT_E})" in r.explanation
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Fundusz zarobił 8% w 2025 r. Wyniki uwzględniają opłatę za zarządzanie.",
+     "Fundusz zarobił 8% w 2025 r. Wyniki nie uwzględniają opłat i prowizji.",
+     "Fundusz zarobił 8% w 2025 r. Wyniki netto, po potrąceniu kosztów."],
+    ids=["includes-fee", "excludes-fees", "net"],
+)
+def test_r12b_fee_statement_with_pln_figures_passes(text, registry, catalogue):
+    r = run(text, registry, catalogue)["R12b"]
+    assert r.result == "pass"
+    assert LIT_E in r.explanation
+
+
+def test_r12b_foreign_currency_without_warning_fails(registry, catalogue):
+    r = run(f"{USD} {FEES}", registry, catalogue)["R12b"]
+    assert r.result == "fail"
+    assert r.evidence == USD
+    assert "kursów walut" in r.explanation and LIT_E in r.explanation
+    assert "opłat" not in r.explanation
+
+
+def test_r12b_foreign_currency_with_warning_passes(registry, catalogue):
+    r = run(f"{USD} {FEES} {FX_WARNING}", registry, catalogue)["R12b"]
+    assert r.result == "pass"
+    assert LIT_E in r.explanation
+
+
+def test_r12b_denominated_product_triggers_the_currency_part(registry, catalogue):
+    denominated = "Fundusz jest denominowany w EUR."
+    r = run(f"{denominated} Fundusz zarobił 8% w 2025 r. {FEES}", registry, catalogue)["R12b"]
+    assert r.result == "fail"
+    assert r.evidence == denominated
+
+
+def test_r12b_both_missing_names_both(registry, catalogue):
+    r = run(USD, registry, catalogue)["R12b"]
+    assert r.result == "fail"
+    assert "opłat" in r.explanation and "kursów walut" in r.explanation and LIT_E in r.explanation
+
+
+def test_r12b_bank_ok_not_applicable(mock_documents, registry, catalogue):
+    assert run_mock(mock_documents, BANK_OK_ID, registry, catalogue)["R12b"].result == "not_applicable"
+
+
+def test_missing_disclaimer_fails_only_r14(registry, catalogue):
+    text = f"W latach 2021–2025 fundusz wypracował średnio 7% rocznie po potrąceniu opłat. {SOURCE}"
+    results = run(text, registry, catalogue)
+    assert results["R14"].result == "fail"
+    assert results["R12a"].result == "pass"
+    assert results["R12b"].result == "pass"
+
+
+def test_shared_trigger_bank_ok_not_applicable_together(mock_documents, registry, catalogue):
+    results = run_mock(mock_documents, BANK_OK_ID, registry, catalogue)
+    for rule_id in ("R12a", "R12b", "R14"):
+        assert results[rule_id].result == "not_applicable", rule_id
+        assert results[rule_id].explanation == "Materiał nie prezentuje wyników historycznych.", rule_id
+
+
+def test_forecast_is_not_past_performance_for_the_shared_trigger(registry, catalogue):
+    results = run("W 2026 roku spodziewamy się 10% zysku.", registry, catalogue, **FETCHED_2026)
+    assert {results[r].result for r in ("R12a", "R12b", "R14")} == {"not_applicable"}
+
+
+def test_r12b_foreign_currency_outside_the_results_needs_no_warning(registry, catalogue):
+    # Only a past result in a foreign currency, or a product denominated in one, needs the warning (lit. e).
+    r = run("Bonus 50 USD na start. Fundusz zarobił 8% w 2025 roku. Wyniki po potrąceniu opłat.", registry, catalogue)["R12b"]
+    assert r.result == "pass"
+    assert "niewymagane – wyniki w PLN" in r.explanation

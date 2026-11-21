@@ -24,3 +24,4 @@
 | F4 | The preprocessing ReDoS that Kacper found is outside the catalogue lint | `new-item`: fixed where it was reported; the timing test here covers only `rules/` |
 | F6 | The stage-2 catalogue comment on R11 says "report the detection even when compliant", which Damian's answer 3 reverses (violations only) | `fix-here`: corrected in task 7.2 |
 | F5 | Lexical source and assumption markers are lenient (`opracowanie własne`, `w okresie`) | `new-item`: calibrate with the gold set |
+| F7 | R12a's short-period markers match a period that is not the result's, inside a past-performance sentence (`…zyskał 9%, przy 3-miesięcznym okresie wypowiedzenia` gives `fail`), group 4 review | `new-item`: lexical by design; measure on the gold set before narrowing |

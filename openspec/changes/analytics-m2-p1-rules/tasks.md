@@ -62,11 +62,11 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - the explanation names the sub-checks that are not `pass`, with their status, in a fixed order;
   - shared trigger: R12a, R12b and R14 are `not_applicable` together on `m2-bank-ok`.
 - [x] 4.2 Write the R12a class on `_PastPerformance`, with the three named sub-checks as a `SubCheck` list and the result taken as the worst of them. Add `short_period_patterns`, `five_year_patterns`, `inception_patterns` and `source_patterns` (`&source_markers`), the N-month and year-range checks in code (ReDoS-tested in group 1's timing test), the legal basis art. 44 ust. 4, and `implemented: true`. Tests green.
-- [x] 4.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 18 tried, 18 caught` (N months and the multiple of 12, the short-period list and its precedence, the 5-year boundaries for `ostatnich N lat`, a year range and distinct years, the 5-year words, since inception as `uncertain`, each reference-period source, the source check, worst-of, only non-pass sub-checks listed, their fixed order, the decisive sentence as evidence, the legal basis). YAML cannot alias forward and R12a precedes R14, so the `pp_*` lists and `source_markers` now live in the catalogue's `shared:` section, aliased by R12a, R12b and R14 (R14's rules are unchanged, asserted when moving). The months regex uses bounded spaces (`\s{0,3}`), and the timing test gained a digit followed by 20 000 spaces. The two shared-trigger scenarios move to group 5, because they need R12b.
+- [x] 4.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 18 tried, 18 caught` (N months and the multiple of 12, the short-period list and its precedence, the 5-year boundaries for `ostatnich N lat`, a year range and distinct years, the 5-year words, since inception as `uncertain`, each reference-period source, the source check, worst-of, only non-pass sub-checks listed, their fixed order, the decisive sentence as evidence, the legal basis). YAML cannot alias forward and R12a precedes R14, so the `pp_*` lists and `source_markers` now live in the catalogue's `shared:` section, aliased by R12a, R12b and R14 (R14's rules are unchanged, asserted when moving). The months regex uses bounded spaces (`\s{0,3}`), and the timing test gained a digit followed by 20 000 spaces. The two shared-trigger scenarios move to group 5, because they need R12b. Review fix (R15's fee and tax exclude spans punctuation and up to 60 characters within the sentence, stopping only at a return verb; the noun `zysków` does not stop it): `mutations: 4 tried, 4 caught`.
 
 ## 5. R12b currency and costs (~45 min)
 
-- [ ] 5.1 Write the failing tests for the R12b scenarios:
+- [x] 5.1 Write the failing tests for the R12b scenarios:
   - `eurotrade` gives `fail`, naming fees only, and the explanation says the currency warning is not required for PLN results under `art. 44 ust. 4 lit. e`;
   - every R12b explanation cites `art. 44 ust. 4 lit. e`;
   - a fee statement with PLN figures gives `pass`;
@@ -76,8 +76,8 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - `denominowany w EUR` triggers the currency part;
   - `m2-bank-ok` gives `not_applicable`;
   - the "missing disclaimer fails only R14" scenario passes.
-- [ ] 5.2 Write the R12b class on `_PastPerformance`. Add `fee_patterns`, `foreign_currency_patterns` and `currency_warning_patterns`, and set `implemented: true`. Tests green.
-- [ ] 5.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 5.2 Write the R12b class on `_PastPerformance`. Add `fee_patterns`, `foreign_currency_patterns` and `currency_warning_patterns`, and set `implemented: true`. Tests green.
+- [x] 5.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (the fee statement, the currency part both ways, the warning, the denominated product and its currency conjunct, lit. e cited for PLN, the PLN note on a fail, the foreign sentence as evidence, the shared trigger, `uwzględniają opłat`, the currency code, the legal basis). One survivor on the first run (a foreign currency outside the results, such as a USD bonus) got its own test. The USD scenario uses `w 2025 roku`, because the sentence splitter keeps `2025 r. Wyniki…` as one sentence.
 
 ## 6. R11 product comparisons (~1 h)
 
