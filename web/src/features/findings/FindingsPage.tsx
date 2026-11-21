@@ -1,7 +1,14 @@
+import { FindingDetailPanel } from './components/FindingDetailPanel';
 import { FindingsFilters } from './components/FindingsFilters';
 import { FindingsPager } from './components/FindingsPager';
 import { FindingsTable } from './components/FindingsTable';
+import { useFindingDetail } from './data/useFindingDetail';
 import { useFindings } from './data/useFindings';
+
+function DetailContainer({ id, onClose }: { id: string; onClose: () => void }) {
+  const d = useFindingDetail(id);
+  return <FindingDetailPanel {...d} onClose={onClose} />;
+}
 
 export function FindingsPage() {
   const f = useFindings();
@@ -36,6 +43,13 @@ export function FindingsPage() {
           onPage={(page) => f.setFilters({ page })}
           onPageSize={(pageSize) => f.setFilters({ pageSize })}
         />
+      )}
+      {f.selectedId && (
+        <>
+          <div className="detail-backdrop" aria-hidden="true" onClick={() => f.select(undefined)} />
+          {/* key: a new selection remounts the panel, so focus handling restarts per finding. */}
+          <DetailContainer key={f.selectedId} id={f.selectedId} onClose={() => f.select(undefined)} />
+        </>
       )}
     </section>
   );

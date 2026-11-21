@@ -1,4 +1,4 @@
-import type { FindingModule, FindingPlatform, FindingStatus, RiskLevel } from '../model';
+import type { FindingModule, FindingPlatform, FindingStatus, RegistryType, RiskLevel, RuleMethod, Severity } from '../model';
 
 // Polish labels shared by the findings components. Values (ids, enums) are shown as the API returns them.
 export const STATUS_LABEL: Record<FindingStatus, string> = {
@@ -53,4 +53,26 @@ export function findingsCount(n: number): string {
   if (n === 1) return '1 zgłoszenie';
   if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return `${n} zgłoszenia`;
   return `${n} zgłoszeń`;
+}
+
+export const SEVERITY_LABEL: Record<Severity, string> = { high: 'wysoka', medium: 'średnia', low: 'niska' };
+
+export const METHOD_LABEL: Record<RuleMethod, string> = { rule: 'reguła', llm: 'model językowy', hybrid: 'reguła + model językowy' };
+
+export const REGISTRY_LABEL: Record<RegistryType, string> = {
+  brokerage_house: 'dom maklerski',
+  brokerage_bank: 'bank prowadzący działalność maklerską',
+  foreign_branch: 'oddział firmy zagranicznej',
+  foreign_no_branch: 'firma zagraniczna bez oddziału',
+};
+
+// Only http(s) links from scraped data become anchors; anything else is shown as text.
+export function safeHttpUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
 }

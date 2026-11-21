@@ -20,9 +20,9 @@
 
 ## 4. Finding detail panel
 
-- [ ] 4.1 Failing tests with `contracts/mocks/finding-detail.json`: `fail`/`uncertain` rules visible with legal basis and explanation, `pass` group collapsed with count, rule id shown verbatim, 404 state, deep link, `Escape` closes and focus returns.
-- [ ] 4.2 Implement detail data hook, panel components and screenshot preview with failure message. Tests pass.
-- [ ] 4.3 Mutation check; `mutations: N tried, N caught`.
+- [x] 4.1 Failing tests with `contracts/mocks/finding-detail.json`: `fail`/`uncertain` rules visible with legal basis and explanation, `pass` group collapsed with count, rule id shown verbatim, 404 state, deep link, `Escape` closes and focus returns.
+- [x] 4.2 Implement detail data hook, panel components and screenshot preview with failure message. Tests pass.
+- [x] 4.3 Mutation check; mutations: 15 tried, 15 caught (two equivalent mutants found, redundant guards removed; 500-is-not-404 case added)
 
 ## 5. Status change
 

@@ -1,0 +1,177 @@
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import type { FindingDetail, RuleView } from '../model';
+import { FindingDetailPanel } from './FindingDetailPanel';
+
+const rule = (over: Partial<RuleView> = {}): RuleView => ({
+  ruleId: 'R3',
+  name: 'Informacja o ryzyku',
+  result: 'fail',
+  severity: 'high',
+  evidence: 'Zarabiaj nawet do 18% rocznie',
+  explanation: 'Brak ostrzeżenia o ryzyku.',
+  legalBasis: 'art. 44 ust. 2 lit. b',
+  method: 'hybrid',
+  ...over,
+});
+
+const detail = (over: Partial<FindingDetail> = {}): FindingDetail => ({
+  id: 'f1',
+  module: 'M2',
+  title: 'Obietnica 18% zysku',
+  summary: 'Materiał eksponuje stopę zwrotu.',
+  score: 0.86,
+  riskLevel: 'high',
+  status: 'new',
+  note: null,
+  url: 'https://alfa.example.com/konto',
+  platform: 'web',
+  detectedAt: '2026-11-21T15:00:00Z',
+  firm: { name: 'Alfa DM S.A.', authorized: true, registryType: 'brokerage_house', matchConfidence: 0.95 },
+  advertiser: undefined,
+  rules: [
+    rule(),
+    rule({ ruleId: 'R12a', name: 'Porównania', result: 'uncertain', severity: 'medium', legalBasis: 'art. 44 ust. 3', explanation: 'Niejasne porównanie.' }),
+    rule({ ruleId: 'R1', name: 'Identyfikacja firmy', result: 'pass', severity: 'medium', explanation: 'Nazwa firmy jest podana.' }),
+    rule({ ruleId: 'R10', name: 'Waluta', result: 'pass', severity: 'low' }),
+    rule({ ruleId: 'R9', name: 'Symulacje', result: 'not_applicable', severity: 'low' }),
+  ],
+  excerpt: 'Konto Premium Alfa Inwestycje.',
+  documentText: 'Pełny tekst strony.',
+  screenshotUrl: '/api/documents/d1/screenshot/desktop',
+  pipelineVersion: '0.1.0-mock',
+  llm: 'gemma3:4b',
+  ...over,
+});
+
+const base = { isLoading: false, isError: false, notFound: false, onClose: vi.fn() };
+
+describe('FindingDetailPanel', () => {
+  it('shows every fail and uncertain rule with legal basis and explanation, without any expand', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} />);
+    const issues = screen.getByRole('region', { name: /Naruszenia/ });
+    const items = within(issues).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent('R3');
+    expect(items[0]).toHaveTextContent('Informacja o ryzyku');
+    expect(items[0]).toHaveTextContent('art. 44 ust. 2 lit. b');
+    expect(items[0]).toHaveTextContent('Brak ostrzeżenia o ryzyku.');
+    expect(items[0]).toHaveTextContent('Zarabiaj nawet do 18% rocznie');
+    expect(items[0]).toHaveTextContent('Waga: wysoka');
+    expect(items[1]).toHaveTextContent('R12a');
+    expect(items[1]).toHaveTextContent('Niepewne');
+    for (const el of [items[0], items[1]]) expect(el.closest('details')).toBeNull();
+  });
+
+  it('collapses passing rules with their count, and not applicable ones apart', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} />);
+    const passed = screen.getByText('Spełnione (2)').closest('details')!;
+    expect(passed).not.toHaveAttribute('open');
+    expect(within(passed).getByText(/Identyfikacja firmy/)).toBeInTheDocument();
+    expect(screen.getByText('Nie dotyczy (1)')).toBeInTheDocument();
+  });
+
+  it('orders issues by severity, high first', () => {
+    const rules = [rule({ ruleId: 'R8', severity: 'low' }), rule({ ruleId: 'R6', severity: 'high' }), rule({ ruleId: 'R5', severity: 'medium' })];
+    render(<FindingDetailPanel {...base} detail={detail({ rules })} />);
+    const items = within(screen.getByRole('region', { name: /Naruszenia/ })).getAllByRole('listitem');
+    expect(items.map((i) => i.querySelector('.rule-id')?.textContent)).toEqual(['R6', 'R5', 'R8']);
+  });
+
+  it('labels M1/M3 signals as detected signals', () => {
+    render(<FindingDetailPanel {...base} detail={detail({ module: 'M1', rules: [rule({ ruleId: 'S1.2', name: 'Kod polecający' })] })} />);
+    const item = within(screen.getByRole('region', { name: /Sygnały/ })).getByRole('listitem');
+    expect(item).toHaveTextContent('S1.2');
+    expect(item).toHaveTextContent('Wykryto sygnał');
+  });
+
+  it('says so when no rule failed', () => {
+    render(<FindingDetailPanel {...base} detail={detail({ rules: [rule({ result: 'pass' })] })} />);
+    expect(screen.getByText('Brak naruszeń ani niepewnych wyników.')).toBeInTheDocument();
+  });
+
+  it('shows header, summary, firm and source link', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Obietnica 18% zysku' })).toBeInTheDocument();
+    expect(screen.getByText('Wysoki')).toBeInTheDocument();
+    expect(screen.getByText('Materiał eksponuje stopę zwrotu.')).toBeInTheDocument();
+    expect(screen.getByText('Alfa DM S.A.')).toBeInTheDocument();
+    expect(screen.getByText('Firma w rejestrze KNF')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /Otwórz źródło/ });
+    expect(link).toHaveAttribute('href', 'https://alfa.example.com/konto');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText(/gemma3:4b/)).toBeInTheDocument();
+  });
+
+  it('flags an unauthorised firm and an advertiser on the warning list', () => {
+    render(
+      <FindingDetailPanel
+        {...base}
+        detail={detail({
+          firm: { name: 'Krzak Ltd', authorized: false },
+          advertiser: { name: 'Jan', handle: '@inwestor_jan', profileUrl: 'https://instagram.com/inwestor_jan', inRegistry: false, onWarningList: true },
+        })}
+      />,
+    );
+    expect(screen.getByText('Firma spoza rejestru KNF')).toBeInTheDocument();
+    expect(screen.getByText('@inwestor_jan')).toBeInTheDocument();
+    expect(screen.getByText('Na liście ostrzeżeń KNF')).toBeInTheDocument();
+  });
+
+  it('does not link a non-http source url', () => {
+    render(<FindingDetailPanel {...base} detail={detail({ url: 'javascript:alert(1)' })} />);
+    expect(screen.queryByRole('link', { name: /Otwórz źródło/ })).toBeNull();
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+  });
+
+  it('renders scraped markup as text', () => {
+    const { container } = render(<FindingDetailPanel {...base} detail={detail({ excerpt: '<script>x()</script><b>b</b>' })} />);
+    expect(screen.getByText('<script>x()</script><b>b</b>')).toBeInTheDocument();
+    expect(container.querySelector('script, b')).toBeNull();
+  });
+
+  it('shows the screenshot and a message when it fails to load', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} />);
+    const img = screen.getByRole('img', { name: 'Zrzut ekranu materiału (desktop)' });
+    expect(img).toHaveAttribute('src', '/api/documents/d1/screenshot/desktop');
+    fireEvent.error(img);
+    expect(screen.getByText('Nie udało się wczytać zrzutu ekranu.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
+  });
+
+  it('shows no screenshot for a url outside the api', () => {
+    render(<FindingDetailPanel {...base} detail={detail({ screenshotUrl: 'https://evil.example/x.png' })} />);
+    expect(screen.queryByRole('img', { name: /Zrzut ekranu/ })).toBeNull();
+  });
+
+  it('shows the not-found and error states with a close action', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<FindingDetailPanel {...base} onClose={onClose} detail={undefined} isError notFound />);
+    expect(screen.getByRole('alert')).toHaveTextContent('To zgłoszenie nie istnieje.');
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij' }));
+    expect(onClose).toHaveBeenCalled();
+    rerender(<FindingDetailPanel {...base} onClose={onClose} detail={undefined} isError />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się pobrać szczegółów zgłoszenia.');
+    rerender(<FindingDetailPanel {...base} onClose={onClose} detail={undefined} isLoading />);
+    expect(screen.getByText('Ładowanie szczegółów…')).toBeInTheDocument();
+  });
+
+  it('focuses the close button, closes on Escape and returns focus', () => {
+    const onClose = vi.fn();
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const { unmount } = render(<FindingDetailPanel {...base} onClose={onClose} detail={detail()} />);
+    expect(screen.getByRole('button', { name: 'Zamknij' })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
+  it('renders the status editor slot', () => {
+    render(<FindingDetailPanel {...base} detail={detail()} statusEditor={<p>edytor</p>} />);
+    expect(screen.getByText('edytor')).toBeInTheDocument();
+  });
+});

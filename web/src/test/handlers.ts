@@ -3,6 +3,7 @@
 // and only for the routes they render. Responses are the contract mocks unchanged: the web app computes nothing the
 // backend owns. A test that needs another response (for example bucket=day) overrides the route with server.use.
 import { http, HttpResponse } from 'msw';
+import findingDetail from './fixtures/finding-detail.json';
 import findings from './fixtures/findings.json';
 import health from './fixtures/health.json';
 import summary from './fixtures/summary.json';
@@ -11,6 +12,12 @@ import trend from './fixtures/trend.json';
 export const handlers = (base: string) => [
   http.get(`${base}/health`, () => HttpResponse.json(health)),
   http.get(`${base}/findings`, () => HttpResponse.json(findings)),
+  // Only the finding that has a detail mock resolves; any other id is a 404 like the backend's unknown id.
+  http.get(`${base}/findings/:id`, ({ params }) =>
+    params.id === findingDetail.id
+      ? HttpResponse.json(findingDetail)
+      : HttpResponse.json({ error: 'finding not found' }, { status: 404 }),
+  ),
   http.get(`${base}/stats/summary`, () => HttpResponse.json(summary)),
   // Hour data only: a test that asks for bucket=day must register its own day points with server.use,
   // so a forgotten override fails loudly instead of drawing hour-shaped data under "Dzień".
