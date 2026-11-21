@@ -1,4 +1,8 @@
-"""Scraped text is attacker-controlled: no M1/M3 pattern may be super-linear (whole-branch security review)."""
+"""Hostile-input regressions: the sentence splitter and the R3 patterns (PR #26 review, required item 4) and every
+M1/M3 signal pattern (analytics-m1-m3 whole-branch security review) stay linear.
+
+Budgets are generous for CI runners; the fixed code takes a few milliseconds per case, the old one 4-130 s.
+"""
 
 from __future__ import annotations
 
@@ -9,11 +13,107 @@ from pathlib import Path
 import pytest
 
 from conftest import NOW, make_doc
+from investwatch_analytics.config import Settings
 from investwatch_analytics.models import ScrapedDocument
 from investwatch_analytics.pipeline import analyze
+from investwatch_analytics.preprocessing import split_sentences
 from investwatch_analytics.registry import Registry
 from investwatch_analytics.rules.engine import Catalogue
 from investwatch_analytics.rules.m1 import EVIDENCE_MAX
+
+
+# A registered firm's own page: since analytics-m1-m3 only registered firms reach M2 (and so R3); the text is
+# unchanged, so the sentence windows these tests pin stay the same.
+FIRM_PAGE = "https://alfa-inwestycje.example.com/oferta"
+
+
+def elapsed(fn, *args) -> float:
+    started = time.perf_counter()
+    fn(*args)
+    return time.perf_counter() - started
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "." + " " * 50_000,
+        ". " + " " * 40_000 + "abc",
+        "S.A. Ab " * 6_000,  # abbreviation chain: every boundary is skipped, `start` never moves
+        "ok. 1 " * 8_000,
+        "\n" + " " * 50_000 + "x",
+    ],
+    ids=["dot-spaces", "dot-spaces-lowercase", "abbrev-chain", "abbrev-before-digit", "newline-spaces"],  # the last was already linear
+)
+def test_split_is_fast_on_hostile_input(text):
+    assert elapsed(split_sentences, text) < 1.0
+
+
+# `digit-run`, `repeated-fee-stem` and `claim-warning-pairs` were quadratic before the fix; the others pin cases
+# that were already linear, so they stay linear.
+@pytest.mark.parametrize(
+    "text",
+    ["1" * 50_000, "1.2" * 15_000, "prowizja " + "9" * 50_000, "prowizj" * 8_000,
+     "Zysk 5%. Ryzyko straty. " * 8_000],
+    ids=["digit-run", "dotted-digits", "fee-then-digits", "repeated-fee-stem", "claim-warning-pairs"],
+)
+def test_r3_patterns_are_fast_on_hostile_input(text):
+    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    doc = ScrapedDocument.model_validate(make_doc(text="Reklama. " + text, url=FIRM_PAGE))
+    assert elapsed(lambda: analyze(doc, registry=registry, catalogue=Catalogue.load(), now=NOW)) < 3.0
+
+
+def test_footnote_marker_with_spaces_still_starts_a_sentence():
+    text = "Zysk 8% rocznie. *  Ryzyko utraty kapitału. (*)   Szczegóły w regulaminie."
+    assert [s.text for s in split_sentences(text)] == [
+        "Zysk 8% rocznie.", "*  Ryzyko utraty kapitału.", "(*)   Szczegóły w regulaminie."]
+
+
+def test_abbreviation_window_keeps_legal_forms_and_years():
+    # Same result as before the linear rewrite (old and new agreed on 20 009 texts, offsets included).
+    text = "Alfa Inwestycje S.A. Zaprasza. Od 2024 r. Nowe konto. Cena ok. 15 zł. Wszystko jest ok. Dalej."
+    assert [s.text for s in split_sentences(text)] == [
+        "Alfa Inwestycje S.A. Zaprasza.", "Od 2024 r. Nowe konto.", "Cena ok. 15 zł.",
+        "Wszystko jest ok.", "Dalej."]
+
+
+def test_percent_claim_still_found():
+    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    doc = ScrapedDocument.model_validate(make_doc(text="Reklama. Zarabiaj 12,5 % rocznie z nami.", url=FIRM_PAGE))
+    [f] = analyze(doc, registry=registry, catalogue=Catalogue.load(), now=NOW)
+    [r3] = [r for r in f.rules if r.rule_id == "R3"]
+    assert r3.result == "fail" and "12,5 %" in (r3.evidence or "")
+
+
+def test_r3_claim_patterns_alone_are_linear_on_a_digit_run():
+    """Each R3 claim and claim-exclude pattern on 20 000 digits: was ~25 s (quadratic), must stay under 2 s."""
+    import re
+
+    params = Catalogue.load().get("R3").params
+    digits = "1" * 20_000
+    for pattern in params["claim_patterns"] + params["claim_exclude_patterns"]:
+        compiled = re.compile(pattern, re.IGNORECASE)
+        assert elapsed(lambda: list(compiled.finditer(digits))) < 2.0, pattern
+
+
+def test_r3_coverage_unchanged_by_bisect():
+    """Covered and uncovered claims around the +-2 sentence window, as before the bisect rewrite
+    (old and new coverage logic agreed on 200 000 random claim/warning layouts)."""
+    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+
+    def r3(text):
+        [f] = analyze(ScrapedDocument.model_validate(make_doc(text=text, url=FIRM_PAGE)), registry=registry,
+                      catalogue=Catalogue.load(), now=NOW)
+        return next(r for r in f.rules if r.rule_id == "R3")
+
+    assert r3("Reklama. Zysk 8% rocznie. A. Ryzyko utraty kapitału.").result == "pass"  # warning 2 after
+    assert r3("Reklama. Ryzyko utraty kapitału. A. Zysk 8% rocznie.").result == "pass"  # warning 2 before
+    far = r3("Reklama. Zysk 8% rocznie. A. B. Ryzyko utraty kapitału.")  # 3 sentences away
+    assert far.result == "fail" and far.evidence == "Zysk 8% rocznie."
+    two = r3("Reklama. Zysk 8% rocznie. Ryzyko utraty kapitału. A. B. C. D. Zarabiaj 9% rocznie.")
+    assert two.result == "fail" and two.evidence == "Zarabiaj 9% rocznie."  # the second claim is uncovered
+
+
+# ---- M1/M3 signal patterns (analytics-m1-m3) -------------------------------------------------------
 
 SEED = Path(__file__).resolve().parents[1] / "registry" / "seed.csv"
 FILLERS = ["1 ", " ", ".", "9", "@", ",", "1.", "1 zł ", "kod ", "nie udzielamy ", "akcja ", "utm_", "ref", "\t"]

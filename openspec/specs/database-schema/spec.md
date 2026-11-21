@@ -2,7 +2,9 @@
 
 ## Purpose
 One migrated Postgres schema that the scraper, analytics and the API share, so every service writes and reads the v1 contracts (`.docs/integration-plan.md` §3-§4) through the same tables, constraints and conflict rules. Owned by `api/` (Alembic).
+
 ## Requirements
+
 ### Requirement: Migrations own the schema
 The `api` service SHALL create and change every shared table only through Alembic revisions under `api/migrations/`, applied as the admin role (`iw_admin`). No other service and no init script SHALL create or alter these tables.
 
@@ -34,7 +36,7 @@ The `api/compose.yaml` file SHALL define a one-shot `api-migrate` service that r
 - **THEN** `api-migrate` exits non-zero, logs the error as JSON without the password, and the services that depend on it do not start
 
 ### Requirement: Columns follow the contracts
-Each table SHALL store the scalar fields of its contract as typed columns and SHALL restrict every enumerated field to the values listed in `contracts/schemas/` with a CHECK constraint. `documents` SHALL keep the remaining `ScrapedDocument` fields (`author`, `links`, `media`, `screenshots`, `blocks`, `scrape_meta`) in `payload JSONB`, and SHALL reject an empty `text`. `findings` SHALL keep `firm`, `advertiser`, `rules` and `model` as JSONB columns, and a contract `null` in `firm`, `advertiser` or `model` SHALL be stored as SQL `NULL`, not as the JSON value `null`. `findings` SHALL NOT have a `risk_level` column.
+Each table SHALL store the scalar fields of its contract as typed columns and SHALL restrict every enumerated field to the values listed in `contracts/schemas/` with a CHECK constraint. `documents` SHALL keep the remaining `ScrapedDocument` fields (`author`, `links`, `media`, `screenshots`, `blocks`, `scrape_meta`) in `payload JSONB`, and SHALL reject an empty `text`. `findings` SHALL keep `firm`, `advertiser`, `rules` and `model` as JSONB columns and SHALL NOT have a `risk_level` column.
 
 #### Scenario: Contract mock round-trips
 - **WHEN** every item of `contracts/mocks/documents.json`, `findings.json` and `sources.json` is inserted and read back into the contract shape
@@ -43,6 +45,7 @@ Each table SHALL store the scalar fields of its contract as typed columns and SH
 #### Scenario: Null JSONB field is SQL NULL
 - **WHEN** a finding is inserted with `firm`, `advertiser` and `model` set to null
 - **THEN** `firm IS NULL`, `advertiser IS NULL` and `model IS NULL` are true for that row
+- **AND** a contract `null` in `firm`, `advertiser` or `model` SHALL be stored as SQL `NULL`, not as the JSON value `null`
 
 #### Scenario: Enum checks match the contracts
 - **WHEN** the CHECK constraints of the migrated database are compared with the `enum` lists of `contracts/schemas/*.json`
@@ -153,4 +156,3 @@ Each table SHALL store the scalar fields of its contract as typed columns and SH
 #### Scenario: Duplicate point in one run
 - **WHEN** a second point with the same `(run_id, module, threshold)` is inserted
 - **THEN** the insert fails with a unique violation
-

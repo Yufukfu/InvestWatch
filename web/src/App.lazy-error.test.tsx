@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import summary from './mocks/fixtures/summary.json';
+import summary from './test/fixtures/summary.json';
 import { makeStore } from './test/store';
 
 // A lazy chunk that cannot load (stale tab after a redeploy): reading the export rejects the import.

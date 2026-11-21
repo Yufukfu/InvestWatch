@@ -1,6 +1,7 @@
 """finding-storage scenarios (openspec/specs/finding-storage/spec.md).
 
-The suite runs on every store backend in STORE_BACKENDS. The Postgres backend needs TEST_DATABASE_URL (a
+The suite runs on every store backend in STORE_BACKENDS. The Postgres backend needs TEST_DATABASE_URL, or CI's
+TEST_DATABASE_ADMIN_URL (a
 throwaway server; the URL's role must be allowed to CREATE DATABASE) and is skipped without it. Each test
 session creates its own database from tests/sql/schema.sql (a test-only mirror of the api-db-schema
 migration) and drops it at the end.
@@ -17,10 +18,9 @@ from datetime import timedelta
 
 import pytest
 
-from conftest import NOW, make_doc
+from conftest import NOW, make_doc, pg_test_url
 from investwatch_analytics.models import AdvertiserRef, Finding, ScrapedDocument
 from investwatch_analytics.storage import (
-    InMemoryStore,
     InvalidDocument,
     NotFound,
     PostgresStore,
@@ -28,6 +28,7 @@ from investwatch_analytics.storage import (
     StoreMisconfigured,
     StoreUnavailable,
 )
+from investwatch_analytics.testing import InMemoryStore
 
 DOC_ID = "22222222-2222-4222-8222-222222222222"
 DOC2_ID = "33333333-3333-4333-8333-333333333333"
@@ -54,7 +55,7 @@ SCHEMA_SQL = pathlib.Path(__file__).parent / "sql" / "schema.sql"
 
 @pytest.fixture(scope="session")
 def pg_url():
-    admin_url = os.environ.get("TEST_DATABASE_URL")
+    admin_url = pg_test_url()
     if not admin_url:
         pytest.skip("TEST_DATABASE_URL not set")
     import psycopg
@@ -512,3 +513,15 @@ def test_pipeline_m1_and_m3_round_trip(backend, finding_validator):
         got = stored[f.module]
         assert got.advertiser == f.advertiser and got.rules == f.rules and got.score == f.score
         assert list(finding_validator.iter_errors(got.to_contract())) == []
+
+
+def test_postgres_cap_counts_the_uncompressed_payload(pg_url):
+    """A highly compressible payload is tiny on disk (TOAST) but huge once loaded: it must still hit the cap."""
+    backend = PostgresBackend(pg_url)
+    backend.seed(columns(text="Reklama. Krótki tekst."), {"author": {"name": "x" * 3_000_000}})  # ~3 MB, compresses to KB
+    store = PostgresStore(pg_url)  # default cap 2 MB
+    with pytest.raises(InvalidDocument) as err:
+        store.load_document(DOC_ID)
+    assert "too large" in str(err.value)
+    store.close()
+    backend.close()

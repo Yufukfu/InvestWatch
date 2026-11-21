@@ -3,5 +3,4 @@
 export const config = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api',
   eventsUrl: import.meta.env.VITE_EVENTS_URL ?? '/events',
-  useMocks: import.meta.env.VITE_USE_MOCKS === 'true',
 } as const;

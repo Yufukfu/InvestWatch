@@ -5,9 +5,10 @@
 -- documents, findings), the findings indexes of `0002_query_indexes.py` and the `documents.text` check of
 -- `0003_documents_text_not_empty.py`. Column names, types, nullability, defaults and checks are copied as
 -- they are. job_errors and calibration_points are left out.
--- Constraint names: the API's naming convention double-prefixes the 0001 CHECK names in a real database
--- (`ck_findings_ck_findings_status`); this file keeps the names as written in 0001. Analytics depends on no
--- constraint name except the upsert target `uq_findings_document_module`, which is the same in both.
+-- Constraint names are the ones a real database gets: the API's naming convention double-prefixes the 0001 CHECK
+-- names (`ck_findings_ck_findings_status`); 0003's is `ck_documents_text_not_empty`. Analytics depends on none of
+-- them except the upsert target `uq_findings_document_module`. Verified identical to `alembic upgrade head` with
+-- `pg_dump --schema-only -t sources -t documents -t findings` (2026-11-21, main at 354d561).
 -- A missing firm / advertiser / model is SQL NULL, never JSON 'null' (api README).
 -- The migrations in api/ are the source of truth (ADR 0303): when they change, update this file and
 -- re-run the Postgres store tests (TEST_DATABASE_URL).
@@ -26,11 +27,11 @@ CREATE TABLE sources (
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT pk_sources PRIMARY KEY (id),
-    CONSTRAINT ck_sources_name_not_empty CHECK (name <> ''),
-    CONSTRAINT ck_sources_platform CHECK (platform IN ('web', 'facebook', 'instagram', 'tiktok', 'youtube', 'x', 'forum', 'other')),
-    CONSTRAINT ck_sources_source_kind CHECK (source_kind IN ('firm_own', 'third_party', 'unknown')),
-    CONSTRAINT ck_sources_target_modules CHECK (cardinality(target_modules) >= 1 AND target_modules <@ ARRAY['M1','M2','M3']::text[]),
-    CONSTRAINT ck_sources_last_run_status CHECK (last_run_status IN ('ok', 'partial', 'failed', 'running'))
+    CONSTRAINT ck_sources_ck_sources_name_not_empty CHECK (name <> ''),
+    CONSTRAINT ck_sources_ck_sources_platform CHECK (platform IN ('web', 'facebook', 'instagram', 'tiktok', 'youtube', 'x', 'forum', 'other')),
+    CONSTRAINT ck_sources_ck_sources_source_kind CHECK (source_kind IN ('firm_own', 'third_party', 'unknown')),
+    CONSTRAINT ck_sources_ck_sources_target_modules CHECK (cardinality(target_modules) >= 1 AND target_modules <@ ARRAY['M1','M2','M3']::text[]),
+    CONSTRAINT ck_sources_ck_sources_last_run_status CHECK (last_run_status IN ('ok', 'partial', 'failed', 'running'))
 );
 
 CREATE TABLE documents (
@@ -53,12 +54,12 @@ CREATE TABLE documents (
     created_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT pk_documents PRIMARY KEY (id),
     CONSTRAINT fk_documents_source_id FOREIGN KEY (source_id) REFERENCES sources (id),
-    CONSTRAINT ck_documents_platform CHECK (platform IN ('web', 'facebook', 'instagram', 'tiktok', 'youtube', 'x', 'forum', 'other')),
-    CONSTRAINT ck_documents_source_kind CHECK (source_kind IN ('firm_own', 'third_party', 'unknown')),
-    CONSTRAINT ck_documents_http_status CHECK (http_status BETWEEN 100 AND 599),
-    CONSTRAINT ck_documents_lang CHECK (lang ~ '^[a-z]{2}$'),
-    CONSTRAINT ck_documents_content_hash CHECK (content_hash ~ '^[a-f0-9]{64}$'),
-    CONSTRAINT ck_documents_payload_object CHECK (jsonb_typeof(payload) = 'object'),
+    CONSTRAINT ck_documents_ck_documents_platform CHECK (platform IN ('web', 'facebook', 'instagram', 'tiktok', 'youtube', 'x', 'forum', 'other')),
+    CONSTRAINT ck_documents_ck_documents_source_kind CHECK (source_kind IN ('firm_own', 'third_party', 'unknown')),
+    CONSTRAINT ck_documents_ck_documents_http_status CHECK (http_status BETWEEN 100 AND 599),
+    CONSTRAINT ck_documents_ck_documents_lang CHECK (lang ~ '^[a-z]{2}$'),
+    CONSTRAINT ck_documents_ck_documents_content_hash CHECK (content_hash ~ '^[a-f0-9]{64}$'),
+    CONSTRAINT ck_documents_ck_documents_payload_object CHECK (jsonb_typeof(payload) = 'object'),
     CONSTRAINT ck_documents_text_not_empty CHECK (text <> '')  -- revision 0003
 );
 CREATE UNIQUE INDEX uq_documents_source_hash ON documents (source_id, content_hash) NULLS NOT DISTINCT
@@ -86,12 +87,12 @@ CREATE TABLE findings (
     CONSTRAINT pk_findings PRIMARY KEY (id),
     CONSTRAINT fk_findings_document_id FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE,
     CONSTRAINT uq_findings_document_module UNIQUE (document_id, module),
-    CONSTRAINT ck_findings_module CHECK (module IN ('M1', 'M2', 'M3')),
-    CONSTRAINT ck_findings_score CHECK (score >= 0 AND score <= 1),
-    CONSTRAINT ck_findings_status CHECK (status IN ('new', 'in_review', 'confirmed', 'false_positive', 'closed')),
-    CONSTRAINT ck_findings_platform CHECK (platform IN ('web', 'facebook', 'instagram', 'tiktok', 'youtube', 'x', 'forum', 'other')),
-    CONSTRAINT ck_findings_content_excerpt CHECK (char_length(content_excerpt) <= 500),
-    CONSTRAINT ck_findings_rules_array CHECK (jsonb_typeof(rules) = 'array')
+    CONSTRAINT ck_findings_ck_findings_module CHECK (module IN ('M1', 'M2', 'M3')),
+    CONSTRAINT ck_findings_ck_findings_score CHECK (score >= 0 AND score <= 1),
+    CONSTRAINT ck_findings_ck_findings_status CHECK (status IN ('new', 'in_review', 'confirmed', 'false_positive', 'closed')),
+    CONSTRAINT ck_findings_ck_findings_platform CHECK (platform IN ('web', 'facebook', 'instagram', 'tiktok', 'youtube', 'x', 'forum', 'other')),
+    CONSTRAINT ck_findings_ck_findings_content_excerpt CHECK (char_length(content_excerpt) <= 500),
+    CONSTRAINT ck_findings_ck_findings_rules_array CHECK (jsonb_typeof(rules) = 'array')
 );
 CREATE INDEX ix_findings_detected_at ON findings (detected_at DESC);
 CREATE INDEX ix_findings_module ON findings (module, detected_at DESC);

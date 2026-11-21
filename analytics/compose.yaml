@@ -1,5 +1,5 @@
 # analytics/ deployment unit (owner Damian): the iw:documents stream worker. Included from the root compose.yaml
-# next to infra/compose.yaml, which owns postgres, redis and the data / egress networks (none is declared here),
+# next to infra/compose.yaml, which owns postgres, redis and the data network (none is declared here),
 # and api/compose.yaml, whose one-shot api-migrate creates the tables this worker reads and writes.
 # Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml up analytics
 services:
@@ -18,14 +18,19 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # Registry: empty = the bundled FICTIONAL seed (3 *.example.com firms); the worker logs a registry_seed WARNING.
+      # Until a real KNF registry CSV is mounted and named here, R1 results and finding.high_risk alerts for real
+      # firms are not meaningful (a real firm is unmatched, so R1 fails). Format: analytics/registry/README.md.
+      REGISTRY_CSV: ${REGISTRY_CSV:-}
       # Optional tuning, defaults in analytics/.env.example: WORKER_CONSUMER (hostname), STREAM_BLOCK_MS,
-      # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES. REGISTRY_CSV defaults to the bundled fictional seed.
+      # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES, MAX_DOCUMENT_BYTES.
     depends_on:
       api-migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-    # data: Postgres and Redis (internal, no route out). egress: the hosted LLM (ADR 0304), unused while rules-only.
-    networks: [data, egress]
+    # data only: Postgres and Redis, internal, no route out. The worker makes no outbound call yet; analytics-llm-p0
+    # adds egress together with the hosted LLM client (ADR 0304).
+    networks: [data]
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

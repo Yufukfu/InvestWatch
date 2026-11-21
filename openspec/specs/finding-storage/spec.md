@@ -37,7 +37,7 @@ Analytics SHALL access persistence only through a store interface with the opera
 - **THEN** it validates against `contracts/schemas/finding.schema.json`
 
 ### Requirement: One finding per document and module
-A finding SHALL be identified by `(document_id, module)`, the unique key of `findings` in `api-db-schema`. When a finding with that key exists, `save_findings` SHALL update it in place, keeping `id`, `detected_at`, `status` and `note`, and replacing `score`, `title`, `summary`, `firm`, `advertiser`, `rules`, `content_excerpt`, `url`, `platform`, `model` and `updated_at` (the `UPSERT_REPLACED` list of `api-db-schema`). Otherwise it SHALL insert a new finding with `status: new`. Concurrent saves for the same key SHALL end with one row, enforced by `INSERT ... ON CONFLICT (document_id, module) DO UPDATE`, not by a prior lookup. A changed page is a new `documents` row and therefore gets a new finding.
+A finding SHALL be identified by `(document_id, module)`, the unique key of `findings` in `api-db-schema`. When a finding with that key exists, `save_findings` SHALL update it in place, keeping `id`, `detected_at`, `status` and `note`. Otherwise it SHALL insert a new finding with `status: new`. Concurrent saves for the same key SHALL end with one row. A changed page is a new `documents` row and therefore gets a new finding.
 
 #### Scenario: First analysis
 - **WHEN** a document produces an M2 finding and no finding for `(document_id, M2)` exists
@@ -46,6 +46,11 @@ A finding SHALL be identified by `(document_id, module)`, the unique key of `fin
 #### Scenario: Same document analysed again
 - **WHEN** the same document is saved again with a new score
 - **THEN** the existing row keeps its `id` and `detected_at`, carries the new score and `updated_at`, is reported as `updated`, and the table still holds one `(document_id, M2)` row
+
+#### Scenario: Upsert key and replaced fields
+- **WHEN** an existing finding is updated
+- **THEN** exactly `score`, `title`, `summary`, `firm`, `advertiser`, `rules`, `content_excerpt`, `url`, `platform`, `model` and `updated_at` are replaced (the `UPSERT_REPLACED` list of `api-db-schema`)
+- **AND** the write is `INSERT ... ON CONFLICT (document_id, module) DO UPDATE`, not a prior lookup
 
 #### Scenario: Advertiser replaced on update
 - **WHEN** the same document is saved again with a different `advertiser`

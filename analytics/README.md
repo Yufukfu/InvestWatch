@@ -4,7 +4,7 @@ Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M
 
 - **Owner:** Damian
 - **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`): S1.5 is always `uncertain`, and S3.3/S3.4 are `uncertain` when the rules find a candidate phrase, `pass` otherwise, until it lands.
-- **Registry:** [`registry/seed.csv`](registry/seed.csv) holds four fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is "not found in the loaded registry"; M3 findings say so, with "(dane demonstracyjne)" while the seed is loaded ([`registry/README.md`](registry/README.md)).
+- **Registry:** [`registry/seed.csv`](registry/seed.csv) holds four fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is "not found in the loaded registry"; M3 findings say so, with "(dane demonstracyjne)" while the seed is loaded ([`registry/README.md`](registry/README.md)). Until a real KNF registry CSV is loaded and `REGISTRY_CSV` is set, a real firm is unmatched, so R1 fails and the score can cross the M2 threshold: R1 results and `finding.high_risk` alerts for real firms are not meaningful. The worker logs a `registry_seed` WARNING at startup in that case. A real KNF loader is a follow-up.
 - **Privacy:** rule `evidence` and `advertiser` copy scraped author names, handles, profile and referral links verbatim (cut to 200-300 characters) into `findings`, and the `iw:events` messages carry the title, which names the advertiser, so treat them as personal data taken from public posts.
 
 ## Modules and routing
@@ -60,13 +60,13 @@ docker run -d --rm --name iw-test-analytics-redis -p 127.0.0.1:56380:6379 public
 TEST_DATABASE_URL=postgresql://postgres:test@127.0.0.1:55433/postgres TEST_REDIS_URL=redis://127.0.0.1:56380/0 CONTRACTS_DIR=../contracts .venv/Scripts/python -m pytest -q
 ```
 
-The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a test-only mirror of the `api/` migrations.
+The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-copied, test-only mirror of the `api/` migrations 0001-0003 (verified identical with `pg_dump --schema-only`; an automated drift check is a follow-up). CI sets `TEST_DATABASE_ADMIN_URL` and `IW_TEST_REDIS_URL`, so these tests run there too.
 
 ## Configuration (env)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REGISTRY_CSV` | `registry/seed.csv` (fictional firms; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | KNF firm registry, format in [`registry/README.md`](registry/README.md) |
+| `REGISTRY_CSV` | `registry/seed.csv` (3 fictional firms, see the registry caveat above; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | KNF firm registry, format in [`registry/README.md`](registry/README.md) |
 | `LOG_LEVEL` | `INFO` | log level |
 | `DATABASE_URL` | worker: required | Postgres, app role (`postgresql://iw_app:...@postgres:5432/investwatch`) |
 | `REDIS_URL` | worker: required | Redis (`redis://:<password>@redis:6379/0`) |
@@ -77,7 +77,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a test-
 | `HEALTH_PORT` | `8001` | `/health` |
 | `MAX_DOCUMENT_BYTES` | `2000000` | a bigger document (`text` + `payload`) is acknowledged as `invalid_document` instead of risking an out-of-memory kill |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | empty | reserved for the LLM client (ADR 0304); unused, rules-only |
-| `CONTRACTS_DIR`, `TEST_DATABASE_URL`, `TEST_REDIS_URL` | unset | tests only |
+| `CONTRACTS_DIR`, `TEST_DATABASE_URL` (or CI's `TEST_DATABASE_ADMIN_URL`), `TEST_REDIS_URL` (or CI's `IW_TEST_REDIS_URL`) | unset | tests only |
 
 ## Where things are
 
@@ -85,5 +85,5 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a test-
 - `src/investwatch_analytics/rules/m2_rules.yaml`: all 18 UKNF rules (name, severity, legal basis, dictionaries). Only entries with `implemented: true` run.
 - `src/investwatch_analytics/rules/m2.py`: R1 firm identification, R2 ad labeling, R3 risk information next to return claims.
 - `src/investwatch_analytics/rules/m1.py`, `rules/m3.py`: the M1/M3 signal classes; `modules/m1.py`, `modules/m3.py`: the M1/M3 findings; `modules/advertiser.py`: publisher identity and `advertiser`; `rules/scoring.py`: the sigmoid score.
-- `src/investwatch_analytics/worker.py`: the stream consumer (`python -m investwatch_analytics.worker`); `storage.py`: Postgres and in-memory stores; `events.py`: `iw:events` publisher and the live threshold read (ADR 0305); `health.py`: `/health`.
+- `src/investwatch_analytics/worker.py`: the stream consumer (`python -m investwatch_analytics.worker`); `storage.py`: the store interface and the Postgres store; `events.py`: `iw:events` publisher and the live threshold read (ADR 0305); `health.py`: `/health`; `testing.py`: test doubles (`InMemoryStore`, `NoopPublisher`), never imported by the worker.
 - Spec: [`openspec/specs/document-analysis/`](../openspec/specs/document-analysis/spec.md) and [`openspec/specs/m2-compliance-rules/`](../openspec/specs/m2-compliance-rules/spec.md); design and review follow-ups: [`openspec/changes/archive/2026-11-21-analytics-skeleton/`](../openspec/changes/archive/2026-11-21-analytics-skeleton/); plan: [`.docs/analytics-plan.md`](../.docs/analytics-plan.md).

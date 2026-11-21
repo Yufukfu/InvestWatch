@@ -84,7 +84,7 @@ def make_event(event_type: str, finding: Finding, emitted_at: datetime) -> dict[
     return {"type": event_type, "emitted_at": stamp, "data": finding_brief(finding)}
 
 
-class _Publisher:
+class Publisher:
     """Decides which events a save result produces; subclasses read thresholds and send."""
 
     def __init__(self, clock: Clock = _utc_now) -> None:
@@ -133,7 +133,7 @@ class _Publisher:
         return sent
 
 
-class RedisPublisher(_Publisher):
+class RedisPublisher(Publisher):
     def __init__(self, client: Any, clock: Clock = _utc_now) -> None:
         super().__init__(clock)
         self._client = client
@@ -143,18 +143,3 @@ class RedisPublisher(_Publisher):
 
     def _send_one(self, event: dict[str, Any]) -> None:
         self._client.publish(EVENTS_CHANNEL, json.dumps(event, ensure_ascii=False))
-
-
-class NoopPublisher(_Publisher):
-    """Same decisions as `RedisPublisher` with fixed thresholds; records events instead of sending them."""
-
-    def __init__(self, thresholds: Mapping[str, float] | None = None, clock: Clock = _utc_now) -> None:
-        super().__init__(clock)
-        self._fixed = dict(DEFAULT_THRESHOLDS if thresholds is None else thresholds)
-        self.sent: list[dict[str, Any]] = []
-
-    def _thresholds(self) -> Mapping[str, float]:
-        return self._fixed
-
-    def _send_one(self, event: dict[str, Any]) -> None:
-        self.sent.append(event)

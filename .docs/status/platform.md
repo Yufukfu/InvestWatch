@@ -14,6 +14,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `analytics-worker` implemented, PR #26 (base `main`, after PR #18 brought Redis): stream worker on `iw:documents` (ack after commit, XAUTOCLAIM, poison messages acked with a reason, backoff on outages), Postgres store with the `(document_id, module)` upsert, `iw:events` publisher with live thresholds, `/health`, container and compose service. Verified end to end on a full stack. Rules-only; the LLM client comes with `analytics-llm-p0`.
 - `analytics-m1-m3` implemented (stage 2, stacked on PR #26): rules-only M1 (S1.1-S1.7, an inventory of third-party ads of registered firms) and M3 (S3.1-S3.8, offers that may indicate investment advice, the S3.4 gate at 0.4), routing by publisher and registry (a firm's own account to M2, unregistered own pages to M3, M1 plus M3 when the advice is the publisher's), `advertiser` on findings. The LLM wiring for M1/M3 is a follow-up change after `analytics-llm-p0`. The registry is still the fictional seed until the real KNF loader lands. Open: a re-scan that changes a document's module keeps the old finding (follow-up: mark superseded findings in the API/UI).
 - `analytics-m1-m3-review-fixes`: Kacper's review of PR #35 fixed (registry "not found" wording with a demo-data flag, no bare `partner` label, no platform as advertiser, the challenge's M3 vocabulary and English pricing, Polish filter only for foreign firms without a branch, "możliwe"/"wspomina" titles, excerpt around the evidence, ADR 0308 for the S3.4 gate). The `_BOUNDARY` ReDoS comes with #26.
+- Registry caveat: the default registry is the fictional `analytics/registry/seed.csv` (4 fictional firms). Until a real KNF registry is loaded and `REGISTRY_CSV` is set, R1 results and high-risk alerts for real firms are not meaningful; the worker logs `registry_seed` at startup. A real KNF loader is open (follow-up of `analytics-worker-review-fixes`).
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
@@ -32,7 +33,8 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `api-v1` and `api-v1-review-fixes` archived in PR #21 (merges after PR #18)
 - `api-db-schema` and `api-db-schema-review-fixes` archived in PR #15
 - `infra-compose` and `infra-compose-review-fixes` archived in PR #18
-- proposed, awaiting approval: `analytics-worker`
+- `analytics-worker` archived; `analytics-worker-review-fixes` (Kacper's PR #26 review) in PR #26
+- `openspec-strict-format` archived in its own PR: 14 requirements across `database-schema`, `document-analysis`, `m2-compliance-rules`, `rest-api` and `shared-infrastructure` brought under OpenSpec 2.1.1's 500-character limit (text moved into scenarios, no behaviour change), so the CI job `Specs and hooks` passes. Its follow-ups name the fixes still due on `analytics-llm-p0` and `analytics-m1-m3`.
 
 ## Blockers and open decisions
 
