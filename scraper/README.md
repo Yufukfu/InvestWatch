@@ -2,7 +2,7 @@
 
 Data collection service: collectors for web pages and social media, job queue, scheduler.
 
-- **Owner:** A
+- **Owner:** Adam
 - **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage, queue and schedule follow in `scraper-ingest` and `scraper-orchestration`; the first social platform is `scraper-v2`.
 
 ## Run the tests

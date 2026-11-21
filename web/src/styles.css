@@ -1,0 +1,19 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+  background: #f6f7f9;
+}
+body { margin: 0; }
+.app { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.app-header { display: flex; align-items: center; justify-content: space-between; }
+.badge { padding: 4px 10px; border-radius: 12px; font-size: 14px; background: #ddd; }
+.badge-ok { background: #d4f5dc; color: #0a5a1e; }
+.badge-degraded { background: #fff1c2; color: #6b4e00; }
+.badge-down,
+.badge-unreachable { background: #fbd5d5; color: #7a0b0b; }
+.cards { display: flex; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
+.card { background: #fff; border-radius: 8px; padding: 12px 16px; min-width: 160px; box-shadow: 0 1px 2px #0001; }
+.card-value { font-size: 28px; font-weight: 600; }
+.card-label { color: #555; }
+.findings { width: 100%; border-collapse: collapse; background: #fff; }
+.findings th, .findings td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }

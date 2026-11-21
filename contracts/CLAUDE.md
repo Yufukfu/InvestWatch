@@ -1,4 +1,4 @@
-# contracts (owner C)
+# contracts (owner Damian)
 
 JSON Schemas, the OpenAPI spec and mock responses for contracts v1: frozen core plus provisional optional fields, per [ADR 0301](../.docs/decisions/0301-contracts-v1.md). The file map, the mock-to-endpoint table and the validation commands are in [`README.md`](README.md); rationale and the full field lists are in [`.docs/integration-plan.md`](../.docs/integration-plan.md) §3-§6. Don't restate them here.
 

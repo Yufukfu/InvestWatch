@@ -17,16 +17,17 @@ A doc claim that matters is checked against the code before you rely on it. Afte
 
 ## Services
 
-Three modules, three owners. B defined the repository layout (root [`README.md`](README.md) has the human-facing overview and Quick Start); confirm with B before adding directories. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
+Three modules, three owners. Kacper defined the repository layout (root [`README.md`](README.md) has the human-facing overview and Quick Start); confirm with Kacper before adding directories. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
 
 | Directory | Owner | Role | Rules |
 |---|---|---|---|
-| `scraper/` | A | collectors, queue, scheduler, `documents` writer | [`scraper/CLAUDE.md`](scraper/CLAUDE.md) |
-| `analytics/` | C | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
-| `web/` | B | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
-| `contracts/` | C | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
+| `scraper/` | Adam | collectors, queue, scheduler, `documents` writer | [`scraper/CLAUDE.md`](scraper/CLAUDE.md) |
+| `analytics/` | Damian | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
+| `web/` | Kacper | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
+| `contracts/` | Damian | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
+| `infra/` | Kacper | shared infrastructure: Postgres, HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 
-`api/` (C) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
+`api/` (Damian) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
 
 ## Process in one line
 
@@ -49,7 +50,7 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 - Every dependency is scanned (`pip-audit` / `npm audit`) before merge.
 - Before any PR is opened, docs and specs are already updated in the same PR: the OpenSpec change and its deltas (archived as the last commit), the affected docs, ADRs, your `.docs/STATUS.md` row, the AI log row, and `docs-check` clean. Never open a PR with these "to follow".
 - Verify every reviewer finding against the code before acting.
-- ADRs in `.docs/decisions/` are written by agents, in the same PR as the change they record: context, options with evidence, the decision and a rationale that cites that evidence (never an invented "why"). Committed with `Status: accepted`, effective when the human approves and merges the PR (a rejected ADR is changed or removed in review).
+- ADRs in `.docs/decisions/` are written by agents, in the same PR as the change they record, or in an earlier docs-only PR when the decision steers work still to come (the implementing PR then links the ADR): context, options with evidence, the decision and a rationale that cites that evidence (never an invented "why"). Committed with `Status: accepted`, effective when the human approves and merges the PR (a rejected ADR is changed or removed in review).
 
 ## Conventions
 

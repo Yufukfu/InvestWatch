@@ -2,7 +2,7 @@
 
 ## Context
 
-This change is the fetch-and-parse half of module A: given a source record it fetches one URL with a browser-like identity and turns the page into contract fields, or into a typed job error. Storing and announcing documents is `scraper-ingest`; queueing, scheduling and scan requests are `scraper-orchestration`. Fetch-layer rules: `iw-scraper-conventions`. Scope: `proposal.md`.
+This change is the fetch-and-parse half of Adam's module: given a source record it fetches one URL with a browser-like identity and turns the page into contract fields, or into a typed job error. Storing and announcing documents is `scraper-ingest`; queueing, scheduling and scan requests are `scraper-orchestration`. Fetch-layer rules: `iw-scraper-conventions`. Scope: `proposal.md`.
 
 ## Goals / Non-Goals
 
