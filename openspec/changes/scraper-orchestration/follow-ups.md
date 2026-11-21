@@ -34,3 +34,4 @@ Findings of the `iw-reviewer` passes on group 1 (`bdeb218..77cb671`) and group 2
 | Uppercase UUIDs in a scan request are refused as `invalid_request` | wont-fix | Contract §7 uses lowercase UUID v4. |
 | `SCRAPER_*` values are not range-validated (`DOMAIN_CONCURRENCY=0` requeues jobs forever) | wont-fix | Hackathon scope; the defaults are sane and config is set by the team. |
 | Log redaction of `http://u:p@ss@host` and `scheme://token@host`, `redis://:pw@host`, `password=x` | docs | Fixed in this change with tests (`test_logs.py`). |
+| `scraper-v1` `DomainGate` (`iw:dom:*`) duplicates the queue's `DomainHealth` (`iw:domain:*`) | new-item | Decision in ADR 0102: the queue owns deferral and pause; the gate must not be wired into a collector. Ask `scraper-v1`'s owner to drop it from PR #19 or leave it unused. The composition root (3.3) converts `FetchFailure.retry_after` (raw header, seconds or HTTP date) into `AttemptResult.retry_after`. |
