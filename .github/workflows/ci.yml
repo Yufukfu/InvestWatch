@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Test and audit each Node service that has a package-lock.json
+      - name: Audit, lint, typecheck and test each Node service that has a package-lock.json
         shell: bash
         run: |
           set -euo pipefail
@@ -67,7 +67,7 @@ jobs:
             [ -f "$lock" ] || continue
             dir=$(dirname "$lock")
             echo "::group::$dir"
-            (cd "$dir" && npm ci && npm audit --audit-level=high && npm test --if-present)
+            (cd "$dir" && npm ci && npm audit --audit-level=high && npm run lint --if-present && npm run typecheck --if-present && npm test --if-present)
             echo "::endgroup::"
           done
 
