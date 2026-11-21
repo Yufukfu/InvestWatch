@@ -8,26 +8,37 @@ the collector and the ingest are stubs here and supplied by
 """
 
 import asyncio
+import json
 import logging
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from arq.connections import ArqRedis
+from arq.connections import ArqRedis, RedisSettings, create_pool
 from arq.worker import Function, Retry, func
 from redis.exceptions import RedisError
 
 from iw_scraper.config import from_env
 from iw_scraper.events import derive_status, publish_scan_event
-from iw_scraper.guards import DomainHealth, LeaseSemaphore, RunLock
+from iw_scraper.guards import KEY_PREFIX, DomainHealth, LeaseSemaphore, RunLock
 from iw_scraper.retry import backoff_delay, is_transient
+from iw_scraper.supervise import JOB_CONNECTION_ERRORS
 from iw_scraper.types import Deferral, JobError, Reason
 
 # arq counts every Retry as a try, deferrals included; we count failed attempts ourselves.
 ARQ_MAX_TRIES = 10_000
 ARQ_TIMEOUT_SLACK = 30.0
 ATTEMPTS_KEY_TTL = 24 * 3600
+# arq rejects a job id whose result is still stored: this is what de-duplicates a replayed schedule slot, so it
+# is pinned and stays far longer than the scheduler's catch-up window
+RESULT_TTL = 3600.0
+FINISHED_KEY_TTL = int(RESULT_TTL)  # never outlives arq's own duplicate-id guard, so a re-enqueued id runs again
 KEEP_ALIVE_DIVISOR = 3
+
+# arq pickles jobs and results by default; JSON keeps the queue readable and a poisoned Redis from running code.
+# One place for the queue name and serializers: the worker, every pool and the tests share them.
+QUEUE_NAME = f"{KEY_PREFIX}queue"
+ARQ_OPTIONS = {"queue_name": QUEUE_NAME, "job_serializer": lambda data: json.dumps(data).encode(), "job_deserializer": json.loads}
 
 logger = logging.getLogger(__name__)
 _rng = random.Random()
@@ -56,11 +67,22 @@ class QueueSettings:
     lease_ttl: float = 30.0
     requeue_delay: float = 5.0
     failure_threshold: int = 5
-    domain_cooldown: float = 300.0
+    domain_cooldown: float = 600.0
+    max_requeues: int = 24  # lost-dependency requeues of one job (about two minutes at the default delay)
 
     @classmethod
     def from_env(cls) -> "QueueSettings":
         return from_env(cls)
+
+
+async def create_queue_pool(settings: RedisSettings) -> ArqRedis:
+    """The arq pool that enqueues onto our queue with our serializers."""
+    return await create_pool(
+        settings,
+        default_queue_name=ARQ_OPTIONS["queue_name"],
+        job_serializer=ARQ_OPTIONS["job_serializer"],
+        job_deserializer=ARQ_OPTIONS["job_deserializer"],
+    )
 
 
 def job_function(settings: QueueSettings) -> Function:
@@ -69,6 +91,7 @@ def job_function(settings: QueueSettings) -> Function:
         name="execute_job",
         max_tries=ARQ_MAX_TRIES,
         timeout=settings.attempt_timeout + ARQ_TIMEOUT_SLACK,
+        keep_result=RESULT_TTL,
     )
 
 
@@ -81,13 +104,15 @@ async def execute_job(ctx: dict, source_id: str, domain: str, requested: bool = 
         return await _run_locked(ctx, source_id, domain, requested, lock)
     except Retry:
         raise  # the lock stays held until the job's final outcome
+    except ctx.get("retry_on", JOB_CONNECTION_ERRORS):
+        # a lost PostgreSQL or Redis connection is not a collection failure, and arq ends a job for good on any
+        # exception but `Retry`: run it again shortly, without using up an attempt, until the cap
+        logger.warning("lost a dependency during job %s", ctx["job_id"], exc_info=True)
+        await _requeue_lost_dependency(ctx, lock)  # raises Retry unless the cap is reached
+        await _fail_crashed(ctx, source_id, requested, lock)
+        raise
     except Exception:
-        # the progress bar must not hang on a collector bug, and a failed finish must not keep the lock
-        try:
-            await _finish_failed(ctx, source_id, requested)
-        except Exception:
-            logger.exception("could not publish the failed finish of a crashed job")
-        await lock.release()
+        await _fail_crashed(ctx, source_id, requested, lock)
         raise
     except asyncio.CancelledError:
         # shutdown: arq requeues the job under the same id, which re-enters its own lock; keep the lock so
@@ -103,10 +128,47 @@ async def execute_job(ctx: dict, source_id: str, domain: str, requested: bool = 
         raise
 
 
+async def _fail_crashed(ctx: dict, source_id: str, requested: bool, lock: RunLock) -> None:
+    """The progress bar must not hang on a collector bug, and a failed finish must not keep the lock."""
+    try:
+        await _finish_failed(ctx, source_id, requested)
+    except Exception:
+        logger.exception("could not publish the failed finish of a crashed job")
+    await lock.release()
+
+
+async def _requeue_lost_dependency(ctx: dict, lock: RunLock) -> None:
+    """Raise `Retry` for a job that lost a dependency, unless it has already done so `max_requeues` times.
+
+    If Redis is the lost dependency the counter and the lock extension fail too; the job is then requeued anyway:
+    arq ends it for good on any other exception, and if Redis is really down arq cannot record that either, so
+    the job stays queued for the next worker. The lock expires on its own lease and the same job id re-enters it.
+    """
+    cfg: QueueSettings = ctx["settings"]
+    key = _requeues_key(ctx["job_id"])
+    try:
+        count = await ctx["redis"].incr(key)
+        await ctx["redis"].expire(key, ATTEMPTS_KEY_TTL)
+        if count > cfg.max_requeues:
+            logger.error("job %s lost its dependency %d times, giving up", ctx["job_id"], count)
+            return
+        await lock.extend(cfg.requeue_delay + max(cfg.lease_ttl, cfg.attempt_timeout))
+    except (RedisError, OSError):
+        logger.warning("could not record the requeue of job %s, requeueing anyway", ctx["job_id"], exc_info=True)
+    raise Retry(defer=cfg.requeue_delay)
+
+
 async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, lock: RunLock) -> str:
     redis: ArqRedis = ctx["redis"]
     cfg: QueueSettings = ctx["settings"]
     job_id = ctx["job_id"]
+
+    if (stored := await redis.get(_finished_key(job_id))) is not None:
+        # a connection dropped after the outcome was decided: only the event and the clean-up are left, never a second run
+        status = await _replay_finish(ctx, source_id, stored)
+        await redis.delete(f"{KEY_PREFIX}attempts:{job_id}", _requeues_key(job_id))
+        await lock.release()
+        return status
 
     source = await ctx["sources"].get(source_id)
     if source is None or not source.collectable:
@@ -115,24 +177,28 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
         return "skipped"
 
     health = DomainHealth(redis, domain, threshold=cfg.failure_threshold, cooldown=cfg.domain_cooldown)
-    if (paused_for := await health.paused_for()) > 0:
-        await _requeue(lock, cfg, paused_for)
+    if (wait := await health.wait_for()) > 0:
+        await _requeue(lock, cfg, wait)
     semaphore = LeaseSemaphore(redis, domain, cfg.domain_concurrency)
     lease_id = f"{job_id}:{ctx['job_try']}"
     if not await semaphore.acquire(lease_id, cfg.lease_ttl):
         await _requeue(lock, cfg, cfg.requeue_delay)
 
     async def announce_start() -> None:
-        # once per job: retries and the collector's own call share this marker
-        if await redis.set(_started_key(job_id), 1, nx=True, ex=ATTEMPTS_KEY_TTL):
+        # once per job: retries and the collector's own call share this marker, which is set only after the
+        # start went out, so a connection lost on the way is announced again by the retry
+        if not await redis.exists(_started_key(job_id)):
             await ctx["sources"].mark_running(source_id)
             await publish_scan_event(redis, "started", source_id)
+            await redis.set(_started_key(job_id), 1, ex=ATTEMPTS_KEY_TTL)
 
     result = await _attempt(ctx["run_source"], source_id, announce_start, lock, semaphore, lease_id, cfg)
 
+    if result.retry_after:  # any status: a 429 or a 503 tells every worker to leave the domain alone
+        await health.defer(min(result.retry_after, cfg.max_retry_after))
     if result.deferral:
         await _requeue(lock, cfg, max(0.0, (result.deferral.until - datetime.now(UTC)).total_seconds()))
-    attempts_key = f"iw:attempts:{job_id}"
+    attempts_key = f"{KEY_PREFIX}attempts:{job_id}"
     if result.error and is_transient(result.error.reason, result.http_status):
         failures = await redis.incr(attempts_key)
         await redis.expire(attempts_key, ATTEMPTS_KEY_TTL)
@@ -153,38 +219,65 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
         await ctx["record_error"](result.error)
     await announce_start()  # a collector that never announced still gets a start before the finish
     await _finish_if_started(ctx, source_id, status=status, documents=result.documents)
-    await redis.delete(attempts_key)
+    await redis.delete(attempts_key, _requeues_key(job_id))
     await lock.release()
     return status
 
 
 def _started_key(job_id: str) -> str:
-    return f"iw:started:{job_id}"
+    return f"{KEY_PREFIX}started:{job_id}"
+
+
+def _finished_key(job_id: str) -> str:
+    """Holds the final status once `scan.finished` is out; `ctx` is rebuilt on every retry, so this lives in Redis."""
+    return f"{KEY_PREFIX}finished:{job_id}"
+
+
+def _requeues_key(job_id: str) -> str:
+    return f"{KEY_PREFIX}requeues:{job_id}"
 
 
 async def _finish_failed(ctx: dict, source_id: str, requested: bool) -> None:
     """End a job that cannot continue: a job that announced its start, or a requested one, ends `failed`."""
-    if ctx.get("finished"):
-        return  # the real outcome is out; a later error must not publish a second finish
-    if await ctx["redis"].exists(_started_key(ctx["job_id"])):
+    if (stored := await ctx["redis"].get(_finished_key(ctx["job_id"]))) is not None:
+        await _replay_finish(ctx, source_id, stored)  # the real outcome is decided; never a second, different finish
+    elif await ctx["redis"].exists(_started_key(ctx["job_id"])):
         await _finish_if_started(ctx, source_id, status="failed", documents=0)
     elif requested:
+        # a requested job owes a finish even if it never started: the marker makes a dropped publish retryable
+        await ctx["redis"].set(_started_key(ctx["job_id"]), 1, ex=ATTEMPTS_KEY_TTL)
+        await _store_outcome(ctx, "failed", 0)
         await publish_scan_event(ctx["redis"], "finished", source_id, documents=0, status="failed")
+        await ctx["redis"].delete(_started_key(ctx["job_id"]))
 
 
 async def _finish_if_started(ctx: dict, source_id: str, *, status: str, documents: int) -> None:
     """Publish `scan.finished` and stamp the source, once, for a job that announced its start."""
     redis: ArqRedis = ctx["redis"]
-    if not await redis.delete(_started_key(ctx["job_id"])):
+    if not await redis.exists(_started_key(ctx["job_id"])):
         return
+    # the outcome is stored before anything goes out, and the start marker stays until the finish is published,
+    # so a connection lost anywhere in between is completed by the retry instead of re-running the collection
+    await _store_outcome(ctx, status, documents)
     try:
         if await ctx["sources"].get(source_id) is not None:
             await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status)
     except Exception:
-        # the marker is gone, so this is the only chance to end the progress bar
         logger.exception("could not stamp the source after its run")
     await publish_scan_event(redis, "finished", source_id, documents=documents, status=status)
-    ctx["finished"] = True
+    await redis.delete(_started_key(ctx["job_id"]))
+
+
+async def _store_outcome(ctx: dict, status: str, documents: int) -> None:
+    await ctx["redis"].set(_finished_key(ctx["job_id"]), f"{status}:{documents}", ex=FINISHED_KEY_TTL)
+
+
+async def _replay_finish(ctx: dict, source_id: str, stored: bytes | str) -> str:
+    """Complete a finish a dropped connection interrupted: publish it if it is still owed, return the stored status."""
+    status, _, documents = (stored.decode() if isinstance(stored, bytes) else stored).partition(":")
+    if await ctx["redis"].delete(_started_key(ctx["job_id"])):
+        await publish_scan_event(ctx["redis"], "finished", source_id, documents=int(documents or 0), status=status)
+    return status
 
 
 async def _requeue(lock: RunLock, cfg: QueueSettings, delay: float) -> None:
