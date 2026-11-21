@@ -12,14 +12,14 @@ rules:
     severity: medium
     legal_basis: null
     weight: 0.5
-    implemented: false
+    implemented: true
 
   - id: S1.2
     name: Link afiliacyjny / kod polecający
     severity: high
     legal_basis: null
     weight: 2.5
-    implemented: false
+    implemented: true
     params:
       referral_query_keys: [ref, aff, affiliate, partner, promo, coupon, referral]
       tracking_query_prefixes: [utm_]
@@ -34,7 +34,7 @@ rules:
     severity: medium
     legal_basis: null
     weight: 2.0
-    implemented: false
+    implemented: true
     params:
       labels:
         - "#reklama"
@@ -58,7 +58,7 @@ rules:
     severity: medium
     legal_basis: null
     weight: 1.0
-    implemented: false
+    implemented: true
     params:
       phrase_patterns:
         - '(?<!\w)(?:otwórz|załóż)\s+(?:konto|rachunek)(?!\w)'
@@ -80,7 +80,7 @@ rules:
     severity: high
     legal_basis: null
     weight: 2.0
-    implemented: false
+    implemented: true
     llm:
       when: always
       question: >-
@@ -92,14 +92,14 @@ rules:
     severity: medium
     legal_basis: null
     weight: 1.0
-    implemented: false
+    implemented: true
 
   - id: S1.7
     name: Kierowanie do odbiorców w Polsce
     severity: low
     legal_basis: null
     weight: 0.5
-    implemented: false
+    implemented: true
     # Same detection as S3.6 in m3_signals.yaml (design decision 5); a test keeps the two copies equal.
     params:
       currency_patterns:
