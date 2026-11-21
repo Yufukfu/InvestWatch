@@ -1,5 +1,7 @@
 # Tasks
 
+Rule for every group: `contracts/mocks/`, `contracts/mock-server/` and the `web/` mock mode are a test double and stay untouched. Tests read `documents.json` and `findings.json` only; a difference from the mock findings is recorded in `follow-ups.md`, never fixed in the mocks.
+
 Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` (proposal, Dependencies). Groups 1-5 are rules-only and do not need `analytics-llm-p0`. Group 6 starts only after `analytics-llm-p0` is merged (design decision 6).
 
 ## 1. Signal catalogues on the shared engine and evidence fields (≈ 1 h)
@@ -29,7 +31,7 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 ## 5. Routing, pipeline and CLI (≈ 1 h)
 
 - [ ] 5.1 Failing tests (`tests/test_pipeline.py`, `tests/test_cli.py`): the routing scenarios of `specs/document-analysis/spec.md` (`firm_own` matched → M2, unmatched → M3 or `no_signals`, firm's own social account → M2, `3c41441c…` → M1, English post → `not_targeting_poland`, `007bbcee…` → M3, `8721cb75…` → `no_signals`, empty text → `empty_text`, link-host match → M1, malformed link → M3, finfluencer buy calls → M1 + M3); the M2 finding assembly scenarios (builder without a firm match, domain-only match); the CLI on `contracts/mocks/documents.json` exits 0 with M1, M2 and M3 findings that pass `contracts/validate.py finding`; every evidence on the six M1/M3 mocks is a substring of one of its rule's evidence fields
-- [ ] 5.2 `modules/router.py` (publisher-and-registry routing), `pipeline.py` (link-host match for third-party documents, M1/M2/M3 dispatch with up to two findings, `no_signals`, `not_targeting_poland`, `module_not_implemented` removed), `cli.py` loads the signal catalogues; `pytest analytics` green
+- [ ] 5.2 `modules/router.py` (publisher-and-registry routing), `pipeline.py` (link-host match for third-party documents, M1/M2/M3 dispatch with up to two findings, `no_signals`, `not_targeting_poland`, `module_not_implemented` removed), `cli.py` loads the signal catalogues; `pytest analytics` green; compare the CLI output for the six M1/M3 mocks with `contracts/mocks/findings.json` and record each difference (module, signal results, evidence, advertiser, score side of threshold) in `follow-ups.md` with a disposition; `git diff --stat -- contracts/ web/` is empty
 - [ ] 5.3 Mutation check; `mutations: N tried, N caught`
 
 ## 6. LLM wiring for M1/M3 (≈ 45 min, after `analytics-llm-p0` is merged)
