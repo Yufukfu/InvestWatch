@@ -161,3 +161,13 @@ async def test_an_error_the_collector_already_recorded_is_not_recorded_again(red
     outcome, recorder = await run_one(redis, start_worker, run, fast_settings())
 
     assert (outcome, recorder.errors) == ("failed", [])
+
+
+async def test_a_huge_retry_after_is_cut_to_the_configured_maximum(redis, start_worker):
+    calls = []
+    run = scripted([fail(Reason.HTTP_ERROR, 503, retry_after=1e12), AttemptResult(documents=1)], calls)
+
+    outcome, _ = await run_one(redis, start_worker, run, fast_settings(max_retry_after=0.4))
+
+    assert outcome == "ok"
+    assert 0.35 <= calls[1] - calls[0] < 3.0

@@ -40,6 +40,11 @@ def test_retry_after_raises_the_delay():
     assert backoff_delay(1, base=2.0, cap=300.0, retry_after=20.0, rng=random.Random(1)) == 20.0
 
 
+def test_retry_after_is_clamped_to_its_own_cap():
+    delay = backoff_delay(1, base=2.0, cap=30.0, retry_after=1e12, rng=random.Random(1), retry_after_cap=600.0)
+    assert delay == 600.0
+
+
 def test_retry_after_never_shortens_the_delay():
     delay = backoff_delay(3, base=2.0, cap=300.0, retry_after=0.5, rng=random.Random(1))
     assert delay >= 4.0

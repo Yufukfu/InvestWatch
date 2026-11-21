@@ -1,7 +1,7 @@
 """`Collector.run_source` over stubbed stages: the order of guards, `started()`, robots, fetch, parse and ingest,
 and how each failure becomes an `AttemptResult` (the queue decides what to do with it)."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -157,6 +157,18 @@ async def test_a_refused_source_url_stops_before_started_and_any_request():
     result = await run(collector, h)
 
     assert result.error.reason is Reason.BLOCKED_TARGET
+    assert h.calls == []
+
+
+@pytest.mark.parametrize("change", [{"active": False}, {"platform": "x"}])
+async def test_a_source_that_is_not_collectable_is_an_invalid_request(change):
+    h = Harness()
+    collector, _ = make(h)
+    collector._store.sources[SRC] = replace(collector._store.sources[SRC], **change)
+
+    result = await run(collector, h)
+
+    assert result.error.reason is Reason.INVALID_REQUEST
     assert h.calls == []
 
 

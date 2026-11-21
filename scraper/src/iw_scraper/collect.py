@@ -81,8 +81,8 @@ class Collector:
 
     async def run_source(self, source_id: str, started: Callable[[], Awaitable[None]]) -> AttemptResult:
         source = await self._store.get(source_id)
-        if source is None:
-            return _failed(source_id, Reason.INVALID_REQUEST, "source does not exist")
+        if source is None or not source.collectable:  # the queue checks too; this keeps a stray caller from fetching
+            return _failed(source_id, Reason.INVALID_REQUEST, "source does not exist or is not collectable")
         try:
             self._urls.check(source.url, enforce_host=False)
         except FetchFailure as failure:

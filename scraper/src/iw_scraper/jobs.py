@@ -50,6 +50,7 @@ class QueueSettings:
     max_tries: int = 3
     backoff_base: float = 2.0
     backoff_cap: float = 300.0
+    max_retry_after: float = 300.0  # a `Retry-After` beyond this is cut to it, so a hostile site cannot park a source
     attempt_timeout: float = 60.0
     domain_concurrency: int = 2
     lease_ttl: float = 30.0
@@ -137,7 +138,12 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
         await redis.expire(attempts_key, ATTEMPTS_KEY_TTL)
         if failures < cfg.max_tries:
             delay = backoff_delay(
-                failures, base=cfg.backoff_base, cap=cfg.backoff_cap, retry_after=result.retry_after, rng=_rng
+                failures,
+                base=cfg.backoff_base,
+                cap=cfg.backoff_cap,
+                retry_after=result.retry_after,
+                rng=_rng,
+                retry_after_cap=cfg.max_retry_after,
             )
             await _requeue(lock, cfg, delay)
 
