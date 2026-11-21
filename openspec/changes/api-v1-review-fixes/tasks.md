@@ -22,9 +22,9 @@ Merge order: PR #18 (`chore/infra-compose-v2`) first, then PR #21. This branch m
 
 ## 4. Docs (review items 4, 6, 11, 12)
 
-- [ ] 4.1 `.docs/integration-plan.md`: the scraper owns the `iw:scan-requests` consumer group and publishes `scan.started`/`scan.finished`; `queries/__init__.py` docstring and the `errors.py` 500-handler comment match the code
-- [ ] 4.2 Damian's `.docs/STATUS.md` row (PR #21 stacked on #18) and the `.docs/INDEX.md` route for REST and Socket.IO; `api/README.md` calibration and input rules; `follow-ups.md` rows for the scan consumer, CI database services and the trend default window
-- [ ] 4.3 Mutation check; docs-only group: `mutations: n/a, docs only`
+- [x] 4.1 `.docs/integration-plan.md`: the scraper owns the `iw:scan-requests` consumer group and publishes `scan.started`/`scan.finished`; `queries/__init__.py` docstring and the `errors.py` 500-handler comment match the code
+- [x] 4.2 Damian's `.docs/STATUS.md` row (PR #21 stacked on #18) and the `.docs/INDEX.md` route for REST and Socket.IO; `api/README.md` calibration and input rules; `follow-ups.md` rows for the scan consumer, CI database services and the trend default window
+- [x] 4.3 Mutation check; docs-only group: `mutations: n/a, docs only`
 
 ## 5. Closing
 

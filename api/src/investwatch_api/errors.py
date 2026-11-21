@@ -37,7 +37,8 @@ def install(api: FastAPI) -> None:
 
     @api.exception_handler(Exception)
     async def unexpected(_: Request, exc: Exception):
-        # Contract error shape for anything unforeseen (database down, driver errors); only the class is logged.
+        # Contract error shape for anything unforeseen (database down, driver errors). This line logs only the class;
+        # Starlette re-raises afterwards, so uvicorn also logs the traceback, through the same redacting JSON formatter.
         logging.getLogger("investwatch_api").error("unhandled error", extra={"reason": type(exc).__name__})
         return JSONResponse({"error": "internal error"}, status_code=500)
 

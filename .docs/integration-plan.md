@@ -186,7 +186,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
 | GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults 0.6 / 0.5 / 0.7 written when missing); analytics reads the same key (ADR 0305) |
 | GET / POST / PATCH | `/sources` | list and edit sources |
-| POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`) |
+| POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`). The scraper owns the consumer side: its consumer group on `iw:scan-requests` runs the scan and publishes `scan.started` / `scan.finished` on `iw:events` (§6). Until the scraper reads the stream, the request is queued and nothing runs |
 | GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
 | GET | `/health` | service status (for the demo) |
 

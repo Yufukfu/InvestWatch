@@ -1,4 +1,8 @@
-"""SQL for the REST routes (SQLAlchemy Core, async). One module per resource."""
+"""SQL shared by several REST routes (SQLAlchemy Core): the risk-level CASE and the literal LIKE pattern.
+
+Statements used by one route only live in that route module (`routes/<resource>.py`); the writers' statements
+are in `db/sql.py`.
+"""
 
 from __future__ import annotations
 
