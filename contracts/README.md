@@ -1,6 +1,8 @@
 # Contracts v1
 
-Single source of truth for data exchanged between the scraper, analytics, API and dashboard. Background and rationale: [`doc/integration-plan.md`](../doc/integration-plan.md).
+Single source of truth for data exchanged between the scraper, analytics, API and dashboard (`web/`). Background and rationale: [`.docs/integration-plan.md`](../.docs/integration-plan.md).
+
+**Status: draft v1** – proposed by C, to be confirmed by A and B (see the open decisions in the integration plan). Until confirmed, treat it as the working assumption for mocks and development.
 
 | File | Used by | Describes |
 |---|---|---|

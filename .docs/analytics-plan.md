@@ -162,7 +162,7 @@ P2 rules (R9, R11, R13, OCR, clustering) only if all P0/P1 work is done before 0
 
 ## 11. "AI-assisted development process" criterion (20% of the score)
 
-We use **OpenSpec** (spec-driven development): every change starts as a spec/proposal, contracts in `contracts/` are the single source of truth for both people and AI assistants. Alongside it we keep `doc/ai-workflow.md` – tools used (Claude Code, OpenSpec), context files (`CLAUDE.md` per service), review rules for generated code, dependency scans, example prompts. C adds an entry at every milestone.
+We use **OpenSpec** (spec-driven development): every change starts as a spec/proposal, contracts in `contracts/` are the single source of truth for both people and AI assistants. Alongside it we keep `.docs/ai-workflow.md` – tools used (Claude Code, OpenSpec), context files (`CLAUDE.md` per service), review rules for generated code, dependency scans, example prompts. C adds an entry at every milestone.
 
 ## 12. Analytics service skeleton – implementation plan
 
