@@ -2,7 +2,7 @@
 
 Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M1–M3, LLM integration.
 
-- **Owner:** Damian (C)
+- **Owner:** Damian
 - **Status:** core pipeline implemented (change `analytics-skeleton`): M2 for firm pages with rules-only R1–R3. No worker, storage, events, LLM, M1 or M3 yet. The worker is the next change, `analytics-worker`.
 
 ## Run locally (no infrastructure)

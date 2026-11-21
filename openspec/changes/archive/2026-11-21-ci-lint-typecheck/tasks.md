@@ -8,7 +8,7 @@
 ## 2. Closing
 
 - [x] 2.1 `iw-docs-update`: `.docs/ai-workflow.md` row, `docs-check` clean.
-- [x] 2.2 `iw-pr-review`: no reviewer agent run (two-command workflow change); the PR is reviewed by B and hen68.
+- [x] 2.2 `iw-pr-review`: no reviewer agent run (two-command workflow change); the PR is reviewed by Kacper and hen68.
 
 ## Workflow follow-up
 

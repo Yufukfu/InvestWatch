@@ -2,11 +2,11 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written; accepted by B via PR
+- Deciders: agent-written; accepted by Kacper via PR
 
 ## Context
 
-The dashboard (`web/`, owner B) must build against mocks from the start and switch to the live `api` with no component changes (`web/CLAUDE.md`). The REST contract is `contracts/openapi.yaml` (owner C, frozen after Sat 14:30). Hand-written request code drifts from the contract silently; the team has three people and ~20 hours, so the stack must be mainstream and fast to iterate. B asked for a client generated from the backend's OpenAPI file (axios or RTK).
+The dashboard (`web/`, owner Kacper) must build against mocks from the start and switch to the live `api` with no component changes (`web/CLAUDE.md`). The REST contract is `contracts/openapi.yaml` (owner Damian, frozen after Sat 14:30). Hand-written request code drifts from the contract silently; the team has three people and ~20 hours, so the stack must be mainstream and fast to iterate. Kacper asked for a client generated from the backend's OpenAPI file (axios or RTK).
 
 ## Options considered
 
@@ -26,5 +26,5 @@ The contract is consumed as a **committed snapshot** (`web/src/api/openapi.json`
 
 - Contract changes reach the UI as one command plus a reviewable diff of `generated.ts`; type errors show which components break.
 - Two copies of the contract exist (source in `contracts/`, snapshot in `web/`); `contracts:check` must run before merging (it is in the `web` tests).
-- If C later generates `openapi.yaml` from FastAPI, nothing in `web/` changes: the snapshot is taken from whatever file `contracts/` holds.
+- If Damian later generates `openapi.yaml` from FastAPI, nothing in `web/` changes: the snapshot is taken from whatever file `contracts/` holds.
 - Socket.IO events are outside OpenAPI; their client is typed by hand from `contracts/schemas/events.schema.json` (later change).

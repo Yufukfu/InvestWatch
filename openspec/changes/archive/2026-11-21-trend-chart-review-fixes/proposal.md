@@ -15,7 +15,7 @@ Review of PR #14 (hen68) found that the trend chart puts Recharts' keyboard laye
 - `TrendPage` is lazy-loaded from `App.tsx`, so Recharts is a separate chunk, inside an error boundary so a chunk that fails to load leaves the rest of the dashboard working.
 - Docs: `.docs/integration-plan.md` §5 matches OpenAPI; the measurements ADR 0203 left open (bundle size, `ResizeObserver`) are recorded in `.docs/STATUS.md`, since an accepted ADR is not edited (`.docs/decisions/README.md`).
 
-**Out of scope:** module display names (the dashboard shows the codes `M1`/`M2`/`M3` everywhere, e.g. the findings table), trend filters, contract mocks in `contracts/` (owner C). Owner B.
+**Out of scope:** module display names (the dashboard shows the codes `M1`/`M2`/`M3` everywhere, e.g. the findings table), trend filters, contract mocks in `contracts/` (owner Damian). Owner Kacper.
 
 ## Capabilities
 

@@ -11,6 +11,6 @@ Findings from the whole-branch `iw-reviewer` pass (security focus) that are out 
 | `init-env.sh` could write empty passwords if `openssl` failed | fix-here: length check before writing |
 | `.env.example` shipped `change-me` passwords | fix-here: empty values, compose refuses to start |
 | Dotfile 403 without security headers | fix-here |
-| Default privileges only cover tables created by `iw_admin` | docs: `infra/README.md` says to run Alembic as `iw_admin` (C) |
+| Default privileges only cover tables created by `iw_admin` | docs: `infra/README.md` says to run Alembic as `iw_admin` (Damian) |
 | CSP/headers on `api` responses, Socket.IO over `wss` under `connect-src 'self'` | new-item: verify when `api` exists (Integration #1) |
 | App password visible via `docker inspect` (official image pattern) | wont-fix: local single-host stack; Docker secrets if deployed shared |

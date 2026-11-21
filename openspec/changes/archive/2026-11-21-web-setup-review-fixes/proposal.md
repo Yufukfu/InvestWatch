@@ -20,5 +20,5 @@ Review of PR #6 (Damian) found a flaky test, a dev-proxy setting that was silent
 
 ## Impact
 
-- Owner: B (`web/`, `infra/`). Touches no contract, REST route or event.
+- Owner: Kacper (`web/`, `infra/`). Touches no contract, REST route or event.
 - Out of scope: everything else in the review is covered above; no open items.

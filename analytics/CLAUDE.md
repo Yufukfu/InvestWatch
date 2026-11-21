@@ -1,4 +1,4 @@
-# analytics (module C)
+# analytics (Damian's module)
 
 Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modules M1-M3, inserts `findings` and publishes to `iw:events`. The logic lives in the docs, not here:
 

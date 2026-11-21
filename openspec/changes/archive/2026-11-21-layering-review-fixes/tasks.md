@@ -29,4 +29,4 @@
 ## Review follow-ups (iw-pr-review)
 
 - `SummaryPage` failure test waited only for the request to be sent; it now waits for the settled failure in the store. Mutant: an error `<p>` rendered on failure is caught. mutations: 1 tried, 1 caught.
-- Not fixed, recorded: an alias import (`@/features/x/data/y`) would bypass the patterns (no alias exists in the repo yet; extend the patterns when one is added); the polling test pins the exact call shape of the mocked hook; CI still has no separate `lint`/`typecheck` step (workflow change, owner B).
+- Not fixed, recorded: an alias import (`@/features/x/data/y`) would bypass the patterns (no alias exists in the repo yet; extend the patterns when one is added); the polling test pins the exact call shape of the mocked hook; CI still has no separate `lint`/`typecheck` step (workflow change, owner Kacper).
