@@ -41,7 +41,9 @@ rules:
     params:
       window: 2
       claim_patterns:
-        - '\d+(?:[.,]\d+)?\s?%'
+        # `(?<!\d)` + possessive digits: linear on a hostile digit run with no `%` (the plain `\d+...%` was
+        # quadratic, 40 000 digits took ~130 s; PR #26 review). Same for the two exclusions below.
+        - '(?<!\d)\d++(?:[.,]\d++)?\s?%'
         - '\bzysk\w*'
         - '\bzarab\w*'
         - '\bzarob\w*'
@@ -52,9 +54,9 @@ rules:
         - '\bprofit\w*'
         - '\breturns?\b'
       claim_exclude_patterns:
-        - '(?:prowizj|opłat|podat|marż)\w*\s+\d+(?:[.,]\d+)?\s?%'
+        - '(?:prowizj|opłat|podat|marż)\w*\s+\d++(?:[.,]\d++)?\s?%'
         - '\b100\s?%\s+(?:online|bezpieczn\w*|za darmo|darmow\w*)'
-        - '\d+(?:[.,]\d+)?\s?%\s*(?:prowizj\w*|opłat\w*|marż\w*|podatk\w*|commission|fees?)'
+        - '(?<!\d)\d++(?:[.,]\d++)?\s?%\s*(?:prowizj\w*|opłat\w*|marż\w*|podatk\w*|commission|fees?)'
       risk_patterns:
         - '\bstra(?:t[aęyo]|ci|ć)\w*'
         - '\bryzyk\w*'
