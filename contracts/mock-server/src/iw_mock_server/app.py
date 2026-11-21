@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal, get_args
 from uuid import UUID
 
-from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -38,6 +38,7 @@ Platform = Literal["web", "facebook", "instagram", "tiktok", "youtube", "x", "fo
 SourceKind = Literal["firm_own", "third_party", "unknown"]
 Status = Literal["new", "in_review", "confirmed", "false_positive", "closed"]
 STATUSES: tuple[str, ...] = get_args(Status)
+ADMIN_HEADER = "X-Mock-Admin"
 
 _HTTP_URL = TypeAdapter(HttpUrl)
 _URI_FORMAT = FormatChecker()
@@ -367,12 +368,20 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     # --- mock-only helpers (not part of the contract) -------------------------------------
 
-    @api.post("/__mock/reset")
+    def require_admin_header(x_mock_admin: Annotated[str | None, Header()] = None) -> None:
+        # A body-less POST is a CORS "simple" request: any web page could send it and only the
+        # response would be hidden. A custom header forces a preflight, which other origins fail.
+        if not x_mock_admin:
+            raise HTTPException(403, f"{ADMIN_HEADER} header required for /__mock/ routes")
+
+    admin = [Depends(require_admin_header)]
+
+    @api.post("/__mock/reset", dependencies=admin)
     async def mock_reset():
         store.reset()
         return {"reset": True}
 
-    @api.post("/__mock/emit")
+    @api.post("/__mock/emit", dependencies=admin)
     async def mock_emit():
         replay_once = api.state.replay_once
         if replay_once is None:

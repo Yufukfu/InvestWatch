@@ -15,6 +15,7 @@ from conftest import assert_valid
 from iw_mock_server.events import create_asgi_app
 from iw_mock_server.settings import Settings
 
+ADMIN = {"X-Mock-Admin": "1"}  # /__mock/* needs it (forces a CORS preflight)
 EVENT_TYPES = ("finding.created", "finding.high_risk", "finding.updated", "scan.started", "scan.finished")
 
 
@@ -122,7 +123,7 @@ def test_scan_in_flight_does_not_write_into_a_reset_store(contracts_dir):
 
         httpx.post(f"{url}/api/scans", json={"source_id": source["id"]})
         rec.wait_for("scan.started")
-        httpx.post(f"{url}/__mock/reset")
+        httpx.post(f"{url}/__mock/reset", headers=ADMIN)
         assert rec.wait_for("scan.finished", timeout=5)
 
         after = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source["id"])
@@ -143,7 +144,7 @@ def test_mock_emit_creates_a_finding_and_events(live):
     url, rec = live
     before = httpx.get(f"{url}/api/findings").json()["total"]
 
-    r = httpx.post(f"{url}/__mock/emit")
+    r = httpx.post(f"{url}/__mock/emit", headers=ADMIN)
 
     assert r.status_code == 200
     created = rec.wait_for("finding.created")
@@ -158,13 +159,13 @@ def test_high_risk_event_only_above_threshold(live):
     url, rec = live
     httpx.put(f"{url}/api/settings/thresholds", json={"M1": 0, "M2": 0, "M3": 0})
 
-    httpx.post(f"{url}/__mock/emit")
+    httpx.post(f"{url}/__mock/emit", headers=ADMIN)
     high = rec.wait_for("finding.high_risk")
     assert len(high) == 1
     assert_event_valid("finding.high_risk", high[0])
 
     httpx.put(f"{url}/api/settings/thresholds", json={"M1": 1, "M2": 1, "M3": 1})
-    httpx.post(f"{url}/__mock/emit")
+    httpx.post(f"{url}/__mock/emit", headers=ADMIN)
     rec.wait_for("finding.created", count=2)
     assert len(rec.wait_for("finding.high_risk", count=2, timeout=0.5)) == 1
 
@@ -222,7 +223,7 @@ def test_reads_stay_consistent_while_replay_writes(contracts_dir):
         def writer():
             with httpx.Client() as c:
                 while not stop.is_set():
-                    c.post(f"{url}/__mock/emit")
+                    c.post(f"{url}/__mock/emit", headers=ADMIN)
 
         def reader(path: str):
             with httpx.Client() as c:

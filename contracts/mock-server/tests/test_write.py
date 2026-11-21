@@ -10,6 +10,7 @@ from iw_mock_server.app import create_app
 from iw_mock_server.settings import Settings
 from openapi_check import assert_response_matches
 
+ADMIN = {"X-Mock-Admin": "1"}
 NEW_SOURCE = {"name": "Nowe źródło", "platform": "web", "url": "https://new-source.example.com/",
               "source_kind": "unknown", "target_modules": ["M3"], "schedule_cron": None, "active": True}
 
@@ -117,7 +118,7 @@ def test_reset_restores_original_data(client):
     client.put("/api/settings/thresholds", json={"M1": 0.1, "M2": 0.1, "M3": 0.1})
     client.post("/api/sources", json=NEW_SOURCE)
 
-    assert client.post("/__mock/reset").status_code == 200
+    assert client.post("/__mock/reset", headers=ADMIN).status_code == 200
 
     assert client.get(f"/api/findings/{f['id']}").json()["status"] == "new"
     assert client.get("/api/settings/thresholds").json() == {"M1": 0.6, "M2": 0.5, "M3": 0.7}
@@ -153,3 +154,17 @@ def test_source_url_is_stored_as_sent(client, url):
 def test_source_url_that_is_not_a_uri_is_422(client, url):
     # HttpUrl strips and percent-encodes, but the url is stored as sent, so it must already be a valid uri
     assert client.post("/api/sources", json={**NEW_SOURCE, "url": url}).status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/__mock/reset", "/__mock/emit"])
+@pytest.mark.parametrize("headers", [{}, {"X-Mock-Admin": ""}])
+def test_mock_helpers_need_the_admin_header(client, path, headers):
+    # a body-less POST without custom headers is a "simple" request any web page could send
+    f = a_finding(client, status="new")
+    client.patch(f"/api/findings/{f['id']}", json={"status": "closed"})
+
+    r = client.post(path, headers=headers)
+
+    assert r.status_code == 403
+    assert "error" in r.json()
+    assert client.get(f"/api/findings/{f['id']}").json()["status"] == "closed"

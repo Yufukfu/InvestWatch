@@ -77,3 +77,10 @@ def test_main_exits_2_on_a_bad_log_level(monkeypatch):
     monkeypatch.setattr(root, "level", root.level)
 
     assert main() == 2
+
+
+def test_default_host_is_loopback(monkeypatch):
+    # /__mock/* is unauthenticated; 0.0.0.0 is set only in the Dockerfile
+    monkeypatch.delenv("MOCK_HOST", raising=False)
+
+    assert Settings().host == "127.0.0.1"

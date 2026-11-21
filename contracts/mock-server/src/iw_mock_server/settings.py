@@ -42,7 +42,7 @@ def _log_level(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    host: str = field(default_factory=lambda: _env("MOCK_HOST", "0.0.0.0"))
+    host: str = field(default_factory=lambda: _env("MOCK_HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: _number("MOCK_PORT", "8000", int, 1, 65535))
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(o.strip() for o in _env("MOCK_CORS_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip())
