@@ -14,11 +14,11 @@
 
 ## 3. Docs and ADRs
 
-- [ ] 3.1 `infra/README.md`: smoke is not run in CI (no docker step in `.github/workflows/ci.yml`); the scraper trims `iw:documents` with `XADD ... MAXLEN ~ N`, because Redis is `noeviction`
-- [ ] 3.2 Root `README.md`: "Licences of third-party services" (Postgres, Caddy, Redis 8 AGPLv3 option, MinIO via Chainguard AGPLv3, Ollama), one line and a link each
-- [ ] 3.3 ADR 0202 lines 25 and 32 to the project-scoped `data`, `edge`, `egress` plus a "partly superseded by ADR 0306 (network names)" note; the matching line in ADR 0306; ADR 0306 evidence (SBOM licence, source repo, Valkey tags probed, AGPL Redis chosen deliberately)
-- [ ] 3.4 `.docs/STATUS.md`: the Sat 14:30 milestone row and Damian's row; follow-ups row on why Postgres keeps its capabilities
-- [ ] 3.5 Mutation check: mutations: n/a, docs-only group; `docs-check` passes
+- [x] 3.1 `infra/README.md`: smoke is not run in CI (no docker step in `.github/workflows/ci.yml`); the scraper trims `iw:documents` with `XADD ... MAXLEN ~ N`, because Redis is `noeviction`
+- [x] 3.2 Root `README.md`: "Licences of third-party services" (Postgres, Caddy, Redis 8 AGPLv3 option, MinIO via Chainguard AGPLv3, Ollama), one line and a link each
+- [x] 3.3 ADR 0202 lines 25 and 32 to the project-scoped `data`, `edge`, `egress` plus a "partly superseded by ADR 0306 (network names)" note; the matching line in ADR 0306; ADR 0306 evidence (SBOM licence, source repo, Valkey tags probed, AGPL Redis chosen deliberately)
+- [x] 3.4 `.docs/STATUS.md`: the Sat 14:30 milestone row and Damian's row; follow-ups row on why Postgres keeps its capabilities
+- [x] 3.5 Mutation check: mutations: n/a, docs-only group; `docs-check` passes
 
 ## 4. Closing
 
