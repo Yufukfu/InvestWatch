@@ -22,6 +22,7 @@ from iw_scraper.config import from_env
 from iw_scraper.events import derive_status, publish_scan_event
 from iw_scraper.guards import KEY_PREFIX, DomainHealth, LeaseSemaphore, RunLock
 from iw_scraper.retry import backoff_delay, is_transient
+from iw_scraper.supervise import CONNECTION_ERRORS
 from iw_scraper.types import Deferral, JobError, Reason
 
 # arq counts every Retry as a try, deferrals included; we count failed attempts ourselves.
@@ -97,6 +98,11 @@ async def execute_job(ctx: dict, source_id: str, domain: str, requested: bool = 
         return await _run_locked(ctx, source_id, domain, requested, lock)
     except Retry:
         raise  # the lock stays held until the job's final outcome
+    except ctx.get("retry_on", CONNECTION_ERRORS):
+        # a lost PostgreSQL or Redis connection is not a collection failure, and arq ends a job for good on any
+        # exception but `Retry`: run it again shortly, without using up an attempt
+        logger.warning("lost a dependency during job %s, it will run again", ctx["job_id"], exc_info=True)
+        await _requeue(lock, ctx["settings"], ctx["settings"].requeue_delay)
     except Exception:
         # the progress bar must not hang on a collector bug, and a failed finish must not keep the lock
         try:

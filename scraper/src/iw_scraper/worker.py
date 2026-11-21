@@ -59,7 +59,7 @@ async def run_worker(
         worker = Worker(
             functions=[job_function(queue)],
             redis_settings=RedisSettings.from_dsn(runner.redis_url),
-            ctx={**ctx, "settings": queue},
+            ctx={"retry_on": retry_on, **ctx, "settings": queue},
             max_jobs=runner.max_jobs,
             poll_delay=runner.poll_delay,
             job_completion_wait=runner.shutdown_deadline,

@@ -3,9 +3,11 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 
+import asyncpg
 import pytest
 
 from conftest import Recorder, fast_settings
+from iw_scraper.app import RETRY_ON
 from iw_scraper.guards import DomainHealth
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.types import Deferral, JobError, Reason
@@ -270,3 +272,65 @@ async def test_a_shorter_deferral_does_not_shorten_a_longer_one(redis):
     await health.defer(0.1)
 
     assert await health.deferred_for() > 1.5
+
+
+async def test_a_lost_postgres_connection_before_the_run_requeues_the_job_without_a_failure(redis, start_worker, store, events):
+    real_get, failures, calls = store.get, [], []
+
+    async def flaky_get(source_id):
+        if not failures:
+            failures.append(1)
+            raise asyncpg.ConnectionDoesNotExistError("connection was closed")
+        return await real_get(source_id)
+
+    store.get = flaky_get
+    start_worker(scripted([AttemptResult(documents=1)], calls), Recorder(), fast_settings(max_tries=1), retry_on=RETRY_ON)
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"
+    await asyncio.sleep(0.2)
+
+    assert len(calls) == 1
+    assert [(e["type"], e["data"].get("status")) for e in events] == [("scan.started", None), ("scan.finished", "ok")]
+    assert await redis.exists(f"iw:scraper:lock:{SRC}") == 0
+
+
+async def test_a_lost_postgres_connection_mid_run_retries_without_consuming_an_attempt(redis, start_worker, events):
+    calls = []
+
+    async def run_source(source_id, started=None):
+        calls.append(1)
+        await started()
+        if len(calls) == 1:
+            raise asyncpg.InterfaceError("connection is closed")
+        return AttemptResult(documents=2)
+
+    recorder = Recorder()
+    start_worker(run_source, recorder, fast_settings(max_tries=1), retry_on=RETRY_ON)
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
+
+    assert await job.result(timeout=10, poll_delay=0.05) == "ok"
+    await asyncio.sleep(0.2)
+
+    assert (len(calls), recorder.errors) == (2, [])
+    assert [(e["type"], e["data"].get("status")) for e in events] == [("scan.started", None), ("scan.finished", "ok")]
+    assert await redis.exists("iw:scraper:attempts:job-1") == 0
+
+
+async def test_the_run_lock_outlives_the_requeue_delay_after_a_lost_connection(redis, start_worker):
+    settings = fast_settings(requeue_delay=1.5, lease_ttl=0.5)
+    calls = []
+
+    async def run_source(source_id, started=None):
+        calls.append(1)
+        if len(calls) == 1:
+            raise asyncpg.InterfaceError("connection is closed")
+        return AttemptResult(documents=1)
+
+    start_worker(run_source, Recorder(), settings, retry_on=RETRY_ON)
+    first = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
+    await asyncio.sleep(0.9)  # past the lease: only the extension for the requeue still holds the lock
+    second = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-2")
+
+    assert await second.result(timeout=10, poll_delay=0.05) == "coalesced"
+    assert await first.result(timeout=10, poll_delay=0.05) == "ok"

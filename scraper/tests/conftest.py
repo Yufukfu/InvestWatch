@@ -329,11 +329,14 @@ async def start_worker(store):
     """Start in-process arq workers (each with its own Redis pool); returns the worker's task."""
     started: list[tuple[Worker, asyncio.Task]] = []
 
-    def start(run_source, recorder: Recorder, settings: QueueSettings, **worker_kwargs) -> asyncio.Task:
+    def start(run_source, recorder: Recorder, settings: QueueSettings, retry_on=None, **worker_kwargs) -> asyncio.Task:
+        ctx = {"settings": settings, "run_source": run_source, "record_error": recorder.record_error, "sources": store}
+        if retry_on is not None:
+            ctx["retry_on"] = retry_on
         worker = Worker(
             functions=[job_function(settings)],
             redis_settings=RedisSettings.from_dsn(os.environ["REDIS_URL"]),
-            ctx={"settings": settings, "run_source": run_source, "record_error": recorder.record_error, "sources": store},
+            ctx=ctx,
             poll_delay=0.02,
             max_jobs=worker_kwargs.pop("max_jobs", 10),
             handle_signals=False,
