@@ -4,15 +4,15 @@ Before group 1: Damian approves ADR 0306 and the open questions in `design.md` a
 
 ## 1. Smoke harness and project-scoped networks
 
-- [x] 1.1 Failing test: `infra/tests/smoke.sh` (throwaway env files through a new optional output-path argument of `scripts/init-env.sh`) with a "two stacks at once" check (two projects, ports 8443/8080 and 8444/8081) and a "no cross-stack DNS" check; it fails today because `iw-edge`/`iw-data` are global names
+- [x] 1.1 Failing test: `infra/tests/smoke.sh` (throwaway env files through a new optional output-path argument of `scripts/init-env.sh`) with a "two stacks at once" check (two projects; the smoke test uses ports 18443/18080 and 18444/18081, so it never clashes with a stack already running on 8443/8080) and a "no cross-stack DNS" check; it fails today because `iw-edge`/`iw-data` are global names
 - [x] 1.2 Remove the explicit network `name:` in `infra/compose.yaml` and `web/compose.yaml`; verify `docker compose -p <p> --env-file .env -f web/compose.yaml config` still resolves; both parallel-stack scenarios and the existing gateway check from `infra/CLAUDE.md` "Done" pass
 - [x] 1.3 Mutation check (put a fixed `name:` back on one network, the parallel-stack check must fail); mutations: 2 tried, 2 caught (fixed `name:` on `data`, fixed `name:` on `edge`)
 
 ## 2. Secrets and env
 
-- [ ] 2.1 Failing tests: `docker compose config` fails naming `REDIS_PASSWORD`, `MINIO_ROOT_PASSWORD` and `MINIO_SECRET_KEY` when each is unset; a generated `.env` has every secret at 32+ characters
-- [ ] 2.2 Extend root `.env.example` (`REDIS_PASSWORD`, `REDIS_URL` template comment, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ENDPOINT=minio:9000`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET=iw-raw`, `MINIO_SECURE=false`, `OLLAMA_MODEL=gemma3:4b`, `IW_DEV_*_PORT`) and `scripts/init-env.sh` (generate the three new secrets, same length check); the three secret scenarios pass
-- [ ] 2.3 Mutation check (give one secret a default in compose, its check must fail); record `mutations: N tried, N caught`
+- [x] 2.1 Failing tests: `.env.example` lists every infrastructure secret empty; a generated `.env` has every secret at 32+ characters and passes `docker compose config`; `init-env` never overwrites and resolves a relative path from the caller; a missing secret is named by `config` (helper `requires_secret`, used for `REDIS_PASSWORD` in group 3 and `MINIO_ROOT_PASSWORD`/`MINIO_SECRET_KEY` in group 4, where the services that need them are added)
+- [x] 2.2 Extend root `.env.example` (`REDIS_PASSWORD`, `REDIS_URL` template comment, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ENDPOINT=minio:9000`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET=iw-raw`, `MINIO_SECURE=false`, `OLLAMA_MODEL=gemma3:4b`, `IW_DEV_*_PORT`) and `scripts/init-env.sh` (generate the three new secrets, same length check); the three secret scenarios pass
+- [x] 2.3 Mutation check (give one secret a default in compose, its check must fail); mutations: 4 tried, 4 caught (drop `*_SECRET_KEY` from the fill pattern, disable the overwrite guard, default for `POSTGRES_APP_PASSWORD`, relative path resolved from the repo root)
 
 ## 3. Redis
 

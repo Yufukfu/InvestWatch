@@ -1,21 +1,35 @@
 #!/bin/sh
-# Creates .env from .env.example with random passwords. Never overwrites an existing file.
-# Optional argument: the file to create (default: .env at the repository root); infra/tests/smoke.sh uses it.
+# Creates .env from .env.example, filling every empty *_PASSWORD and *_SECRET_KEY with a random value.
+# Never overwrites an existing file. Optional argument: the file to create (default: .env at the
+# repository root); infra/tests/smoke.sh uses it for throwaway stacks.
 set -eu
+case ${1:-} in
+  "") out="$(cd "$(dirname "$0")/.." && pwd)/.env" ;;
+  /*|[A-Za-z]:/*) out=$1 ;;
+  *) out="$(pwd)/$1" ;;  # relative to the caller, not the repository
+esac
 cd "$(dirname "$0")/.."
-out=${1:-.env}
-if [ -f "$out" ]; then
+if [ -e "$out" ] || [ -L "$out" ]; then
   echo "$out already exists, not touching it" >&2
   exit 1
 fi
 gen() { openssl rand -hex 24; }
-admin_pw=$(gen)
-app_pw=$(gen)
-if [ ${#admin_pw} -lt 32 ] || [ ${#app_pw} -lt 32 ]; then
-  echo "could not generate passwords (is openssl installed?)" >&2
-  exit 1
-fi
 umask 077
-sed -e "s|^POSTGRES_ADMIN_PASSWORD=.*|POSTGRES_ADMIN_PASSWORD=${admin_pw}|" \
-    -e "s|^POSTGRES_APP_PASSWORD=.*|POSTGRES_APP_PASSWORD=${app_pw}|" .env.example > "$out"
-echo "Created $out (mode 600) with random passwords."
+tmp="$out.tmp.$$"
+trap 'rm -f "$tmp"' EXIT
+while IFS= read -r line || [ -n "$line" ]; do
+  case $line in
+    \#*) printf '%s\n' "$line" ;;
+    *_PASSWORD=|*_SECRET_KEY=)
+      value=$(gen)
+      if [ ${#value} -lt 32 ]; then
+        echo "could not generate secrets (is openssl installed?)" >&2
+        exit 1
+      fi
+      printf '%s%s\n' "$line" "$value" ;;
+    *) printf '%s\n' "$line" ;;
+  esac
+done < .env.example > "$tmp"
+mv "$tmp" "$out"
+trap - EXIT
+echo "Created $out (mode 600) with random secrets."
