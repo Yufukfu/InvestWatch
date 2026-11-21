@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written; accepted by Kacper via PR #<n>
+- Deciders: agent-written; accepted by Kacper via PR #47
 
 ## Context
 
