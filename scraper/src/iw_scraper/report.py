@@ -7,13 +7,25 @@ the last status and never a rate over past runs. Sources appear by id and name, 
 `job_errors.detail` is never read.
 """
 
+import argparse
+import asyncio
 import json
+import logging
+import os
+import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+
+import asyncpg
 
 from iw_scraper.events import utc_iso
+from iw_scraper.logs import configure_logging
+
+log = logging.getLogger(__name__)
+
+DEFAULT_HOURS = 24
 
 NOTE = "Run statuses are of the last run only, one per source; the database keeps no run history."
 
@@ -207,3 +219,78 @@ def render_table(report: Report) -> str:
         f"  errors in the window: {_counts(report.errors)}",
     ]
     return "\n".join(lines) + "\n"
+
+
+# Ids are cast to text so they compare and serialise as strings; dates stay `timestamptz`. Only counts and
+# `reason` come from `job_errors`: `detail` and every URL column are never selected.
+_SOURCES = """
+SELECT s.id::text AS id, s.name, s.platform, s.source_kind, s.active, s.last_run_status, s.last_run_at,
+       count(d.id) AS documents_total,
+       count(d.id) FILTER (WHERE d.fetched_at >= $1) AS documents_window,
+       max(d.fetched_at) AS latest_fetched_at
+FROM sources s LEFT JOIN documents d ON d.source_id = s.id
+GROUP BY s.id ORDER BY s.name, s.id
+"""
+_ERRORS = """
+SELECT source_id::text AS source_id, reason, count(*) AS count
+FROM job_errors WHERE occurred_at >= $1 GROUP BY source_id, reason
+"""
+_DOCUMENTS = """
+SELECT platform, source_kind, count(*) AS total, count(html_object_key) AS with_html
+FROM documents GROUP BY platform, source_kind
+"""
+
+
+async def collect(conn, *, hours: int, now: datetime) -> Report:
+    """The report of the three tables, read in one read-only transaction (a snapshot the database enforces)."""
+    start = window_start(now, hours)
+    async with conn.transaction(readonly=True):
+        rows = Rows(
+            sources=await conn.fetch(_SOURCES, start),
+            errors=await conn.fetch(_ERRORS, start),
+            documents=await conn.fetch(_DOCUMENTS),
+        )
+    return build_report(rows, hours=hours, now=now)
+
+
+def _hours(value: str) -> int:
+    if not (value.isascii() and value.isdigit() and int(value) > 0):
+        raise argparse.ArgumentTypeError(f"{value!r} is not a positive whole number of hours")
+    return int(value)
+
+
+def parse_args(argv: Sequence[str]) -> tuple[int, bool]:
+    """(window hours, json?). A bad value exits with status 2 and a usage message on stderr."""
+    parser = argparse.ArgumentParser(prog="python -m iw_scraper.report", description=__doc__.splitlines()[0])
+    parser.add_argument("--since", type=_hours, default=DEFAULT_HOURS, metavar="HOURS", help="window in hours (default 24)")
+    parser.add_argument("--json", action="store_true", help="print one JSON object instead of the table")
+    args = parser.parse_args(argv)
+    return args.since, args.json
+
+
+async def run(argv: Sequence[str], dsn: str | None, *, now: datetime | None = None) -> int:
+    """The exit code. The arguments are checked before any connection; stdout gets the report and nothing else."""
+    hours, as_json = parse_args(argv)
+    if not dsn:
+        log.error("DATABASE_URL is not set")
+        return 1
+    try:
+        conn = await asyncpg.connect(dsn)
+        try:
+            built = await collect(conn, hours=hours, now=now or datetime.now(UTC))
+        finally:
+            await conn.close()
+    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
+        log.error("report failed: %s: %s", type(error).__name__, error)  # the formatter redacts DSN secrets
+        return 1
+    sys.stdout.write(render_json(built) if as_json else render_table(built))
+    return 0
+
+
+def main() -> None:
+    configure_logging(sys.stderr)  # stdout is the report
+    sys.exit(asyncio.run(run(sys.argv[1:], os.environ.get("DATABASE_URL"))))
+
+
+if __name__ == "__main__":
+    main()
