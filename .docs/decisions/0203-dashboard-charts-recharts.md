@@ -21,11 +21,12 @@ Both are open source, and both are licensed MIT, which satisfies the web rule.
 
 Option 1: **Recharts** is the only chart library in `web/`. Chart components take their data and callbacks as props and do not fetch or read the store.
 
-Rationale: Recharts is declarative, so a chart is a pure function of its props. That matches the props architecture and makes chart components testable with Vitest and Testing Library, without a canvas. Its React 19 peer range covers the installed version. Chart.js would work, but its imperative model adds a wrapper layer and a registration step, and a second chart model would have to be learned for the same job.
+Rationale: Recharts is declarative, so a chart is a pure function of its props. That matches the props architecture and keeps chart components simple to test with Vitest and Testing Library. Its React 19 peer range covers the installed version. Chart.js would work, but its imperative model adds a wrapper layer and a registration step, and a second chart model would have to be learned for the same job.
 
 ## Consequences
 
 - Chart code is declarative JSX, consistent with the rest of `web/`.
 - Recharts renders SVG, so very large series (thousands of points) need aggregation on the API side (`GET /stats/trend`, [integration-plan.md](../integration-plan.md) §5, bucketed by hour or day) rather than in the browser. Revisit if the trend view has to show raw series.
 - Adding Chart.js later is a new ADR that supersedes this one; no ADR is edited in place.
+- Responsive charts (`ResponsiveContainer`) size themselves by measuring the DOM with `ResizeObserver`, which jsdom does not provide. Tests therefore give charts a fixed `width`/`height` or stub `ResizeObserver`. Not verified yet: Recharts is not installed in this repo; confirm when the install PR runs the tests.
 - The library is added with `npm install recharts` in `web/`, then `npm audit` is run before merge, as every dependency requires ([CLAUDE.md](../../CLAUDE.md) hard rules).
