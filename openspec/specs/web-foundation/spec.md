@@ -17,21 +17,6 @@ The dashboard SHALL call the REST API only through the RTK Query client generate
 - **WHEN** `contracts/openapi.yaml` or a mock changed and the snapshot was not re-synced
 - **THEN** `npm run contracts:check` exits non-zero and names the stale files
 
-### Requirement: Mock mode
-The dashboard SHALL render contract mock data without the `api` service, with no change to components.
-
-#### Scenario: Findings from mocks
-- **WHEN** the app runs against the mock handlers
-- **THEN** the findings table shows the titles from `contracts/mocks/findings.json` as plain text
-
-#### Scenario: API down
-- **WHEN** the API is unreachable
-- **THEN** the health badge shows "Brak połączenia z API" and the table shows an error message instead of crashing
-
-#### Scenario: System reported down
-- **WHEN** the API answers `/health` with `status: down`
-- **THEN** the health badge shows "System nie działa", not the unreachable message
-
 ### Requirement: Hardened static delivery
 The `web` container SHALL serve the build as non-root, on a read-only filesystem, with security headers, behind the HTTPS gateway.
 
@@ -91,3 +76,22 @@ Dashboard feature components SHALL render only from their props, with no store, 
 #### Scenario: Real components are checked by the tests
 - **WHEN** a real component under `src/features/*/components/` imports `src/api/`
 - **THEN** `npm test` fails
+
+### Requirement: Data from the backend
+The running dashboard SHALL get all data from the backend at `VITE_API_BASE_URL` (default `/api`) through the generated client, with no in-browser fake backend in any build. A fake network SHALL exist only in the Vitest setup, serving the contract mocks unchanged.
+
+#### Scenario: Findings from the backend
+- **WHEN** the app runs against a backend that answers `GET /api/findings` with `contracts/mocks/findings.json`
+- **THEN** the findings table shows those titles as plain text
+
+#### Scenario: No fake backend in app code
+- **WHEN** the sources under `web/src/` outside `src/test/` and test files are checked
+- **THEN** none imports `msw` or registers a service worker, and `web/public/` has no `mockServiceWorker.js`
+
+#### Scenario: API down
+- **WHEN** the API is unreachable
+- **THEN** the health badge shows "Brak połączenia z API" and the table shows an error message instead of crashing
+
+#### Scenario: System reported down
+- **WHEN** the API answers `/health` with `status: down`
+- **THEN** the health badge shows "System nie działa", not the unreachable message
