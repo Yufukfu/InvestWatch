@@ -1,6 +1,6 @@
 # Status: scraper (Adam)
 
-Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
+Edit only this file for `scraper/` state. Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -14,6 +14,8 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
 - `scraper-v2-sources` (12 vetted M1/M2/M3 web sources in `scraper/seeds/sources.toml`, validated and idempotent seed loader, host-guard test, opt-in live check) is implemented and tested, stacked on `scraper-orchestration` (PR #38). The opt-in live check passed for all 12 pages on 2026-11-21 (HTTP 200, no redirect, robots allowed, text present). M3 positives come from `scraper-v2-social` (Telegram channels) and the icobench list page; naming a business from the KNF warnings list is an optional, human-only follow-up.
+
+- Social R&D (ADR 0109, docs-only PR): X and YouTube are collectable with a dedicated account's cookies (X timeline through Playwright, YouTube metadata through our fetch layer); YouTube transcripts are not (caption URL 429 from every setup tried). Specs `scraper-social-youtube` (metadata only) and `scraper-social-x` follow.
 
 ## Active OpenSpec changes
 
