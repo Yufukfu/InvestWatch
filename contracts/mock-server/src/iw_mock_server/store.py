@@ -60,6 +60,25 @@ def _require_keys(obj, keys: tuple[str, ...], file_name: str) -> dict:
     return obj
 
 
+def _check_thresholds(obj, file_name: str) -> dict[str, float]:
+    _require_keys(obj, MODULES, file_name)
+    for m in MODULES:
+        value = obj[m]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+            raise MockDataError(f"{file_name}: {m} must be a number between 0 and 1, got {value!r}")
+    return {m: float(obj[m]) for m in MODULES}
+
+
+def _check_points(points, keys: tuple[str, ...], numeric: tuple[str, ...], file_name: str) -> None:
+    if not isinstance(points, list):
+        raise MockDataError(f"{file_name}: points must be a list")
+    for index, point in enumerate(points):
+        _require_keys(point, keys, f"{file_name} points[{index}]")
+        for k in numeric:
+            if isinstance(point[k], bool) or not isinstance(point[k], (int, float)):
+                raise MockDataError(f"{file_name} points[{index}].{k} must be a number, got {point[k]!r}")
+
+
 def load_mock_data(contracts_dir: Path) -> MockData:
     """Read every mock the server needs and validate it against contracts/schemas."""
     mocks = Path(contracts_dir) / "mocks"
@@ -79,7 +98,11 @@ def load_mock_data(contracts_dir: Path) -> MockData:
         m: _require_keys(_read_json(mocks / f"calibration-{m}.json"), ("module", "points"), f"calibration-{m}.json")
         for m in MODULES
     }
-    thresholds = _require_keys(_read_json(mocks / "thresholds.json"), MODULES, "thresholds.json")
+    _check_points(trend["points"], ("t", *MODULES), MODULES, "trend.json")
+    for m, cal in calibration.items():
+        _check_points(cal["points"], ("threshold", "tp", "fp", "fn", "tn", "precision", "recall"),
+                      ("threshold", "tp", "fp", "fn", "tn", "precision", "recall"), f"calibration-{m}.json")
+    thresholds = _check_thresholds(_read_json(mocks / "thresholds.json"), "thresholds.json")
     health = _require_keys(_read_json(mocks / "health.json"), ("status", "services"), "health.json")
 
     doc_ids = {d["id"] for d in documents}
@@ -87,8 +110,7 @@ def load_mock_data(contracts_dir: Path) -> MockData:
         if f["document_id"] not in doc_ids:
             raise MockDataError(f"findings.json: finding {f['id']} references unknown document {f['document_id']}")
 
-    return MockData(findings, documents, sources, events, trend, calibration,
-                    {m: float(thresholds[m]) for m in MODULES}, health)
+    return MockData(findings, documents, sources, events, trend, calibration, thresholds, health)
 
 
 def risk_level(score: float, threshold: float) -> str:

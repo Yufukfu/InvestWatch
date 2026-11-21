@@ -50,6 +50,35 @@ def test_unparsable_json_names_the_file(contracts_copy):
         load_mock_data(contracts_copy)
 
 
+@pytest.mark.parametrize("bad", [{"M1": 0.6, "M2": 1.5, "M3": 0.7}, {"M1": 0.6, "M2": None, "M3": 0.7},
+                                 {"M1": 0.6, "M2": "x", "M3": 0.7}, {"M1": 0.6, "M3": 0.7}])
+def test_invalid_thresholds_name_the_file(contracts_copy, bad):
+    (contracts_copy / "mocks" / "thresholds.json").write_text(json.dumps(bad), encoding="utf-8")
+
+    with pytest.raises(MockDataError, match="thresholds.json"):
+        load_mock_data(contracts_copy)
+
+
+def test_invalid_trend_point_names_the_file(contracts_copy):
+    path = contracts_copy / "mocks" / "trend.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["points"][0]["M1"] = "many"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(MockDataError, match="trend.json"):
+        load_mock_data(contracts_copy)
+
+
+def test_invalid_calibration_names_the_file(contracts_copy):
+    path = contracts_copy / "mocks" / "calibration-M2.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["points"] = "none"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(MockDataError, match="calibration-M2.json"):
+        load_mock_data(contracts_copy)
+
+
 @pytest.mark.parametrize(
     ("score", "threshold", "expected"),
     [(0.9, 0.9, "high"), (0.95, 0.9, "high"), (0.7, 0.9, "medium"), (0.89, 0.9, "medium"), (0.69, 0.9, "low"), (0.0, 0.5, "low")],
