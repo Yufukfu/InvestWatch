@@ -6,9 +6,9 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
 | ADR | Decision | Status |
 |---|---|---|
-| [0101](0101-scraper-fetch-client.md) | Scraper fetch client | proposed (agent draft, no decision) |
-| [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | proposed (agent draft, no decision) |
-| [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research) |
+| [0101](0101-scraper-fetch-client.md) | Scraper fetch client | accepted (agent-written; effective on merge) |
+| [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | accepted (agent-written; effective on merge) |
+| [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research; decided in `scraper-v2`) |
 | [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted |
 | [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted |
 | [0203](0203-dashboard-charts-recharts.md) | Dashboard charts: Recharts (the only chart library in `web/`) | accepted (takes effect when PR merges) |
@@ -24,7 +24,5 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
-- **Scraper fetch client:** `noble-tls` (v0.1.9 on PyPI at time of writing) vs `curl_cffi` vs plain `httpx`. Read the installed package's real API first. Owner Adam.
 - **Playwright boundary:** which sources must be rendered, because `blocks` and screenshots (`.docs/integration-plan.md` §3) feed rules R4-R8 and R13 (`.docs/analytics-plan.md` §5). Owner Adam, with Damian.
-- **Job queue and scheduler** for the scraper: open source, undecided. Owner Adam.
 - **First social platform** (team decision: one platform first). Owner Adam.
