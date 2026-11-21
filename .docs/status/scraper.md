@@ -11,9 +11,12 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - `content-hash-definition` (issue #31): the `content_hash` definition (NFC) is written into integration-plan §3 and ADR 0105, pinned by scraper tests; no scraper code changed. Analytics (Damian) still has to read the stored hash instead of recomputing it with NFKC (proposal in the issue).
 - ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
+- `scraper-v2-sources` (12 vetted M1/M2/M3 web sources in `scraper/seeds/sources.toml`, validated and idempotent seed loader, host-guard test, opt-in live check) is implemented and tested, stacked on `scraper-orchestration` (PR #38). The opt-in live check passed for all 12 pages on 2026-11-21 (HTTP 200, no redirect, robots allowed, text present). M3 positives come from `scraper-v2-social` (Telegram channels) and the icobench list page; naming a business from the KNF warnings list is an optional, human-only follow-up.
+
 ## Active OpenSpec changes
 
-- `scraper-orchestration` (PR pending); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
+- `scraper-orchestration` (PR #38 merged; its review fixes are in PR #49); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
+- `scraper-v2-sources` (PR #43)
 
 ## Blockers and open decisions
 
