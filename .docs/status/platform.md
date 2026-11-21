@@ -11,7 +11,8 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 ### analytics
 - `analytics-skeleton` merged (PR #10): pure pipeline, registry, M2 rules R1-R3, CLI. No worker, storage or events yet.
 - Both of Kacper's reviews fixed in `analytics-skeleton-review-fixes` and `analytics-skeleton-review-2-fixes`.
-- Proposed on its own branch, awaiting approval: `analytics-worker` (needs `main` merged in now that PR #10 is in).
+- `analytics-worker` implemented on branch `analytics/analytics-worker`, stacked on PR #18 (Redis): stream worker on `iw:documents` (ack after commit, XAUTOCLAIM, poison messages acked with a reason, backoff on outages), Postgres store with the `(document_id, module)` upsert, `iw:events` publisher with live thresholds, `/health`, container and compose service. Verified end to end on a full stack. Rules-only; the LLM client comes with `analytics-llm-p0`.
+- Blocker: merges only after PR #18 (`redis` in infra), because the root `compose.yaml` includes `analytics/compose.yaml`.
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
