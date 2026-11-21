@@ -26,7 +26,7 @@ KNOWN_PARAMS = {
     "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
     # analytics-llm-p0 (M2 P0 rules)
     "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
-    "hiding_regions",
+    "hiding_regions", "figure_extra_exclude_patterns",
 }
 _RULES: dict[str, type["Rule"]] = {}
 

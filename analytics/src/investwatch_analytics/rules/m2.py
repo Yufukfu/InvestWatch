@@ -126,7 +126,12 @@ class R3RiskNextToReturns(Rule):
         return self.result("fail", claim, why)
 
 
-_YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
+# A year only in a year context ("w 2025", "za 2024 r.", "2023 roku"), so amounts ("2000 zł") and
+# dates ("do 31.12.2026") are not years.
+_YEAR = re.compile(
+    r"\b(?:w|we|za|od|z)\s+(?:roku\s+)?((?:19|20)\d{2})(?!\d)|(?<![\d.])((?:19|20)\d{2})\s*(?:r\.|rok\w*)",
+    re.IGNORECASE,
+)
 
 
 @register
@@ -143,7 +148,7 @@ class R14PastPerformanceDisclaimer(Rule):
         p = self.spec.params
         return {
             "figure": compile_patterns(p.get("figure_patterns", [])),
-            "figure_x": compile_patterns(p.get("figure_exclude_patterns", [])),
+            "figure_x": compile_patterns(p.get("figure_exclude_patterns", []) + p.get("figure_extra_exclude_patterns", [])),
             "past": compile_patterns(p.get("past_patterns", [])),
             "future": compile_patterns(p.get("future_patterns", [])),
             "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
@@ -158,7 +163,7 @@ class R14PastPerformanceDisclaimer(Rule):
             return True
         if any(f.search(sentence) for f in p["future"]):
             return False
-        return any(int(y) <= fetch_year for y in _YEAR.findall(sentence))
+        return any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence))
 
     def evaluate(self, ctx: Context) -> RuleResult:
         p = self._p

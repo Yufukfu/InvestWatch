@@ -53,6 +53,7 @@ rules:
         - '\bprzych[óo]d\w*'
         - '\bprofit\w*'
         - '\breturns?\b'
+      # Shared with R14 (alias *return_figure_exclude): an edit here changes R14 too.
       claim_exclude_patterns: &return_figure_exclude
         # `\b`: without it every repeat of a stem inside one long word ("prowizjprowizj...") started a match
         # whose `\w*` ran to the end of the word, quadratic (PR #26 review).
@@ -108,7 +109,8 @@ rules:
       disclaimer_patterns: &past_performance_disclaimers
         - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
         - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
-        - '\bpast performance\b.{0,60}?\b(?:is not|does not|isn.t|not a)\b'
+        - '\b(?:past|historical)\s+(?:performance|results?|returns?)\b.{0,60}?\b(?:is not|are not|does not|do not|isn.t|aren.t|not a|no guarantee)\b'
+        - '\b(?:osiągnięt\w*\s+w\s+przeszłości|historyczn\w*|przeszł\w*)\s+wynik\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
         - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
       risk_patterns: *risk_patterns
       risk_override_patterns: *risk_override_patterns
@@ -135,6 +137,11 @@ rules:
       figure_patterns:
         - '\d+(?:[.,]\d+)?\s?%'
       figure_exclude_patterns: *return_figure_exclude
+      # R14 only: percentages that are not returns (share of clients or accounts, bonuses).
+      figure_extra_exclude_patterns:
+        - '\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
+        - '\bbonus\w*\s+(?:\w+\s+)?\d+(?:[.,]\d+)?\s?%'
+        - '\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
       past_patterns:
         - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
         - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
@@ -158,6 +165,12 @@ rules:
         - '\bexpect\w*'
         - '\bwill\b'
         - '\bforecast\w*'
+        - '\bzyskaj\w*'
+        - '\bzarabiaj\w*'
+        - '\bmożesz\b'
+        - '\bnawet\b'
+        - '\bważn\w*'
+        - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
   - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}

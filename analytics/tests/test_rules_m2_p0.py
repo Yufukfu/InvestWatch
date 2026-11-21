@@ -285,3 +285,45 @@ def test_r6_hidden_plus_unknown_is_uncertain(registry, catalogue):
     blocks = [block("Ryzyko utraty kapitału.", region="footer", in_view=False),
               block("Ryzyko utraty kapitału.", region="legal", in_view=None)]
     assert run("Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R6"].result == "uncertain"
+
+
+# ---- R14 review fixes (group 1 review) ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("text", [
+    "Bonus 2000 zł i oprocentowanie 6%.",                         # amount, not a year
+    "Promocja do 31.12.2026: oprocentowanie 7%.",                  # offer deadline
+    "Lokata 6% na 12 miesięcy, oferta do końca 2026.",              # offer deadline
+    "Zyskaj nawet 20% w 2026 roku!",                                # imperative promise
+    "Zyskaj 20% w 2026 roku!",                                      # imperative alone
+    "Lokata 7% do końca 2026 roku.",                                # deadline with a year context
+    "W 2025 roku 80% klientów było zadowolonych.",                  # share of clients, not a return
+    "Bonus 100% do depozytu w 2025.",                               # bonus
+    "74% rachunków inwestorów detalicznych w ostatnich 12 miesiącach odnotowało straty.",  # ESMA warning
+])
+def test_r14_non_past_performance(text, registry, catalogue):
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "not_applicable"
+
+
+@pytest.mark.parametrize("disclaimer", [
+    "Osiągnięte w przeszłości wyniki nie gwarantują osiągnięcia podobnych w przyszłości.",
+    "Past results are not indicative of future results.",
+    "Historical returns are not indicative of future returns.",
+])
+def test_r14_more_disclaimer_wordings(disclaimer, registry, catalogue):
+    text = f"Fundusz wypracował 12% w 2024 roku. {disclaimer}"
+    assert run(text, registry, catalogue)["R14"].result == "pass"
+
+
+def test_r14_past_marker_beats_future_marker_in_one_sentence(registry, catalogue):
+    text = "Nasz fundusz zarobił w 2025 roku 12%, a w 2026 roku celujemy w 15%."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+def test_r14_year_suffix_form_counts(registry, catalogue):
+    text = "Portfel ETF: 2025 rok zamknięty wynikiem +11%."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+def test_r14_year_with_context_still_counts(registry, catalogue):
+    assert run("Za 2025 r. portfel: +11%.", registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"

@@ -15,3 +15,18 @@
 | 7 | `eurotrade` | no R4, no R6 | R4 `not_applicable` (the risk block has `visible: false`, which is R5's concern); R6 `pass` (the risk block is in `region: main`) | R4 measures only visible risk blocks. R6 judges placement only, not visibility or interaction. |
 | 8 | `m2-bank-ok` (`5030107e`) | R4, R6 `not_applicable` only; score 0.12 | also R10 `pass`, R14, R17, R18 `not_applicable`; score 0 | More rules are implemented, and none fails. |
 | 9 | all M2 mocks | `model.llm: gemma3:4b`, `embedder: bge-m3` | `model.llm` is the configured model only when an LLM verdict was merged, otherwise `null`; `embedder: null` | `model.llm` reflects actual LLM use (M2 finding assembly requirement). There are no embeddings in this change. |
+
+## Review findings
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R1 | review group 1 | `_YEAR` read amounts like `2000 zł` as years | `fix-here`: a year counts only in a year context (`w/za/od 2025`, `2025 r.`, `2025 roku`) |
+| R2 | review group 1 | Offer deadlines and imperative promises in the fetch year (`do końca 2026`, `Zyskaj 20% w 2026 roku`) read as past performance | `fix-here`: future markers `zyskaj`, `zarabiaj`, `możesz`, `nawet`, `ważn…`, `do (końca) <date/year>` |
+| R3 | review group 1 | Non-return percentages (share of clients or accounts, bonuses, the ESMA CFD warning `74% rachunków…`) read as return figures | `fix-here`: R14-only `figure_extra_exclude_patterns` |
+| R4 | review group 1 | The aliased R3 exclude list silently changes R14 | `fix-here`: comment on the anchor; R14-only excludes live in their own key |
+| R5 | review group 1 | Disclaimers missed: `Osiągnięte w przeszłości wyniki nie gwarantują…`, `Past results / Historical returns are not indicative…` | `fix-here`: two disclaimer patterns (shared with R6) |
+| R6 | review group 1 | No test with a past and a future marker in one sentence | `fix-here`: test added |
+| R7 | review group 1 | tasks.md 1.2 named the wrong parameter keys | `fix-here` |
+| R8 | review group 1, declined | `\bcel\w*\b` also matches `celowo`, `celny` | `wont-fix` for now: low impact, it only makes a year-only sentence not past performance |
+| R9 | review group 1, declined | Absolute-amount past returns (`przyniósł 5 000 zł zysku`) are not return figures | `new-item`: decide with the gold set whether R14 needs amounts |
+| R10 | review group 1, declined | R3 shares the percentage false positives (bonus, share of clients) | `new-item`: R3 claim excludes, outside this change's R3 scope |

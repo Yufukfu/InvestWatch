@@ -5,8 +5,8 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 ## 1. R14 past-performance disclaimer (~45 min)
 
 - [x] 1.1 Failing tests for the R14 scenarios (eurotrade `fail`, disclaimer next to past returns `pass`, disclaimer far from the claim `pass` (no proximity requirement, ZASÓB), forecast `not_applicable` with `fetched_at` year, footnote-only R14 `pass`; the R6 half of that scenario is tested in group 2)
-- [x] 1.2 R14 class in `rules/m2.py`, `past_patterns` / `past_markers` / `future_markers` / `past_warning_patterns` in `m2_rules.yaml` (new keys in `KNOWN_PARAMS`, validated), `implemented: true`; tests green
-- [x] 1.3 Mutation check; `mutations: 10 tried, 10 caught`
+- [x] 1.2 R14 class in `rules/m2.py`, `figure_patterns` / `figure_exclude_patterns` (shared with R3) / `figure_extra_exclude_patterns` / `past_patterns` / `future_patterns` / `disclaimer_patterns` (shared with R6) in `m2_rules.yaml` (new keys in `KNOWN_PARAMS`, validated), `implemented: true`; tests green
+- [x] 1.3 Mutation check; `mutations: 10 tried, 10 caught`; review fixes (follow-ups R1-R7): `mutations: 10 tried, 10 caught`
 
 ## 2. Evidence locator and R6 hidden risk (~1 h)
 
