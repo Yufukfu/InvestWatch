@@ -9,8 +9,15 @@ Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../..
 
 ## Architecture (code quality)
 
-- Presentational components in `src/features/**` receive data and callbacks through props. They do not import the store, RTK Query hooks or Socket.IO. Put that wiring in a container component or a feature hook, one level above.
+- Layers (decided in [ADR 0204](../../.docs/decisions/0204-frontend-architecture.md)):
+  - `src/api/`: the generated client. Only `src/api/` and `src/features/*/data/` import `generated.ts`.
+  - `src/features/<name>/model.ts`: app-owned view-model types. Components do not use the generated DTO types (`Finding`, `Status`, `Module`).
+  - `src/features/<name>/data/use<Name>.ts`: the feature's data hook. It calls the generated hooks, maps DTOs to view models, and returns plain values and callbacks.
+  - `src/features/<name>/components/`: presentational components. Props in, JSX out. They do not import from `api/`, `data/`, the store or Socket.IO.
+  - `src/features/<name>/<Name>Page.tsx`: calls the data hook and passes its results down as props. This is the only layer where data and presentation meet.
+- Do not add a container component when a hook does the job. The hook is the boundary.
 - Server state lives in RTK Query (`src/api/baseApi.ts`, generated endpoints). No raw `fetch` in components. Local UI state (open panel, selected row) stays in the component that owns it.
+- A PR that imports from `api/generated` in a component or uses a DTO type in a component is not ready.
 - Filter state (date range, source, `risk_level`, `module`) is one object. It maps 1:1 onto the `GET /findings` query parameters from §5 (`module, status, platform, source_id, risk_level, score_min, date_from, date_to, q`) and is kept in the URL search params, so a filtered view can be shared and reloaded.
 - Do not compute `risk_level` in the browser. The API derives it from the threshold (§4, ADR 0305). Read it from the response and show it.
 - Real-time: subscribe to `finding.high_risk`, `finding.created` and `finding.updated` in one place (a single hook or middleware). Apply updates to the RTK Query cache (`updateQueryData` or invalidation). Do not keep a second copy of the findings list.
