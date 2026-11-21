@@ -1,6 +1,6 @@
 # Dependency audits
 
-Dependency and secret scan results before a merge to `main` ([integration-plan.md](integration-plan.md) §7). How to run each scan: [supply-chain.md](supply-chain.md) ([ADR 0209](decisions/0209-supply-chain-scanning.md)). Newest first; one row per run.
+Service security notes, the aggregated scan at a milestone or the hand-in, and residual risks that outlive their PR. Per-PR scan results go in the PR body, not here ([ADR 0209](decisions/0209-supply-chain-scanning.md) decision 2, [supply-chain.md](supply-chain.md)). Rows up to 2026-11-22 are from the earlier one-row-per-audit rule. Newest first.
 
 | Date | Module | Command | Result |
 |---|---|---|---|

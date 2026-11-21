@@ -1,6 +1,6 @@
 # Supply chain: dependency scanning and secrets
 
-Runbook for [ADR 0209](decisions/0209-supply-chain-scanning.md). This file says how; the ADR says why. Results go to [security-audit.md](security-audit.md), one row per run.
+Runbook for [ADR 0209](decisions/0209-supply-chain-scanning.md). This file says how; the ADR says why. Results go in the PR body, in a short **Security scans** section (commands, versions, result); [security-audit.md](security-audit.md) holds only service notes, the hand-in run and long-lived residual risks.
 
 Every tool here is open source and runs locally with Docker or the language toolchain. None needs an account or sends source code anywhere.
 
@@ -38,7 +38,7 @@ docker run --rm -v "$PWD":/src:ro -v osv-db:/root/.cache/osv-scanner \
 |---|---|---|
 | npm | `npm audit fix` (semver-compatible updates in the lockfile), then `npm ci && npm test`. For a transitive dependency with no compatible fix, use `overrides` in `package.json`. | `npm audit fix --force` without reading the diff, because it allows major upgrades |
 | pip | Raise the `==` pin to the first fixed version that `pip-audit` reports (`pip-audit --fix` does it in place), then reinstall and run the service tests | Unpinning, or `>=` ranges |
-| No fix released | Record a residual risk row in `security-audit.md`: advisory id, why it is not exploitable here, the revisit date | Silently ignoring it |
+| No fix released | Document the residual risk in the PR body: advisory id, severity, why it is not exploitable here, the revisit date. If it outlives the PR, also add it to `security-audit.md` | Silently ignoring it |
 
 ## 4. Secrets
 
