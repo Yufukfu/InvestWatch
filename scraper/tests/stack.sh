@@ -95,15 +95,17 @@ single_scheduler() {
 secrets_have_no_default() { # structural: infra and api fail on the same unset variables first, so read the file
   local f="$ROOT/scraper/compose.yaml" v
   for v in POSTGRES_APP_PASSWORD REDIS_PASSWORD MINIO_SECRET_KEY; do
-    grep -Eq "\\$\\{$v:\\?" "$f" || { echo "$v has no :? form in scraper/compose.yaml"; return 1; }
-    ! grep -Eq "\\$\\{$v:-" "$f" || { echo "$v has a fallback"; return 1; }
+    local all required
+    all=$(grep -Eo "\\$\\{$v[:}-]" "$f" | wc -l | tr -d ' '); required=$(grep -Eo "\\$\\{$v:\\?" "$f" | wc -l | tr -d ' ')
+    [ "$required" -ge 1 ] && [ "$all" = "$required" ] || { echo "$v: $required of $all uses are the required form"; return 1; }
   done
 }
 no_admin_credential() {
   js '
     const banned = [e.POSTGRES_ADMIN_PASSWORD, e.MINIO_ROOT_PASSWORD, e.POSTGRES_ADMIN_USER, e.MINIO_ROOT_USER];
+    if (banned.some((b) => !b)) fail("an admin value is unset in the env file, the check would be vacuous");
     for (const s of S) for (const [k, v] of Object.entries(c.services[s].environment || {})) {
-      for (const b of banned) if (b && String(v).includes(b)) fail(s + "." + k + " holds an admin credential");
+      for (const b of banned) if (String(v).includes(b)) fail(s + "." + k + " holds an admin credential");
     }
     for (const s of S) {
       const u = (c.services[s].environment || {}).DATABASE_URL || "";
@@ -124,7 +126,11 @@ networks_and_ports() {
       if (!n.length || n.some((x) => x !== "data" && x !== "egress")) fail(s + " networks " + n);
       if ((c.services[s].ports || []).length) fail(s + " publishes a port");
     }
-    if (!Object.keys(c.services.worker.networks).includes("egress")) fail("worker has no route out")'
+    if (!Object.keys(c.services.worker.networks).includes("egress")) fail("worker has no route out")
+    for (const s of ["scheduler", "seed"]) {
+      const n = Object.keys(c.services[s].networks).join(",");
+      if (n !== "data") fail(s + " fetches nothing and must be on data alone, not " + n);
+    }'
 }
 hardening_declared() {
   js '
@@ -180,8 +186,11 @@ knf_rows() { # prints "<count>|<schedule_cron>"
 }
 
 invalid_cron_refused() {
+  dc build seed >/dev/null || return 1  # never judge a stale image tagged by an earlier run
   dc up -d --wait api-migrate minio-init || return 1
-  if SCRAPER_SEED_CRON='not a cron' dc run --rm --no-deps seed; then echo "seed accepted an invalid cron"; return 1; fi
+  local out
+  if out=$(SCRAPER_SEED_CRON='not a cron' dc run --rm --no-deps seed 2>&1); then echo "seed accepted an invalid cron"; return 1; fi
+  case $out in *"invalid cron"*) ;; *) echo "failed for another reason: $out"; return 1 ;; esac
   [ "$(knf_rows)" = "0|" ] || { echo "a row was written: $(knf_rows)"; return 1; }
 }
 seed_failure_blocks_services() {
