@@ -17,6 +17,11 @@ The choice is hard to reverse once several charts are built, so it is recorded h
 
 Both are open source, and both are licensed MIT, which satisfies the web rule.
 
+Evidence from npm metadata (`npm view`, 2026-11-21):
+
+- Recharts 3.11.0 lists peers `react`, `react-dom` and `react-is`, each including `^19.0.0`, plus `@types/react`. `react-is` is a peer, not a dependency, so the install PR must have a `react-is` version matching the installed React 19.
+- Package size (`dist.unpackedSize`): Recharts 3.11.0 is about 8.9 MB, Chart.js 4.6.1 is about 6.2 MB and react-chartjs-2 5.3.1 is about 55 kB. This is the size on disk, not the size of the production bundle, which depends on tree-shaking and which charts are used. The bundle size was not measured, because neither library is installed. The install PR measures it with `vite build`.
+
 ## Decision
 
 Option 1: **Recharts** is the only chart library in `web/`. Chart components take their data and callbacks as props and do not fetch or read the store.
