@@ -24,6 +24,7 @@ from iw_scraper.seed import (
 )
 
 ENTRIES = load_seed_dir(SEEDS_DIR)
+WEB_ENTRIES = [entry for entry in ENTRIES if entry.platform == "web"]  # only these go through the web fetch path (`collectable()`)
 
 
 def stored(rows) -> list[tuple]:
@@ -124,10 +125,10 @@ async def test_seed_all_writes_nothing_when_a_seed_file_is_invalid(pool, tmp_pat
 
 
 async def test_every_seeded_host_is_allowed_with_no_extra_hosts_and_a_foreign_hop_is_refused(pool):
-    await seed_sources(pool, ENTRIES)
+    await seed_sources(pool, WEB_ENTRIES)
     guard = await allowed_urls(PgSourceStore(pool), [], (80, 443))()  # FETCH_EXTRA_HOSTS empty
 
-    for entry in ENTRIES:
+    for entry in WEB_ENTRIES:
         guard.check(entry.url)
         guard.check(urlsplit(entry.url)._replace(path="/elsewhere", query="").geturl())  # a redirect within the host
     with pytest.raises(FetchFailure) as refused:

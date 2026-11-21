@@ -24,7 +24,7 @@ pytestmark = pytest.mark.scraper_live
 REQUEST_INTERVAL_SECONDS = 5.0  # the scraper's default gap between two request starts on one domain
 TIMEOUT_SECONDS = 20.0
 MAX_BYTES = 5 * 1024 * 1024
-ENTRIES = load_seed_dir(SEEDS_DIR)
+ENTRIES = [entry for entry in load_seed_dir(SEEDS_DIR) if entry.platform == "web"]  # the web fetch path is all this check drives
 
 
 async def check_entry(entry: SeedEntry, *, addresses, limiter, stages: Stages = Stages()) -> None:
