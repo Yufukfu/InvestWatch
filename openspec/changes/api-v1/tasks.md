@@ -32,12 +32,12 @@ Starts after change `api-db-schema` groups 1-3 (package, tables, migrate service
 
 ## 5. Stats, calibration, sources, scans, screenshots
 
-- [ ] 5.1 Failing tests, then `/api/stats/summary` and `/api/stats/trend` with zero-filled buckets and the default ranges of design decision 9: every "Statistics" scenario and the stats part of "Filter uses the same rule" pass
-- [ ] 5.2 Failing tests, then `/api/calibration` from the latest `calibration_points` run: every "Calibration curve" scenario passes
-- [ ] 5.3 Failing tests, then `GET`/`POST /api/sources` and `PATCH /api/sources/{id}` with the copied models: every "Sources management" scenario passes
-- [ ] 5.4 Failing tests, then `POST /api/scans` (`XADD iw:scan-requests`): every "Manual scan request" scenario passes and the stream entry validates against `scan_request`
-- [ ] 5.5 Failing tests, then the screenshot route over `ObjectStore`: every "Screenshot proxy" scenario passes, including that the key comes only from the document row
-- [ ] 5.6 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 5.1 Failing tests, then `/api/stats/summary` and `/api/stats/trend` with zero-filled buckets and the default ranges of design decision 9: every "Statistics" scenario and the stats part of "Filter uses the same rule" pass
+- [x] 5.2 Failing tests, then `/api/calibration` from the latest `calibration_points` run: every "Calibration curve" scenario passes
+- [x] 5.3 Failing tests, then `GET`/`POST /api/sources` and `PATCH /api/sources/{id}` with the copied models: every "Sources management" scenario passes
+- [x] 5.4 Failing tests, then `POST /api/scans` (`XADD iw:scan-requests`): every "Manual scan request" scenario passes and the stream entry validates against `scan_request`
+- [x] 5.5 Failing tests, then the screenshot route over `ObjectStore`: every "Screenshot proxy" scenario passes, including that the key comes only from the document row
+- [x] 5.6 Mutation check; mutations: 17 tried, 16 caught, 1 equivalent (a redundant 404 guard in `PATCH /sources`, removed); plus the 11-path route test from task 1.3
 
 ## 6. Container and end to end
 

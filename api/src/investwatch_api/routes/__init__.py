@@ -1,18 +1,12 @@
-"""REST routes, one module per resource of contracts/openapi.yaml."""
+"""REST routes, one module per resource of contracts/openapi.yaml, all under /api."""
 
 from __future__ import annotations
 
 from fastapi import FastAPI
 
+from . import calibration, documents, findings, scans, settings, sources, stats
+
 
 def register(api: FastAPI) -> None:
-    import importlib
-
-    for name in ("findings", "settings", "stats", "calibration", "sources", "scans", "documents"):
-        try:
-            module = importlib.import_module(f"{__name__}.{name}")
-        except ModuleNotFoundError as exc:
-            if exc.name == f"{__name__}.{name}":
-                continue  # resource not implemented yet
-            raise
+    for module in (findings, settings, stats, calibration, sources, scans, documents):
         api.include_router(module.router, prefix="/api")
