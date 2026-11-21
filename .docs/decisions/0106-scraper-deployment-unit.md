@@ -6,7 +6,7 @@
 
 ## Context
 
-`scraper-orchestration` (PR #38) delivered `python -m iw_scraper worker|scheduler` and `iw_scraper.seed`, but the root `compose.yaml` included only infra, web, api and analytics, so `docker compose up` ran no scan. `scraper-stack` (`openspec/changes/scraper-stack/`) deploys them. Facts read in code: `runtime()` in `app.py` is shared by both commands and opens Postgres, Redis and MinIO before starting; `scheduler.py` makes no HTTP call; `worker.py` defines `CLOSE_TIMEOUT = 10.0` and the shutdown deadline is `SCRAPER_SHUTDOWN_DEADLINE` (default 30 s); `infra/compose.yaml` declares `data` as `internal: true` and `egress` as the route out. `scraper-v3-render` (branch `scraper/scraper-v3-render`, task 3.2) also plans to create `scraper/compose.yaml`, with `stop_grace_period: 45s`.
+`scraper-orchestration` (PR #38) delivered `python -m iw_scraper worker|scheduler` and `iw_scraper.seed`, but the root `compose.yaml` included only infra, web, api and analytics, so `docker compose up` ran no scan. `scraper-stack` (`openspec/changes/archive/2026-11-21-scraper-stack/`) deploys them. Facts read in code: `runtime()` in `app.py` is shared by both commands and opens Postgres, Redis and MinIO before starting; `scheduler.py` makes no HTTP call; `worker.py` defines `CLOSE_TIMEOUT = 10.0` and the shutdown deadline is `SCRAPER_SHUTDOWN_DEADLINE` (default 30 s); `infra/compose.yaml` declares `data` as `internal: true` and `egress` as the route out. `scraper-v3-render` (branch `scraper/scraper-v3-render`, task 3.2) also plans to create `scraper/compose.yaml`, with `stop_grace_period: 45s`.
 
 ## Options considered
 
