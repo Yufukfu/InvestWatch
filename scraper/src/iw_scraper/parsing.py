@@ -67,11 +67,20 @@ def _title(root: html.HtmlElement) -> str | None:
     return None
 
 
+def _web_url(base: str, href: str) -> str | None:
+    """`href` resolved against `base` if it is an http(s) URL; None for anything else or a hostile value."""
+    try:
+        resolved = urljoin(base, href)
+        return resolved if urlsplit(resolved).scheme in _WEB_SCHEMES else None
+    except ValueError:  # e.g. `http://[` raises "Invalid IPv6 URL"; one bad value must not fail the page
+        return None
+
+
 def _canonical(root: html.HtmlElement, final_url: str) -> str:
     for link in root.xpath("//link[@rel and @href]"):
         if "canonical" in link.get("rel", "").lower().split():
-            resolved = urljoin(final_url, link.get("href").strip())
-            if urlsplit(resolved).scheme in _WEB_SCHEMES:
+            resolved = _web_url(final_url, link.get("href").strip())
+            if resolved:
                 return resolved
     return final_url
 
@@ -82,8 +91,8 @@ def _links(root: html.HtmlElement, final_url: str) -> tuple[str, ...]:
         href = anchor.get("href").strip()
         if not href or href.startswith("#"):
             continue
-        resolved = urljoin(final_url, href)
-        if urlsplit(resolved).scheme in _WEB_SCHEMES:
+        resolved = _web_url(final_url, href)
+        if resolved:
             seen.setdefault(resolved)
     return tuple(seen)
 

@@ -15,7 +15,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 - [x] 2.2 Save the real KNF warnings page as a fixture (`scraper/tests/fixtures/`), plus article, no-title, windows-1250, empty and malformed fixtures; failing tests, then the parser (title with `<h1>` fallback, `canonical_url`, link filtering); the parse scenarios pass
 - [x] 2.3 Failing tests, then the host-keyed parser registry with the generic parser as default; the registry scenarios pass
 - [x] 2.4 Failing tests, then typed `JobError` with the closed reason set, an in-memory sink, the JSON logger and redaction of `user:pass@` URLs; the closed-set and string-level no-credentials tests pass
-- [x] 2.5 Mutation check; `mutations: 24 tried, 24 caught`
+- [x] 2.5 Mutation check; `mutations: 26 tried, 26 caught`
 
 ## 3. Fetch layer (single attempt)
 

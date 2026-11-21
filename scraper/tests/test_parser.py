@@ -177,3 +177,19 @@ def test_text_after_a_script_is_kept():
     page = parse_page(body, HTML, "https://example.pl/")
 
     assert page.text == "before after the script"
+
+
+def test_unparseable_link_is_dropped_not_fatal():
+    body = b'<html><body>x<a href="http://[">bad</a><a href="/ok">ok</a></body></html>'
+
+    page = parse_page(body, HTML, "https://example.pl/")
+
+    assert page.links == ("https://example.pl/ok",)
+
+
+def test_unparseable_canonical_falls_back_to_final_url():
+    body = b'<html><head><link rel="canonical" href="http://["></head><body>x</body></html>'
+
+    page = parse_page(body, HTML, "https://example.pl/a")
+
+    assert page.canonical_url == "https://example.pl/a"
