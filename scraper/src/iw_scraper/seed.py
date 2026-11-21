@@ -10,6 +10,7 @@ import os
 import sys
 
 import asyncpg
+from croniter import croniter
 
 KNF_NAME = "KNF ostrzeżenia publiczne"
 KNF_URL = "https://www.knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne"
@@ -28,8 +29,13 @@ async def seed_knf(pool: asyncpg.Pool, *, cron: str | None = None) -> str | None
 
 
 def cron_from(argv: list[str]) -> str | None:
-    """The optional first argument of the command line."""
-    return argv[1] if len(argv) > 1 else None
+    """The optional first argument of the command line; an invalid cron ends the process before any write
+    (the scheduler would otherwise skip the source with a logged warning on every tick)."""
+    if len(argv) < 2:
+        return None
+    if not croniter.is_valid(argv[1]):
+        raise SystemExit(f"invalid cron: {argv[1]!r}")
+    return argv[1]
 
 
 async def main() -> None:

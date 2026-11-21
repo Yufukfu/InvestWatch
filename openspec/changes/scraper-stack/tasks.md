@@ -4,15 +4,15 @@ Before group 1: the branch is on `origin/main` (it has PR #38; the branch was cu
 
 ## 1. Stack check and compose file
 
-- [ ] 1.1 Write `scraper/tests/stack.sh` with every scenario of `scraper-deployment` red before any compose file exists: services, gates (`docker compose config --format json`), restart policies, single scheduler, seed override that fails, rerun and one KNF row, non-null cron and invalid cron, structural no-default secrets, no admin string, seed holds less, networks and no ports, health from a throwaway container on `data`, hardening via `docker inspect`, read-only write refused, grace arithmetic, idle stop; it fails because `scraper/compose.yaml` does not exist
-- [ ] 1.2 Add `scraper/compose.yaml` per design decisions 1 to 7 (including the pass-through variables in the root `.env.example`); the scenarios pass
-- [ ] 1.3 Mutation check (add a host port; put `worker` on `edge`; drop `read_only`; drop `cap_drop`; drop `tmpfs`; add `MINIO_ROOT_PASSWORD` to `worker`; remove the `seed` gate; remove `:?` from `DATABASE_URL`; `replicas: 2` on `scheduler`; `stop_grace_period: 35s`; drop the seed cron argument; each must be caught) and write `mutations: N tried, N caught` on this line
+- [x] 1.1 Write `scraper/tests/stack.sh` with every scenario of `scraper-deployment` red before any compose file exists: services, gates (`docker compose config --format json`), restart policies, single scheduler, seed override that fails, rerun and one KNF row, non-null cron and invalid cron, structural no-default secrets, no admin string, seed holds less, networks and no ports, health from a throwaway container on `data`, hardening via `docker inspect`, read-only write refused, grace arithmetic, idle stop; it fails because `scraper/compose.yaml` does not exist
+- [x] 1.2 Add `scraper/compose.yaml` per design decisions 1 to 7 (including the pass-through variables in the root `.env.example`) and make `seed` reject an invalid cron (`cron_from`, unit test written red first); the scenarios pass (10 run, 12 config)
+- [x] 1.3 Mutation check (add a host port; put `worker` on `edge`; drop `read_only`; drop `cap_drop`; drop `tmpfs`; add `MINIO_ROOT_PASSWORD` to `worker`; remove the `seed` gate; remove `:?` from `DATABASE_URL`; `replicas: 2` on `scheduler`; `stop_grace_period: 35s`; drop the seed cron argument; each must be caught) and write `mutations: N tried, N caught` on this line: mutations: 11 tried, 11 caught (each by its own check, `stack.sh config`)
 
 ## 2. Join the root stack
 
-- [ ] 2.1 Failing test: `docker compose config` at the repo root lists `worker`, `scheduler` and `seed`; it fails because the root file does not include the scraper
-- [ ] 2.2 Add `scraper/compose.yaml` to the root `include:`; the root `docker compose up` passes "Whole stack starts" (no fetch); tell Kacper about the line in the PR body
-- [ ] 2.3 Mutation check (remove the include line; rename a service; each must be caught) and write `mutations: N tried, N caught` on this line
+- [x] 2.1 Failing test: `docker compose config` at the repo root lists `worker`, `scheduler` and `seed`; it fails because the root file does not include the scraper
+- [x] 2.2 Add `scraper/compose.yaml` to the root `include:`; the root `docker compose up` passes "Whole stack starts" (no fetch); tell Kacper about the line in the PR body
+- [x] 2.3 Mutation check (remove the include line; rename a service; each must be caught) and write `mutations: N tried, N caught` on this line: mutations: 2 tried, 2 caught (`stack.sh root`)
 
 ## 3. Audit and docs
 

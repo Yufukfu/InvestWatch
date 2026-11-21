@@ -1,3 +1,5 @@
+import pytest
+
 from iw_scraper.seed import KNF_URL, cron_from, seed_knf
 
 
@@ -21,3 +23,9 @@ async def test_the_cron_is_stored_when_given(pool):
 def test_the_cron_comes_from_the_first_argument():
     assert cron_from(["seed", "0 * * * *"]) == "0 * * * *"
     assert cron_from(["seed"]) is None
+
+
+@pytest.mark.parametrize("bad", ["not a cron", "61 * * * *", "* * * *", ""])
+def test_an_invalid_cron_stops_the_seed_before_it_connects(bad):
+    with pytest.raises(SystemExit, match="invalid cron"):
+        cron_from(["seed", bad])
