@@ -47,6 +47,10 @@ class StoreUnavailable(StoreError):
     """Connection loss or a serialization failure: retry later, never ack."""
 
 
+class StoreMisconfigured(StoreError):
+    """`DATABASE_URL` cannot be parsed. Not retryable: the worker exits. The message never quotes the URL."""
+
+
 @dataclass(frozen=True)
 class SavedFinding:
     finding: Finding
@@ -113,7 +117,7 @@ class InMemoryStore:
             saved: list[SavedFinding] = []
             for f in findings:
                 if f.document_id not in self._documents:
-                    raise StoreError(f"foreign key: document {f.document_id} does not exist")
+                    raise StoreError("ForeignKeyViolation (sqlstate 23503)")  # same text as the Postgres store
                 key = (f.document_id, f.module)
                 existing = staged.get(key)
                 if existing is None:
@@ -180,6 +184,15 @@ class PostgresStore:
     """Store on the shared Postgres (connect as `iw_app`). One connection per thread, reopened after a drop."""
 
     def __init__(self, dsn: str, *, connect_timeout: int = 5) -> None:
+        from psycopg.conninfo import conninfo_to_dict
+
+        try:
+            conninfo_to_dict(dsn)
+            malformed = False
+        except Exception:
+            malformed = True
+        if malformed:  # raised outside the except block, so the libpq error (it may quote the password) is not kept
+            raise StoreMisconfigured("DATABASE_URL is malformed")
         self._dsn = dsn
         self._connect_timeout = connect_timeout
         self._local = threading.local()
@@ -203,6 +216,9 @@ class PostgresStore:
         conn = getattr(self._local, "conn", None)
         self._local.conn = None
         if conn is not None:
+            with self._all_lock:
+                if conn in self._all:
+                    self._all.remove(conn)
             try:
                 conn.close()
             except Exception:  # already broken; nothing left to release
@@ -223,8 +239,11 @@ class PostgresStore:
             # first line so a DSN can never reach the logs.
             first_line = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
             raise StoreUnavailable(f"{type(exc).__name__}: {first_line}") from exc
-        except psycopg.IntegrityError as exc:
-            raise StoreError(f"integrity: {type(exc).__name__}: {exc.diag.constraint_name}") from exc
+        except psycopg.Error as exc:
+            # e.g. an FK violation (IntegrityError), InsufficientPrivilege (a missing grant) or DataError:
+            # unexpected, so the worker counts it toward MAX_DELIVERIES. Only the class and SQLSTATE, never the
+            # message: driver messages can echo row values ("Key (document_id)=(...)").
+            raise StoreError(f"{type(exc).__name__} (sqlstate {exc.sqlstate})") from None
 
     def load_document(self, document_id: str) -> ScrapedDocument:
         try:
@@ -266,7 +285,11 @@ class PostgresStore:
         return self._run(op)
 
     def findings_for_document(self, document_id: str) -> list[Finding]:
-        rows = self._run(lambda conn: conn.execute(_FINDINGS_SQL, (uuid.UUID(document_id),)).fetchall())
+        try:
+            key = uuid.UUID(document_id)
+        except (ValueError, AttributeError, TypeError):
+            return []  # same as the in-memory store: no finding can belong to a non-UUID id
+        rows = self._run(lambda conn: conn.execute(_FINDINGS_SQL, (key,)).fetchall())
         return [_finding_from_row(r) for r in rows]
 
     def ping(self) -> bool:

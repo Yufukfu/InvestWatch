@@ -25,6 +25,7 @@ from investwatch_analytics.storage import (
     NotFound,
     PostgresStore,
     StoreError,
+    StoreMisconfigured,
     StoreUnavailable,
 )
 
@@ -274,8 +275,9 @@ def test_two_modules_two_rows(backend):
 def test_failure_mid_batch_commits_nothing(backend):
     backend.seed(columns())
     bad = finding(document_id=MISSING_ID, module="M1", fid="66666666-6666-4666-8666-666666666666")
-    with pytest.raises(StoreError):
+    with pytest.raises(StoreError) as err:
         backend.store.save_findings(load(backend), [finding(), bad])
+    assert not isinstance(err.value, StoreUnavailable) and MISSING_ID not in str(err.value)
     assert backend.store.findings_for_document(DOC_ID) == []
 
 
@@ -394,3 +396,41 @@ def test_postgres_operational_error_drops_a_still_open_connection():
     with pytest.raises(StoreUnavailable):
         store.load_document(DOC_ID)
     assert store._local.conn is None and conn.closed  # the next call opens a fresh connection
+
+
+def test_findings_for_a_non_uuid_id_is_empty(backend):
+    assert backend.store.findings_for_document("not-a-uuid") == []
+
+
+@pytest.mark.parametrize("dsn", ["postgresql://u:s3cr%zzet@127.0.0.1:1/db", "host=127.0.0.1 password='s3cr%zzet"])
+def test_postgres_malformed_dsn_never_quotes_it(dsn):
+    with pytest.raises(StoreMisconfigured) as err:
+        PostgresStore(dsn)
+    text = str(err.value) + repr(err.value.__cause__) + repr(err.value.__context__)
+    assert "s3cr" not in text
+    assert err.value.__cause__ is None and err.value.__context__ is None
+
+
+def test_postgres_other_driver_errors_become_store_errors_without_detail():
+    from psycopg import errors
+
+    store = PostgresStore("postgresql://unused@127.0.0.1:1/none")
+    store._local.conn = RaisingConn(errors.InsufficientPrivilege("permission denied for table findings: row secret"))
+    with pytest.raises(StoreError) as err:
+        store.load_document(DOC_ID)
+    assert not isinstance(err.value, StoreUnavailable)
+    assert "InsufficientPrivilege" in str(err.value) and "secret" not in str(err.value)
+    assert err.value.__cause__ is None and err.value.__suppress_context__
+
+
+def test_postgres_dropped_connections_are_forgotten():
+    from psycopg import errors
+
+    store = PostgresStore("postgresql://unused@127.0.0.1:1/none")
+    for _ in range(3):
+        conn = RaisingConn(errors.QueryCanceled("timeout"))
+        store._local.conn = conn
+        store._all.append(conn)
+        with pytest.raises(StoreUnavailable):
+            store.load_document(DOC_ID)
+    assert store._all == []
