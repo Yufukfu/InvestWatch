@@ -5,7 +5,7 @@
 
 ## 2. Write the definition down
 
-- [ ] 2.1 `.docs/integration-plan.md` §3 definition, ADR 0105 and its index row, `.docs/decisions/README.md`, `.docs/status/scraper.md`, `scraper/CLAUDE.md` pointer if needed
+- [x] 2.1 `.docs/integration-plan.md` §3 definition, ADR 0105 and its index row, `.docs/decisions/README.md`, `.docs/status/scraper.md`, `scraper/CLAUDE.md` pointer if needed
 
 ## 3. Closing
 

@@ -81,7 +81,7 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
   "lang": "pl | null",                  // optional – analytics detects it anyway
   "title": "string | null",
   "text": "clean text of the whole material",
-  "content_hash": "sha256 of normalized text", // deduplication
+  "content_hash": "sha256 of normalized text", // deduplication; exact definition below
   "author": {                           // for social media / blogs
     "name": "string | null",
     "handle": "@nick | null",
@@ -118,6 +118,8 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 Machine-readable versions of all contracts in this document (JSON Schema, OpenAPI, mocks): [`contracts/`](../contracts/README.md).
 
 Minimum required for analytics to work: `id, platform, url, fetched_at, text, source_kind`.
+
+`content_hash` is the lowercase hex sha256 of the UTF-8 bytes of the normalised `text`: Unicode **NFC**, then every run of whitespace (`str.split()` semantics, so no-break and ideographic spaces count) collapsed to one space, leading and trailing whitespace removed, case kept. Compatibility characters (ligature `ﬁ`, superscript `²`, full-width digits) are not folded, so NFKC is not part of the definition. The scraper computes and stores it (unique per `source_id`, used for dedup); consumers read the stored value or must reproduce this exact function, never their own matching normalisation ([ADR 0105](decisions/0105-content-hash-normalisation.md)).
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
 Table `sources` (managed by the scraper, editable from the dashboard):

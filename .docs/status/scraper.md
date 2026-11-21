@@ -8,11 +8,12 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - `scraper-v1` (fetch, parse, politeness, guards) is merged (PR #19).
 - `scraper-ingest` (database sink, `documents`, `iw:documents`, republish sweep) is implemented against Damian's `0001_initial`, in review (PR #22) and archived in that PR.
 - `scraper-orchestration` (queue, schedule, scan requests, the run that joins the pieces) not started.
+- `content-hash-definition` (issue #31): the `content_hash` definition (NFC) is written into integration-plan §3 and ADR 0105, pinned by scraper tests; no scraper code changed. Analytics (Damian) still has to read the stored hash instead of recomputing it with NFKC (proposal in the issue).
 - ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
 ## Active OpenSpec changes
 
-- none (`scraper-v1` archived; `scraper-ingest` archived in PR #22)
+- none (`scraper-v1` archived; `scraper-ingest` archived in PR #22; `content-hash-definition` archived in its own PR)
 
 ## Blockers and open decisions
 
