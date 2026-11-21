@@ -253,3 +253,20 @@ def test_socketio_cors_allows_only_configured_origins(contracts_dir):
     assert allowed.status_code == 200
     assert allowed.headers.get("access-control-allow-origin") == "http://localhost:5173"
     assert other.status_code == 400
+
+
+def test_source_is_running_while_its_scan_is_in_flight(contracts_dir):
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0, scan_delay_s=1.5, cors_origins=("*",))
+    with LiveServer(settings) as url:
+        rec = Recorder(url)
+        source_id = httpx.post(f"{url}/api/sources", json=NEW_SOURCE).json()["id"]
+
+        httpx.post(f"{url}/api/scans", json={"source_id": source_id})
+        running = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source_id)
+        rec.wait_for("scan.finished", timeout=5)
+        done = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source_id)
+        rec.close()
+
+    assert running["last_run_status"] == "running"  # the contract enum has "running" for this window
+    assert_valid("source", running)
+    assert done["last_run_status"] == "ok"

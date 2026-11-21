@@ -184,3 +184,12 @@ def test_no_cors_header_for_other_origin(client):
     r = client.get("/api/findings", headers={"Origin": "http://evil.example"})
 
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_trend_date_from_inside_an_hour_keeps_that_hour(client):
+    points = client.get("/api/stats/trend").json()["points"]
+    lo = points[3]["t"].replace(":00:00Z", ":30:00Z")  # findings after 10:30 are counted in the 10:00 bucket
+
+    subset = client.get(f"/api/stats/trend?date_from={lo}").json()["points"]
+
+    assert [p["t"] for p in subset] == [p["t"] for p in points[3:]]

@@ -141,3 +141,14 @@ def test_store_findings_carry_no_stored_risk_level(contracts_dir):
     store = Store(load_mock_data(contracts_dir))
 
     assert all("risk_level" not in f for f in store.findings.values())
+
+
+def test_mock_without_findings_is_rejected(contracts_copy):
+    # replay clones mock findings, so an empty list would only fail later, on every replay tick
+    path = contracts_copy / "mocks" / "findings.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["items"] = []
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(MockDataError, match="findings.json: at least one finding"):
+        load_mock_data(contracts_copy)

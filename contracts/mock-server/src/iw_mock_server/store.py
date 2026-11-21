@@ -103,6 +103,8 @@ def load_mock_data(contracts_dir: Path) -> MockData:
 
     findings = _validate_items(_require_keys(_read_json(mocks / "findings.json"), ("items",), "findings.json")["items"],
                                finding_v, "findings.json")
+    if not findings:  # replay clones mock findings; with none, every replay tick would fail
+        raise MockDataError("findings.json: at least one finding is required")
     documents = _validate_items(_read_json(mocks / "documents.json"), document_v, "documents.json")
     sources = _validate_items(_require_keys(_read_json(mocks / "sources.json"), ("items",), "sources.json")["items"],
                               source_v, "sources.json")

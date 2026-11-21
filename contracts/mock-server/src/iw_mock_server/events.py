@@ -95,6 +95,9 @@ class EventHub:
     # --- scans -----------------------------------------------------------------------------
 
     def start_scan(self, source_id: str) -> None:
+        source = self.store.sources.get(source_id)
+        if source is not None:  # set before the 202 so a reload during the scan already sees it
+            source["last_run_status"] = "running"
         self._spawn(self._scan(source_id))
 
     async def _scan(self, source_id: str) -> None:

@@ -276,7 +276,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     ):
         hourly = store.trend_points(risk_level)
         if date_from:
-            hourly = [p for p in hourly if parse_ts(p["t"]) >= _aware(date_from)]
+            # keep the hour that contains date_from: its bucket starts before date_from but ends after it
+            hourly = [p for p in hourly if parse_ts(p["t"]) + timedelta(hours=1) > _aware(date_from)]
         if date_to:
             hourly = [p for p in hourly if parse_ts(p["t"]) <= _aware(date_to)]
 
