@@ -15,7 +15,7 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 
 ## Active OpenSpec changes
 
-- `realtime-alerts` (stacked on `findings-explorer`, PR #39); next: calibration panel
+- none (`realtime-alerts` archived, stacked on PR #39); next: calibration panel
 
 ## Blockers and open decisions
 
