@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from C's choices; accepted by A, B and C via PR #3
+- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
 
 ## Context
 
@@ -22,7 +22,7 @@ Not measured yet: tokens per second of `gemma3:4b` / `gemma3:12b` on the team's 
 
 None of the three options as written: **analytics uses a cloud-hosted model, on the condition that it is easy to swap for another cloud or local model.** The model is reached only through the env configuration (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`), so switching provider or moving to a local Ollama container is a configuration change, not a code change.
 
-Why (C): a cloud model is acceptable only if it can be replaced by another cloud or local model easily.
+Why (Damian): a cloud model is acceptable only if it can be replaced by another cloud or local model easily.
 
 ## Consequences
 

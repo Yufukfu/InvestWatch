@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from C's choices; accepted by A, B and C via PR #3
+- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
 
 ## Context
 
@@ -20,7 +20,7 @@ Two existing statements pull in different directions: §6 of the integration pla
 
 Option 1: **thresholds in a Redis key (`iw:settings:thresholds`) written by the API; analytics reads it and emits `finding.high_risk`.**
 
-Why (C):
+Why (Damian):
 - It keeps the event flow of [integration-plan.md](../integration-plan.md) §6, where analytics publishes `finding.high_risk` on `iw:events`; nothing in the flow changes.
 - The API relay stays a plain pass-through from `iw:events` to Socket.IO with no threshold logic, which is less work before Integration #1.
 

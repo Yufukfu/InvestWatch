@@ -19,7 +19,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 |---|---|---|---|
 | scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
 | dashboard | B | n/a | none yet |
-| analytics, api, contracts | C | plans written; contracts draft v1 in `contracts/`; ADRs 0301-0305 committed as accepted with C's decisions (0301 minimal core, 0302 Python `api/`, 0303 Alembic in `api/`, 0304 swappable cloud LLM, 0305 Redis thresholds), take effect when A and B approve and PR #3 merges | none yet |
+| analytics, api, contracts | Damian | plans written; contracts draft v1 in `contracts/`; ADRs 0301-0305 committed as accepted with Damian's decisions (0301 minimal core, 0302 Python `api/`, 0303 Alembic in `api/`, 0304 swappable cloud LLM, 0305 Redis thresholds), take effect when Adam and Kacper approve and PR #3 merges | none yet |
 
 ## Blockers and open decisions
 
