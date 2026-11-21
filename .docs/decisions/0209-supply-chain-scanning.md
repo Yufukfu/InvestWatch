@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written; accepted by Kacper via PR #47
+- Deciders: agent-written; proposed by Kacper (`web/`) in PR #47; pending approval by Adam (`scraper/`) and Damian (`analytics/`, `api/`, `contracts/`) on that PR
 
 ## Context
 
