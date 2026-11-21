@@ -21,6 +21,21 @@ CONTEXT_OPTIONS = {"service_workers": "block", "accept_downloads": False}  # per
 # `service_workers="block"` only stops a worker from intercepting requests (measured: `register()` still resolves in
 # the headless shell), and a worker's own fetches would bypass the policy, so `navigator.serviceWorker` is removed
 # from every frame, before any page script runs (no instance of the container is left to call `register` on).
+# WebRTC (UDP to STUN/ICE hosts) and WebTransport (QUIC) do not pass through `route`, so a page could probe internal
+# hosts or show the real egress address behind a proxy; the constructors are removed from every frame and the
+# launch flags below close the same paths in the browser.
+NO_REALTIME_NETWORK = """
+(() => {
+  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'WebTransport']) {
+    Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false });
+  }
+})();
+"""
+LAUNCH_ARGS = (
+    "--no-sandbox",  # ADR 0105: the sandbox does not start under Docker's default seccomp profile
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    "--disable-quic",
+)
 NO_SERVICE_WORKERS = """
 (() => {
   Object.defineProperty(Navigator.prototype, 'serviceWorker', { get: () => undefined, configurable: false });
@@ -31,8 +46,9 @@ AddressCheck = Callable[[str], Awaitable[str]]
 
 
 def _same_site(host: str, source_host: str) -> bool:
-    """`www.x.com`, `x.com` and `app.x.com` are one site; without a public-suffix list this is deliberately simple."""
-    return host == source_host or host.endswith(f".{source_host}") or source_host.endswith(f".{host}")
+    """The source host without `www.` and everything below it. Never a parent: `co.uk` and `github.io` are not ours."""
+    base = source_host.removeprefix("www.")
+    return host == base or host.endswith(f".{base}")
 
 
 class RequestPolicy:
@@ -117,6 +133,7 @@ async def confined_page(context: BrowserContext, policy: RequestPolicy) -> Page:
         await socket.close()  # `route` does not see websockets, `route_web_socket` does
 
     await context.add_init_script(NO_SERVICE_WORKERS)
+    await context.add_init_script(NO_REALTIME_NETWORK)
     await context.route("**/*", handle)
     await context.route_web_socket("**/*", refuse_websocket)
     page = await context.new_page()  # created before the listener, so only later pages (popups) are closed

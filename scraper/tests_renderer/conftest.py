@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from playwright.async_api import async_playwright
 
+from iw_renderer.confine import LAUNCH_ARGS
 from iw_scraper.addresses import AddressChecker
 
 FIXTURE_HOSTS = ("source.test", "third.test", "other.test")
@@ -80,6 +81,6 @@ def address_check() -> Callable[[str], Awaitable[str]]:
 async def browser():
     rules = ", ".join(f"MAP {host} 127.0.0.1" for host in FIXTURE_HOSTS)
     async with async_playwright() as playwright:
-        launched = await playwright.chromium.launch(args=["--no-sandbox", f"--host-resolver-rules={rules}"])
+        launched = await playwright.chromium.launch(args=[*LAUNCH_ARGS, f"--host-resolver-rules={rules}"])
         yield launched
         await launched.close()

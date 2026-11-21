@@ -179,6 +179,18 @@ def test_a_proxy_url_is_split_into_the_parts_playwright_wants():
     assert playwright_proxy("http://proxy.test:8080") == {"server": "http://proxy.test:8080"}
 
 
+def test_proxy_credentials_are_percent_decoded():
+    assert playwright_proxy("http://us%40er:p%3Ass@proxy.test:8080") == {
+        "server": "http://proxy.test:8080",
+        "username": "us@er",
+        "password": "p:ss",
+    }
+
+
+def test_an_ipv6_proxy_keeps_its_brackets():
+    assert playwright_proxy("http://u:p@[::1]:8080")["server"] == "http://[::1]:8080"
+
+
 def test_the_viewport_table_follows_the_contract():
     assert {n: (v.width, v.height, v.is_mobile, v.has_touch) for n, v in VIEWPORTS.items()} == {
         "desktop": (1440, 900, False, False),

@@ -7,7 +7,7 @@ keeps state between calls, and no failure detail holds a proxy URL, a query stri
 import asyncio
 import re
 from dataclasses import dataclass, replace
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from playwright.async_api import Browser, Page, Request
 from playwright.async_api import Error as PlaywrightError
@@ -67,12 +67,12 @@ class RenderResult:
 
 
 def playwright_proxy(url: str) -> dict[str, str]:
-    """Playwright wants the credentials apart from the server address."""
+    """Playwright wants the credentials apart from the server address, and decoded (`%40` is `@`)."""
     parts = urlsplit(url)
-    proxy = {"server": f"{parts.scheme}://{parts.hostname}" + (f":{parts.port}" if parts.port else "")}
+    proxy = {"server": f"{parts.scheme}://{parts.netloc.rpartition('@')[2]}"}  # netloc keeps an IPv6 host's brackets
     if parts.username:
-        proxy["username"] = parts.username
-        proxy["password"] = parts.password or ""
+        proxy["username"] = unquote(parts.username)
+        proxy["password"] = unquote(parts.password or "")
     return proxy
 
 

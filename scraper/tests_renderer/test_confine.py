@@ -63,6 +63,18 @@ async def test_a_navigation_within_the_site_is_allowed(address_check):
     assert await RequestPolicy("www.x.com", AddressChecker(), [80]).verdict("http://other.com/", "document", is_navigation=True)
 
 
+@pytest.mark.parametrize("source, target", [("bank.co.uk", "co.uk"), ("foo.github.io", "github.io"), ("app.x.com", "x.com")])
+async def test_a_navigation_to_a_parent_domain_is_refused(source, target):
+    async def public(host: str) -> str:
+        return "93.184.216.34"
+
+    policy = RequestPolicy(source, public, allowed_ports=[80])
+
+    reason = await policy.verdict(f"http://{target}/", "document", is_navigation=True)
+
+    assert reason is not None and "navigation away" in reason
+
+
 async def test_the_reason_never_holds_a_query_string(address_check):
     policy = RequestPolicy(SOURCE, address_check, allowed_ports=[80])
 
@@ -203,3 +215,21 @@ async def test_a_third_party_iframe_is_loaded_because_only_the_top_frame_must_st
     await settle()
 
     assert server.hits("third.test") == ["third.test/widget"]
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        "typeof RTCPeerConnection",
+        "typeof webkitRTCPeerConnection",
+        "typeof WebTransport",
+    ],
+)
+async def test_realtime_network_apis_that_the_route_cannot_see_are_gone(server, page, script):
+    url = server.serve(SOURCE, "/", "<iframe id=f srcdoc='<p>x</p>'></iframe>")
+    await page.goto(url)
+
+    in_page = await page.evaluate(script)
+    in_frame = await page.evaluate(f"document.getElementById('f').contentWindow.eval({script!r})")
+
+    assert (in_page, in_frame) == ("undefined", "undefined")
