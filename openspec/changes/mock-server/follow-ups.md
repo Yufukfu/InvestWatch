@@ -13,3 +13,13 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 7 | review group 1 | `summary.json` and `finding-detail.json` are not loaded | wont-fix (summary and detail are computed from the store so they reflect writes; the files remain reference examples) |
 | 8 | group 2 | `openapi.yaml` `GET /findings/{id}` combines `allOf: [finding.schema.json]` (which has `additionalProperties: false`) with extra `document` and `screenshot_urls` properties, so no valid detail response can pass that schema | new-item (contract fix for the whole team; tests validate the finding and document parts separately, like `contracts/validate.py`) |
 | 9 | group 2 | `starlette.testclient` deprecation warning for `httpx` | wont-fix (test-only warning; revisit when FastAPI's TestClient moves to the new client) |
+| 10 | review group 2 | trend with `risk_level` is recomputed from stored findings, so its scale differs from the unfiltered mock background | docs (README mock-server section, group 5) |
+| 11 | review group 2 | trend filters (`module`, `risk_level`, dates) untested | fix-here (tests added) |
+| 12 | review group 2 | calibration `current_threshold` test could not fail (mock value equalled the threshold) | fix-here (test uses a store with a different threshold) |
+| 13 | review group 2 | trend/calibration counts accepted floats; `labeled_samples` not required | fix-here (integers enforced, `labeled_samples` required) |
+| 14 | review group 2 | `q` also searched `summary`, beyond spec and openapi | fix-here (summary dropped; spec scenario now names advertiser name and handle, as openapi does) |
+| 15 | review group 2 | 404/422 bodies not checked against `components/responses` | fix-here (test helper follows response `$ref`s; 404 validated) |
+| 16 | review group 2 | runtime findings must use `...Z` timestamps for trend buckets | fix-here in group 4 (replay uses `bumped_timestamp`, always UTC `Z`) |
+| 17 | review group 2 | clients must URL-encode `+` in `date_from`/`date_to` | docs (README mock-server section) |
+| 18 | review group 2 | CORS headers missing on unhandled 500s; `MOCK_PORT` upper bound; `nan`/`inf` intervals; partial first hour in day buckets | wont-fix (mock-only edge cases; no 500s expected, values come from the team's own `.env`) |
+| 19 | group 4 | uvicorn without `websockets` silently falls back to long-polling | fix-here (`websockets` pinned in `requirements.txt`) |

@@ -69,14 +69,28 @@ def _check_thresholds(obj, file_name: str) -> dict[str, float]:
     return {m: float(obj[m]) for m in MODULES}
 
 
-def _check_points(points, keys: tuple[str, ...], numeric: tuple[str, ...], file_name: str) -> None:
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _check_points(points, integers: tuple[str, ...], numbers: tuple[str, ...], file_name: str,
+                  required: tuple[str, ...] = ()) -> None:
+    """Point shapes from openapi.yaml: counts are integers, ratios and thresholds are numbers."""
     if not isinstance(points, list):
         raise MockDataError(f"{file_name}: points must be a list")
     for index, point in enumerate(points):
-        _require_keys(point, keys, f"{file_name} points[{index}]")
-        for k in numeric:
-            if isinstance(point[k], bool) or not isinstance(point[k], (int, float)):
-                raise MockDataError(f"{file_name} points[{index}].{k} must be a number, got {point[k]!r}")
+        where = f"{file_name} points[{index}]"
+        _require_keys(point, (*required, *integers, *numbers), where)
+        for k in integers:
+            if not _is_int(point[k]):
+                raise MockDataError(f"{where}.{k} must be an integer, got {point[k]!r}")
+        for k in numbers:
+            if not _is_number(point[k]):
+                raise MockDataError(f"{where}.{k} must be a number, got {point[k]!r}")
 
 
 def load_mock_data(contracts_dir: Path) -> MockData:
@@ -98,10 +112,12 @@ def load_mock_data(contracts_dir: Path) -> MockData:
         m: _require_keys(_read_json(mocks / f"calibration-{m}.json"), ("module", "points"), f"calibration-{m}.json")
         for m in MODULES
     }
-    _check_points(trend["points"], ("t", *MODULES), MODULES, "trend.json")
+    _check_points(trend["points"], MODULES, (), "trend.json", required=("t",))
     for m, cal in calibration.items():
-        _check_points(cal["points"], ("threshold", "tp", "fp", "fn", "tn", "precision", "recall"),
-                      ("threshold", "tp", "fp", "fn", "tn", "precision", "recall"), f"calibration-{m}.json")
+        file_name = f"calibration-{m}.json"
+        if not _is_int(cal.get("labeled_samples")):
+            raise MockDataError(f"{file_name}: labeled_samples must be an integer")
+        _check_points(cal["points"], ("tp", "fp", "fn", "tn"), ("threshold", "precision", "recall"), file_name)
     thresholds = _check_thresholds(_read_json(mocks / "thresholds.json"), "thresholds.json")
     health = _require_keys(_read_json(mocks / "health.json"), ("status", "services"), "health.json")
 

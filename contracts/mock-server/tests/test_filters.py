@@ -75,6 +75,13 @@ def test_full_text_search_is_case_insensitive(client):
     assert result[0]["advertiser"]["handle"] == "@inwestor_jan"
 
 
+def test_search_does_not_look_into_the_summary(client, store):
+    word = "eksponuje"  # appears only in a summary, not in title, excerpt, firm or advertiser
+    assert any(word in (f.get("summary") or "") for f in store.findings.values())
+
+    assert items(client, f"q={word}") == []
+
+
 def test_search_matches_firm_name(client):
     result = items(client, "q=alfa inwestycje")
 

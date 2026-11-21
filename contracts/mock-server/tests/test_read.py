@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from conftest import assert_valid
 from iw_mock_server.app import create_app
 from iw_mock_server.settings import Settings
+from iw_mock_server.store import Store, load_mock_data
 from openapi_check import assert_response_matches, response_errors
 
 
@@ -68,14 +69,38 @@ def test_unknown_finding_is_404_with_error_body(client):
     r = client.get(f"/api/findings/{uuid.uuid4()}")
 
     assert r.status_code == 404
-    assert "error" in r.json()
+    assert_response_matches("/findings/{id}", "get", r)
 
 
 def test_malformed_finding_id_is_422(client):
     r = client.get("/api/findings/not-a-uuid")
 
     assert r.status_code == 422
-    assert "error" in r.json()
+    assert "error" in r.json() and r.json()["details"]
+
+
+def test_trend_module_filter_zeroes_other_modules(client):
+    points = client.get("/api/stats/trend?module=M2").json()["points"]
+
+    assert sum(p["M2"] for p in points) > 0
+    assert all(p["M1"] == 0 and p["M3"] == 0 for p in points)
+
+
+def test_trend_risk_level_counts_only_findings_of_that_level(client):
+    expected = len(client.get("/api/findings?risk_level=high&page_size=200").json()["items"])
+
+    points = client.get("/api/stats/trend?risk_level=high").json()["points"]
+
+    assert sum(p["M1"] + p["M2"] + p["M3"] for p in points) == expected
+
+
+def test_trend_date_range(client):
+    points = client.get("/api/stats/trend").json()["points"]
+    lo, hi = points[3]["t"], points[10]["t"]
+
+    subset = client.get(f"/api/stats/trend?date_from={lo}&date_to={hi}").json()["points"]
+
+    assert [p["t"] for p in subset] == [p["t"] for p in points[3:11]]
 
 
 @pytest.mark.parametrize(
@@ -115,11 +140,15 @@ def test_trend_by_day_aggregates_hourly_points(client):
         assert sum(p[module] for p in daily["points"]) == sum(p[module] for p in hourly)
 
 
-def test_calibration_uses_current_threshold(client):
-    body = client.get("/api/calibration?module=M3").json()
+def test_calibration_uses_current_threshold(contracts_dir):
+    store = Store(load_mock_data(contracts_dir))
+    store.thresholds["M3"] = 0.42
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0)
+    with TestClient(create_app(settings, store)) as c:
+        body = c.get("/api/calibration?module=M3").json()
 
     assert body["module"] == "M3"
-    assert body["current_threshold"] == 0.7
+    assert body["current_threshold"] == 0.42
 
 
 def test_calibration_without_module_is_422(client):

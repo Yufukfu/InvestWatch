@@ -69,6 +69,21 @@ def test_invalid_trend_point_names_the_file(contracts_copy):
         load_mock_data(contracts_copy)
 
 
+@pytest.mark.parametrize(("file", "mutate"), [
+    ("trend.json", lambda d: d["points"][0].update(M1=1.5)),
+    ("calibration-M1.json", lambda d: d["points"][0].update(tp=2.5)),
+    ("calibration-M1.json", lambda d: d.pop("labeled_samples")),
+])
+def test_non_integer_counts_and_missing_keys_name_the_file(contracts_copy, file, mutate):
+    path = contracts_copy / "mocks" / file
+    data = json.loads(path.read_text(encoding="utf-8"))
+    mutate(data)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(MockDataError, match=file.replace(".", r"\.")):
+        load_mock_data(contracts_copy)
+
+
 def test_invalid_calibration_names_the_file(contracts_copy):
     path = contracts_copy / "mocks" / "calibration-M2.json"
     data = json.loads(path.read_text(encoding="utf-8"))

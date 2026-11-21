@@ -55,8 +55,19 @@ def _pointer(*parts: str) -> str:
     return "/".join(p.replace("~", "~0").replace("/", "~1") for p in parts)
 
 
+def _response_pointer(path: str, method: str, status: int) -> str:
+    """JSON pointer to the response schema, following `$ref: '#/components/responses/...'`."""
+    spec = yaml.safe_load((CONTRACTS_DIR / "openapi.yaml").read_text(encoding="utf-8"))
+    response = spec["paths"][path][method]["responses"][str(status)]
+    ref = response.get("$ref")
+    if ref:
+        parts = ref.removeprefix("#/").split("/")
+        return _pointer(*parts, "content", "application/json", "schema")
+    return _pointer("paths", path, method, "responses", str(status), "content", "application/json", "schema")
+
+
 def response_errors(path: str, method: str, status: int, body) -> list[str]:
-    pointer = _pointer("paths", path, method, "responses", str(status), "content", "application/json", "schema")
+    pointer = _response_pointer(path, method, status)
     validator = Draft202012Validator({"$ref": f"urn:openapi#/{pointer}"}, registry=_registry(),
                                      format_checker=FormatChecker())
     return [f"{'/'.join(map(str, e.path)) or '<root>'}: {e.message}" for e in validator.iter_errors(body)]

@@ -111,7 +111,8 @@ def _aware(dt: datetime) -> datetime:
 
 
 def _matches_text(finding: dict, needle: str) -> bool:
-    haystack = [finding.get("title"), finding.get("content_excerpt"), finding.get("summary"),
+    # openapi.yaml: "Full-text search in title, excerpt, firm and advertiser"
+    haystack = [finding.get("title"), finding.get("content_excerpt"),
                 (finding.get("firm") or {}).get("name"),
                 (finding.get("advertiser") or {}).get("name"), (finding.get("advertiser") or {}).get("handle")]
     return any(needle in h.lower() for h in haystack if h)

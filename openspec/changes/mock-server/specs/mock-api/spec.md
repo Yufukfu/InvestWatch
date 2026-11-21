@@ -42,7 +42,7 @@ The mock server SHALL expose every path of `contracts/openapi.yaml` under the `/
 
 #### Scenario: Full-text search
 - **WHEN** a client sends `GET /api/findings?q=inwestor_jan`
-- **THEN** only findings whose title, excerpt, firm name or advertiser handle contain that text (case-insensitive) are returned
+- **THEN** only findings whose title, excerpt, firm name, advertiser name or advertiser handle contain that text (case-insensitive) are returned, as `contracts/openapi.yaml` describes `q`; the summary is not searched
 
 #### Scenario: Pagination
 - **WHEN** a client sends `GET /api/findings?page=2&page_size=2`
