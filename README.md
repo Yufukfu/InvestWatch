@@ -9,15 +9,13 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 | [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler | A |
 | [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM | C |
 | [`web/`](web/) | dashboard | B |
-| [`doc/`](doc/) | UKNF materials, plans, ADRs, AI work log | all |
-
-Decision: [ADR-0001](doc/adr/0001-repository-structure.md).
+| [`.docs/`](.docs/) | project documentation (English): plans, decisions, AI work log | all |
+| [`doc/`](doc/) | UKNF challenge materials (Polish), removed before hand-in | – |
 
 ## Documentation
 
-- [Integration plan](doc/integration-plan.md) and [analytics plan](doc/analytics-plan.md): drafts, contracts not yet confirmed
-- [Architecture decision records](doc/adr/README.md): agreed decisions and the backlog of open ones
-- [AI-assisted development log](doc/ai-workflow.md)
+- [Integration plan](.docs/integration-plan.md) and [analytics plan](.docs/analytics-plan.md): drafts, contracts not yet confirmed
+- [AI-assisted development log](.docs/ai-workflow.md)
 
 ## Quick Start
 
