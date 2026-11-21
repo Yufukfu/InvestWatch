@@ -139,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         log.info("module evaluated", extra={"eval_module": module, "status": entry["status"],
                                             "labeled_samples": entry["labeled_samples"],
                                             "recommended_threshold": entry.get("recommended_threshold"),
+                                            "default_threshold": entry.get("default_threshold"),
                                             "stored": (report["store"] or {}).get(module)})
     sys.stdout.write(report_json(report))
     if code:

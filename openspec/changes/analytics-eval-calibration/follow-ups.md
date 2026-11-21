@@ -30,11 +30,11 @@ Review findings and out-of-scope items, one row each (iw-commit-cycle step 8).
 | 26 | review groups 6-9 | `m2-r12b-no-currency-no-fees` hard case said "without currency" although EUR is named | fix-here (reworded: no FX warning, no fees) |
 | 27 | review groups 6-9 | `m2-r17-approval-claimed` used the no-branch foreign firm, outside M2 (firms registered in Poland incl. Polish branches) | fix-here (Nordavik, the foreign branch) |
 | 28 | review groups 6-9, declined to judge | both compose services build the same image tag | wont-fix: the second build is a cache hit; an image-only service could be started before the image exists |
-| 29 | review groups 11-12 | M3 default 0.25 sits below the ADR 0308 gate cap 0.4, so capped M3 findings alert again | docs + question to Damian: recorded in ADR 0316 Consequences; keep 0.25 or floor M3 at 0.4 |
+| 29 | review groups 11-12 | M3 default 0.25 sat below the ADR 0308 gate cap 0.4, so capped M3 findings alerted again | fix-here: Damian chose the floor; M3 default 0.4 (`THRESHOLD_FLOORS`), numbers at both in ADR 0316; re-evaluate M3 when the LLM scores S3.4 |
 | 30 | review groups 11-12 | `--write-thresholds` with `--llm` was refused only after the run (and its store) | fix-here (checked before analysis, test) |
 | 31 | review groups 11-12 | `--write-thresholds` wrote defaults from a run with a crashed gold document | fix-here (not written, exit 1, test) |
 | 32 | review groups 11-12 | a broken thresholds file escaped as a traceback (exit 1) | fix-here (exit 2, test) |
-| 33 | review groups 11-12 | with the medium band, M2/M3 findings are `medium` from 0.05 | docs: ADR 0316 Consequences |
+| 33 | review groups 11-12 | with the API's medium band (threshold - 0.2), M2 findings are `medium` from a score of 0.05 | new-item for Kacper (UI question, no change now); noted in ADR 0316 |
 | 34 | review groups 11-12 | `.docs/analytics-plan.md` §12.4 read "defaults 0.6 / 0.5 / 0.7" next to the ADR 0316 note | fix-here (reworded) |
 | 35 | review groups 11-12, declined to judge | `--write-thresholds` with a custom `--gold` also rewrites the defaults | wont-fix: an explicit path argument is the opt-in; the pinning test catches a file that does not match the committed gold set |
 | 7 | group 5 | `--llm` looks for `investwatch_analytics.llm.judge_from_env` and `analyze(judge=...)`; `analytics-llm-p0` (5f40414) has `llm/judge.py` `HttpJudge(LlmSettings)` and `LlmSettings.from_env` but no factory and no `judge` argument on `analyze` yet, so `--llm` exits 2 on this build | new-item: when llm-p0 wires the judge into `analyze`, make `_judge_factory` return `lambda: HttpJudge(LlmSettings.from_env())` and add a FakeJudge CLI test |

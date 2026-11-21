@@ -27,15 +27,24 @@ For M3 also at 0.4, the ADR 0308 gate cap: precision 1.0, recall 0.4, F1 0.571 (
 
 ## Decision
 
-Option 2. `python analytics/eval/run.py --write-thresholds` writes the recommended thresholds to `analytics/eval/thresholds.json`, the one source: today `{"M1": 0.65, "M2": 0.25, "M3": 0.25}`. The report shows the plateau and the point at the old default for each module. The API image cannot read files from `analytics/` (separate build context), so `api/src/investwatch_api/thresholds.py` `DEFAULTS` is a copy, and so is `analytics/src/investwatch_analytics/events.py` `DEFAULT_THRESHOLDS` (the analytics fallback when the key is missing). `analytics/tests/test_eval_thresholds.py` fails when the file differs from a fresh rules-only run or when either copy differs from the file. The defaults apply only when the key is missing (`SET NX`); a running stack keeps the thresholds its users set, and the calibration panel still changes them.
+Option 2, with a floor for M3 (Damian). The default is the recommendation raised to the module's floor. M3's floor is the S3.4 gate cap of [0308](0308-m3-s34-gate.md) (`modules/m3.py` `GATE_CAP`, 0.4), so **M3's default is 0.4, not its best-F1 0.25**:
+
+| M3 at | Precision | Recall | F1 | tp / fp / fn / tn |
+|---|---|---|---|---|
+| 0.25 (best F1) | 0.875 | 0.7 | 0.778 | 7 / 1 / 3 / 7 |
+| 0.4 (gate cap, chosen) | 1.0 | 0.4 | 0.571 | 4 / 0 / 6 / 8 |
+
+Why 0.4: it keeps ADR 0308's rule that service wording without a recommendation of instruments never reaches the alert threshold; it removes the one false `finding.high_risk` of the gold run (`m3-plain-crypto-signals`, plain crypto signals, score 0.378); and for alerts sent to a supervisor, precision comes first. M3 is re-evaluated once the LLM layer scores S3.4: rescoring S3.4 is expected to move confirmed cases to about 0.88, above the cap, and the recommendation may then rise above the floor on its own.
+
+`python analytics/eval/run.py --write-thresholds` writes the floored defaults to `analytics/eval/thresholds.json`, the one source: today `{"M1": 0.65, "M2": 0.25, "M3": 0.4}`. The report shows the plateau and the point at the old default for each module. The API image cannot read files from `analytics/` (separate build context), so `api/src/investwatch_api/thresholds.py` `DEFAULTS` is a copy, and so is `analytics/src/investwatch_analytics/events.py` `DEFAULT_THRESHOLDS` (the analytics fallback when the key is missing). `analytics/tests/test_eval_thresholds.py` fails when the file differs from a fresh rules-only run or when either copy differs from the file. The defaults apply only when the key is missing (`SET NX`); a running stack keeps the thresholds its users set, and the calibration panel still changes them.
 
 ## Consequences
 
-- A fresh stack alerts on M3, and M2's default sits at its best measured F1 instead of 0.4.
+- A fresh stack alerts on M3 (at the gate cap, so only on rule-candidate recommendations), and M2's default sits at its best measured F1 (0.667) instead of 0.345.
 - A rule or gold-set change that moves a module's best F1 fails the analytics tests until someone reruns `--write-thresholds` and copies the values into the two constants. That coupling is intended: the defaults stay measured.
 - The values are rules-only. When the LLM layer or more rules land, scores rise, and the defaults move with the next `--write-thresholds`.
 - M2 0.25 is low because only part of the 18 rules run today; the README states this next to the numbers.
-- **M3 0.25 is below the ADR 0308 gate cap (0.4).** A finding with no S3.4 recommendation is capped at 0.4, so with this default a capped finding raises `finding.high_risk` again; in the gold run the one M3 false positive at 0.25 is such a case (`m3-plain-crypto-signals`, 0.378). ADR 0308 rejected an alert from service wording alone. Rules-only, S3.4 is never `fail` (it needs the model), so at 0.4 or above M3 alerts only on the few rule candidates (recall 0.4). This trade-off is open for Damian: keep 0.25 (best F1), or floor M3 at the gate cap until the LLM layer confirms S3.4.
-- With the API's medium band (`medium` from threshold - 0.2), M2 and M3 findings count as `medium` from a score of 0.05, so nearly every M2/M3 finding is at least `medium`.
+- M3 alerts less than its best F1 allows: recall 0.4 instead of 0.7 rules-only, in exchange for no alert on capped findings (ADR 0308). The floor is a code constant (`THRESHOLD_FLOORS` in `evaluation/runner.py`, from `GATE_CAP`), so a change of the cap moves the default with it.
+- With the API's medium band (`medium` from threshold - 0.2), M2 findings count as `medium` from a score of 0.05 (M3 from 0.2), so nearly every M2 finding is at least `medium`; a UI question for Kacper, no change here.
 - The mock server keeps 0.6 / 0.5 / 0.7 (`contracts/mocks/thresholds.json`, untouched by rule): the "one source" covers the real API and analytics, not the test double.
 - `contracts/mocks/thresholds.json` and the OpenAPI example keep 0.6 / 0.5 / 0.7: the mocks stay untouched (Damian's rule), and the example is not a default.

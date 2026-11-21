@@ -16,7 +16,9 @@ from investwatch_analytics.evaluation.metrics import GRID, f1_plateau, recommend
 from investwatch_analytics.evaluation.runner import (
     DEFAULT_GOLD,
     DEFAULT_REGISTRY,
+    THRESHOLD_FLOORS,
     THRESHOLDS_FILE,
+    default_threshold,
     evaluate,
     load_build,
     write_thresholds,
@@ -55,11 +57,24 @@ def test_just_outside_the_plateau_is_not_chosen():
     assert recommended_threshold(curve) == 0.3
 
 
+def test_m3_floor_is_the_s34_gate_cap():
+    from investwatch_analytics.modules.m3 import GATE_CAP
+
+    assert THRESHOLD_FLOORS == {"M3": GATE_CAP}
+
+
+def test_default_is_the_recommendation_raised_to_the_floor():
+    assert default_threshold("M3", 0.25) == 0.4
+    assert default_threshold("M3", 0.55) == 0.55
+    assert default_threshold("M2", 0.25) == 0.25
+    assert default_threshold("M3", None) is None
+
+
 def test_write_thresholds_keeps_modules_without_a_recommendation(tmp_path):
     path = tmp_path / "thresholds.json"
     path.write_text('{"M1": 0.6, "M2": 0.5, "M3": 0.7}\n', encoding="utf-8")
-    report = {"modules": {"M1": {"status": "evaluated", "recommended_threshold": 0.65},
-                          "M2": {"status": "evaluated", "recommended_threshold": None},
+    report = {"modules": {"M1": {"status": "evaluated", "default_threshold": 0.65},
+                          "M2": {"status": "evaluated", "default_threshold": None},
                           "M3": {"status": "not_run", "points": []}}}
     assert write_thresholds(path, report) == {"M1": 0.65, "M2": 0.5, "M3": 0.7}
     assert json.loads(path.read_text(encoding="utf-8")) == {"M1": 0.65, "M2": 0.5, "M3": 0.7}
@@ -68,7 +83,7 @@ def test_write_thresholds_keeps_modules_without_a_recommendation(tmp_path):
 
 def test_write_thresholds_without_a_previous_file(tmp_path):
     path = tmp_path / "thresholds.json"
-    report = {"modules": {"M2": {"status": "evaluated", "recommended_threshold": 0.25}}}
+    report = {"modules": {"M2": {"status": "evaluated", "default_threshold": 0.25}}}
     with pytest.raises(ValueError):
         write_thresholds(path, report)  # M1/M3 would have no value at all
 
@@ -110,8 +125,8 @@ def test_cli_write_thresholds(tmp_path, capsys, monkeypatch):
     assert code in (0, 1)
     written = json.loads(path.read_text(encoding="utf-8"))
     for module, entry in report["modules"].items():
-        if entry.get("recommended_threshold") is not None:
-            assert written[module] == entry["recommended_threshold"]
+        if entry.get("default_threshold") is not None:
+            assert written[module] == entry["default_threshold"]
 
 
 @pytest.fixture(scope="module")
@@ -133,6 +148,8 @@ def test_report_has_a_recommended_threshold_per_evaluated_module(fresh_run):
             assert rec in GRID
             assert entry["at_recommended_threshold"]["threshold"] == rec
             assert entry["f1_plateau"][1] == rec
+            assert entry["default_threshold"] == max(rec, THRESHOLD_FLOORS.get(module, 0.0))
+            assert entry["at_default_threshold"]["threshold"] == entry["default_threshold"]
             assert entry["at_adr_0305_default"]["threshold"] == {"M1": 0.6, "M2": 0.5, "M3": 0.7}[module]
 
 
@@ -141,8 +158,8 @@ def test_committed_defaults_match_the_evaluation(fresh_run):
     values into api/src/investwatch_api/thresholds.py DEFAULTS and events.DEFAULT_THRESHOLDS (ADR 0316)."""
     expected = committed()
     for module, entry in fresh_run["modules"].items():
-        if entry["status"] == "evaluated" and entry["recommended_threshold"] is not None:
-            assert entry["recommended_threshold"] == expected[module], module
+        if entry["status"] == "evaluated" and entry["default_threshold"] is not None:
+            assert entry["default_threshold"] == expected[module], module
 
 
 def test_api_defaults_are_a_copy_of_the_file():

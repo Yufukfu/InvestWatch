@@ -119,11 +119,11 @@ For each evaluated module the report SHALL give `f1_plateau`, the lowest and hig
 - **THEN** for each evaluated module, the point at its recommended threshold differs in `fp` or `fn` from the point 0.2 below it or 0.2 above it
 
 ### Requirement: Default thresholds from the evaluation
-`analytics/eval/thresholds.json` SHALL hold the recommended threshold per module from a rules-only run of the committed gold set, and SHALL be the one source of the default thresholds: the API's defaults (written to `iw:settings:thresholds` only when the key is missing) and the analytics fallback defaults SHALL equal it. A key that is already set SHALL be left unchanged.
+`analytics/eval/thresholds.json` SHALL hold the default threshold per module from a rules-only run of the committed gold set, and SHALL be the one source of the default thresholds: the API's defaults (written to `iw:settings:thresholds` only when the key is missing) and the analytics fallback defaults SHALL equal it. A key that is already set SHALL be left unchanged.
 
 #### Scenario: Committed defaults match the evaluation
 - **WHEN** the committed gold set is evaluated rules-only on this build
-- **THEN** each module's `recommended_threshold` equals its value in `analytics/eval/thresholds.json`
+- **THEN** each module's `default_threshold` equals its value in `analytics/eval/thresholds.json`
 
 #### Scenario: Copies match the file
 - **WHEN** the API defaults and the analytics fallback defaults are read
@@ -131,11 +131,26 @@ For each evaluated module the report SHALL give `f1_plateau`, the lowest and hig
 
 #### Scenario: Writing the file
 - **WHEN** the evaluation runs with `--write-thresholds`
-- **THEN** `analytics/eval/thresholds.json` holds the run's recommended thresholds, and a module without one keeps its previous value
+- **THEN** `analytics/eval/thresholds.json` holds the run's default thresholds, and a module without one keeps its previous value
 
 #### Scenario: Thresholds not written from a bad run
 - **WHEN** `--write-thresholds` is combined with `--llm`, or a gold document crashed the pipeline, or the file is not a JSON object
 - **THEN** the file is unchanged; with `--llm` or a bad file the run exits 2 (with `--llm` before analyzing), after a crash it exits 1
+
+### Requirement: Threshold floor
+Each evaluated module's `default_threshold` SHALL be its `recommended_threshold` raised to the module's floor. The M3 floor SHALL be the S3.4 gate cap of ADR 0308 (`modules/m3.py` `GATE_CAP`, 0.4), so a capped M3 finding never raises `finding.high_risk` at the default; M1 and M2 SHALL have no floor. The report SHALL give the point at `default_threshold`.
+
+#### Scenario: M3 recommendation below the gate cap
+- **WHEN** M3's recommended threshold is 0.25 and the gate cap is 0.4
+- **THEN** M3's `default_threshold` is 0.4 and `at_default_threshold` is the 0.4 point
+
+#### Scenario: Recommendation above the floor
+- **WHEN** M3's recommended threshold is 0.55
+- **THEN** M3's `default_threshold` is 0.55
+
+#### Scenario: No floor for M2
+- **WHEN** M2's recommended threshold is 0.25
+- **THEN** M2's `default_threshold` is 0.25
 
 ### Requirement: Per-rule and per-signal metrics
 For each labeled rule or signal the report SHALL give `tp`, `fp`, `fn`, `tn`, `precision`, `recall` and `f1` in two readings, `strict` (a predicted `uncertain` counts as not flagged) and `review` (it counts as flagged), plus counts of `uncertain` and of `applicability_errors`. Gold `fail` SHALL be a positive and `pass` a negative; gold `not_applicable` SHALL stay out of the counts.

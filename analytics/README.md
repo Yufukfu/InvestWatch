@@ -52,11 +52,11 @@ Latest rules-only numbers (build `main` bb770a0 with this change). Recommended t
 |---|---|---|---|---|
 | M1 (18: 10 / 8) | 0.65 (0.40-0.65) | precision 1.0, recall 0.8, F1 0.889 | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
 | M2 (35: 23 / 12) | 0.25 (0.05-0.25) | precision 0.923, recall 0.522, F1 0.667 | 0.5: F1 0.345 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0 (R4-R18 not in this build) |
-| M3 (18: 10 / 8) | 0.25 (0.25 only) | precision 0.875, recall 0.7, F1 0.778 | 0.7: F1 0 | S3.1 1.0 / 0.67, S3.2 1.0 / 0.71, S3.8 1.0 / 1.0 |
+| M3 (18: 10 / 8) | 0.25 (0.25 only); **default 0.4** (gate cap) | at 0.25: precision 0.875, recall 0.7, F1 0.778; at 0.4: precision 1.0, recall 0.4, F1 0.571 | 0.7: F1 0 | S3.1 1.0 / 0.67, S3.2 1.0 / 0.71, S3.8 1.0 / 1.0 |
 
-M3's 0.25 is below the S3.4 gate cap (0.4, ADR 0308), so capped findings alert; see ADR 0316 for the trade-off. S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
+M3's default is raised to the S3.4 gate cap (0.4, ADR 0308) so capped findings never alert by default; it is re-evaluated once the LLM scores S3.4 (ADR 0316). S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
 
-**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md)): the recommended thresholds are the defaults the API writes when `iw:settings:thresholds` is missing (M1 0.65, M2 0.25, M3 0.25). [`eval/thresholds.json`](eval/thresholds.json) is the source. `python eval/run.py --write-thresholds` rewrites it, and the API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from it: `tests/test_eval_thresholds.py` fails until they match a fresh run. M2's value is low because only part of the 18 rules run today, and it moves when more rules or the LLM land.
+**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md)): the recommended thresholds, M3 raised to its gate cap, are the defaults the API writes when `iw:settings:thresholds` is missing (M1 0.65, M2 0.25, M3 0.4). [`eval/thresholds.json`](eval/thresholds.json) is the source. `python eval/run.py --write-thresholds` rewrites it, and the API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from it: `tests/test_eval_thresholds.py` fails until they match a fresh run. M2's value is low because only part of the 18 rules run today, and it moves when more rules or the LLM land.
 
 ## Run locally (no infrastructure)
 

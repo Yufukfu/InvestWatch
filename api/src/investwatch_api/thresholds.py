@@ -18,7 +18,7 @@ from .errors import ServiceUnavailable
 KEY = "iw:settings:thresholds"
 # Best-F1 thresholds of the gold-set evaluation: a copy of analytics/eval/thresholds.json (ADR 0316, superseding
 # ADR 0305's values). Written only when the key is missing; analytics/tests/test_eval_thresholds.py pins the copy.
-DEFAULTS = {"M1": 0.65, "M2": 0.25, "M3": 0.25}
+DEFAULTS = {"M1": 0.65, "M2": 0.25, "M3": 0.4}
 MODULES = ("M1", "M2", "M3")
 MEDIUM_BAND = 0.2  # medium = within 0.2 below the threshold (integration-plan §4)
 RETRY_AFTER_S = 5.0  # after a failed read, use the last known values without contacting Redis

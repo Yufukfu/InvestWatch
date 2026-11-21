@@ -22,6 +22,7 @@ from typing import Any
 from .. import pipeline
 from ..config import PIPELINE_VERSION
 from ..models import Finding, ScrapedDocument
+from ..modules.m3 import GATE_CAP
 from ..registry import Registry
 from ..rules.engine import Catalogue
 from .gold import GoldItem, rule_status
@@ -35,6 +36,10 @@ DEFAULT_GOLD = EVAL_DIR / "gold.jsonl"
 DEFAULT_REGISTRY = EVAL_DIR / "registry.csv"
 #: The one source of the default thresholds (ADR 0316); api DEFAULTS and events.DEFAULT_THRESHOLDS are copies.
 THRESHOLDS_FILE = EVAL_DIR / "thresholds.json"
+#: Lowest allowed default per module (ADR 0316, Damian's decision). M3: the S3.4 gate cap of ADR 0308, so a
+#: capped finding (no recommendation of instruments) never raises finding.high_risk by default. Rules-only, S3.4 is
+#: never `fail`; re-evaluate when the LLM layer scores S3.4.
+THRESHOLD_FLOORS = {"M3": GATE_CAP}
 #: ADR 0305's original defaults, reported next to the recommendation for comparison (ADR 0316).
 ADR_0305_DEFAULTS = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
 #: Namespace of the deterministic run id (design decision 7); never change it, or every stored run is "new".
@@ -66,6 +71,13 @@ class PipelineBuild(Build):
         if judge is not None:
             kwargs["judge"] = judge
         return pipeline.analyze(doc, **kwargs)
+
+
+def default_threshold(module: str, recommended: float | None) -> float | None:
+    """The recommendation raised to the module's floor; None without a recommendation."""
+    if recommended is None:
+        return None
+    return max(recommended, THRESHOLD_FLOORS.get(module, 0.0))
 
 
 def _ids(catalogue: Catalogue) -> dict[str, bool]:
@@ -140,10 +152,13 @@ def evaluate(
                  for i in labeled]
         points = curve(pairs)
         rec = recommended_threshold(points)
+        default = default_threshold(module, rec)
         mid = run_id or (llm_run_id if judge is not None else _run_id(gold_sha256, pipeline_version, module, points))
         report_modules[module] = {"status": "evaluated", "run_id": mid, **entry, "points": points,
                                   "recommended_threshold": rec,
                                   "f1_plateau": f1_plateau(points),
+                                  "default_threshold": default,
+                                  "at_default_threshold": next((p for p in points if p["threshold"] == default), None),
                                   "at_adr_0305_default": next(p for p in points
                                                               if p["threshold"] == ADR_0305_DEFAULTS[module]),
                                   "at_recommended_threshold": next((p for p in points if p["threshold"] == rec), None),
@@ -187,7 +202,7 @@ def _rules(module: str, labeled: list[GoldItem], found: dict[str, dict[str, Find
 
 
 def write_thresholds(path: Path, report: dict) -> dict[str, float]:
-    """Write each evaluated module's recommended threshold; a module without one keeps its value in the file."""
+    """Write each evaluated module's default threshold; a module without one keeps its value in the file."""
     try:
         current = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -195,8 +210,8 @@ def write_thresholds(path: Path, report: dict) -> dict[str, float]:
     if not isinstance(current, dict):
         raise ValueError(f"{path}: not a JSON object of module thresholds")
     for module, entry in report["modules"].items():
-        if entry["status"] == "evaluated" and entry.get("recommended_threshold") is not None:
-            current[module] = entry["recommended_threshold"]
+        if entry["status"] == "evaluated" and entry.get("default_threshold") is not None:
+            current[module] = entry["default_threshold"]
     missing = [m for m in MODULES if m not in current]
     if missing:
         raise ValueError(f"no threshold for {', '.join(missing)}: evaluate those modules or keep a previous file")
