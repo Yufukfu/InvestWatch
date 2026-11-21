@@ -1,0 +1,40 @@
+# Proposal
+
+**Stage 3 (etap 3).** This change depends on `analytics-worker` (PR #26) and on both stage-2 changes, `analytics-m1-m3` (M1 signals S1.1-S1.7, M3 signals S3.1-S3.8, routing) and `analytics-llm-p0` (the extra M2 rules R4, R6, R14, R17, R18 and the optional LLM judge). It is applied only after those three are merged, and its branch is rebased on them, so the gold set labels all three modules with the rule and signal ids that really exist.
+
+## Why
+
+The jury scores "trafność klasyfikacji ryzyka przez moduły AI oraz wpływ zmian parametrów progowych na wyniki w panelu kalibracji" (`doc/Opis Wyzwania HackNation UKNF 19.11.pdf` §6), and the challenge says "zmiana wartości treshold bezpośrednio wpływa na liczbę wyników False Positive vs False Negative" (§2, Panel Kalibracji). `GET /api/calibration` (merged in #21) already computes a curve from analyst labels and falls back to the latest run stored in `calibration_points`, but nothing writes those runs. A fresh `docker compose up` has no analyst labels, so the calibration panel is empty at the demo, and we have no measured precision or recall to show for any module or rule. Integration #3 (Sun 03:00) needs that curve to come from a labeled gold set.
+
+## What Changes
+
+- **Gold set** `analytics/eval/gold.jsonl` (`.docs/analytics-plan.md` §8): one JSON line per document with a valid `ScrapedDocument` v1 and, per module it is labeled for, a document label (`positive` / `negative`) and per-rule or per-signal labels (`fail` / `pass` / `not_applicable`). About 20 hand-made documents per module, positive and negative, with named hard cases near the module thresholds. Every ZASÓB rule (R1-R18, `doc/ZASÓB … kryteria oceny informacji o ryzyku.docx`) gets a violating and a compliant example written from its operational description, including rules not implemented yet (they are reported as `not_implemented` until a rule class exists). M3 examples follow annex 3 (Art. 76 advice, Art. 2 instruments). `doc/` holds only definitions and criteria, no sample ads (checked: the PDF and four DOCX files), so every document is synthetic: fictional firms, fictional handles, no real person's data. The gold set has its own fictional registry `analytics/eval/registry.csv`, so the KNF loader (`analytics-knf-registry`) cannot change the results. The gold set is separate from `contracts/mocks`, which stay untouched.
+- **Evaluation** (`investwatch_analytics.evaluation`, run as `python analytics/eval/run.py` or `python -m investwatch_analytics.evaluation`): runs the real pipeline (`analyze`) on every gold document, takes each module's finding `score` (no finding = score 0), and computes per module the confusion counts, precision, recall and F1 on the threshold grid 0.05-0.95. The counting rules are the ones `GET /api/calibration` uses (`openspec/specs/rest-api/spec.md`, "Calibration curve"), so a stored run and a label-based curve mean the same thing. Per rule and per signal it reports precision, recall and F1 in two readings: `strict` (`uncertain` counts as not flagged) and `review` (`uncertain` counts as flagged, as the dashboard shows it as "do weryfikacji").
+- **Calibration data for the panel**: with `--db`, one run (one `run_id`, one `computed_at`) is written to `calibration_points`, 19 rows per evaluated module, in one transaction, in exactly the columns the API reads (`threshold, tp, fp, fn, tn, precision, recall, f1, labeled_samples`). The API then serves it when a module has no analyst labels.
+- **How it runs**: deterministic and rules-only by default. `--llm` uses the `analytics-llm-p0` judge from the `LLM_*` env; when the endpoint is down the pipeline degrades to rules-only as it already does, and the report says how many documents ran without the model. A one-shot compose service `analytics-eval` in `analytics/compose.yaml` runs after `api-migrate` on every `docker compose up` and writes a rules-only run, so the panel has data at the demo without manual steps.
+- **Failure paths**: an empty or malformed gold set, an unknown module, an unknown rule or signal id, or a duplicate id stops the run before anything is written (exit 2). A module that has labels but produced no finding on any gold document is reported `not_run` and gets no rows (exit 1). A database that is down or rejects the rows leaves no partial run and exits 3, with the report still printed.
+- **Tests**: a unit test per metric and per counting edge case, parity with the API's curve on the rest-api spec scenario, loader failure tests, store tests against Postgres, and a gold-set test that the rules-only run finishes and moves FP/FN between each module's default threshold and default + 0.2. Every task group ends with a mutation check on the counting code.
+- **Out of scope**: any change to `GET /api/calibration`, the `calibration_points` table or `contracts/` (the gap between analyst labels and the gold run is an open question for Damian, see design); the table `gold_labels` named in `.docs/integration-plan.md` §5 (not created, the gold set stays a file); web calibration panel changes (Kacper); weight tuning of M1/M3 and M2 (a follow-up that uses this report); new rules (`analytics-m2-p1-rules`); the topic gate and embeddings (`analytics-embeddings`); `.docs/STATUS.md` and `.docs/status/*`, which the coordinator updates.
+- **Owner**: Damian (`analytics/`).
+- **Contracts, routes, events**: reads `ScrapedDocument` v1 and the in-process `Finding` v1; writes rows into the existing `calibration_points` table (schema from `api/migrations/versions/0001_initial.py`, unchanged; `iw_app` already has INSERT through the default privileges in `infra/postgres/init/01-app-role.sh`). No contract change, no version bump, no REST route change, no event.
+
+## Dependencies
+
+- **`analytics-worker` (PR #26)**: Dockerfile, `analytics/compose.yaml` and `DATABASE_URL` handling (`storage.py`) that the eval service and store reuse.
+- **`analytics-m1-m3` (stage 2)**: M1/M3 modules, `m1_signals.yaml`, `m3_signals.yaml`. Without it, M1/M3 labels fail validation (unknown signal id), so gold-set content for M1/M3 (task group 7) is written after it lands.
+- **`analytics-llm-p0` (stage 2)**: the implemented M2 rules and the `judge` argument of `analyze` used by `--llm`.
+- **Sibling stage-3 changes** (`analytics-m2-p1-rules`, `analytics-knf-registry`, `analytics-embeddings`): independent. New rules turn from `not_implemented` to evaluated with no gold-set change; the eval's own registry isolates it from the KNF loader; a topic gate that drops a gold document shows up as a missed positive, which is the point of the gold set.
+
+## Capabilities
+
+### New Capabilities
+- `gold-set-evaluation`: the gold-set file and its validation, the evaluation metrics per module and per rule or signal, the threshold curve, the stored calibration run, the command line and the one-shot compose service.
+
+### Modified Capabilities
+- None. `rest-api` "Calibration curve" and `database-schema` "Calibration points table" are used as they are.
+
+## Impact
+
+- New: `analytics/eval/gold.jsonl`, `analytics/eval/registry.csv`, `analytics/eval/run.py`, the labeling guide (README in `analytics/eval/`); `analytics/src/investwatch_analytics/evaluation/` (`gold.py`, `metrics.py`, `runner.py`, `store.py`, `__main__.py`); tests `analytics/tests/test_eval_*.py`.
+- Changed: `analytics/Dockerfile` (`COPY eval eval`), `analytics/compose.yaml` (service `analytics-eval`), `analytics/README.md`, `.docs/analytics-plan.md` §8 (gold line shape), ADR 0312.
+- No new dependency (psycopg 3 comes with `analytics-worker`).
