@@ -18,7 +18,7 @@ from datetime import timedelta
 import pytest
 
 from conftest import NOW, make_doc
-from investwatch_analytics.models import Finding, ScrapedDocument
+from investwatch_analytics.models import AdvertiserRef, Finding, ScrapedDocument
 from investwatch_analytics.storage import (
     InMemoryStore,
     InvalidDocument,
@@ -140,6 +140,7 @@ def finding(document_id: str = DOC_ID, module: str = "M2", score: float = 0.4, f
         content_excerpt="Przykładowy tekst.",
         firm={"name": "Alfa Inwestycje Dom Maklerski S.A.", "registry_id": "0b6d2f1e-3c4a-4b5d-8e6f-7a8b9c0d1e2f",
               "registry_type": "brokerage_house", "authorized": True, "match_confidence": 0.95},
+        advertiser={"name": "Jan Kowalski", "handle": "@inwestor_jan", "in_registry": False},
         url="https://example.com/oferta",
         platform="web",
         detected_at=NOW,
@@ -229,7 +230,8 @@ def test_same_document_again_updates_in_place(backend):
     later = NOW + timedelta(minutes=5)
     again = finding(score=0.9, fid="55555555-5555-4555-8555-555555555555").model_copy(
         update={"title": "Nowy tytuł", "detected_at": later, "updated_at": later,
-                "url": "https://example.com/oferta?v=2", "platform": "other"}
+                "url": "https://example.com/oferta?v=2", "platform": "other",
+                "advertiser": AdvertiserRef(name="Anna Nowak", handle="@anna", in_registry=True)}
     )
     [second] = backend.store.save_findings(doc, [again])
     assert second.outcome == "updated"
@@ -239,6 +241,7 @@ def test_same_document_again_updates_in_place(backend):
     assert second.finding.title == "Nowy tytuł"
     assert second.finding.updated_at == later
     assert (second.finding.url, second.finding.platform) == ("https://example.com/oferta?v=2", "other")
+    assert second.finding.advertiser == AdvertiserRef(name="Anna Nowak", handle="@anna", in_registry=True)
     assert backend.store.findings_for_document(DOC_ID) == [second.finding]
 
 
@@ -439,7 +442,7 @@ def test_postgres_dropped_connections_are_forgotten():
 def test_postgres_absent_json_values_are_sql_null(pg_url):
     backend = PostgresBackend(pg_url)
     backend.seed(columns())
-    bare = finding().model_copy(update={"firm": None, "model": None})
+    bare = finding().model_copy(update={"firm": None, "advertiser": None, "model": None})
     backend.store.save_findings(load(backend), [bare])
     import psycopg
 

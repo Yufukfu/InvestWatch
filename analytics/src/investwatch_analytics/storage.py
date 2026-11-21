@@ -20,10 +20,10 @@ from pydantic import ValidationError
 from .models import Finding, ScrapedDocument
 
 #: Fields replaced on an update. Everything else on an existing row is kept.
-#: Mirrors `UPSERT_REPLACED` in api-db-schema (`api/src/investwatch_api/db/sql.py`); `advertiser` joins once
-#: the `Finding` model carries it.
+#: Mirrors `UPSERT_REPLACED` in api-db-schema (`api/src/investwatch_api/db/sql.py`).
 ANALYSIS_FIELDS = (
-    "score", "title", "summary", "firm", "rules", "content_excerpt", "url", "platform", "model", "updated_at",
+    "score", "title", "summary", "firm", "advertiser", "rules", "content_excerpt", "url", "platform", "model",
+    "updated_at",
 )
 
 
@@ -145,10 +145,10 @@ DOCUMENT_COLUMNS = (
     "id", "source_id", "platform", "source_kind", "url", "canonical_url", "fetched_at", "published_at",
     "http_status", "lang", "title", "text", "content_hash", "html_object_key",
 )
-#: `findings` columns analytics reads back into a `Finding` (`advertiser` is not in the model yet).
+#: `findings` columns analytics reads back into a `Finding`.
 FINDING_COLUMNS = (
-    "id", "document_id", "module", "score", "status", "title", "summary", "firm", "rules", "content_excerpt",
-    "url", "platform", "note", "detected_at", "updated_at", "model",
+    "id", "document_id", "module", "score", "status", "title", "summary", "firm", "advertiser", "rules",
+    "content_excerpt", "url", "platform", "note", "detected_at", "updated_at", "model",
 )
 _JSON_COLUMNS = ("firm", "advertiser", "rules", "model")
 _INSERT_COLUMNS = (
@@ -163,8 +163,7 @@ _UPSERT_SQL = (
     "ON CONFLICT ON CONSTRAINT uq_findings_document_module DO UPDATE SET "
     + ", ".join(
         f"{c} = excluded.{c}"
-        for c in ("score", "title", "summary", "firm", "advertiser", "rules", "content_excerpt", "url",
-                  "platform", "model", "updated_at")
+        for c in ANALYSIS_FIELDS
     )
     + f" RETURNING {', '.join(FINDING_COLUMNS)}, (xmax = 0) AS inserted"
 )

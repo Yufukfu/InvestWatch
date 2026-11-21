@@ -36,6 +36,14 @@ Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this b
 - [ ] 5.4 Manual check: `docker build` succeeds, `id -u` in the image is not 0, `docker compose up --build` makes `analytics` healthy, and an `XADD iw:documents * document_id <mock id> schema v1` for a seeded mock document yields a `findings` row and a `finding.created` message seen with `SUBSCRIBE iw:events`
 - [ ] 5.5 Mutation check; `mutations: n/a, container and compose config` unless 5.3 adds logic beyond `health.py`, in which case `mutations: N tried, N caught`
 
+## 7. Advertiser on `Finding` (issue #20, follow-up 3)
+
+Done between groups 4 and 5 at the owner's request, so the PR ships the full `UPSERT_REPLACED` list. M2 sets no advertiser; M1/M3 will.
+
+- [x] 7.1 Failing tests: `AdvertiserRef` in contract shape (strict, `in_registry` required, absolute http(s) URLs), `Finding.advertiser` defaults to `None`, the store replaces `advertiser` on update and reads it back on both backends, absent `advertiser` is SQL `NULL`
+- [x] 7.2 `AdvertiserRef` and `Finding.advertiser` in `models.py`; `advertiser` in `ANALYSIS_FIELDS` and `FINDING_COLUMNS`, the upsert `SET` list built from `ANALYSIS_FIELDS`; full suite green (with `TEST_DATABASE_URL` and `CONTRACTS_DIR`)
+- [x] 7.3 Mutation check; `mutations: 8 tried, 8 caught` (throwaway Postgres 17 on 127.0.0.1:55437)
+
 ## 6. Closing
 
 - [ ] 6.1 Apply the iw-docs-update skill (already added: the `iw:events` envelope rule in `analytics/CLAUDE.md` and `.docs/analytics-plan.md` §12.2, asked for by the api-v1 session; `analytics/README.md` run and env section, `analytics/CLAUDE.md` if a rule is easy to get wrong, the analytics row of `.docs/STATUS.md`, `docs-check` clean) and add the iw-ai-log row
