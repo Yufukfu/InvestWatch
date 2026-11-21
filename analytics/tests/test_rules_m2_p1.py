@@ -134,6 +134,29 @@ def test_r16_eurotrade_not_applicable(mock_documents, registry, catalogue):
     assert r.evidence is None
 
 
+@pytest.mark.parametrize(
+    "text", ["Kurs akcji jest podatny na wahania rynkowe.", "Fundusz jest podatny na zmiany kursów walut.",
+             "Przepisy podatkowe mogą ulec zmianie.", "Korzyść podatkowa zależy od indywidualnej sytuacji klienta.",
+             "Korzyść zależy od indywidualnej sytuacji podatnika."],
+    ids=["podatny", "podatny-currency", "lone-change-part", "lone-individual-part", "taxpayer-in-the-part"],
+)
+def test_r16_no_tax_reference_not_applicable(text, registry, catalogue):
+    assert run(text, registry, catalogue)["R16"].result == "not_applicable"
+
+
+@pytest.mark.parametrize(
+    ("text", "missing"),
+    [("Ulga IKZE pozwala odliczyć wpłaty od podatku, a jej wysokość zależy od indywidualnej sytuacji podatnika.", "zmian"),
+     ("W IKE nie płacisz podatku Belki, choć przepisy mogą ulec zmianie.", "indywidualnej")],
+    ids=["benefit-with-individual-part", "benefit-with-change-part"],
+)
+def test_r16_tax_claim_inside_a_partial_disclaimer_still_applies(text, missing, registry, catalogue):
+    r = run(text, registry, catalogue)["R16"]
+    assert r.result == "fail"
+    assert r.evidence == text
+    assert missing in r.explanation
+
+
 def test_r16_unknown_param_fails_at_load(tmp_path):
     with pytest.raises(CatalogueError, match=r"R16 has unknown param\(s\) tax_patern"):
         load_with(tmp_path, "R16", {"tax_patern": ["podat"]})

@@ -569,6 +569,7 @@ class R16TaxInformation(Rule):
             "individual": compile_patterns(p.get("tax_individual_patterns", [])),
             "change": compile_patterns(p.get("tax_change_patterns", [])),
             "context": compile_patterns(p.get("tax_context_patterns", [])),
+            "subject": compile_patterns(p.get("tax_subject_patterns", [])),
         }
 
     def evaluate(self, ctx: Context) -> RuleResult:
@@ -580,9 +581,12 @@ class R16TaxInformation(Rule):
             if any(c.search(t) for c in p["change"]) and (i in individual or any(c.search(t) for c in p["context"]))
         ]
         disclaimer = set(individual) | set(change)
+        # A disclaimer sentence is a tax reference only through what is left once the disclaimer is stripped
+        # ("W IKE nie płacisz podatku Belki, choć przepisy mogą ulec zmianie" is both; group 2 review).
+        stripped = p["individual"] + p["change"] + p["subject"]
         refs = [
             i for i, t in enumerate(texts)
-            if i not in disclaimer and R3RiskNextToReturns._hits(t, p["tax"], p["tax_x"])
+            if R3RiskNextToReturns._hits(t, p["tax"], p["tax_x"] + (stripped if i in disclaimer else []))
         ]
         if not refs:
             return self.result("not_applicable", None, "Materiał nie odwołuje się do traktowania podatkowego.")

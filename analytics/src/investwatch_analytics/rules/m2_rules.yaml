@@ -229,7 +229,8 @@ rules:
     implemented: true
     params:
       tax_patterns:
-        - '\bpodat\w*'
+        # Tax stems only: `podatny` ("susceptible") is common in risk warnings (group 2 review).
+        - '\bpodat(?:ek|k|nik|nicz)\w*'
         - '\bopodatkowan\w*'
         - '\bIKZE\b'
         - '\bIKE\b'
@@ -242,7 +243,7 @@ rules:
         - '\b(?:podat\w*\s+)?VAT\b'
         - '\bpodat\w*\s+od\s+towarów\s+i\s+usług\b'
       tax_individual_patterns:
-        - '\b(?:zależ|uzależnion)\w*\s+(?:\w+\s+){0,2}od\s+(?:\w+\s+)?(?:indywidualn|osobist)\w*\s+sytuacj\w*'
+        - '\b(?:zależ|uzależnion)\w*\s+(?:\w+\s+){0,2}od\s+(?:\w+\s+)?(?:indywidualn|osobist)\w*\s+sytuacj\w*(?:\s+(?:\w+\s+)?(?:klient|inwestor|podatnik)\w*)?'
         - '\b(?:indywidualn|osobist)\w*\s+sytuacj\w*\s+(?:\w+\s+){0,2}(?:klient|inwestor|podatnik)\w*'
         - '\bindividual\s+circumstances\b'
       # Counts only in the sentence of the individual part, or in a sentence with `tax_context_patterns`.
@@ -251,8 +252,15 @@ rules:
         - '\bpodleg\w*\s+(?:\w+\s+)?zmian\w*'
         - '\bsubject\s+to\s+change\b'
         - '\bmay\s+change\b'
+      # Generic subjects of a disclaimer ("Traktowanie podatkowe zależy…"), stripped together with the
+      # disclaimer parts: a disclaimer sentence is a tax reference only if a tax word is left after that.
+      tax_subject_patterns:
+        - '\b(?:traktowani|korzyś|korzyść|skutk|konsekwencj|zasad|przepis|rozliczeni)\w*\s+(?:\w+\s+)?podatkow\w*'
+        - '\bpodatkow\w*\s+(?:traktowani|skutk|konsekwencj|zasad|przepis|korzyś|korzyść)\w*'
+        - '\btax\s+treatment\b'
       tax_context_patterns:
-        - '\bpodat\w*'
+        # Tax stems only: `podatny` ("susceptible") is common in risk warnings (group 2 review).
+        - '\bpodat(?:ek|k|nik|nicz)\w*'
         - '\bopodatkowan\w*'
         - '\bprzepis\w*'
         - '\bIKZE\b'

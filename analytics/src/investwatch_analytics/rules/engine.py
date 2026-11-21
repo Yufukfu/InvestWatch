@@ -58,6 +58,7 @@ KNOWN_PARAMS = {
     "forecast_patterns", "forecast_verb_patterns", "forecast_exclude_patterns", "forecast_weak_patterns",
     "performance_patterns", "forecast_disclaimer_patterns",
     "tax_patterns", "tax_exclude_patterns", "tax_individual_patterns", "tax_change_patterns", "tax_context_patterns",
+    "tax_subject_patterns",
 }
 # M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
 # the plain string lists below must hold non-empty strings.
