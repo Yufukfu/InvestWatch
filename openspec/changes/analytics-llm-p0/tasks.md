@@ -40,9 +40,9 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 7. Response validation, quote verification, chunk merge (~1 h)
 
-- [ ] 7.1 Failing tests: per-item Pydantic validation (result outside allowed set dropped, unrequested rule id dropped, duplicate keeps first, explanation over 500 chars dropped, control characters stripped); hallucinated quote → `uncertain`, quote under 8 chars → `uncertain`, whitespace-insensitive match maps to the exact original span, pass without quote kept; worst chunk wins with ties to the earliest; one failed chunk drops the module's verdicts
-- [ ] 7.2 `llm/judge.py`: `SemanticCheck`, `LlmVerdict`, `JudgeOutcome`, `LlmJudge` protocol, `HttpJudge.judge(...)` wiring client + prompt + chunking + validation; tests green against `stub_llm`
-- [ ] 7.3 Mutation check; `mutations: N tried, N caught`
+- [x] 7.1 Failing tests: per-item Pydantic validation (result outside allowed set dropped, unrequested rule id dropped, duplicate keeps first, explanation over 500 chars dropped, control characters stripped); hallucinated quote → `uncertain`, quote under 8 chars → `uncertain`, whitespace-insensitive match maps to the exact original span, pass without quote kept; worst chunk wins with ties to the earliest; one failed chunk drops the module's verdicts
+- [x] 7.2 `llm/judge.py`: `SemanticCheck`, `LlmVerdict`, `JudgeOutcome`, `LlmJudge` protocol, `HttpJudge.judge(...)` wiring client + prompt + chunking + validation; tests green against `stub_llm`
+- [x] 7.3 Mutation check; `mutations: 18 tried, 18 caught` (one survivor on the first run closed: `model` stays null when no verdict is used)
 
 ## 8. Engine seam, merge and finding assembly (~1.5 h)
 
