@@ -49,6 +49,7 @@ class SeedEntry:
 SEEDS_DIR = Path(__file__).resolve().parents[2] / "seeds"  # scraper/seeds, beside src/ (the image copies scraper/)
 _REQUIRED = ("name", "url", "source_kind", "target_modules")
 _OPTIONAL = ("platform", "schedule_cron")
+HTTPS_PORT = 443
 _CRON_FIELDS = 5  # croniter.is_valid also accepts six
 
 
@@ -63,9 +64,13 @@ def _contract_values() -> tuple[set[str], set[str], set[str]]:
 
 
 def _is_plain_https_url(url: str) -> bool:
-    parts = urlsplit(url)
-    # userinfo would be stored and echoed in error messages; whitespace is never part of a fetchable URL
-    return parts.scheme == "https" and bool(parts.hostname) and "@" not in parts.netloc and not any(c.isspace() for c in url)
+    parts = urlsplit(url)  # `.port` below raises ValueError on a bad port, which `_read` reports with file and entry
+    # userinfo would be stored and echoed in error messages; a space, control or invisible character is never part of a
+    # fetchable URL (PostgreSQL refuses NUL); the port is the https default or 443 spelled out
+    return (
+        parts.scheme == "https" and bool(parts.hostname) and "@" not in parts.netloc and url.isprintable()
+        and not any(c.isspace() for c in url) and parts.port in (None, HTTPS_PORT)
+    )
 
 
 def _parse(raw: object) -> SeedEntry:
@@ -83,11 +88,12 @@ def _parse(raw: object) -> SeedEntry:
     platform, cron, targets = raw.get("platform", "web"), raw.get("schedule_cron"), raw["target_modules"]
     if not isinstance(name, str) or not name.strip():
         raise ValueError("name is empty")
-    if platform not in platforms:
+    if not isinstance(platform, str) or platform not in platforms:
         raise ValueError(f"platform {platform!r} is not one of {sorted(platforms)}")
-    if kind not in kinds:
+    if not isinstance(kind, str) or kind not in kinds:
         raise ValueError(f"source_kind {kind!r} is not one of {sorted(kinds)}")
-    if not isinstance(targets, list) or not targets or len(set(targets)) != len(targets) or not set(targets) <= modules:
+    targets_ok = isinstance(targets, list) and targets and all(isinstance(t, str) for t in targets)
+    if not targets_ok or len(set(targets)) != len(targets) or not set(targets) <= modules:
         raise ValueError(f"target_modules must be a non-empty list of distinct values from {sorted(modules)}")
     if not isinstance(url, str) or not _is_plain_https_url(url):
         raise ValueError("url must be an https URL with a host, without credentials or spaces")

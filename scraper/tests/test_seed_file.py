@@ -59,6 +59,14 @@ def test_platform_defaults_to_web_and_cron_to_none(tmp_path):
     assert (loaded.platform, loaded.schedule_cron) == ("web", None)
 
 
+def test_an_explicit_https_port_is_accepted(tmp_path):
+    path = write(tmp_path, "sources.toml", entry(url='"https://www.xtb.com:443/pl/ike"'))
+
+    [loaded] = load_seed(path)
+
+    assert loaded.url == "https://www.xtb.com:443/pl/ike"
+
+
 def test_a_source_of_unknown_registry_status_is_accepted(tmp_path):
     body = entry(name='"EY family office (negative control)"', source_kind='"unknown"', target_modules='["M3"]')
     path = write(tmp_path, "sources.toml", body)
@@ -76,6 +84,9 @@ def test_a_source_of_unknown_registry_status_is_accepted(tmp_path):
         {"target_modules": '["M2", "M2"]'},
         {"target_modules": '"M2"'},
         {"target_modules": "5"},
+        {"target_modules": '[["M2"]]'},
+        {"platform": '["web"]'},
+        {"source_kind": '{ a = 1 }'},
         {"name": '""'},
         {"name": '"  "'},
         {"url": '"http://www.xtb.com/pl/ike"'},
@@ -84,6 +95,11 @@ def test_a_source_of_unknown_registry_status_is_accepted(tmp_path):
         {"url": '"https://user:pw@www.xtb.com/pl/ike"'},
         {"url": '"https://user@www.xtb.com/pl/ike"'},
         {"url": '"https://www.xtb.com/pl/i ke"'},
+        {"url": '"https://www.xtb.com/a\\u0000b"'},
+        {"url": '"https://www.xtb.com/a\\u200bb"'},
+        {"url": '"https://www.xtb.com:99999/pl/ike"'},
+        {"url": '"https://www.xtb.com:8443/pl/ike"'},
+        {"url": '"https://www.xtb.com:80/pl/ike"'},
         {"url": None},
         {"schedule_cron": '"every day"'},
         {"schedule_cron": '"0 0 6 * * *"'},
