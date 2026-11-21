@@ -396,3 +396,33 @@ def test_r2_negation_window_does_not_cut_inside_a_word(registry, catalogue):
     # The 40-char look-back starts right after "Inwestowa", so a sliced window would see "nie".
     text = "Inwestowanie " + "a" * 20 + " " + "b" * 14 + " reklama. Zysk."
     assert results(text, registry, catalogue)["R2"].result == "pass"
+
+
+def _catalogue_with(tmp_path, old: str, new: str) -> Path:
+    src = Path(__file__).resolve().parents[1] / "src" / "investwatch_analytics" / "rules" / "m2_rules.yaml"
+    text = src.read_text(encoding="utf-8")
+    assert old in text
+    return _write(tmp_path, text.replace(old, new))
+
+
+@pytest.mark.parametrize(
+    "old, new, key",
+    [
+        ("negation_before: '(?:", "negation_before: '((?:", "negation_before"),
+        ("negation_before: '", "negation_before: ['x']\n      unused_: '", "negation_before"),
+        ("prominent_sentences: 2", "prominent_sentences: two", "prominent_sentences"),
+        ("prominent_sentences: 2", "prominent_sentences: -1", "prominent_sentences"),
+        ("prominent_sentences: 2", "prominent_sentences: true", "prominent_sentences"),
+        ('footnote_markers: ["*", "¹", "²", "³"]', "footnote_markers: 5", "footnote_markers"),
+        ('footnote_markers: ["*", "¹", "²", "³"]', 'footnote_markers: ["*", 1]', "footnote_markers"),
+        ('footnote_markers: ["*", "¹", "²", "³"]', 'footnote_markers: ["*", ""]', "footnote_markers"),
+    ],
+)
+def test_bad_rule_params_fail_at_load(tmp_path, old, new, key):
+    with pytest.raises(CatalogueError, match=key):
+        Catalogue.load(_catalogue_with(tmp_path, old, new))
+
+
+def test_catalogue_root_must_be_a_mapping(tmp_path):
+    with pytest.raises(CatalogueError, match="mapping"):
+        Catalogue.load(_write(tmp_path, "- id: R1\n"))

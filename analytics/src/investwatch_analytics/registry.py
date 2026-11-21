@@ -102,7 +102,9 @@ class Registry:
                     seen.add(firm.id)
                     firms.append(firm)
         except OSError as exc:
-            raise RegistryError(f"{path}: cannot read registry ({exc.strerror})") from exc
+            raise RegistryError(
+                f"{path}: cannot read registry ({exc.strerror}); set REGISTRY_CSV to the registry CSV path"
+            ) from exc
         except (UnicodeDecodeError, csv.Error) as exc:
             raise RegistryError(f"{path}: not a UTF-8 CSV file ({exc})") from exc
         if not firms:

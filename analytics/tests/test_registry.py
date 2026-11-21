@@ -221,3 +221,8 @@ def test_earliest_mention_counts_not_where_the_longest_form_is(registry):
     text = "Alfa Inwestycje poleca. Bank Przykładowy S.A. też. Alfa Inwestycje Dom Maklerski S.A. zaprasza."
     m = registry.match(text, "https://x.example.org/")
     assert m.firm.id == ALFA_ID and m.evidence == "Alfa Inwestycje Dom Maklerski S.A."
+
+
+def test_unreadable_registry_tells_to_set_registry_csv(tmp_path):
+    with pytest.raises(RegistryError, match="REGISTRY_CSV"):
+        Registry.from_csv(tmp_path / "nope.csv")

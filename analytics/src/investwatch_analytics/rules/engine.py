@@ -99,6 +99,8 @@ class Catalogue:
             data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except (OSError, yaml.YAMLError) as exc:
             raise CatalogueError(f"{path}: cannot load rule catalogue ({exc})") from exc
+        if not isinstance(data, dict):
+            raise CatalogueError(f"{path}: the catalogue root must be a mapping with a `rules` list")
         specs: list[RuleSpec] = []
         seen: set[str] = set()
         for entry in data.get("rules") or []:
@@ -124,10 +126,27 @@ class Catalogue:
 
 
 def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
-    """Fail at load, not on the first document: every `*_patterns` list compiles, `window` is an int."""
+    """Fail at load, not on the first document: every parameter a rule reads is checked here.
+
+    `*_patterns` lists and `negation_before` compile; `labels` and `footnote_markers` are lists of
+    strings; `window` and `prominent_sentences` are non-negative integers.
+    """
     if not isinstance(params, dict):
         raise CatalogueError(f"{path}: {rule_id} params must be a mapping")
     for key, value in params.items():
+        if key == "footnote_markers" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
+        if key == "negation_before":
+            if not isinstance(value, str):
+                raise CatalogueError(f"{path}: {rule_id} {key} must be a regex string")
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise CatalogueError(f"{path}: {rule_id} {key} is an invalid regex ({exc})") from exc
+        if key in ("window", "prominent_sentences") and (
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a non-negative integer")
         if key.endswith("_patterns") or key == "labels":
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
                 raise CatalogueError(f"{path}: {rule_id} {key} must be a list of strings")
@@ -136,8 +155,6 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
                     compile_patterns(value)
                 except re.error as exc:
                     raise CatalogueError(f"{path}: {rule_id} {key} has an invalid regex ({exc})") from exc
-    if "window" in params and (not isinstance(params["window"], int) or params["window"] < 0):
-        raise CatalogueError(f"{path}: {rule_id} window must be a non-negative integer")
     return dict(params)
 
 

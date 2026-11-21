@@ -123,3 +123,37 @@ def test_cli_invalid_document_log_has_no_input_values(tmp_path, capsys):
     assert "invalid document" in err
     for secret in ("Tajny tekst", "jan.kowalski.secret", "not-a-date"):
         assert secret not in err
+
+
+def test_cli_analysis_error_skips_document_and_exits_1(tmp_path, capsys, monkeypatch):
+    first = make_doc(id="33333333-3333-4333-8333-333333333333", text="Tajny tekst klienta. Zarabiaj 18%!")
+    second = make_doc(text="Konto Alfa Inwestycje. Zarabiaj 18%!")
+    real = cli.analyze
+
+    def flaky(doc, **kw):
+        if doc.id == first["id"]:
+            raise RuntimeError("boom " + doc.text)
+        return real(doc, **kw)
+
+    monkeypatch.setattr(cli, "analyze", flaky)
+    path = tmp_path / "batch.json"
+    path.write_text(json.dumps([first, second]), encoding="utf-8")
+    assert cli.main([str(path)]) == 1
+    out, err = capsys.readouterr()
+    [finding] = json.loads(out)
+    assert finding["document_id"] == second["id"]
+    [line] = [json.loads(ln) for ln in err.splitlines() if "analysis failed" in ln]
+    assert line["document_id"] == first["id"] and line["error_type"] == "RuntimeError" and line["level"] == "error"
+    assert "Tajny tekst" not in err
+
+
+def test_cli_catalogue_with_list_root_exits_2(tmp_path, capsys, monkeypatch):
+    from investwatch_analytics.rules import engine
+
+    bad = tmp_path / "rules.yaml"
+    bad.write_text("- id: R1\n", encoding="utf-8")
+    monkeypatch.setattr(engine, "DEFAULT_CATALOGUE", bad)
+    path = tmp_path / "doc.json"
+    path.write_text(json.dumps(make_doc()), encoding="utf-8")
+    assert cli.main([str(path)]) == 2
+    assert capsys.readouterr().out == ""

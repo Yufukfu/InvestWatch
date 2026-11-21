@@ -6,8 +6,10 @@ The file holds one ScrapedDocument or a list of them. Findings are written to st
 list (contract shape); logs go to stderr as JSON so stdout stays machine-readable.
 Each document is validated on its own: an invalid one is logged (index, error locations and types,
 never input values) and skipped.
-Exit codes: 0 ok, 2 unreadable input, bad configuration, or documents of which none is valid
-(nothing is written to stdout).
+If analyzing one document raises, that document is logged (id and exception type only) and
+skipped; the other documents' findings are still written.
+Exit codes: 0 ok; 1 at least one document failed analysis (stdout holds the others' findings);
+2 unreadable input, bad configuration, or documents of which none is valid (nothing on stdout).
 """
 
 from __future__ import annotations
@@ -59,9 +61,17 @@ def main(argv: list[str] | None = None) -> int:
         log.error("no valid document", extra={"file": str(args.file), "documents": len(items)})
         return 2
 
-    findings = [f.to_contract() for doc in docs for f in analyze(doc, registry=registry, catalogue=catalogue)]
+    findings: list[dict] = []
+    failed = 0
+    for doc in docs:
+        try:
+            findings.extend(f.to_contract() for f in analyze(doc, registry=registry, catalogue=catalogue))
+        except Exception as exc:  # one bad document must not cost the batch; a bug still shows in the exit code
+            failed += 1
+            # Type only: exception messages can carry scraped text.
+            log.error("analysis failed", extra={"document_id": doc.id, "error_type": type(exc).__name__})
     sys.stdout.write(json.dumps(findings, ensure_ascii=False, indent=2) + "\n")
-    return 0
+    return 1 if failed else 0
 
 
 def _validate(item: object, index: int, file: Path) -> ScrapedDocument | None:
