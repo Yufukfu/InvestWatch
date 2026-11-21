@@ -11,6 +11,8 @@ services:
       target: renderer
     image: investwatch/renderer:${IW_VERSION:-dev}
     restart: unless-stopped
+    init: true  # Chromium spawns many children; PID 1 must reap them
+    pids_limit: 256
     environment:
       HOME: /tmp  # the browser profile and the Playwright driver write here, the only writable path besides /dev/shm
       RENDERER_PORT: "8080"
@@ -18,8 +20,8 @@ services:
       RENDER_MAX_PAGE_HEIGHT: ${RENDER_MAX_PAGE_HEIGHT:-12000}
       RENDER_MAX_PNG_BYTES: ${RENDER_MAX_PNG_BYTES:-8000000}
       RENDER_CONCURRENCY: ${RENDER_CONCURRENCY:-1}
-    # egress reaches the scraped sites; render is internal and shared with the scraper worker (`worker` joins it in
-    # scraper/compose.yaml's overlay). Not on data or edge.
+    # egress reaches the scraped sites; render is internal and shared with the scraper worker (the `worker` will join it in
+    # the scraper overlay added with the render hook). Not on data or edge.
     networks: [egress, render]
     read_only: true
     tmpfs: ["/tmp:size=256m"]

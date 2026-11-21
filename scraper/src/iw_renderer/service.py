@@ -1,17 +1,20 @@
 """The renderer's HTTP interface: `POST /render` for one viewport of one page, `GET /health`.
 
 The scraper is the only caller (private `render` network). Every field is validated before any navigation. Nothing
-that identifies the page or the proxy is logged or echoed: logs carry the source host, the viewport and the outcome.
+that identifies the page or the proxy is logged: logs carry the source host, the viewport and the outcome. The response
+echoes only the final URL, which the scraper already knows.
 """
 
 import base64
 import json
 import logging
+import re
 import time
 from urllib.parse import urlsplit
 
 from aiohttp import web
 
+from iw_renderer.confine import _same_site
 from iw_renderer.render import RenderBlocked, RenderFailed, Renderer, RenderRequest
 from iw_renderer.settings import DEFAULT_TIMEOUT_SECONDS
 from iw_renderer.viewports import VIEWPORTS
@@ -47,6 +50,19 @@ def _url(value: str, field: str, schemes: tuple[str, ...]) -> None:
         raise InvalidRequest(f"field '{field}' is not a readable URL") from None
     if parts.scheme not in schemes or not parts.hostname or "@" in parts.netloc and field == "url":
         raise InvalidRequest(f"field '{field}' must be a {'/'.join(schemes)} URL" + (" without credentials" if field == "url" else ""))
+
+
+_HOSTNAME = re.compile(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*")
+
+
+def _source_host(data: dict, url: str) -> str:
+    """A bare hostname, and the same site as the page URL: the renderer's confinement is built from it."""
+    host = _text(data, "source_host", 253).lower()
+    if not _HOSTNAME.fullmatch(host):
+        raise InvalidRequest("field 'source_host' must be a hostname")
+    if not _same_site((urlsplit(url).hostname or "").lower(), host):
+        raise InvalidRequest("field 'source_host' must be the site of 'url'")
+    return host
 
 
 def _headers(data: dict) -> tuple[tuple[str, str], ...]:
@@ -90,9 +106,10 @@ def parse_request(data: object) -> RenderRequest:
     timeout = data.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
     if isinstance(timeout, bool) or not isinstance(timeout, int | float) or not 0 < timeout <= MAX_TIMEOUT_SECONDS:
         raise InvalidRequest(f"field 'timeout_seconds' must be a number above 0 and at most {MAX_TIMEOUT_SECONDS:g}")
+    source_host = _source_host(data, url)
     return RenderRequest(
         url=url,
-        source_host=_text(data, "source_host", 253),
+        source_host=source_host,
         viewport=viewport,
         headers=_headers(data),
         proxy=proxy,

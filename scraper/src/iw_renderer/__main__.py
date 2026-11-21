@@ -39,6 +39,8 @@ async def serve() -> int:
 
         def browser_died(_: object) -> None:
             nonlocal exit_code
+            if stopped.is_set():  # an intended shutdown closes the browser too
+                return
             exit_code = 1
             _log.error("browser disconnected")
             stopped.set()
