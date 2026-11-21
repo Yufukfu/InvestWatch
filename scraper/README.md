@@ -25,6 +25,18 @@ COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml
 
 Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
 
+## Author provenance
+
+Analytics routes a post to M2 (published by the firm itself) from `author.handle`, `author.profile_url` and the host of `url` (`advertiser.publisher_firm`; `url` is the guarded fetch URL, so a collector must never take it from markup), so where they come from decides whether an impersonator can fake a firm post (issue 36). Read from the code on `main`:
+
+| Platform | `author.handle` | `author.profile_url` | Source | Platform-verified |
+|---|---|---|---|---|
+| `web` (every source today) | never set | never set | `parsing.parse_page` returns title, text, canonical URL and links only; `document.build_document` emits no `author` | n/a, the field is absent |
+| any parsed page that carries an `author` | dropped | dropped | `ingest.document.build_document` ignores `author` on the page: markup (`<meta>`, `rel=author`, embedded JSON) is written by the post's author | no, so it is never stored |
+| Telegram (`scraper/scraper-v2-social`, not on `main`) | channel handle | `https://t.me/<handle>` built from the handle | `social/telegram.py` parses the handle from the `t.me/s/<handle>` preview header; `social/model.build_page` puts it in the page dict's `author`, which the ingest now drops until it is passed through the `author=` argument | the handle is the channel's unique platform username, but it is parsed from preview HTML, not an API; not verified beyond that |
+
+Rule: `author` is set only by a platform collector from the platform's own account data, passed as the `author=` argument of `Ingestor.ingest` / `build_document`, never copied from the page dict. `scraper-v2-social` must switch `build_page` from `page["author"]` to that argument when it rebases, or its posts will have no author. A document without `author` is a valid `ScrapedDocument`; consumers must treat it as "unknown", not "third party". `ingest.validate` only checks that `profile_url` is an http(s) URL, not who wrote it. A positive "verified" flag would need a `scrape_meta` field, which is a contract change (proposal: an optional `scrape_meta.author_source`, `platform_account | page_markup | unknown`, in the [issue 36 reply](https://github.com/Yufukfu/InvestWatch/issues/36#issuecomment-7068727126)). When that flag lands, `ingest.document._scrape_meta` must drop it from a page-supplied `scrape_meta` and set it only when `author=` is given, because today it keeps every page key and a parser could otherwise claim `platform_account`.
+
 ## Configuration
 
 Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; `app.py` passes the values on. The queue, worker and health settings are `SCRAPER_<FIELD>` variables, listed with their defaults in `.env.example`. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
