@@ -5,14 +5,18 @@ Pure: no I/O. Input is `fetch.fetch_all`'s result, optionally the previous regis
 
 from __future__ import annotations
 
+import csv
 import re
 import unicodedata
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from importlib import resources
+from pathlib import Path
+from urllib.parse import urlsplit
 
 from ..registry import _normalize_domain, core_name
+from . import KnfError
 from .fetch import LISTS, SUMMARY_URL, FetchedList
 from .parse import COUNTRIES, RawRecord, country_code
 
@@ -96,6 +100,7 @@ class BuildReport:
     dropped_aliases: list[tuple[str, str, str]] = field(default_factory=list)  # (firm, alias, reason)
     dropped_domains: list[tuple[str, str]] = field(default_factory=list)  # (domain, reason)
     unknown_countries: list[tuple[str, str]] = field(default_factory=list)  # (firm, country name)
+    curated: list[tuple[str, str, bool]] = field(default_factory=list)  # (firm, domain, verified_by_human)
 
 
 def split_name(record: RawRecord) -> tuple[str, list[str]]:
@@ -184,9 +189,66 @@ def _alias_rejection(alias: str) -> str | None:
     return None
 
 
-def build(fetched: dict[str, FetchedList], *, previous: dict[str, str] | None = None
-          ) -> tuple[list[Firm], BuildReport]:
-    """Registry firms from the fetched lists. `previous` maps a normalized name to its id in the old CSV."""
+MANUAL_COLUMNS = ("name", "website_domains", "source_url", "verified_by_human")
+
+
+@dataclass(frozen=True)
+class ManualRow:
+    """A curated domain row (`registry/knf_domains_manual.csv`): InvestWatch's attribution aid, not KNF data."""
+
+    name: str
+    domains: tuple[str, ...]
+    source_url: str
+    verified_by_human: bool
+    where: str
+
+
+def load_manual(path: Path) -> list[ManualRow]:
+    """Curated domains; a missing file is no rows. Any malformed row fails with `manual_row` naming file:line."""
+    if not path.exists():
+        return []
+    rows = []
+    with open(path, encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        missing = [c for c in MANUAL_COLUMNS if c not in (reader.fieldnames or [])]
+        if missing:
+            raise KnfError("manual_row", f"{path}: missing column(s) {', '.join(missing)}")
+        for line, row in enumerate(reader, start=2):
+            rows.append(_manual_row(row, f"{path}:{line}"))
+    return rows
+
+
+def _manual_row(row: dict, where: str) -> ManualRow:
+    def fail(msg: str):
+        raise KnfError("manual_row", f"{where}: {msg}")
+
+    name = (row.get("name") or "").strip()
+    if not name:
+        fail("empty name")
+    domains = tuple(_normalize_domain(d) for d in (row.get("website_domains") or "").split("|") if d.strip())
+    if not domains:
+        fail("no domains")
+    for d in domains:
+        if "." not in d or not re.fullmatch(r"[a-z0-9.-]+", d):
+            fail(f"{d!r} is not a domain")
+        if _on(d, SOCIAL_HOSTS):
+            fail(f"{d} is a social platform host")
+    source = (row.get("source_url") or "").strip()
+    parts = urlsplit(source)
+    if parts.scheme != "https":
+        fail(f"source_url {source!r} must be an https URL")
+    if not _on(_normalize_domain(source), domains):
+        fail(f"source_url {source!r} is not on one of {', '.join(domains)}")
+    flag = (row.get("verified_by_human") or "").strip().lower()
+    if flag not in ("true", "false"):
+        fail(f"verified_by_human must be true or false, got {flag!r}")
+    return ManualRow(name, domains, source, flag == "true", where)
+
+
+def build(fetched: dict[str, FetchedList], *, previous: dict[str, str] | None = None,
+          manual: list[ManualRow] | None = None) -> tuple[list[Firm], BuildReport]:
+    """Registry firms from the fetched lists. `previous` maps a normalized name to its id in the old CSV;
+    `manual` adds curated domains by firm name (a row naming no firm fails with `manual_row`)."""
     report = BuildReport()
     previous = previous or {}
     by_name: dict[str, Firm] = {}
@@ -225,6 +287,15 @@ def build(fetched: dict[str, FetchedList], *, previous: dict[str, str] | None = 
                 if alias and alias not in firm.aliases:
                     firm.aliases.append(alias)
             firm.domains += [d for d in domains_in(record.notes) if d not in firm.domains]
+
+    for row in manual or []:
+        firm = by_name.get(normalize_name(row.name))
+        if firm is None:
+            raise KnfError("manual_row", f"{row.where}: {row.name!r} is not in the fetched KNF register")
+        for d in row.domains:
+            if d not in firm.domains:
+                firm.domains.append(d)
+            report.curated.append((firm.name, d, row.verified_by_human))
 
     firms = list(by_name.values())
     _carry_ids(firms, previous, report)
