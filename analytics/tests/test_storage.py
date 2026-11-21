@@ -140,7 +140,8 @@ def test_same_document_again_updates_in_place(backend):
     [first] = backend.store.save_findings(doc, [finding(score=0.4)])
     later = NOW + timedelta(minutes=5)
     again = finding(score=0.9, fid="55555555-5555-4555-8555-555555555555").model_copy(
-        update={"title": "Nowy tytuł", "detected_at": later, "updated_at": later}
+        update={"title": "Nowy tytuł", "detected_at": later, "updated_at": later,
+                "url": "https://example.com/oferta?v=2", "platform": "other"}
     )
     [second] = backend.store.save_findings(doc, [again])
     assert second.outcome == "updated"
@@ -149,6 +150,7 @@ def test_same_document_again_updates_in_place(backend):
     assert second.finding.score == 0.9
     assert second.finding.title == "Nowy tytuł"
     assert second.finding.updated_at == later
+    assert (second.finding.url, second.finding.platform) == ("https://example.com/oferta?v=2", "other")
     assert backend.store.findings_for_document(DOC_ID) == [second.finding]
 
 

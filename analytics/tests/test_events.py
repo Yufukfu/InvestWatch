@@ -48,9 +48,20 @@ def created(**kw) -> SavedFinding:
     return SavedFinding(finding(**kw), "created")
 
 
+class CountingRedis(fakeredis.FakeRedis):
+    """Counts real GETs of the thresholds key, so a cache anywhere in the publisher is visible."""
+
+    threshold_gets = 0
+
+    def get(self, name):
+        if name == THRESHOLDS_KEY:
+            self.threshold_gets += 1
+        return super().get(name)
+
+
 @pytest.fixture
 def r():
-    return fakeredis.FakeRedis(decode_responses=True)
+    return CountingRedis(decode_responses=True)
 
 
 @pytest.fixture
@@ -147,9 +158,8 @@ def test_update_publishes_nothing(r, sub):
 
 def test_update_does_not_read_thresholds(r, sub):
     r.set(THRESHOLDS_KEY, "not json")
-    publisher = RedisPublisher(r, clock=clock)
-    publisher.publish_findings([SavedFinding(finding(score=0.99), "updated")])
-    assert publisher.threshold_reads == 0
+    RedisPublisher(r, clock=clock).publish_findings([SavedFinding(finding(score=0.99), "updated")])
+    assert r.threshold_gets == 0
 
 
 # ---- live thresholds ----------------------------------------------------------------------------
@@ -165,9 +175,23 @@ def test_slider_moved_between_findings(r, sub):
 
 
 def test_read_per_finding_without_cache(r):
-    publisher = RedisPublisher(r, clock=clock)
-    publisher.publish_findings([created(), created(module="M1", fid="55555555-5555-4555-8555-555555555555")])
-    assert publisher.threshold_reads == 2
+    RedisPublisher(r, clock=clock).publish_findings(
+        [created(), created(module="M1", fid="55555555-5555-4555-8555-555555555555")]
+    )
+    assert r.threshold_gets == 2
+
+
+def test_slider_moved_inside_one_batch(r, sub):
+    set_thresholds(r, M2=0.5)
+
+    def moving_clock() -> datetime:  # called once per created finding, right after its threshold read
+        set_thresholds(r, M2=0.7)
+        return EMITTED
+
+    RedisPublisher(r, clock=moving_clock).publish_findings(
+        [created(score=0.6), created(score=0.6, fid="55555555-5555-4555-8555-555555555555")]
+    )
+    assert [e["type"] for e in sub()] == ["finding.created", "finding.high_risk", "finding.created"]
 
 
 def test_key_missing_uses_default(r, sub, caplog):
@@ -240,6 +264,35 @@ def test_publish_failure_is_logged_not_raised(client, caplog):
     assert sent == []
     [rec] = [rec for rec in caplog.records if getattr(rec, "reason", None) == "publish_failed"]
     assert rec.finding_ids == ["44444444-4444-4444-8444-444444444444"]
+
+
+class SecondPublishFails(fakeredis.FakeRedis):
+    calls = 0
+
+    def publish(self, channel, message):
+        self.calls += 1
+        if self.calls == 2:
+            raise redis.ConnectionError("down")
+        return super().publish(channel, message)
+
+
+@pytest.mark.parametrize(
+    "first_score,unsent",
+    [(0.1, ["55555555-5555-4555-8555-555555555555"]),  # first finding fully sent, the second not at all
+     (0.9, ["44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"])],  # high_risk lost
+    ids=["second-finding-lost", "high-risk-lost"],
+)
+def test_partial_publish_reports_what_was_sent(caplog, first_score, unsent):
+    client = SecondPublishFails(decode_responses=True)
+    first, other = "44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"
+    with caplog.at_level(logging.WARNING):
+        sent = RedisPublisher(client, clock=clock).publish_findings(
+            [created(score=first_score), created(score=0.1, fid=other)]
+        )
+    assert [(e["type"], e["data"]["id"]) for e in sent] == [("finding.created", first)]
+    [rec] = [rec for rec in caplog.records if getattr(rec, "reason", None) == "publish_failed"]
+    assert rec.finding_ids == unsent
+    assert rec.sent == 1
 
 
 def test_returns_the_events_sent(r):

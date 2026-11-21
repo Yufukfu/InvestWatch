@@ -19,7 +19,11 @@ from pydantic import ValidationError
 from .models import Finding, ScrapedDocument
 
 #: Fields replaced on an update. Everything else on an existing row is kept.
-ANALYSIS_FIELDS = ("score", "title", "summary", "firm", "rules", "content_excerpt", "model", "updated_at")
+#: Mirrors `UPSERT_REPLACED` in api-db-schema (`api/src/investwatch_api/db/sql.py`); `advertiser` joins once
+#: the `Finding` model carries it.
+ANALYSIS_FIELDS = (
+    "score", "title", "summary", "firm", "rules", "content_excerpt", "url", "platform", "model", "updated_at",
+)
 
 
 class StoreError(Exception):

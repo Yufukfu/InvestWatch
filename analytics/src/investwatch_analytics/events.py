@@ -89,13 +89,11 @@ class _Publisher:
 
     def __init__(self, clock: Clock = _utc_now) -> None:
         self._clock = clock
-        #: How many times thresholds were read (one per created finding; checked by tests: no cache).
-        self.threshold_reads = 0
 
     def _thresholds(self) -> Mapping[str, float]:
         raise NotImplementedError
 
-    def _send(self, events: list[dict[str, Any]]) -> None:
+    def _send_one(self, event: dict[str, Any]) -> None:
         raise NotImplementedError
 
     def _events_for(self, saved: Sequence[SavedFinding]) -> list[dict[str, Any]]:
@@ -103,7 +101,6 @@ class _Publisher:
         for item in saved:
             if item.outcome != "created":
                 continue
-            self.threshold_reads += 1
             threshold = self._thresholds()[item.finding.module]
             emitted_at = self._clock()
             events.append(make_event("finding.created", item.finding, emitted_at))
@@ -112,18 +109,28 @@ class _Publisher:
         return events
 
     def publish_findings(self, saved: Sequence[SavedFinding]) -> list[dict[str, Any]]:
-        """Publish the events for one committed save; returns the events sent ([] after a failure)."""
-        created_ids = [s.finding.id for s in saved if s.outcome == "created"]
+        """Publish the events for one committed save; returns the events actually sent.
+
+        On a Redis error the rest is dropped (events are at most once) and the log names the findings whose
+        events were not all sent.
+        """
+        sent: list[dict[str, Any]] = []
+        events: list[dict[str, Any]] | None = None
         try:
             events = self._events_for(saved)
-            self._send(events)
+            for event in events:
+                self._send_one(event)
+                sent.append(event)
         except redis.RedisError as exc:
+            if events is None:  # thresholds could not be read, so nothing was sent
+                unsent = [s.finding.id for s in saved if s.outcome == "created"]
+            else:
+                unsent = list(dict.fromkeys(e["data"]["id"] for e in events[len(sent):]))
             log.warning(
                 "event publish failed; findings stay committed",
-                extra={"reason": "publish_failed", "finding_ids": created_ids, "error": str(exc)},
+                extra={"reason": "publish_failed", "finding_ids": unsent, "sent": len(sent), "error": str(exc)},
             )
-            return []
-        return events
+        return sent
 
 
 class RedisPublisher(_Publisher):
@@ -134,9 +141,8 @@ class RedisPublisher(_Publisher):
     def _thresholds(self) -> Mapping[str, float]:
         return read_thresholds(self._client)
 
-    def _send(self, events: list[dict[str, Any]]) -> None:
-        for event in events:
-            self._client.publish(EVENTS_CHANNEL, json.dumps(event, ensure_ascii=False))
+    def _send_one(self, event: dict[str, Any]) -> None:
+        self._client.publish(EVENTS_CHANNEL, json.dumps(event, ensure_ascii=False))
 
 
 class NoopPublisher(_Publisher):
@@ -150,5 +156,5 @@ class NoopPublisher(_Publisher):
     def _thresholds(self) -> Mapping[str, float]:
         return self._fixed
 
-    def _send(self, events: list[dict[str, Any]]) -> None:
-        self.sent.extend(events)
+    def _send_one(self, event: dict[str, Any]) -> None:
+        self.sent.append(event)
