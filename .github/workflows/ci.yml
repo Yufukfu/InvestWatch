@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  process:
+    name: Specs and hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Hook tests
+        run: node --test ".claude/hooks/*.test.js"
+      - name: Validate OpenSpec specs and changes
+        run: npx -y @fission-ai/openspec@2.1.1 validate --all --strict --no-interactive
+        env:
+          OPENSPEC_TELEMETRY: "0"
+
+  python:
+    name: Python services
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test and audit each Python service that has a requirements.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install pip-audit pytest
+          for req in */requirements.txt; do
+            [ -f "$req" ] || continue
+            dir=$(dirname "$req")
+            echo "::group::$dir"
+            pip install -r "$req"
+            pip-audit -r "$req"
+            if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q); fi
+            echo "::endgroup::"
+          done
+
+  node:
+    name: Node services
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test and audit each Node service that has a package-lock.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lock in */package-lock.json; do
+            [ -f "$lock" ] || continue
+            dir=$(dirname "$lock")
+            echo "::group::$dir"
+            (cd "$dir" && npm ci && npm audit --audit-level=high && npm test --if-present)
+            echo "::endgroup::"
+          done
+
+  no-debug-output:
+    name: No console.log or tracked secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: console.log in non-test JS/TS
+        shell: bash
+        run: |
+          hits=$(git grep -nE 'console\.log\s*\(' -- '*.js' '*.jsx' '*.ts' '*.tsx' ':!*.test.*' ':!*.spec.*' ':!.claude' ':!node_modules' || true)
+          if [ -n "$hits" ]; then echo "$hits"; exit 1; fi
+      - name: tracked .env files
+        shell: bash
+        run: |
+          hits=$(git ls-files | grep -E '(^|/)\.env(\.[A-Za-z0-9_-]+)?$' | grep -vE '\.env\.(example|sample|template)$' || true)
+          if [ -n "$hits" ]; then echo "$hits"; exit 1; fi

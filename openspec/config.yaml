@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  Language: en
+  All artifacts must be written in en.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Project: InvestWatch, a hackathon system that finds risky investment content online (UKNF challenge).
+  Modules: scraper (owner A), dashboard (B), analytics + api + contracts (C). Light separate services,
+  one `docker compose up`, open-source and on-premise only. Read doc/STATUS.md and doc/plan-integracji.md
+  (contracts ScrapedDocument and Finding, v1) before proposing anything. Contracts are frozen after
+  Sat 14:30; a change that alters one must say so and bump the version.
+
+rules:
+  proposal:
+    - State what is out of scope and which module owns the change.
+    - Name any contract, REST route or event the change touches, or say it touches none.
+  specs:
+    - Every requirement has at least one scenario in WHEN/THEN form that a test can check.
+    - Scenarios for scraped content cover the failure path (blocked, empty, malformed), not only success.
+  design:
+    - Record choices that are hard to reverse as an ADR draft in doc/decisions/ for a human to decide.
+  tasks:
+    - Each task is one commit-sized unit that starts with its failing test.
+    - Keep tasks under about 2 hours.
+
+operations:
+  apply:
+    guidance:
+      - Commit through the iw-commit-cycle skill, one commit per task group.
+  archive:
+    guidance:
+      - After archiving, update doc/STATUS.md and add an entry with the iw-ai-log skill.

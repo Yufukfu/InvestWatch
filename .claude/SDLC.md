@@ -1,0 +1,49 @@
+# InvestWatch SDLC
+
+How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut down for a 24-hour hackathon and fully git-tracked so every teammate gets the same skills and hooks. Evidence of the process goes to `doc/ai-log.md`; the narrative is `doc/ai-workflow.md`.
+
+## Where things live
+
+| Question | Place |
+|---|---|
+| What does the system do now? | `openspec/specs/` (updated on archive) |
+| What are we changing right now? | `openspec/changes/<slug>/` (proposal, specs delta, design, tasks, `follow-ups.md`) |
+| Why did we choose X? | `doc/decisions/` (ADRs, human-authored) |
+| Where are we, what is blocked? | `doc/STATUS.md` |
+| Contracts and architecture | `doc/plan-integracji.md`, later `contracts/` |
+
+## Stages
+
+| # | Stage | Tool | Gate |
+|---|---|---|---|
+| 0 | Intake: read `doc/STATUS.md` and the owning spec | agent | none |
+| 1 | Size: trivial fix vs. spec'd change; foggy scope goes to `/openspec-explore` | human | none |
+| 2 | Worktree + branch | `iw-implement` | branch prefix per module |
+| 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
+| 4 | Implement per commit | `/openspec-apply-change`, `iw-commit-cycle` | failing test first; tdd-guide; code-reviewer on pinned range |
+| 5 | Whole-branch check | `iw-pr-review` | deterministic checks green, findings verified |
+| 6 | Push and PR | human | fresh go-ahead, every time |
+| 7 | CI | `.github/workflows/ci.yml` | spec validation, hook tests, per-module tests, dependency audit |
+| 8 | After merge | `/openspec-archive-change`, `doc/STATUS.md`, `iw-ai-log` | specs updated, log entry added |
+
+Sizing: one-file fixes and docs skip the spec (`IW_SKIP_SPEC=1` on the commit). A contract, a cross-module or a security-relevant change always gets a spec.
+
+## Deterministic guards (`.claude/hooks/git-guard.js`, tested)
+
+Denies force push, push to `main`, `reset --hard`, whole-tree checkout, amending a pushed commit; on commit denies a staged `.env`, `console.log` in non-test JS/TS, and service code with no active OpenSpec change. Escapes are named in the hook header and need the human's say-so.
+
+## Findings triage
+
+Anything real but out of scope goes into the change's `follow-ups.md` with one disposition: `fix-here`, `new-item` (GitHub issue), `wont-fix` (reason) or `docs`. No row stays unresolved at merge.
+
+## Parallel work
+
+Three people, three modules, so a worktree per change and ownership by directory (`scraper/` A, `dashboard/` B, `analytics/` `api/` `contracts/` C). Touching another owner's directory or a frozen contract is announced in the team chat first.
+
+## Not adopted from Neopadel (on purpose)
+
+Mutation testing, the LLM-judge hook, receipt gates, retro and memory audits, Monday sync. Revisit after the hackathon if the process continues.
+
+## Kill switch
+
+Rename a `.claude/skills/<name>` directory (append `.disabled`) or remove its entry from `.claude/settings.json` to disable one automation, and say so in the team chat.
