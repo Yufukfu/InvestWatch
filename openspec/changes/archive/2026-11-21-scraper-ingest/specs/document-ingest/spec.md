@@ -45,14 +45,18 @@ The scraper SHALL compute `content_hash` as the sha256 of the normalised text (U
 
 #### Scenario: Insert fails for another reason
 - **WHEN** the HTML was uploaded and the insert then fails with an error other than a duplicate
-- **THEN** the uploaded object is removed and no document row exists
+- **THEN** a job error with reason `storage_error` is recorded, and the uploaded object is removed if the insert certainly did not commit; if the insert may have committed (a dropped connection, a timeout, a cancellation) the object is kept and logged as `possible_orphan`, so that no document row points at a missing object
 
 ### Requirement: Store raw HTML in object storage
-The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_id}.html` and set `html_object_key` accordingly. At startup the scraper SHALL check that the bucket exists and fail with a clear error if it does not; it SHALL NOT create it (the stack's `minio-init` does, and the app user may lack that permission). If the upload fails the document SHALL NOT be inserted.
+The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_id}.html` and set `html_object_key` accordingly. At startup the scraper SHALL check that the bucket exists and fail with a clear error if it does not; it SHALL NOT create it (the stack's `minio-init` does, and the app user may lack that permission). If the upload fails the document SHALL NOT be inserted. A page that has no HTML SHALL NOT be inserted either.
 
 #### Scenario: HTML stored
 - **WHEN** a document is ingested
 - **THEN** the object `html/{document_id}.html` exists in `iw-raw` and `html_object_key` equals that key
+
+#### Scenario: Page without HTML
+- **WHEN** a page has no `html` (missing or blank)
+- **THEN** nothing is uploaded, no `documents` row is inserted and a job error with reason `parse_error` is recorded
 
 #### Scenario: Object storage unavailable
 - **WHEN** the upload to MinIO fails

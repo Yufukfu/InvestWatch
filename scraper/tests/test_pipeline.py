@@ -257,7 +257,7 @@ async def test_a_lost_reply_after_the_commit_leaves_the_object_the_row_points_at
     assert key in await storage.list_keys()
 
 
-@pytest.mark.parametrize("html", [None, ""])
+@pytest.mark.parametrize("html", [None, "", " \n\t "])
 async def test_a_page_without_html_records_a_parse_error_and_stores_nothing(
     pool, storage, redis_client, stream_name, seeded_source, html
 ):

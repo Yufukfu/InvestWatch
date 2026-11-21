@@ -57,7 +57,7 @@ class Ingestor:
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"dedup check failed: {exc}", source_id))
 
         html = page.get("html")
-        if not html:  # the spec stores the HTML of every page; a parser that drops it must show up, not pass silently
+        if not (html and html.strip()):  # the spec stores the HTML of every page; a parser that drops it must show up, not pass silently
             return await self._fail(JobError(Reason.PARSE_ERROR, "page has no html", source_id))
         try:
             key = await self.storage.put_html(doc["id"], html)
