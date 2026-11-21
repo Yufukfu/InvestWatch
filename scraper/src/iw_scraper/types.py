@@ -53,7 +53,15 @@ class Source:
 
     @property
     def collectable(self) -> bool:
-        return self.active and self.platform == "web"
+        """Active, and a web page or a non-web source whose host has a social collector."""
+        if not self.active:
+            return False
+        if self.platform == "web":
+            return True
+        # imported here: the collectors import `types` (through `parsing`), so a module-level import would be a cycle
+        from iw_scraper.social.registry import registry
+
+        return registry.for_url(self.url) is not None
 
 
 @dataclass(frozen=True)
