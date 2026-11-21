@@ -21,5 +21,5 @@
 
 ## 4. Closing
 
-- [ ] 4.1 Apply the iw-docs-update skill (own `.docs/status/platform.md` section, `docs-check` clean) and add the iw-ai-log row
+- [x] 4.1 Apply the iw-docs-update skill (own `.docs/status/platform.md` section, `docs-check` clean) and add the iw-ai-log row
 - [ ] 4.2 Run the iw-pr-review skill and fix real findings
