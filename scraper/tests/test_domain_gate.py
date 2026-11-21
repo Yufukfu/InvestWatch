@@ -8,7 +8,6 @@ from email.utils import format_datetime
 import pytest
 import redis.asyncio as aioredis
 
-from iw_scraper.config import domain_gate_settings
 from iw_scraper.domaingate import DomainGate
 from iw_scraper.types import Deferral
 
@@ -326,38 +325,3 @@ def test_a_gate_that_could_never_work_is_refused(kwargs):
 
     with pytest.raises(ValueError):
         DomainGate(None, **options)
-
-
-def test_the_settings_default_to_300_seconds_5_failures_and_a_10_minute_pause(monkeypatch):
-    for name in ("MAX_RETRY_AFTER_SECONDS", "DOMAIN_FAILURE_THRESHOLD", "DOMAIN_PAUSE_SECONDS"):
-        monkeypatch.delenv(name, raising=False)
-
-    assert domain_gate_settings() == (300.0, 5, 600.0)
-
-
-def test_the_settings_read_the_environment(monkeypatch):
-    monkeypatch.setenv("MAX_RETRY_AFTER_SECONDS", "60")
-    monkeypatch.setenv("DOMAIN_FAILURE_THRESHOLD", "3")
-    monkeypatch.setenv("DOMAIN_PAUSE_SECONDS", "120.5")
-
-    assert domain_gate_settings() == (60.0, 3, 120.5)
-
-
-@pytest.mark.parametrize(
-    "name, value",
-    [
-        ("MAX_RETRY_AFTER_SECONDS", "0"),
-        ("MAX_RETRY_AFTER_SECONDS", "inf"),
-        ("DOMAIN_FAILURE_THRESHOLD", "0"),
-        ("DOMAIN_FAILURE_THRESHOLD", "2.5"),
-        ("DOMAIN_PAUSE_SECONDS", "-1"),
-        ("DOMAIN_PAUSE_SECONDS", "nan"),
-        ("DOMAIN_PAUSE_SECONDS", "abc"),
-        ("DOMAIN_FAILURE_THRESHOLD", "abc"),
-    ],
-)
-def test_a_setting_that_is_not_usable_is_refused_by_name(monkeypatch, name, value):
-    monkeypatch.setenv(name, value)
-
-    with pytest.raises(ValueError, match=name):
-        domain_gate_settings()

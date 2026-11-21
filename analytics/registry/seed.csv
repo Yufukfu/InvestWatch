@@ -2,3 +2,4 @@ id,name,aliases,type,country,website_domains,source_url
 facc6bd1-c728-5348-90a4-011b0972fea9,Alfa Inwestycje Dom Maklerski S.A.,Alfa Inwestycje DM,brokerage_house,PL,alfa-inwestycje.example.com,
 1deb09a7-047b-507c-89e6-512e8ee99140,Bank Przykładowy S.A. – Biuro Maklerskie,Bank Przykładowy BM,brokerage_bank,PL,bank-przykladowy.example.com,
 2d7456b6-f7b5-52f2-a039-64e250001e24,EuroTrade Markets Ltd (oddział w Polsce),EuroTrade,foreign_branch,CY,eurotrade-markets.example.com,
+5b0c3e9a-7d2f-4a61-9c83-2f6e1a4d8b17,Atlantic Brokers Ltd,Atlantic Brokers,foreign_no_branch,MT,atlantic-brokers.example.com,

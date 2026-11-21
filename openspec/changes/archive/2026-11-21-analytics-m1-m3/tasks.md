@@ -1,0 +1,44 @@
+# Tasks
+
+Rule for every group: `contracts/mocks/`, `contracts/mock-server/` and the `web/` mock mode are a test double and stay untouched. Tests read `documents.json` and `findings.json` only; a difference from the mock findings is recorded in `follow-ups.md`, never fixed in the mocks.
+
+Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` (proposal, Dependencies). Groups 1-5 are rules-only and do not need `analytics-llm-p0`. Group 6 (LLM wiring) is deferred to a follow-up change.
+
+## 1. Signal catalogues on the shared engine and evidence fields (≈ 1 h)
+
+- [x] 1.1 Failing tests (`tests/test_signal_catalogue.py`): both catalogues load with the expected ids and `implemented` flags (S1.1-S1.7; S3.1-S3.8 with only S3.7 off), with `bias` and per-entry `weight`; a wrong prefix (`S3.2` in the M1 file, `S1.1` in `m2_rules.yaml`), a duplicate id, a weight `high`, a missing `bias`, an unknown param or a bad regex fail at load naming file and entry; `Rule.evidence_fields` defaults to `text`, a signal quoting `author.handle` / a link href / `url` passes the safety net, an M2 rule quoting the handle becomes `uncertain`; the sigmoid score (`σ(0) = 0.5` case, rounding, bounds)
+- [x] 1.2 `rules/engine.py`: per-module id check, `weight`/`bias` read for M1/M3, signal param keys in `KNOWN_PARAMS`, `Rule.evidence_fields` in the safety net; `rules/scoring.py`; `rules/m1_signals.yaml` and `rules/m3_signals.yaml` with names from `contracts/mocks/generate_mocks.py`, weights and bias from design decision 10, and `llm:` blocks (Polish questions) on S1.4, S1.5, S3.3, S3.4; if `AdvertiserRef` is missing from `models.py` after the rebase, add it as in the worker branch; existing M2 tests stay green
+- [x] 1.3 Mutation check; `mutations: 16 tried, 16 caught`; review fix: `mutations: 5 tried, 5 caught`
+
+## 2. Link-host registry match, publisher identity and advertiser (≈ 1.25 h)
+
+- [x] 2.1 Failing tests (`tests/test_registry.py`, `tests/test_advertiser.py`): referral link to a firm domain matches with 0.9 and the href as quote; malformed and non-http hrefs are skipped; a social page host never matches (`firm_own` ignoring link hosts is a routing test, moved to 5.1); publisher identity by profile host, non-social page host and normalized handle (`@alfainwestycje` yes, `@alfa_inwestycje_fan` no, social host never); advertiser from author, from page host (`website` set), malformed `profile_url` → null, 5000-character name cut to 200, `in_registry` equal to publisher identity, `on_warning_list` null
+- [x] 2.2 Link-host matching in `registry.py` (used only for `third_party`/`unknown`); `modules/advertiser.py` (advertiser and publisher identity); tests green
+- [x] 2.3 Mutation check; `mutations: 22 tried, 22 caught` (two first survivors, an empty normalized handle and a firm listing a social domain, got their own test cases); review fix: `mutations: 6 tried, 5 caught`, 1 equivalent (an empty-host guard that `_url_or_none` already covers, removed)
+
+## 3. M1 signals and finding (≈ 1.5 h)
+
+- [x] 3.1 Failing tests (`tests/test_m1.py`) for every scenario in `specs/m1-third-party-signals/spec.md`, on mocks `3c41441c…` and `182e5a42…` plus the hand-made cases (fuzzy-only, UTM only, `preferencje`, negated label, sponsored rel, past tense, author missing on a social post, bare mention below 0.6, S1.7 Polish-language-only, English ad of a Polish brokerage house)
+- [x] 3.2 `rules/m1.py` (S1.1-S1.7, S1.7 sharing the S3.6 detection; S1.5 rules-only `uncertain`; S1.4 `ask_llm` only on `pass`), dictionaries in `m1_signals.yaml`, `modules/m1.py` (score, Polish title and summary, `firm`, `advertiser`, `model`); tests green
+- [x] 3.3 Mutation check; `mutations: 35 tried, 35 caught` (four first survivors, a query key inside another key, a key without `?`, the first of two phrases and an over-long excerpt, got their own test cases); review fix: `mutations: 6 tried, 6 caught`
+
+## 4. M3 signals, S3.4 gate, M3 alongside M1 and finding (≈ 2 h)
+
+- [x] 4.1 Failing tests (`tests/test_m3.py`) for every rules-only scenario in `specs/m3-unauthorized-advice-signals/spec.md`, on mocks `007bbcee…`, `cdbf5306…` and `72acbb3b…` plus the hand-made cases (plain crypto, crypto CFD, `kupiłam`, English `.com` page, S3.8 crypto signal group, gate cases: S3.3 alone capped, S3.4 alone ≥ 0.7 via a fixed result, both strongest), and the "M3 alongside M1" attribution cases (`@trader_ola`, the firm's own offer, the two M1 mocks)
+- [x] 4.2 `rules/m3.py` (S3.1-S3.6, S3.8; S3.7 catalogue-only), dictionaries in `m3_signals.yaml`, `modules/m3.py` (score with the S3.4 gate, sentence-level attribution, Polish texts, `firm: null`, `advertiser`); tests green
+- [x] 4.3 Mutation check; `mutations: 26 tried, 26 caught` (three first survivors, a verb sentence without crypto, a `.pl` host quote for S3.6 and the art. 2 summary note, got their own test cases; one no-op mutant discarded); review fix: `mutations: 13 tried, 13 caught`
+
+## 5. Routing, pipeline and CLI (≈ 1 h)
+
+- [x] 5.1 Failing tests (`tests/test_pipeline.py`, `tests/test_cli.py`): the routing scenarios of `specs/document-analysis/spec.md` (`firm_own` matched → M2, unmatched → M3 or `no_signals`, firm's own social account → M2, `3c41441c…` → M1, English ad of a foreign firm → `not_targeting_poland`, English ad of a Polish brokerage house → M1, `007bbcee…` → M3, `8721cb75…` → `no_signals`, `firm_own` page ignores link hosts, empty text → `empty_text`, link-host match → M1, malformed link → M3, finfluencer buy calls → M1 + M3); the M2 finding assembly scenarios (builder without a firm match, domain-only match); the CLI on `contracts/mocks/documents.json` exits 0 with M1, M2 and M3 findings that pass `contracts/validate.py finding`; every evidence on the six M1/M3 mocks is a substring of one of its rule's evidence fields
+- [x] 5.2 `modules/router.py` (publisher-and-registry routing), `pipeline.py` (link-host match for third-party documents, M1/M2/M3 dispatch with up to two findings, `no_signals`, `not_targeting_poland`, `module_not_implemented` removed), `cli.py` loads the signal catalogues; `pytest analytics` green; compare the CLI output for the six M1/M3 mocks with `contracts/mocks/findings.json` and record each difference (module, signal results, evidence, advertiser, score side of threshold) in `follow-ups.md` with a disposition; `git diff --stat -- contracts/ web/` is empty
+- [x] 5.3 Mutation check; `mutations: 16 tried, 16 caught` (two first survivors, the publisher's own name quote and the worker startup check, which hung on Redis instead of failing, got a test case and a stub); review fix: `mutations: 1 tried, 1 caught` (M3 alongside after the foreign-firm filter)
+
+## 6. LLM wiring for M1/M3 (deferred)
+
+Moved out of this change (coordinator decision on Damian's instruction, Sat 2026-11-21) so the rules-only M1/M3 land for Integration #2. It becomes a small follow-up change after `analytics-llm-p0` is merged: pass `judge`, `module` and `M1_CONTEXT` / `M3_CONTEXT` to `run_rules` in `modules/m1.py` and `modules/m3.py`, set `model.llm` as M2 does, and test the seam with that change's `FakeJudge`. The seam is already in place here: `llm:` blocks on S1.4, S1.5, S3.3 and S3.4 (`test_llm_blocks_only_on_semantic_signals`), `S14CallToAction.ask_llm`, and rules-only fallbacks that the LLM replaces. The requirement "LLM seam and rules-only degradation for signals" moved with it (follow-ups row 40).
+
+## 7. Closing
+
+- [x] 7.1 Apply the iw-docs-update skill (`analytics/README.md` modules and signals, `.docs/analytics-plan.md` §2 routing and §6 S3.4 gate, the skeleton open question answered here, your own analytics row in `.docs/STATUS.md` unless the coordinating session still owns STATUS updates, ADRs: none expected, `docs-check` clean) and add the iw-ai-log row
+- [x] 7.2 Run the iw-pr-review skill and fix real findings (whole branch plus a `focus: security` pass; fixes: ReDoS in the currency and price patterns, impersonator handles, evidence cap, social page host; `mutations: 6 tried, 5 caught`, 1 equivalent: a redundant href length cap, removed)

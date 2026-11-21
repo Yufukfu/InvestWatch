@@ -12,7 +12,10 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `analytics-skeleton` merged (PR #10): pure pipeline, registry, M2 rules R1-R3, CLI. No worker, storage or events yet.
 - Both of Kacper's reviews fixed in `analytics-skeleton-review-fixes` and `analytics-skeleton-review-2-fixes`.
 - `analytics-worker` implemented, PR #26 (base `main`, after PR #18 brought Redis): stream worker on `iw:documents` (ack after commit, XAUTOCLAIM, poison messages acked with a reason, backoff on outages), Postgres store with the `(document_id, module)` upsert, `iw:events` publisher with live thresholds, `/health`, container and compose service. Verified end to end on a full stack. Rules-only; the LLM client comes with `analytics-llm-p0`.
-- Registry caveat: the default registry is the fictional `analytics/registry/seed.csv` (3 firms). Until a real KNF registry is loaded and `REGISTRY_CSV` is set, R1 results and high-risk alerts for real firms are not meaningful; the worker logs `registry_seed` at startup. A real KNF loader is open (follow-up of `analytics-worker-review-fixes`).
+- `analytics-m1-m3` implemented (stage 2, stacked on PR #26): rules-only M1 (S1.1-S1.7, an inventory of third-party ads of registered firms) and M3 (S3.1-S3.8, offers that may indicate investment advice, the S3.4 gate at 0.4), routing by publisher and registry (a firm's own account to M2, unregistered own pages to M3, M1 plus M3 when the advice is the publisher's), `advertiser` on findings. The LLM wiring for M1/M3 is a follow-up change after `analytics-llm-p0`. The registry is still the fictional seed until the real KNF loader lands. Open: a re-scan that changes a document's module keeps the old finding (follow-up: mark superseded findings in the API/UI).
+- `analytics-m1-m3-review-fixes`: Kacper's review of PR #35 fixed (registry "not found" wording with a demo-data flag, no bare `partner` label, no platform as advertiser, the challenge's M3 vocabulary and English pricing, Polish filter only for foreign firms without a branch, "możliwe"/"wspomina" titles, excerpt around the evidence, ADR 0308 for the S3.4 gate). The `_BOUNDARY` ReDoS comes with #26.
+- `analytics-m1-m3-review-2-fixes`: Kacper's second review of PR #35 fixed (the page host through `http_host` in `registry.match`, so a backslash URL is no firm's page; a 200 KB scan cap for routing and M1/M3; a handle alone is not a firm's account; names matched after NFKC and zero-width removal; growth-checked ReDoS tests). Real-scale registry matching comes with the stage-3 `analytics-knf-registry` change.
+- Registry caveat: the default registry is the fictional `analytics/registry/seed.csv` (4 fictional firms). Until a real KNF registry is loaded and `REGISTRY_CSV` is set, R1 results and high-risk alerts for real firms are not meaningful; the worker logs `registry_seed` at startup. A real KNF loader is open (follow-up of `analytics-worker-review-fixes`).
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
@@ -24,7 +27,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 ### infra-compose
 - Redis 8, object storage (MinIO, bucket `iw-raw`), the optional Ollama profile `llm`, project-scoped networks (`data`, `edge`, `egress`) and the smoke test `infra/tests/smoke.sh`: applied and archived, in PR #18.
 - Kacper's two reviews of PR #18 fixed in `infra-compose-review-fixes` (archived).
-- Follow-up: `OLLAMA_CONTEXT_LENGTH=8192` on the `ollama` service for the stage-2 LLM change (`infra-compose-review-fixes` follow-up 3).
+- `OLLAMA_CONTEXT_LENGTH=8192` (default, override in `.env`) on the `ollama` service for the stage-2 LLM change: issue #32, branch `chore/ollama-context-length` (`infra-compose-review-fixes` follow-up 3).
 
 ## Active OpenSpec changes
 

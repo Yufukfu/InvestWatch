@@ -8,6 +8,7 @@ CREATE TABLE sources (
   url text NOT NULL,
   source_kind text NOT NULL CHECK (source_kind IN ('firm_own', 'third_party', 'unknown')),
   target_modules text[] NOT NULL CHECK (cardinality(target_modules) >= 1 AND target_modules <@ ARRAY['M1', 'M2', 'M3']),
+  schedule_cron text NULL,
   active boolean NOT NULL DEFAULT true,
   last_run_at timestamptz NULL,
   last_run_status text NULL CHECK (last_run_status IN ('ok', 'partial', 'failed', 'running'))

@@ -3,20 +3,21 @@
 Data collection service: collectors for web pages and social media, job queue, scheduler.
 
 - **Owner:** Adam
-- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; queue and schedule follow in `scraper-orchestration`; the first social platform is `scraper-v2`.
+- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; the queue, scheduler, scan requests, events and the run that joins all pieces (`scraper-orchestration`) are implemented. The first social platform is `scraper-v2`.
+
+## Run
+
+`python -m iw_scraper worker` runs the job worker, the scan-request consumer (Redis Stream `iw:scan-requests`) and `GET /health` (port `SCRAPER_HEALTH_PORT`, default 8080, not published by compose). `python -m iw_scraper scheduler` enqueues due sources and runs the republish sweep; run exactly one per stack (a second only wastes ticks, jobs are de-duplicated by slot). Both stop gracefully on SIGTERM: running jobs finish for `SCRAPER_SHUTDOWN_DEADLINE`, the rest is requeued. `python -m iw_scraper.seed` registers the KNF source once. Needs `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` (`MINIO_BUCKET`, `MINIO_SECURE` optional) besides `REDIS_URL`; the stack's `api-migrate` must have run first.
 
 ## Run the tests
 
-Python 3.12 and the native TLS library are only in the image. From the repository root:
+Python 3.12 and the native TLS library are only in the image. From the repository root, one command starts the same Redis, PostgreSQL and MinIO images as the stack and runs every test, including the ingest and queue tests:
 
 ```bash
-docker build -f scraper/Dockerfile --target test -t iw-scraper:test .
-docker network create iw-scraper-test
-docker run -d --name iw-scraper-test-redis --network iw-scraper-test redis:7
-docker run --rm --network iw-scraper-test -e REDIS_URL=redis://iw-scraper-test-redis:6379/0 iw-scraper:test
+COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml run --rm --build test
 ```
 
-The ingest tests also need real PostgreSQL, Redis and MinIO, addressed by `IW_TEST_PG_DSN`, `IW_TEST_REDIS_URL`, `IW_TEST_MINIO_ENDPOINT`, `IW_TEST_MINIO_ACCESS_KEY` and `IW_TEST_MINIO_SECRET_KEY`; without them they are skipped, and with `CI` set they fail. The schema they run on is `tests/schema.sql`, a throwaway copy of Damian's `api/migrations` (0001-0003); the service itself never creates tables or the `iw-raw` bucket.
+Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
 
 ## Author provenance
 
@@ -32,18 +33,15 @@ Rule: `author` is set only by a platform collector from the platform's own accou
 
 ## Configuration
 
-Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; the run that joins the pieces (`scraper-orchestration`) passes the values on, so until it exists the library takes them as parameters. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
+Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; `app.py` passes the values on. The queue, worker and health settings are `SCRAPER_<FIELD>` variables, listed with their defaults in `.env.example`. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROXY_LIST` | empty (direct) | comma-separated `http`, `https` or `socks5` proxy URLs |
+| `PROXY_LIST` | empty (direct) | comma-separated `http`, `https` or `socks5` proxy URLs; use an egress-only proxy: behind a proxy the address guard checks our own DNS answer, but the proxy resolves the host itself |
 | `PROXY_ROTATION` | `per_request` | `per_request` or `per_session` |
 | `PROXY_COOLDOWN_SECONDS` | `90` | how long a proxy that answered 407 is skipped |
 | `REDIS_URL` | `redis://localhost:6379/0` | shared rate limit, deferrals and domain pause |
 | `DOMAIN_MIN_INTERVAL_SECONDS` | `5` | minimum gap between request starts per domain, all workers |
-| `MAX_RETRY_AFTER_SECONDS` | `300` | cap on a `Retry-After` wait |
-| `DOMAIN_FAILURE_THRESHOLD` | `5` | consecutive failure outcomes before a domain is paused |
-| `DOMAIN_PAUSE_SECONDS` | `600` | length of that pause |
 | `FETCH_TIMEOUT_SECONDS` | `20` | per-request timeout |
 | `FETCH_MAX_BYTES` | `5242880` | response size cap (5 MiB) |
 | `ALLOWED_PORTS` | `80,443` | ports the scraper may request |
