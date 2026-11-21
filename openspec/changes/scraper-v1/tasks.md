@@ -25,8 +25,8 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 4. Identity, proxy, politeness (Redis)
 
-- [ ] 4.1 Failing tests, then the identity table (lowercase header order per browser version, one version constant for user agent, `sec-ch-ua` and TLS profile) with a load-time pairing check, and a fresh session per attempt; the header-order test against a raw-socket stub, pairing, current profiles only, no-cookie-carry-over and identity-per-run scenarios pass
-- [ ] 4.2 Failing tests, then the proxy rotator (`per_request` default, random start, never the same twice in a row, `PROXY_COOLDOWN_SECONDS` on 407, deferral outcome when all cool, `per_session`, empty list); the proxy scenarios pass
+- [x] 4.1 Failing tests, then the identity table (lowercase header order per browser version, one version constant for user agent, `sec-ch-ua` and TLS profile) with a load-time pairing check, and a fresh session per attempt; the header-order test against a raw-socket stub, pairing, current profiles only, no-cookie-carry-over and identity-per-run scenarios pass
+- [x] 4.2 Failing tests, then the proxy rotator (`per_request` default, random start, never the same twice in a row, `PROXY_COOLDOWN_SECONDS` on 407, deferral outcome when all cool, `per_session`, empty list); the proxy scenarios pass
 - [ ] 4.3 Failing tests, then `robots.txt` handling (401/403/404/410 allow, 429/5xx/timeout disallow, never a block signal) and a Redis token-bucket per-domain rate limit with a local fallback; the robots and cross-worker rate-limit scenarios pass
 - [ ] 4.4 Failing tests, then `Retry-After` (seconds and HTTP-date, cap, domain deferral in Redis) the per-domain failure cooldown driven by recorded outcomes, and the deferral outcome (the time it ends) that a run reports; the Retry-After, paused-domain and deferral scenarios pass with a fake clock
 - [ ] 4.5 Mutation check; `mutations:`

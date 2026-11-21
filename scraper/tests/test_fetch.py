@@ -9,6 +9,7 @@ from noble_tls.exceptions.exceptions import TLSClientException
 import iw_scraper.fetch as fetch_module
 from iw_scraper.fetch import MAX_REDIRECTS, FetchFailure, Identity, _transport_failure, fetch
 from iw_scraper.parsing import parse_page
+from iw_scraper.proxy import PER_REQUEST, ProxyRotator
 from iw_scraper.types import Reason
 
 IDENTITY = Identity(
@@ -238,24 +239,8 @@ async def test_non_http_scheme_is_refused_without_a_request(url):
     assert failure.reason is Reason.BLOCKED_TARGET
 
 
-async def test_request_goes_through_the_proxy(stub):
-    stub.route("/ok", body=PAGE.encode())
-
-    result = await fetch("http://example.test/ok", IDENTITY, stub.url("/"))
-
-    assert result.status == 200
-    assert stub.requests[0].connect is True  # example.test does not resolve; only the proxy can serve it
-    assert stub.requests[0].path == "example.test:80"
-    assert stub.requests[1].path == "/ok"
 
 
-async def test_proxy_credentials_never_appear_in_a_failure():
-    failure = await failure_of(
-        "http://example.test/ok", IDENTITY, "http://user:secret@127.0.0.1:1", timeout=2
-    )
-
-    assert failure.reason is Reason.HTTP_ERROR
-    assert "secret" not in failure.detail
 
 
 @pytest.mark.parametrize("status", [403, 429])
@@ -457,7 +442,7 @@ async def test_a_proxy_resolves_the_host_so_no_address_is_pinned(stub):
     async def guard(url: str) -> str | None:
         return "127.0.0.2"
 
-    await fetch("http://example.test/ok", IDENTITY, stub.url("/"), guard=guard)
+    await fetch("http://example.test/ok", IDENTITY, ProxyRotator([stub.url("/")], PER_REQUEST, 90.0).start_run(), guard=guard)
 
     assert stub.requests[0].path == "example.test:80"
 

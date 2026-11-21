@@ -19,8 +19,9 @@ from urllib.parse import SplitResult, urljoin, urlsplit
 from noble_tls import Client, Session
 
 from iw_scraper.parsing import HTML_TYPES, content_type_params
+from iw_scraper.proxy import ProxyChoice, ProxyRun
 from iw_scraper.reporting import redact
-from iw_scraper.types import Reason
+from iw_scraper.types import Deferral, Reason
 
 _log = logging.getLogger(__name__)
 DEFAULT_TIMEOUT_SECONDS = 20.0
@@ -64,6 +65,7 @@ class FetchResult:
     content_type: str  # media type with `charset=utf-8`: the client already decoded the body
     body: bytes
     headers: dict[str, str]  # lowercase names
+    proxy_id: str | None  # identifier (never the URL) of the proxy that served the final request
 
 
 class FetchFailure(Exception):
@@ -73,6 +75,18 @@ class FetchFailure(Exception):
         super().__init__(detail)
         self.reason = reason
         self.detail = detail
+
+
+class ProxyAuthFailure(FetchFailure):
+    """The proxy answered 407: the caller cools that proxy and tries another."""
+
+
+class FetchDeferred(Exception):
+    """Nothing was fetched and nothing failed: no proxy may be used until `deferral.until`."""
+
+    def __init__(self, deferral: Deferral) -> None:
+        super().__init__(f"deferred until {deferral.until.isoformat()}")
+        self.deferral = deferral
 
 
 # Asked about every URL before it is requested. Raises `FetchFailure(BLOCKED_TARGET)` to refuse, or returns
@@ -110,6 +124,8 @@ def _address_url(parts: SplitResult, address: str) -> str:
 def _transport_failure(exc: Exception) -> FetchFailure:
     message = redact(str(exc))
     lowered = message.lower()
+    if "proxy responded with non 200 code: 407" in lowered:  # the client's wording for a refused CONNECT
+        return ProxyAuthFailure(Reason.HTTP_ERROR, f"proxy authentication failed: {message}")
     if "timeout" in lowered or "deadline exceeded" in lowered:
         return FetchFailure(Reason.TIMEOUT, f"request timed out: {message}")
     return FetchFailure(Reason.HTTP_ERROR, f"transport error: {message}")
@@ -142,7 +158,7 @@ def _read_checked_body(path: str, headers: dict[str, str], max_bytes: int) -> by
 async def _request_once(
     session: Session,
     url: str,
-    proxy: str | None,
+    choice: ProxyChoice | None,
     guard: TargetGuard | None,
     timeout: float,
     max_bytes: int,
@@ -160,7 +176,7 @@ async def _request_once(
     address = await guard(url) if guard else None
     request_url, host_override = url, None
     session.server_name_overwrite = None
-    if address and proxy is None:  # behind a proxy the proxy resolves the host itself
+    if address and choice is None:  # behind a proxy the proxy resolves the host itself
         request_url, host_override = _address_url(parts, address), _host_header(parts)
         session.server_name_overwrite = hostname  # certificate and SNI still use the real host
 
@@ -173,7 +189,7 @@ async def _request_once(
                 request_url,
                 allow_redirects=False,
                 timeout_milliseconds=int(timeout * 1000),
-                proxy=proxy,
+                proxy=choice.url if choice else None,
                 request_host_override=host_override,
                 stream_output_path=path,
             )
@@ -189,10 +205,29 @@ async def _request_once(
             os.unlink(path)
 
 
+async def _request_through_proxies(
+    session: Session,
+    url: str,
+    proxies: ProxyRun | None,
+    guard: TargetGuard | None,
+    timeout: float,
+    max_bytes: int,
+) -> tuple[int, dict[str, str], bytes, ProxyChoice | None]:
+    """One request, each time through the proxy the run picks. A 407 cools that proxy and tries another."""
+    while True:  # every 407 cools one more proxy, so the picks run out in at most len(proxies) rounds
+        choice = proxies.pick() if proxies else None
+        if isinstance(choice, Deferral):
+            raise FetchDeferred(choice)
+        try:
+            return (*await _request_once(session, url, choice, guard, timeout, max_bytes), choice)
+        except ProxyAuthFailure:
+            proxies.penalize(choice)
+
+
 async def fetch(
     url: str,
     identity: Identity,
-    proxy: str | None,
+    proxy: ProxyRun | None,
     *,
     guard: TargetGuard | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -203,7 +238,9 @@ async def fetch(
     try:
         current = url
         for _ in range(MAX_REDIRECTS + 1):
-            status, headers, body = await _request_once(session, current, proxy, guard, timeout, max_bytes)
+            status, headers, body, choice = await _request_through_proxies(
+                session, current, proxy, guard, timeout, max_bytes
+            )
             if status in _REDIRECT_STATUSES and "location" in headers:
                 current = urljoin(current, headers["location"])
                 continue
@@ -222,6 +259,7 @@ async def fetch(
                 content_type=f"{media_type or 'text/html'}; charset=utf-8",
                 body=body,
                 headers=headers,
+                proxy_id=choice.identifier if choice else None,
             )
         raise FetchFailure(Reason.HTTP_ERROR, f"more than {MAX_REDIRECTS} redirects")
     finally:

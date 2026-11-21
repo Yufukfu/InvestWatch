@@ -29,6 +29,7 @@ class Stub:
     def __init__(self) -> None:
         self.routes: dict[str, Route] = {}
         self.requests: list[Received] = []
+        self.connect_status = 200  # what a CONNECT gets; 407 plays a proxy that refuses our credentials
         stub = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -39,6 +40,11 @@ class Stub:
 
             def do_CONNECT(self) -> None:
                 stub.requests.append(Received(self.path, tuple(self.headers.items()), True))
+                if stub.connect_status != 200:
+                    self.send_response(stub.connect_status)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 self.send_response(200, "Connection established")
                 self.end_headers()  # the next request on this socket is the tunnelled one
 
@@ -86,6 +92,14 @@ class Stub:
 
 @pytest.fixture
 def stub():
+    server = Stub()
+    yield server
+    server.close()
+
+
+@pytest.fixture
+def stub2():
+    """A second server, for tests that need two proxies."""
     server = Stub()
     yield server
     server.close()

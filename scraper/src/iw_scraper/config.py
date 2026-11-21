@@ -9,3 +9,17 @@ def contracts_dir() -> Path:
     """Directory holding the JSON Schemas (`CONTRACTS_DIR`, default `<repo>/contracts`)."""
     override = os.environ.get("CONTRACTS_DIR")
     return Path(override) if override else _REPO_ROOT / "contracts"
+
+
+DEFAULT_PROXY_COOLDOWN_SECONDS = 90.0
+_ROTATION_MODES = ("per_request", "per_session")
+
+
+def proxy_settings() -> tuple[list[str], str, float]:
+    """(`PROXY_LIST`, `PROXY_ROTATION`, `PROXY_COOLDOWN_SECONDS`). The list may hold credentials: never log it."""
+    proxies = [item.strip() for item in os.environ.get("PROXY_LIST", "").split(",") if item.strip()]
+    mode = os.environ.get("PROXY_ROTATION", "per_request")
+    if mode not in _ROTATION_MODES:
+        raise ValueError(f"PROXY_ROTATION must be one of {_ROTATION_MODES}")
+    cooldown = float(os.environ.get("PROXY_COOLDOWN_SECONDS", DEFAULT_PROXY_COOLDOWN_SECONDS))
+    return proxies, mode, cooldown
