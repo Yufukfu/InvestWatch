@@ -14,8 +14,8 @@ from ..config import PIPELINE_VERSION
 from ..models import AdvertiserRef, Finding, FirmRef, ModelInfo, RuleResult
 from ..rules.engine import Catalogue, Context, run_rules
 from ..rules.scoring import sigmoid_score
+from .excerpt import excerpt
 
-EXCERPT_MAX = 500
 #: Signals named in the title when present, strongest ad evidence first.
 TITLE_SIGNALS = ("S1.2", "S1.3", "S1.4")
 LLM_ONLY = ("S1.5",)
@@ -55,7 +55,7 @@ def build_finding(
         firm=firm,
         advertiser=advertiser,
         rules=rules,
-        content_excerpt=ctx.pre.normalized[:EXCERPT_MAX] or None,
+        content_excerpt=excerpt(ctx.doc.text, ctx.pre, rules),
         url=ctx.doc.url,
         platform=ctx.doc.platform,
         detected_at=now,
@@ -69,7 +69,9 @@ def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: Advertiser
     who = advertiser_label(advertiser)
     firm_name = firm.name if firm else "firmę z rejestru"
     present = [by_id[i].name.lower() for i in TITLE_SIGNALS if i in by_id and by_id[i].result == "fail"]
-    title = f"{who} reklamuje {firm_name}" + (f" ({', '.join(present)})" if present else "")
+    # "reklamuje" only when an ad signal fired; a plain mention is not an ad claim (#35 review).
+    verb = "reklamuje" if present else "wspomina"
+    title = f"{who} {verb} {firm_name}" + (f" ({', '.join(present)})" if present else "")
     label = by_id.get("S1.3")
     if label is not None and label.result == "fail":
         label_text = f"Oznaczenie współpracy: {label.evidence}." if label.evidence else "Oznaczenie współpracy obecne."

@@ -375,3 +375,33 @@ def test_social_post_without_author_has_no_advertiser_name(registry, cat):
     f = finding(third_party(text="Polecam Alfa Inwestycje DM, konto otworzyłem w minutę.", author=None), registry, cat)
     assert f.advertiser.name is None and f.advertiser.website is None
     assert f.title.startswith("Nieznany autor")
+
+
+# ---- review of #35, items 7 and 10 ------------------------------------------------------------------
+
+
+def test_plain_mention_title_says_wspomina(registry, cat):
+    f = finding(third_party(text="Słyszałem, że Alfa Inwestycje ma nową aplikację mobilną."), registry, cat)
+    assert "wspomina" in f.title and "reklamuje" not in f.title
+
+
+def test_ad_signal_title_says_reklamuje(mock, registry, cat):
+    assert "reklamuje" in finding(mock(JAN), registry, cat).title
+
+
+def test_m1_excerpt_around_the_evidence(registry, cat):
+    text = "Długi wstęp o pogodzie i wakacjach. " * 60 + "Na koniec: konto w Alfa Inwestycje DM jest świetne."
+    f = finding(third_party(text=text), registry, cat)
+    assert len(f.content_excerpt) <= 500 and "Alfa Inwestycje DM" in f.content_excerpt
+
+
+def test_m1_excerpt_without_text_evidence_is_the_start(registry, cat):
+    href = "https://eurotrade-markets.example.com/pl/register?ref=X"
+    f = finding(third_party(text="Polecam, link niżej.", links=[{"href": href}]), registry, cat)
+    assert f.content_excerpt == "Polecam, link niżej."
+
+
+def test_m1_excerpt_starts_at_the_earliest_evidence(registry, cat):
+    text = "Konto w Alfa Inwestycje DM. " + "Opowieść o wakacjach i pogodzie nad morzem. " * 60 + "Link w bio!"
+    f = finding(third_party(text=text), registry, cat)
+    assert f.content_excerpt.startswith("Konto w Alfa Inwestycje DM")

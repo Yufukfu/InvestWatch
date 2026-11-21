@@ -432,3 +432,32 @@ def test_s35_english_pricing(registry, cat, text):
 def test_s35_no_price(registry, cat):
     assert signals(page("Free monthly newsletter about markets, 2000 readers."), registry, cat)["S3.5"].result == "pass"
 
+
+# ---- review of #35, items 7, 8 and 10 ---------------------------------------------------------------
+
+
+def test_candidate_title_says_possible(mock, registry, cat):
+    f = finding(mock(VIP), registry, cat)
+    assert "możliwe rekomendacje instrumentów finansowych" in f.title
+
+
+def test_confirmed_title_has_no_possible(registry, cat):
+    rules = [rr("S3.1", "fail"), rr("S3.3", "pass"), rr("S3.4", "fail"), rr("S3.6", "fail")]
+    d = page("Kupuj akcje.")
+    f = m3.build_finding(ctx_of(d, registry), cat, advertiser=build_advertiser(d, registry), now=NOW, rules=rules)
+    assert "rekomendacje instrumentów finansowych" in f.title and "możliwe" not in f.title
+
+
+def test_unconfirmed_personalisation_note(mock, registry, cat):
+    f = finding(mock(VIP), registry, cat)
+    assert "nie potwierdzono personalizacji" in f.summary.lower() and "art. 76" in f.summary
+
+
+def test_personalisation_candidate_has_no_unconfirmed_note(mock, registry, cat):
+    assert "nie potwierdzono personalizacji" not in finding(mock(GOLD), registry, cat).summary.lower()
+
+
+def test_m3_excerpt_around_the_offer(registry, cat):
+    text = "Ogólne informacje o rynku i historii giełdy. " * 50 + "Rekomendujemy kupno akcji PKO w tym tygodniu."
+    f = finding(page(text), registry, cat)
+    assert len(f.content_excerpt) <= 500 and "Rekomendujemy kupno akcji PKO" in f.content_excerpt

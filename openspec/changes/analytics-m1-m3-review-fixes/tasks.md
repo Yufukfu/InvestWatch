@@ -22,9 +22,9 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 
 ## 4. Titles, notes and the excerpt (items 7, 8, 10)
 
-- [ ] 4.1 Failing tests: M3 titles say `możliwe …` while the deciding signal is `uncertain`; M1 titles say `wspomina` without an ad signal; the M3 summary says personalisation is unconfirmed when S3.3 is `pass`; M1/M3 `content_excerpt` is at most 500 characters around the first evidence
-- [ ] 4.2 `modules/m1.py`, `modules/m3.py`, `modules/excerpt.py`; tests green
-- [ ] 4.3 Mutation check; `mutations: N tried, N caught`
+- [x] 4.1 Failing tests: M3 titles say `możliwe …` while the deciding signal is `uncertain`; M1 titles say `wspomina` without an ad signal; the M3 summary says personalisation is unconfirmed when S3.3 is `pass`; M1/M3 `content_excerpt` is at most 500 characters around the first evidence
+- [x] 4.2 `modules/m1.py`, `modules/m3.py`, `modules/excerpt.py`; tests green
+- [x] 4.3 Mutation check; `mutations: 11 tried, 10 caught`, 1 equivalent (counting a `pass` evidence: no rule returns one today; kept for LLM `pass` verdicts with a quote); the first survivor, the earliest of two evidences, got its own test
 
 ## 5. Docs and ADR (items 1, 8, 11)
 

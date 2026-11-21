@@ -15,8 +15,8 @@ from ..rules import engine
 from ..rules.engine import Catalogue, Context, run_rules
 from ..rules.m3 import CRYPTO_NOTE, not_found_text
 from ..rules.scoring import capped, sigmoid_score
+from .excerpt import excerpt
 
-EXCERPT_MAX = 500
 GATE_CAP = 0.4
 #: Signals that indicate an offer at all; without one, an M3-only document gets no finding.
 ADVISORY = ("S3.2", "S3.3", "S3.4", "S3.5", "S3.8")
@@ -82,7 +82,7 @@ def build_finding(
         firm=None,
         advertiser=advertiser,
         rules=rules,
-        content_excerpt=ctx.pre.normalized[:EXCERPT_MAX] or None,
+        content_excerpt=excerpt(ctx.doc.text, ctx.pre, rules),
         url=ctx.doc.url,
         platform=ctx.doc.platform,
         detected_at=now,
@@ -98,10 +98,16 @@ def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool,
     def present(sid: str) -> bool:
         return sid in by_id and by_id[sid].result in PRESENT
 
+    def maybe(sid: str, text: str) -> str:
+        """A rule candidate is not a finding of fact: say "możliwe" while the signal is `uncertain` (#35 review)."""
+        return f"możliwe {text}" if by_id[sid].result == "uncertain" else text
+
     if present("S3.4"):
-        what = "rekomendacje instrumentów finansowych" + (" dopasowane do klienta" if present("S3.3") else "")
+        what = maybe("S3.4", "rekomendacje instrumentów finansowych")
+        if present("S3.3"):
+            what += " (możliwie dopasowane do klienta)" if by_id["S3.3"].result == "uncertain" else " dopasowane do klienta"
     elif present("S3.3"):
-        what = "personalizowana oferta bez rekomendacji instrumentów"
+        what = maybe("S3.3", "dopasowanie oferty do klienta, bez rekomendacji instrumentów")
     elif present("S3.8"):
         what = "rekomendacje kryptoaktywów (poza art. 2)"
     elif present("S3.5"):
@@ -118,6 +124,10 @@ def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool,
         parts.append("Do weryfikacji: " + "; ".join(f"{r.rule_id} {r.name}" for r in unsure) + ".")
     if was_capped:
         parts.append("Wynik ograniczony do 0,4: brak rekomendacji konkretnych instrumentów finansowych (art. 76).")
+    if "S3.3" in by_id and by_id["S3.3"].result == "pass":
+        # ADR 0308: the S3.4 gate flags offers that may indicate advice; art. 76 also needs the client's situation.
+        parts.append("Nie potwierdzono personalizacji (potrzeb i sytuacji klienta), której wymaga art. 76 – "
+                     "materiał może jedynie wskazywać na doradztwo inwestycyjne.")
     if present("S3.8"):
         parts.append(f"{CRYPTO_NOTE[0].upper()}{CRYPTO_NOTE[1:]}.")
     parts.append("Tryb regułowy (bez modelu językowego).")
