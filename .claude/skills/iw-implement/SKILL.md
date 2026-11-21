@@ -21,7 +21,7 @@ description: Use at the start of any feature, fix or refactor that will become i
    git worktree add -b <prefix>/<slug> ../InvestWatch-worktrees/<slug> origin/main
    ```
    A fresh worktree has no untracked files: copy your `.env` from the main clone (never commit it) and install the module's dependencies. For parallel stacks set `COMPOSE_PROJECT_NAME=iw-<slug>` and avoid port clashes.
-4. **Spec, using the OpenSpec skills**: read `.docs/STATUS.md` and the owning spec under `openspec/specs/`, then run `/openspec-propose <slug>`. A change that alters a frozen contract (`.docs/integration-plan.md`, v1) says so in the proposal and needs the whole team's OK and a version bump.
+4. **Spec, using the OpenSpec skills**: read `.docs/STATUS.md`, your domain file in `.docs/status/` and the owning spec under `openspec/specs/`, then run `/openspec-propose <slug>`. A change that alters a frozen contract (`.docs/integration-plan.md`, v1) says so in the proposal and needs the whole team's OK and a version bump.
 5. **Stop for the human to approve the spec.** Then implement with `/openspec-apply-change` only; do not code outside the apply flow. Per task group `iw-commit-cycle` applies (the config guidance in `openspec/config.yaml` says so), and the closing tasks generated into `tasks.md` finish the change.
 
 ## Don't
