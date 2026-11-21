@@ -67,15 +67,146 @@ def test_score_all_fail_is_one():
 # ---- routing -----------------------------------------------------------------------------------
 
 
-def test_route_firm_own_to_m2():
-    assert route(ScrapedDocument.model_validate(make_doc(source_kind="firm_own"))) == ["M2"]
+MOCK = {"jan": "3c41441c-40ba-5864-b3e0-03f8bc9acebe", "kasia": "182e5a42-1041-5147-99dc-84d73ed34220",
+        "edu": "8721cb75-d75c-537f-8981-07a7e2dede3c", "gold": "007bbcee-0737-5c6d-b9b4-ce56fcbfa8e4",
+        "vip": "cdbf5306-1bb9-5d3b-b8b8-bc64f2ed8e88", "blog": "72acbb3b-3546-5c9b-9b26-2b29f69ccce9"}
+SOCIAL = {"source_kind": "third_party", "platform": "instagram", "url": "https://www.instagram.com/p/R1/"}
 
 
-@pytest.mark.parametrize("kind", ["third_party", "unknown"])
-def test_third_party_is_skipped_with_reason(kind, registry, catalogue, caplog):
+def modules_of(findings) -> list[str]:
+    return [f.module for f in findings]
+
+
+def reasons(caplog) -> set[str]:
+    return {getattr(r, "reason", None) for r in caplog.records}
+
+
+def test_route_firm_own_to_m2(registry):
+    r = route(ScrapedDocument.model_validate(make_doc(source_kind="firm_own", text="Alfa Inwestycje")), registry)
+    assert r.module == "M2" and r.firm_match.firm.name.startswith("Alfa")
+
+
+def test_firm_own_on_firm_domain(registry, catalogue):
+    raw = make_doc(url="https://alfa-inwestycje.example.com/oferta", text="Reklama. Otwórz konto.")
+    assert modules_of(run(raw, registry, catalogue)) == ["M2"]
+
+
+def test_unmatched_own_page_with_advisory_goes_to_m3(registry, catalogue):
+    raw = make_doc(text="Beta Kapitał – family office. Rekomendujemy kupno obligacji. Abonament 500 zł miesięcznie.")
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M3" and f.firm is None
+
+
+def test_unmatched_own_page_without_advisory(registry, catalogue, caplog):
     with caplog.at_level(logging.INFO):
-        assert run(make_doc(source_kind=kind, text="Polecam Alfa Inwestycje! Zarabiaj 18%."), registry, catalogue) == []
-    assert any(getattr(r, "reason", None) == "module_not_implemented" for r in caplog.records)
+        assert run(make_doc(text="Reklama. Beta Kapitał zaprasza na piknik."), registry, catalogue) == []
+    assert "no_signals" in reasons(caplog)
+
+
+def test_firms_own_social_account_goes_to_m2(registry, catalogue):
+    raw = make_doc(**SOCIAL, text="Alfa Inwestycje: nowe konto IKE. Otwórz konto.", author={"handle": "@alfainwestycje"})
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M2" and f.firm.name.startswith("Alfa") and f.firm.match_confidence == 0.95
+
+
+def test_firm_account_naming_another_firm_is_still_its_m2(registry, catalogue):
+    raw = make_doc(**SOCIAL, text="Bank Przykładowy jest naszym bankiem depozytariuszem.",
+                   author={"handle": "@alfainwestycje"})
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M2" and f.firm.name.startswith("Alfa")
+    assert {r.rule_id: r.result for r in f.rules}["R1"] == "fail"
+
+
+def test_third_party_post_about_registered_firm(mock_documents, registry, catalogue):
+    docs = {d["id"]: d for d in mock_documents}
+    assert modules_of(run(docs[MOCK["jan"]], registry, catalogue)) == ["M1"]
+    assert modules_of(run(docs[MOCK["kasia"]], registry, catalogue)) == ["M1"]
+
+
+def test_foreign_firm_ad_not_aimed_at_poland(registry, catalogue, caplog):
+    raw = make_doc(source_kind="third_party", platform="web", url="https://blog.example.com/x",
+                   text="EuroTrade Markets is a great broker for international traders.")
+    with caplog.at_level(logging.INFO):
+        assert run(raw, registry, catalogue) == []
+    assert "not_targeting_poland" in reasons(caplog)
+
+
+def test_polish_brokerage_house_advertised_in_english(registry, catalogue):
+    raw = make_doc(source_kind="third_party", platform="web", url="https://blog.example.com/x",
+                   text="Alfa Inwestycje is a great broker, open an account today.")
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M1" and {r.rule_id: r.result for r in f.rules}["S1.7"] == "pass"
+
+
+def test_unknown_page_of_unregistered_entity(mock_documents, registry, catalogue):
+    docs = {d["id"]: d for d in mock_documents}
+    assert modules_of(run(docs[MOCK["gold"]], registry, catalogue)) == ["M3"]
+
+
+def test_unmatched_post_without_advisory(mock_documents, registry, catalogue, caplog):
+    docs = {d["id"]: d for d in mock_documents}
+    with caplog.at_level(logging.INFO):
+        assert run(docs[MOCK["edu"]], registry, catalogue) == []
+    assert "no_signals" in reasons(caplog) and "module_not_implemented" not in reasons(caplog)
+
+
+def test_empty_third_party_text(registry, catalogue, caplog):
+    with caplog.at_level(logging.INFO):
+        assert run(make_doc(**SOCIAL, text="  "), registry, catalogue) == []
+    assert "empty_text" in reasons(caplog)
+
+
+def test_referral_link_routes_to_m1(registry, catalogue):
+    raw = make_doc(**SOCIAL, text="Polecam, link niżej. Bonus 200 zł.",
+                   links=[{"href": "https://eurotrade-markets.example.com/pl/register?ref=X"}])
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M1" and f.firm.name.startswith("EuroTrade")
+
+
+def test_malformed_link_routes_to_m3(registry, catalogue):
+    raw = make_doc(**SOCIAL, text="Doradztwo inwestycyjne dla każdego. Abonament 99 zł/mies.", links=[{"href": "not a url"}])
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M3"
+
+
+def test_firm_own_ignores_link_hosts(registry, catalogue):
+    raw = make_doc(text="Beta Kapitał zaprasza na piknik.",
+                   links=[{"href": "https://alfa-inwestycje.example.com/"}])
+    assert run(raw, registry, catalogue) == []
+
+
+def test_finfluencer_buy_calls_give_m1_and_m3(registry, catalogue):
+    raw = make_doc(**SOCIAL, author={"handle": "@trader_ola"},
+                   text="Konto mam w EuroTrade Markets. Moja grupa: co tydzień mówię, co kupić z akcji WIG20.")
+    findings = run(raw, registry, catalogue)
+    assert modules_of(findings) == ["M1", "M3"]
+    m1, m3 = findings
+    assert m1.firm.name.startswith("EuroTrade") and m3.firm is None and m3.advertiser.handle == "@trader_ola"
+    assert m1.id != m3.id
+
+
+def test_firms_offer_gives_only_m1(registry, catalogue):
+    raw = make_doc(**SOCIAL, text="Alfa Inwestycje DM rekomenduje kupno obligacji skarbowych.")
+    assert modules_of(run(raw, registry, catalogue)) == ["M1"]
+
+
+def test_signal_catalogues_can_be_injected(registry, catalogue, tmp_path):
+    from investwatch_analytics.pipeline import SignalCatalogues, default_signal_catalogues
+
+    default = default_signal_catalogues()
+    assert default is default_signal_catalogues()
+    m1 = Catalogue.load(_write_m1(tmp_path), module="M1")
+    raw = make_doc(**SOCIAL, text="Polski post: Alfa Inwestycje DM.")
+    [f] = analyze(ScrapedDocument.model_validate(raw), registry=registry, catalogue=catalogue, now=NOW,
+                  signals=SignalCatalogues(m1=m1, m3=default.m3))
+    assert [r.rule_id for r in f.rules] == ["S1.1"]
+
+
+def _write_m1(tmp_path) -> Path:
+    p = tmp_path / "m1.yaml"
+    p.write_text("bias: 0\nrules:\n  - {id: S1.1, name: Wzmianka, severity: medium, weight: 1, implemented: true}\n",
+                 encoding="utf-8")
+    return p
 
 
 def test_empty_text_yields_nothing(registry, catalogue, caplog):
@@ -126,8 +257,14 @@ def test_compliant_material(registry, catalogue):
     assert "brak naruszeń" in f.title
 
 
-def test_unmatched_firm_on_own_page(registry, catalogue):
-    [f] = run(make_doc(text="Reklama. Beta Kapitał zaprasza do inwestowania."), registry, catalogue)
+def test_m2_builder_without_a_firm_match(registry, catalogue):
+    from investwatch_analytics.modules import m2
+    from investwatch_analytics.preprocessing import preprocess
+    from investwatch_analytics.rules.engine import Context
+
+    doc = ScrapedDocument.model_validate(make_doc(text="Reklama. Beta Kapitał zaprasza do inwestowania."))
+    ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=None, registry=registry)
+    f = m2.build_finding(ctx, catalogue, now=NOW)
     assert f.firm is None
     assert {r.rule_id: r.result for r in f.rules}["R1"] == "fail"
     assert "Nieznana firma" in f.title
@@ -139,7 +276,7 @@ def test_only_implemented_rules_are_listed(registry, catalogue):
 
 
 def test_excerpt_is_capped_at_500(registry, catalogue):
-    [f] = run(make_doc(text="Reklama. " + "Słowo " * 200), registry, catalogue)
+    [f] = run(make_doc(text="Reklama. Alfa Inwestycje. " + "Słowo " * 200), registry, catalogue)
     assert len(f.content_excerpt) <= 500
 
 
@@ -172,3 +309,23 @@ def test_summary_when_no_rule_applies():
     _, summary = _texts([rr("not_applicable", "high")], None)
     assert "Sprawdzono" not in summary and "Żadna z reguł nie miała zastosowania" in summary
     assert "Nie dotyczy: R1 x." in summary
+
+
+def test_six_m1_m3_mocks(mock_documents, registry, catalogue, finding_validator):
+    """Routing, contract validity and evidence of the six M1/M3 mock documents (read-only test double)."""
+    docs = {d["id"]: d for d in mock_documents}
+    expected = {"jan": ["M1"], "kasia": ["M1"], "edu": [], "gold": ["M3"], "vip": ["M3"], "blog": ["M3"]}
+    for key, modules in expected.items():
+        findings = run(docs[MOCK[key]], registry, catalogue)
+        assert modules_of(findings) == modules, key
+        for f in findings:
+            assert [e.message for e in finding_validator.iter_errors(f.to_contract())] == []
+            assert all("Nie udało się potwierdzić cytatu" not in (r.explanation or "") for r in f.rules), key
+
+
+def test_firm_account_naming_itself_after_another_firm(registry, catalogue):
+    raw = make_doc(**SOCIAL, text="Bank Przykładowy przechowuje środki klientów Alfa Inwestycje.",
+                   author={"handle": "@alfainwestycje"})
+    [f] = run(raw, registry, catalogue)
+    assert f.firm.name.startswith("Alfa") and f.firm.match_confidence == 0.95
+    assert {r.rule_id: r.result for r in f.rules}["R1"] == "pass"

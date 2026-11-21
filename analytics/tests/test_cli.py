@@ -22,7 +22,7 @@ def test_cli_on_mocks_passes_contract_validator(contracts_dir, tmp_path):
     assert run.returncode == 0, run.stderr
     findings = json.loads(run.stdout)
     assert isinstance(findings, list) and findings
-    assert {f["module"] for f in findings} == {"M2"}
+    assert {f["module"] for f in findings} == {"M1", "M2", "M3"}
     out.write_text(run.stdout, encoding="utf-8")
     check = subprocess.run(
         [sys.executable, str(contracts_dir / "validate.py"), "finding", str(out)],
@@ -48,7 +48,7 @@ def test_cli_invalid_document_exits_2(tmp_path, capsys):
 
 def test_cli_reads_utf8_bom(tmp_path, capsys):
     path = tmp_path / "bom.json"
-    path.write_text(json.dumps([make_doc()]), encoding="utf-8-sig")
+    path.write_text(json.dumps([make_doc(text="Reklama. Konto w Alfa Inwestycje.")]), encoding="utf-8-sig")
     assert cli.main([str(path)]) == 0
     assert json.loads(capsys.readouterr().out)
 
@@ -157,3 +157,20 @@ def test_cli_catalogue_with_list_root_exits_2(tmp_path, capsys, monkeypatch):
     path.write_text(json.dumps(make_doc()), encoding="utf-8")
     assert cli.main([str(path)]) == 2
     assert capsys.readouterr().out == ""
+
+
+def test_cli_bad_signal_catalogue_exits_2(tmp_path, capsys, monkeypatch):
+    from investwatch_analytics import pipeline
+    from investwatch_analytics.rules import engine
+
+    bad = tmp_path / "m1.yaml"
+    bad.write_text("rules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n", encoding="utf-8")  # no bias
+    monkeypatch.setitem(engine.MODULE_CATALOGUES, "M1", bad)
+    pipeline.default_signal_catalogues.cache_clear()
+    try:
+        path = tmp_path / "doc.json"
+        path.write_text(json.dumps(make_doc(text="Konto w Alfa Inwestycje.")), encoding="utf-8")
+        assert cli.main([str(path)]) == 2
+        assert capsys.readouterr().out == ""
+    finally:
+        pipeline.default_signal_catalogues.cache_clear()

@@ -792,3 +792,26 @@ def test_oversized_document_is_acked_as_invalid(r, registry, catalogue, caplog):
     assert pending(r) == 0
     [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
     assert (rec.outcome, rec.field) == ("invalid_document", "text")
+
+
+def test_main_exits_non_zero_on_bad_signal_catalogue(tmp_path, capsys, monkeypatch):
+    from investwatch_analytics import pipeline
+    from investwatch_analytics.rules import engine
+
+    bad = tmp_path / "m3.yaml"
+    bad.write_text("bias: 0\nrules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n", encoding="utf-8")
+    monkeypatch.setitem(engine.MODULE_CATALOGUES, "M3", bad)
+    pipeline.default_signal_catalogues.cache_clear()
+    import investwatch_analytics.worker as worker_module
+
+    def no_redis(*args, **kwargs):  # never reach the network: a missed check must fail fast, not retry forever
+        raise ValueError("stub")
+
+    monkeypatch.setattr(worker_module, "stream_client", no_redis)
+    try:
+        env = {"DATABASE_URL": "postgresql://u@127.0.0.1:1/db", "REDIS_URL": "redis://127.0.0.1:1/0"}
+        assert main(env) == 2
+        out = capsys.readouterr().out
+        assert "m3.yaml" in out and "config_error" in out
+    finally:
+        pipeline.default_signal_catalogues.cache_clear()
