@@ -1,7 +1,8 @@
 """The queue wrapper around one collection job: lock, concurrency cap, retry, deferral, outcome.
 
-`ctx` carries `settings` (QueueSettings), `run_source` (async source_id -> AttemptResult) and
-`record_error` (async JobError -> None); `run_source` must report failures as an AttemptResult, not raise;
+`ctx` carries `settings` (QueueSettings), `sources` (SourceStore), `run_source` (async (source_id, started)
+-> AttemptResult) and `record_error` (async JobError -> None). `run_source` awaits `started()` once its guards
+pass and before its first request, and reports failures as an AttemptResult instead of raising;
 the collector and the ingest are stubs here and supplied by
 `scraper-v1` and `scraper-ingest`.
 """
@@ -16,6 +17,7 @@ from arq.connections import ArqRedis
 from arq.worker import Function, Retry, func
 from redis.exceptions import RedisError
 
+from iw_scraper.events import derive_status, publish_scan_event
 from iw_scraper.guards import DomainHealth, LeaseSemaphore, RunLock
 from iw_scraper.retry import backoff_delay, is_transient
 from iw_scraper.types import Deferral, JobError, Reason
@@ -63,37 +65,59 @@ def job_function(settings: QueueSettings) -> Function:
     )
 
 
-async def execute_job(ctx: dict, source_id: str, domain: str) -> str:
-    """Returns `ok`, `failed` or `coalesced`; raises `Retry` to wait and try again."""
+async def execute_job(ctx: dict, source_id: str, domain: str, requested: bool = False) -> str:
+    """Returns `ok`, `partial`, `failed`, `coalesced` or `skipped`; raises `Retry` to wait and try again."""
     lock = RunLock(ctx["redis"], source_id, ctx["job_id"])
     if not await lock.acquire(ctx["settings"].lease_ttl):
         return "coalesced"
     try:
-        return await _run_locked(ctx, source_id, domain, lock)
+        return await _run_locked(ctx, source_id, domain, requested, lock)
     except Retry:
         raise  # the lock stays held until the job's final outcome
+    except Exception:
+        # the progress bar must not hang on a collector bug
+        await _finish_if_started(ctx, source_id, status="failed", documents=0)
+        await lock.release()
+        raise
     except BaseException:
         await lock.release()
         raise
 
 
-async def _run_locked(ctx: dict, source_id: str, domain: str, lock: RunLock) -> str:
+async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, lock: RunLock) -> str:
     redis: ArqRedis = ctx["redis"]
     cfg: QueueSettings = ctx["settings"]
-    health = DomainHealth(redis, domain, threshold=cfg.failure_threshold, cooldown=cfg.domain_cooldown)
+    job_id = ctx["job_id"]
 
+    source = await ctx["sources"].get(source_id)
+    if source is None or not source.collectable:
+        # a job that already announced its start must also announce its end
+        if requested and not await redis.exists(_started_key(job_id)):
+            await publish_scan_event(redis, "finished", source_id, documents=0, status="failed")
+        else:
+            await _finish_if_started(ctx, source_id, status="failed", documents=0)
+        await lock.release()
+        return "skipped"
+
+    health = DomainHealth(redis, domain, threshold=cfg.failure_threshold, cooldown=cfg.domain_cooldown)
     if (paused_for := await health.paused_for()) > 0:
         await _requeue(lock, cfg, paused_for)
     semaphore = LeaseSemaphore(redis, domain, cfg.domain_concurrency)
-    lease_id = f"{ctx['job_id']}:{ctx['job_try']}"
+    lease_id = f"{job_id}:{ctx['job_try']}"
     if not await semaphore.acquire(lease_id, cfg.lease_ttl):
         await _requeue(lock, cfg, cfg.requeue_delay)
 
-    result = await _attempt(ctx["run_source"], source_id, lock, semaphore, lease_id, cfg)
+    async def announce_start() -> None:
+        # once per job: retries and the collector's own call share this marker
+        if await redis.set(_started_key(job_id), 1, nx=True, ex=ATTEMPTS_KEY_TTL):
+            await ctx["sources"].mark_running(source_id)
+            await publish_scan_event(redis, "started", source_id)
+
+    result = await _attempt(ctx["run_source"], source_id, announce_start, lock, semaphore, lease_id, cfg)
 
     if result.deferral:
         await _requeue(lock, cfg, max(0.0, (result.deferral.until - datetime.now(UTC)).total_seconds()))
-    attempts_key = f"iw:attempts:{ctx['job_id']}"
+    attempts_key = f"iw:attempts:{job_id}"
     if result.error and is_transient(result.error.reason, result.http_status):
         failures = await redis.incr(attempts_key)
         await redis.expire(attempts_key, ATTEMPTS_KEY_TTL)
@@ -103,12 +127,29 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, lock: RunLock) -> 
             )
             await _requeue(lock, cfg, delay)
 
-    await health.record(ok=result.error is None)
+    status = derive_status(documents=result.documents, errors=1 if result.error else 0)
+    await health.record(ok=status != "failed")
     if result.error:
         await ctx["record_error"](result.error)
+    await announce_start()  # a collector that never announced still gets a start before the finish
+    await _finish_if_started(ctx, source_id, status=status, documents=result.documents)
     await redis.delete(attempts_key)
     await lock.release()
-    return "failed" if result.error else "ok"
+    return status
+
+
+def _started_key(job_id: str) -> str:
+    return f"iw:started:{job_id}"
+
+
+async def _finish_if_started(ctx: dict, source_id: str, *, status: str, documents: int) -> None:
+    """Publish `scan.finished` and stamp the source, once, for a job that announced its start."""
+    redis: ArqRedis = ctx["redis"]
+    if not await redis.delete(_started_key(ctx["job_id"])):
+        return
+    if await ctx["sources"].get(source_id) is not None:
+        await ctx["sources"].mark_finished(source_id, at=datetime.now(UTC), status=status, documents=documents)
+    await publish_scan_event(redis, "finished", source_id, documents=documents, status=status)
 
 
 async def _requeue(lock: RunLock, cfg: QueueSettings, delay: float) -> None:
@@ -121,11 +162,11 @@ async def _requeue(lock: RunLock, cfg: QueueSettings, delay: float) -> None:
     raise Retry(defer=delay)
 
 
-async def _attempt(run_source, source_id, lock: RunLock, semaphore: LeaseSemaphore, lease_id: str, cfg: QueueSettings):
+async def _attempt(run_source, source_id, announce_start, lock: RunLock, semaphore: LeaseSemaphore, lease_id: str, cfg: QueueSettings):
     keeper = asyncio.create_task(_keep_alive(lock, semaphore, lease_id, cfg.lease_ttl))
     try:
         async with asyncio.timeout(cfg.attempt_timeout):
-            return await run_source(source_id)
+            return await run_source(source_id, announce_start)
     except TimeoutError:
         return AttemptResult(error=JobError(Reason.TIMEOUT, "attempt exceeded its timeout", source_id))
     finally:

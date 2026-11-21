@@ -16,7 +16,7 @@ def scripted(results, calls):
     """run_source that returns the scripted results in order and records attempt times."""
     queue = list(results)
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         calls.append(time.monotonic())
         return queue.pop(0) if len(queue) > 1 else queue[0]
 
@@ -78,7 +78,7 @@ async def test_non_transient_failures_are_not_retried(redis, start_worker, reaso
 async def test_attempt_over_its_timeout_counts_as_a_timeout_failure_and_is_retried(redis, start_worker):
     calls = []
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         calls.append(1)
         await asyncio.sleep(30)
 

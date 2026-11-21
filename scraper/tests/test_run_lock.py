@@ -15,7 +15,7 @@ LOCK_KEY = f"iw:lock:{SRC}"
 async def test_overlapping_jobs_for_one_source_coalesce(redis, start_worker):
     release, calls = asyncio.Event(), []
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         calls.append(source_id)
         await release.wait()
         return AttemptResult(documents=1)
@@ -35,7 +35,7 @@ async def test_overlapping_jobs_for_one_source_coalesce(redis, start_worker):
 async def test_lock_is_held_while_a_job_waits_out_its_retry_backoff(redis, start_worker):
     calls = []
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         calls.append(1)
         if len(calls) == 1:
             return AttemptResult(error=JobError(Reason.HTTP_ERROR, "x", SRC), http_status=503, retry_after=0.8)
@@ -54,7 +54,7 @@ async def test_lock_is_held_while_a_job_waits_out_its_retry_backoff(redis, start
 async def test_lock_is_renewed_while_the_job_lives_longer_than_its_ttl(redis, start_worker):
     release, calls = asyncio.Event(), []
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         calls.append(1)
         await release.wait()
         return AttemptResult(documents=1)
@@ -71,7 +71,7 @@ async def test_lock_is_renewed_while_the_job_lives_longer_than_its_ttl(redis, st
 
 
 async def test_lock_is_released_after_the_final_outcome(redis, start_worker):
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         return AttemptResult(error=JobError(Reason.BLOCKED, "x", SRC))
 
     start_worker(run_source, Recorder(), fast_settings())
@@ -82,7 +82,7 @@ async def test_lock_is_released_after_the_final_outcome(redis, start_worker):
 
 
 async def test_lock_is_released_when_the_run_raises(redis, start_worker):
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         raise RuntimeError("boom")
 
     start_worker(run_source, Recorder(), fast_settings())
@@ -98,7 +98,7 @@ async def test_lock_is_released_when_the_run_raises(redis, start_worker):
 async def test_a_stale_lock_from_a_crashed_worker_expires_and_the_next_job_runs(redis, start_worker):
     calls = []
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         calls.append(1)
         return AttemptResult(documents=1)
 
@@ -133,7 +133,7 @@ async def test_a_non_owner_cannot_extend_the_lock(redis):
 
 
 async def test_lock_outlives_the_retry_due_time_by_at_least_the_attempt_timeout(redis, start_worker):
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         return AttemptResult(error=JobError(Reason.HTTP_ERROR, "x", SRC), http_status=503, retry_after=3.0)
 
     start_worker(run_source, Recorder(), fast_settings(lease_ttl=0.3, attempt_timeout=5.0))
@@ -155,7 +155,7 @@ async def test_renewal_survives_a_redis_error(redis, start_worker, monkeypatch):
 
     monkeypatch.setattr(RunLock, "extend", flaky_extend)
 
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         await release.wait()
         return AttemptResult(documents=1)
 

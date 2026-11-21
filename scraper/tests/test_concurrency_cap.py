@@ -16,7 +16,7 @@ class Gauge:
         self.running = 0
         self.peak = 0
 
-    async def run_source(self, source_id):
+    async def run_source(self, source_id, started=None):
         self.running += 1
         self.peak = max(self.peak, self.running)
         await asyncio.sleep(0.15)
@@ -72,11 +72,11 @@ async def test_pending_jobs_survive_a_worker_stopping_and_run_on_the_next_worker
     release = asyncio.Event()
     ran: list[str] = []
 
-    async def blocked(source_id):
+    async def blocked(source_id, started=None):
         await release.wait()
         return AttemptResult(documents=1)
 
-    async def quick(source_id):
+    async def quick(source_id, started=None):
         ran.append(source_id)
         return AttemptResult(documents=1)
 
@@ -94,10 +94,10 @@ async def test_pending_jobs_survive_a_worker_stopping_and_run_on_the_next_worker
 
 
 async def test_a_running_job_keeps_its_slot_past_the_lease_ttl(redis, start_worker):
-    release, started = asyncio.Event(), []
+    release, begun = asyncio.Event(), []
 
-    async def run_source(source_id):
-        started.append(source_id)
+    async def run_source(source_id, started=None):
+        begun.append(source_id)
         await release.wait()
         return AttemptResult(documents=1)
 
@@ -108,14 +108,14 @@ async def test_a_running_job_keeps_its_slot_past_the_lease_ttl(redis, start_work
     second = await redis.enqueue_job("execute_job", second_id, DOMAIN, _job_id="b")
     await asyncio.sleep(0.4)
 
-    assert started == [first_id]
+    assert begun == [first_id]
     release.set()
     assert await first.result(timeout=5, poll_delay=0.05) == "ok"
     assert await second.result(timeout=5, poll_delay=0.05) == "ok"
 
 
 async def test_a_finished_job_frees_its_slot_at_once(redis, start_worker):
-    async def run_source(source_id):
+    async def run_source(source_id, started=None):
         return AttemptResult(documents=1)
 
     start_worker(run_source, Recorder(), fast_settings(domain_concurrency=1, lease_ttl=30.0))
