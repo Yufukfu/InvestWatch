@@ -36,6 +36,44 @@ def test_finding_matches_contract(finding_validator):
     assert "risk_level" not in payload
 
 
+def test_rules_only_finding_with_nulls_matches_contract(finding_validator):
+    data = sample_finding().model_dump()
+    data.update(firm=None, summary=None, content_excerpt=None, model=None)
+    payload = Finding(**data).to_contract()
+    assert [e.message for e in finding_validator.iter_errors(payload)] == []
+
+
+def test_firm_authorized_has_no_default():
+    with pytest.raises(ValidationError):
+        FirmRef(name="X", match_confidence=0.5)
+
+
+@pytest.mark.parametrize("url", ["example.com/x", "not a url", "ftp://example.com/x", "https://exa mple.com/x", "https:///x"])
+def test_document_url_must_be_absolute_http(url):
+    with pytest.raises(ValidationError):
+        ScrapedDocument.model_validate(make_doc(url=url))
+
+
+def test_finding_url_must_be_absolute_http():
+    data = sample_finding().model_dump()
+    data["url"] = "example.com/x"
+    with pytest.raises(ValidationError):
+        Finding(**data)
+
+
+def test_url_is_kept_verbatim():
+    url = "https://www.instagram.com/p/MOCK0001/?utm_source=x"
+    assert ScrapedDocument.model_validate(make_doc(url=url)).url == url
+
+
+def test_timestamps_converted_to_utc():
+    from datetime import datetime, timedelta, timezone
+
+    data = sample_finding().model_dump()
+    data["detected_at"] = datetime(2026, 11, 21, 18, 0, tzinfo=timezone(timedelta(hours=2)))
+    assert Finding(**data).to_contract()["detected_at"] == "2026-11-21T16:00:00Z"
+
+
 def test_timestamps_are_utc_z():
     payload = sample_finding().to_contract()
     assert payload["detected_at"] == "2026-11-21T16:00:00Z"

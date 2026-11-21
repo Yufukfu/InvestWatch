@@ -6,10 +6,11 @@ output is strict (unknown fields rejected). The JSON Schemas in `contracts/` sta
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import datetime, timezone
+from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
 
 Platform = Literal["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"]
 SourceKind = Literal["firm_own", "third_party", "unknown"]
@@ -20,6 +21,22 @@ RegistryType = Literal["brokerage_house", "brokerage_bank", "foreign_branch", "f
 
 UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 RULE_ID_PATTERN = r"^(R([1-9]|1[0-8])|R12[ab]|S[13]\.[0-9]+)$"
+
+
+def _absolute_http_url(value: str) -> str:
+    """Contract `format: uri`, narrowed to absolute http(s) URLs; the value is kept verbatim."""
+    parts = urlsplit(value)
+    if parts.scheme not in ("http", "https") or not parts.hostname or " " in value:
+        raise ValueError("must be an absolute http(s) URL")
+    return value
+
+
+def _to_utc(value: datetime) -> datetime:
+    return value.astimezone(timezone.utc)
+
+
+HttpUrlStr = Annotated[str, AfterValidator(_absolute_http_url)]
+UtcDatetime = Annotated[AwareDatetime, AfterValidator(_to_utc)]
 
 
 class _Lenient(BaseModel):
@@ -66,7 +83,7 @@ class ScrapedDocument(_Lenient):
     id: str = Field(pattern=UUID_PATTERN)
     platform: Platform
     source_kind: SourceKind
-    url: str
+    url: HttpUrlStr
     fetched_at: AwareDatetime
     text: str
     source_id: str | None = None
@@ -98,7 +115,7 @@ class FirmRef(_Strict):
     name: str
     registry_id: str | None = Field(default=None, pattern=UUID_PATTERN)
     registry_type: RegistryType | None = None
-    authorized: bool = True
+    authorized: bool
     match_confidence: float = Field(ge=0, le=1)
 
 
@@ -119,11 +136,11 @@ class Finding(_Strict):
     firm: FirmRef | None = None
     rules: list[RuleResult]
     content_excerpt: str | None = Field(default=None, max_length=500)
-    url: str
+    url: HttpUrlStr
     platform: Platform
     note: str | None = None
-    detected_at: AwareDatetime
-    updated_at: AwareDatetime
+    detected_at: UtcDatetime
+    updated_at: UtcDatetime
     model: ModelInfo | None = None
 
     def to_contract(self) -> dict:
