@@ -75,7 +75,13 @@ class Ingestor:
         except Exception as exc:  # the minio client raises S3Error, urllib3 and OS errors alike
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"upload failed: {exc}", source_id))
         doc["html_object_key"] = key
-        keys = [key, *await self._attach_render(doc, output, source_id)]
+        keys = [key]
+        try:
+            await self._attach_render(doc, output, source_id, keys)
+        except asyncio.CancelledError:  # no insert has started: nothing can be committed, so every object goes
+            for stale in keys:
+                await self._remove_object(stale)
+            raise
 
         try:
             result = await insert_document(self.pool, doc)
@@ -109,25 +115,26 @@ class Ingestor:
             await self._record(JobError(error.reason, error.detail, source_id))
         return output
 
-    async def _attach_render(self, doc: dict, output: RenderOutput | None, source_id: str) -> list[str]:
-        """Upload the screenshots and set `screenshots` and `scrape_meta.render`; the object keys uploaded.
+    async def _attach_render(self, doc: dict, output: RenderOutput | None, source_id: str, keys: list[str]) -> None:
+        """Upload the screenshots and set `screenshots` and `scrape_meta.render`.
 
+        Each uploaded key is appended to `keys` at once, so a cancellation can remove what is already there.
         A failure here costs the layout only: nothing of it is kept, and the error is recorded.
         """
         if output is None or output.errors:
-            return []
+            return
         if output.skipped or not output.screenshots:
             doc["scrape_meta"] = {**doc["scrape_meta"], "render": {"skipped": output.skipped or "empty"}}
-            return []
+            return
         uploaded: dict[str, str] = {}
         try:
             for viewport, png in output.screenshots.items():
                 uploaded[viewport] = await self.storage.put_screenshot(doc["id"], viewport, png)
+                keys.append(uploaded[viewport])
         except Exception as exc:
             await self._record(JobError(Reason.STORAGE_ERROR, f"screenshot upload failed: {exc}", source_id))
-            for key in uploaded.values():
-                await self._remove_object(key)
-            return []
+            await self._drop(uploaded.values(), keys)
+            return
         candidate = {
             **doc,
             "screenshots": uploaded,
@@ -137,11 +144,14 @@ class Ingestor:
         }
         if check_document(candidate) is not None:  # the layout is not worth a document the schema refuses
             await self._record(JobError(Reason.RENDER_FAILED, "render output is not valid against the schema", source_id))
-            for key in uploaded.values():
-                await self._remove_object(key)
-            return []
+            await self._drop(uploaded.values(), keys)
+            return
         doc.update(candidate)
-        return list(uploaded.values())
+
+    async def _drop(self, shots, keys: list[str]) -> None:
+        for key in shots:
+            await self._remove_object(key)
+            keys.remove(key)
 
     async def _announce(self, document_id: str, source_id: str) -> None:
         try:

@@ -526,6 +526,26 @@ async def test_render_output_the_schema_refuses_costs_the_layout_not_the_documen
     assert await storage.list_keys() == [f"html/{result.document_id}.html"]
 
 
+async def test_a_cancellation_during_the_screenshot_uploads_removes_every_object_uploaded_so_far(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    class CancelledStorage(Storage):
+        async def put_screenshot(self, document_id, viewport, png):
+            if viewport == "mobile":
+                raise asyncio.CancelledError()  # the attempt timeout, or a worker shutdown
+            return await super().put_screenshot(document_id, viewport, png)
+
+    cancelled = CancelledStorage(storage.endpoint, storage.access_key, storage.secret_key, bucket=storage.bucket)
+
+    with pytest.raises(asyncio.CancelledError):
+        await run(
+            Ingestor(pool, cancelled, redis_client, stream=stream_name), seeded_source,
+            rendering(shots("desktop", "mobile")),
+        )
+
+    assert await storage.list_keys() == [] and await doc_count(pool) == 0
+
+
 async def test_a_failed_screenshot_upload_degrades_and_removes_what_was_uploaded(
     pool, storage, redis_client, stream_name, seeded_source
 ):
