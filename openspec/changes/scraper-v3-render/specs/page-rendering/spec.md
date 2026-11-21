@@ -133,7 +133,7 @@ For each viewport the scraper SHALL emit `blocks` in the contract's `block` shap
 - **THEN** no block is emitted for it
 
 ### Requirement: Say where a block is and whether it can be seen
-`visible` SHALL be `false` for a block hidden by `display`, `visibility`, `opacity` 0 or a zero-size box, and such text SHALL still be emitted so that hiding is detectable. `in_viewport_on_load` SHALL be `true` only when the block's box is inside the first viewport height without scrolling. `requires_interaction` SHALL be `true` for a block inside a closed `details`, or hidden and controlled by a visible element (`summary`, or an element whose `aria-controls` names it with `aria-expanded` `false`), and `false` otherwise. `region` SHALL be `footer` inside `footer` or `[role=contentinfo]`, `header` inside `header` or `[role=banner]`, `aside` inside `aside`, `overlay` inside a fixed or modal positioned layer, `legal` inside an element whose id, class or accessible name contains `legal`, `disclaimer`, `zastrzezen`, `regulamin` or `przypis` (case-insensitive, diacritics folded), and `main` otherwise.
+`visible` SHALL be `false` for a block hidden by `display`, `visibility`, `opacity` 0 or a zero-size box, and such text SHALL still be emitted so that hiding is detectable. `in_viewport_on_load` SHALL be `true` only when the block's box is inside the first viewport height without scrolling. `requires_interaction` SHALL be `true` for a block inside a closed `details`, or hidden and controlled by a visible element (`summary`, or an element whose `aria-controls` names it with `aria-expanded` `false`), and `false` otherwise. `region` SHALL be `footer` inside `footer` or `[role=contentinfo]`, `header` inside `header` or `[role=banner]`, `aside` inside `aside`, `overlay` inside a fixed or modal positioned layer, `legal` inside an element whose id, class, accessible name or section heading contains one of the placement words in one list (case-insensitive substring, diacritics folded): `legal`, `prawn`, `klauzul`, `objasnien`, `warunk`, `regulacj`, `regulamin`, `zastrzezen`, `przypis`, `knf`, `disclaimer`, `disclosure`, `footnote`, `endnote`, `fine-print`, `fineprint`, `small-print`, `important-information`, `important-notice`, `terms`, `tnc`, `notice`, `compliance`, `regulatory`, `imprint`, `impressum`, or inside `small`, `role=note`, `role=doc-footnote` or `role=doc-endnotes`, and `main` otherwise. `region` SHALL always be set, never `null` (analytics' R6 cannot pass a block with unknown region). The list SHALL hold placement words only, never content words such as `risk`, `ryzyk`, `ostrzezen` or `warning`: a prominent risk box below the fold is not legal text and must not fail R6 as one.
 
 #### Scenario: Collapsed accordion
 - **WHEN** a risk text sits in a closed `details` element
@@ -150,6 +150,14 @@ For each viewport the scraper SHALL emit `blocks` in the contract's `block` shap
 #### Scenario: Cookie banner
 - **WHEN** a fixed-position banner contains text
 - **THEN** that text's `region` is `overlay`
+
+#### Scenario: Placement words, not content words
+- **WHEN** a below-the-fold `<div class="risk-warning">` and a `<div class="nota-prawna">` each hold text
+- **THEN** the first block's `region` is `main` and the second's is `legal`
+
+#### Scenario: Region is never null
+- **WHEN** a block matches no region rule
+- **THEN** its `region` is `main`
 
 ### Requirement: Bound the work
 The renderer SHALL stop a render that exceeds `RENDER_TIMEOUT_SECONDS` (default 90, for all viewports together; the scraper passes each call the time left), SHALL emit at most `RENDER_MAX_BLOCKS` blocks per viewport (default 600) with each block's text cut at 4000 characters, and SHALL return at most `RENDER_MAX_PNG_BYTES` per image. When a cap is hit, `scrape_meta.render.truncated` SHALL be `true`. One render at a time per browser process SHALL be the default (`RENDER_CONCURRENCY`, default 1).

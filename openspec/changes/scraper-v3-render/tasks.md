@@ -5,7 +5,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 ## 1. Agreements and ADR
 
 - [ ] 1.1 Measure with evidence: build a throwaway image with the pinned Playwright, Chromium and its system libraries; record size, browser version (its major against `CHROME_VERSION`, design decision 4), checksum source, and whether Chromium's sandbox starts as a non-root user with `cap_drop: [ALL]`, `no-new-privileges` and a read-only root filesystem. Write ADR 0105 (renderer as a separate image and service, options A/B/C of design decision 1, hardening, the DNS-rebinding residual risk, three navigations per document) and list it in `.docs/decisions/README.md`; docs-check clean
-- [ ] 1.2 Send Damian the two questions that are not blocking: the `legal` word list (design open question 2) and, for later, `occluded` (open question 1); record any answer in `design.md`. Nothing in groups 2-7 waits for the reply
+- [x] 1.2 Damian answered both questions in issue #34 (2026-11-21): the `legal` word list and `region` never null are folded into the spec and design; `occluded` stays deferred, as a nullable boolean in v2. Nothing in groups 2-7 waits
 
 ## 2. A confined, bounded render with screenshots (desktop and mobile)
 
@@ -33,7 +33,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 - [ ] 5.1 Failing tests on synthetic pages, then the in-page measurement script and its Python wrapper: block selection (nearest block-level element with its own text, no `script`, `style`, `noscript`, `template`), `font_size_px`, `font_weight`, `bbox`, document order, caps (`RENDER_MAX_BLOCKS`, 4000-character text, `truncated`); the small-risk-text, non-text-elements and too-many-blocks scenarios pass
 - [ ] 5.2 Failing tests, then colour resolution (alpha compositing over the nearest opaque ancestor, `null` for image or gradient backgrounds, `#rrggbb` only); the colour scenarios pass
-- [ ] 5.3 Failing tests, then `visible`, `in_viewport_on_load`, `requires_interaction` (closed `details`, `aria-controls` with `aria-expanded=false`) and `region` (footer, header, aside, overlay, legal word list with diacritics folded); the collapsed-accordion, below-the-fold, footer-legal and cookie-banner scenarios pass
+- [ ] 5.3 Failing tests, then `visible`, `in_viewport_on_load`, `requires_interaction` (closed `details`, `aria-controls` with `aria-expanded=false`) and `region` (footer, header, aside, overlay, legal placement-word list with diacritics folded, `main` default, never null); the collapsed-accordion, below-the-fold, footer-legal, cookie-banner, placement-words and region-never-null scenarios pass
 - [ ] 5.4 Failing tests, then `overflow_clipped` and the same text measured per viewport; the same-text-per-viewport scenario passes and every emitted block validates against the contract's `block` definition (`contracts/validate.py`)
 - [ ] 5.5 Failing tests, then ingest sets `blocks` on the document and the blocks-reach-analytics scenario passes against real PostgreSQL and MinIO
 - [ ] 5.6 Mutation check; line reads `mutations: N tried, N caught`
@@ -52,7 +52,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## Deferred follow-up (not part of this change's done criteria)
 
-- `occluded` on `block` (design open question 1): only if the whole team accepts the contract change after Integration #1 (`IW_CONTRACT_CHANGE=1`); then a failing test with a sticky bar over a risk text and a `document.elementFromPoint` measurement, as its own small change. Nothing in groups 1-7 depends on it.
+- `occluded` on `block` (design open question 1; Damian suggests `boolean | null`, null = not measured): only if the whole team accepts the contract change after Integration #1 (`IW_CONTRACT_CHANGE=1`); then a failing test with a sticky bar over a risk text and a `document.elementFromPoint` measurement, as its own small change. Nothing in groups 1-7 depends on it.
 - `sources.config` column for per-source render and parser options: a proposal for Damian after the hackathon.
 
 ## Workflow follow-up
