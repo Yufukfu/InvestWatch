@@ -24,7 +24,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 ## 4. Closing
 
 - [x] 4.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md`, your row in `.docs/STATUS.md`), run docs-check, add the `iw-ai-log` row, and fix `.docs/integration-plan.md` §3 and §6 to match `source.schema.json` and `events.schema.json` (record the bucket-check, named-conflict-target and `created_at`-sweep decisions in an ADR if `iw-docs-update` requires one)
-- [ ] 4.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
+- [x] 4.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
 
