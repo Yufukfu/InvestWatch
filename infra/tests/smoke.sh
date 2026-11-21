@@ -116,9 +116,26 @@ generated_env_complete() {
   [ "$n_all" -eq "$n_uniq" ] || { echo "secrets repeat: $n_uniq distinct of $n_all"; return 1; }
   docker compose --env-file "$f" -f "$ROOT/compose.yaml" config -q
 }
-init_env_no_overwrite() {
-  local f="$TMP/keep.env"; echo KEEP=1 >"$f"
-  ! "$ROOT/scripts/init-env.sh" "$f" && grep -qx KEEP=1 "$f"
+init_env_no_overwrite() { # a repeated Quick Start run keeps .env, says so, and is not an error
+  local f="$TMP/keep.env" out; echo KEEP=1 >"$f"
+  out=$("$ROOT/scripts/init-env.sh" "$f" 2>&1) || { echo "exit $? on an existing file: $out"; return 1; }
+  echo "$out"; grep -qx KEEP=1 "$f" && [ "$(wc -l <"$f" | tr -d ' ')" = 1 ] && case $out in *"already exists"*) ;; *) return 1 ;; esac
+}
+init_env_llm_slots_empty() { # hosted-LLM settings are the operator's: present, empty, never generated
+  local f="$TMP/llm.env" v
+  "$ROOT/scripts/init-env.sh" "$f" >/dev/null || return 1
+  for v in LLM_BASE_URL LLM_MODEL LLM_API_KEY; do
+    grep -qx "$v=" "$f" || { echo "$v: $(grep -E "^$v=" "$f" | cut -c1-20)… (missing or filled)"; return 1; }
+  done
+}
+init_env_without_openssl() { # stub openssl that behaves like "command not found"
+  local bin="$TMP/noopenssl" f="$TMP/noopenssl.env" out code
+  mkdir -p "$bin"; printf '#!/bin/sh\nexit 127\n' >"$bin/openssl"; chmod +x "$bin/openssl"
+  local pbin=$bin; command -v cygpath >/dev/null 2>&1 && pbin=$(cygpath -u "$bin") # PATH needs /c/..., not C:/...
+  out=$(PATH="$pbin:$PATH" "$ROOT/scripts/init-env.sh" "$f" 2>&1); code=$?
+  echo "exit $code: $out"
+  [ "$code" -ne 0 ] && case $out in *openssl*) ;; *) return 1 ;; esac && [ ! -e "$f" ] &&
+    [ -z "$(ls "$TMP" | grep '^noopenssl\.env\.')" ]
 }
 init_env_relative_to_caller() {
   local d="$TMP/rel" name="smoke-rel-$RUN_ID.env"; mkdir -p "$d"
@@ -146,7 +163,9 @@ requires_secret() {
 group_env() {
   check ".env.example lists every infrastructure secret, empty" example_lists_secrets
   check "init-env fills every secret with 32+ chars and compose config accepts it" generated_env_complete
-  check "init-env never overwrites an existing file" init_env_no_overwrite
+  check "init-env keeps an existing file, says so, exits 0" init_env_no_overwrite
+  check "init-env leaves LLM_BASE_URL, LLM_MODEL, LLM_API_KEY empty" init_env_llm_slots_empty
+  check "init-env without openssl fails naming it and writes nothing" init_env_without_openssl
   check "init-env resolves a relative path from the caller's directory" init_env_relative_to_caller
   check "init-env fills secrets from a CRLF .env.example" init_env_crlf
   check "missing POSTGRES_APP_PASSWORD is named" requires_secret POSTGRES_APP_PASSWORD
