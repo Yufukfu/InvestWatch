@@ -4,7 +4,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 1. Agreements
 
-- [x] 1.1 Agreed with C (Damian's reply, 2026-11-21): he writes the Alembic revision `0001_initial` (branch `api/api-v1`; `api/README.md` has the scraper SQL); `documents.source_id` and `content_hash` are real columns; `documents_count` is not stored (the API counts it on read); redis, minio and `minio-init` (creates `iw-raw`) come with his `infra-compose` change; the plan fix is ours (4.1). The throwaway test schema `scraper/tests/schema.sql` mirrors his DDL
+- [x] 1.1 Agreed with C (Damian's reply, 2026-11-21): he writes the Alembic revision `0001_initial` (branch `api/api-v1`; the README of `api/` on that branch has the scraper SQL); `documents.source_id` and `content_hash` are real columns; `documents_count` is not stored (the API counts it on read); redis, minio and `minio-init` (creates `iw-raw`) come with his `infra-compose` change; the plan fix is ours (4.1). The throwaway test schema `scraper/tests/schema.sql` mirrors his DDL
 
 ## 2. Document build and insert
 
@@ -23,7 +23,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 ## 4. Closing
 
-- [ ] 4.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md`, your row in `.docs/STATUS.md`), run docs-check, add the `iw-ai-log` row, and fix `.docs/integration-plan.md` §3 and §6 to match `source.schema.json` and `events.schema.json` (record the bucket-check, named-conflict-target and `created_at`-sweep decisions in an ADR if `iw-docs-update` requires one)
+- [x] 4.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md`, your row in `.docs/STATUS.md`), run docs-check, add the `iw-ai-log` row, and fix `.docs/integration-plan.md` §3 and §6 to match `source.schema.json` and `events.schema.json` (record the bucket-check, named-conflict-target and `created_at`-sweep decisions in an ADR if `iw-docs-update` requires one)
 - [ ] 4.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
