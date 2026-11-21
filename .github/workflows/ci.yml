@@ -37,7 +37,7 @@ jobs:
       matrix:
         include:
           - python: "3.12"
-            services: "analytics scraper"
+            services: "contracts analytics scraper"
           - python: "3.13"
             services: "api"
     # Throwaway services for the tests that need real PostgreSQL, Redis and MinIO. Each suite names its own
@@ -87,7 +87,7 @@ jobs:
         shell: bash
         env:
           SERVICES: ${{ matrix.services }}
-          ALL_SERVICES: analytics scraper api  # every matrix entry above; the guard below keeps this list honest
+          ALL_SERVICES: contracts analytics scraper api  # every matrix entry above; the guard below keeps this list honest
         run: |
           set -euo pipefail
           # A service with a requirements.txt that no matrix entry lists would go untested and still be green.
