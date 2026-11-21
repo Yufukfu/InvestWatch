@@ -9,10 +9,10 @@ Analytics (module C) has nothing to analyse until the scraper turns registered s
 - Add a scheduled collection job that reads active rows from `sources`, fetches each web page over the fetch ladder (see `iw-scraper-conventions`) and parses it into a `ScrapedDocument` (`platform: web`).
 - Add an ingest step that validates the document against the contract schema, stores raw HTML in MinIO (`iw-raw`), inserts into `documents` deduplicated by `content_hash`, then publishes `{"document_id", "schema": "v1"}` to Redis Stream `iw:documents` after the DB commit.
 - Record every block, timeout or parse failure as a job error with a reason; a failed fetch never produces a document with empty `text`.
-- Pages that need `blocks` and screenshots (Playwright) are only flagged for later; rendering is not built here.
+- Documents from this change carry no `blocks` or screenshots; Playwright rendering for the visual rules is a later change.
 - Out of scope: social-media collectors (first platform needs its own ADR and change), Playwright rendering with `blocks`/screenshots, proxy pool management beyond reading `PROXY_LIST`, the `sources` editing UI (B), the REST API (C), and analytics consumption.
 - Owner: module A (`scraper/`).
-- Contracts: reads and writes `ScrapedDocument` v1 and the `sources` table, publishes the `iw:documents` event (integration points 1-3 in `.docs/integration-plan.md` §2). It changes none of them and needs no version bump.
+- Contracts: reads and writes `ScrapedDocument` v1 and the `sources` table, publishes the `iw:documents` event (integration points 1-3 in `.docs/integration-plan.md` §2). It changes none of those shapes. Two things are open with C: the `scrape_meta.scraper` value for a TLS-impersonating client (the v1 enum has none that fits; a change would be a v1 enum addition) and the shared database migration for the unique index, `job_errors` and the published marker (§7: migrations live in `api`).
 - Assumptions: contract v1 is confirmed by A and B; `docker-compose.yml` with postgres, redis and minio exists (owned by C); the fetch client and queue choices are settled in ADRs drafted by this change before the matching tasks start.
 
 ## Capabilities

@@ -24,6 +24,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 ## Blockers and open decisions
 
 - Scraper fetch client, job queue and first social platform need a human decision: option drafts are ADRs 0101, 0102 and 0103 in `.docs/decisions/` (0103 has criteria only, no research yet). Applying `scraper-v1` task groups 3 and 6 waits on 0101 and 0102.
+- Open with C before `scraper-v1` can be applied: the `scrape_meta.scraper` value for a TLS-impersonating client (v1 enum is `playwright|httpx|api|manual`) and who writes the Alembic migration for the `documents` unique index, `job_errors` and a published marker (`api/` does not exist yet).
 - Playwright is required for sources that must provide `blocks`/`screenshots` (rules R4-R8, R13).
 - Repository layout is B's (`scraper/`, `analytics/`, `web/`, `contracts/`, `.docs/`, `doc/` for UKNF materials). `api/` from the integration plan does not exist yet; C creates it with a `CLAUDE.md` when needed.
 - Contracts v1 exist as a draft in `contracts/` (C) and are still to be confirmed by A and B; rendering metadata (`blocks`, screenshots) still to be discussed with A.

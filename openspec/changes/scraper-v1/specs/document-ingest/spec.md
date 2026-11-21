@@ -27,6 +27,10 @@ The scraper SHALL compute `content_hash` as the sha256 of the normalised text an
 - **WHEN** the page text changes between two runs
 - **THEN** a second row is inserted with a different `content_hash`
 
+#### Scenario: Duplicate leaves no stray object
+- **WHEN** an unchanged page is collected again and the document is a duplicate
+- **THEN** no object is added to `iw-raw` (any object uploaded before the duplicate was detected is removed)
+
 ### Requirement: Store raw HTML in object storage
 The scraper SHALL store the fetched HTML in bucket `iw-raw` at `html/{document_id}.html` and set `html_object_key` accordingly. If the upload fails the document SHALL NOT be inserted.
 
@@ -43,7 +47,7 @@ The scraper SHALL publish `{"document_id": "<uuid>", "schema": "v1"}` to the Red
 
 #### Scenario: Event follows commit
 - **WHEN** a new document is committed
-- **THEN** exactly one `iw:documents` entry exists carrying its `document_id`
+- **THEN** an `iw:documents` entry carrying its `document_id` is published, and delivery is at-least-once (consumers deduplicate by `document_id`)
 
 #### Scenario: Database insert fails
 - **WHEN** the insert fails or rolls back
@@ -51,4 +55,8 @@ The scraper SHALL publish `{"document_id": "<uuid>", "schema": "v1"}` to the Red
 
 #### Scenario: Redis unavailable after commit
 - **WHEN** the row is committed but publishing fails
-- **THEN** a job error with reason `publish_failed` is recorded and the document remains retrievable for republishing
+- **THEN** a job error with reason `publish_failed` is recorded and the document is marked as unpublished
+
+#### Scenario: Republish sweep
+- **WHEN** the republish sweep runs and Redis is available
+- **THEN** every unpublished document is published once and marked as published, and an already published document is not republished

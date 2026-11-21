@@ -33,4 +33,6 @@ Evidence read from packages installed into a scratch venv (Python 3.9.6): `noble
 
 (to be written by a human)
 
+Contract note: `scrape_meta.scraper` in `contracts/schemas/scraped-document.schema.json` allows `playwright|httpx|api|manual`, and none describes a TLS-impersonating client (`noble-tls` or `curl_cffi`), so whichever is chosen needs a value agreed with C (task 1.3 of `scraper-v1`).
+
 Points a decider may want checked before choosing: that the target sources accept each client in a short manual probe, how the image gets the `noble-tls` binary in an offline demo, and which Python version `scraper/` pins.
