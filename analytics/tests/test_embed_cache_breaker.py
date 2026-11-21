@@ -305,3 +305,79 @@ def test_build_embedder_disabled_returns_none():
 def test_build_embedder_enabled(stub_llm, r):
     e = build_embedder(settings(stub_llm.base_url), redis=r)
     assert isinstance(e, HttpEmbedder) and e.model == "bge-m3"
+
+
+# ---- review fixes (group 3) -------------------------------------------------------------------
+
+
+def test_non_utf8_cached_value_is_a_miss_and_overwritten(stub_llm):
+    server = fakeredis.FakeServer()
+    raw = fakeredis.FakeRedis(server=server)
+    dec = fakeredis.FakeRedis(server=server, decode_responses=True)
+    s = settings(stub_llm.base_url)
+    raw.set(cache_key(s, HASH), b"\xff\xfe")
+    stub_llm.default = Reply(body=body(vec()))
+    out = HttpEmbedder(s, redis=dec).embed("x", HASH)
+    assert out.status == "ok" and len(stub_llm.requests) == 1
+    assert EmbedCache(dec, s).get(HASH) is not None
+
+
+def test_oversized_cached_value_is_rejected_before_decoding(r, monkeypatch):
+    import investwatch_analytics.embeddings.cache as cache_mod
+
+    s = settings("http://127.0.0.1:1/v1")
+    r.set(cache_key(s, HASH), base64.b64encode(np.ones(100_000, dtype=np.float32).tobytes()).decode())
+
+    def boom(*a, **k):
+        raise AssertionError("an oversized value must not be turned into floats")
+
+    monkeypatch.setattr(cache_mod, "validate_vector", boom)
+    assert EmbedCache(r, s).get(HASH) is None
+
+
+class RaisingClient:
+    model = "bge-m3"
+
+    def __init__(self):
+        self.calls = 0
+
+    def embed(self, text):
+        self.calls += 1
+        raise RuntimeError("unexpected")
+
+
+def test_unexpected_client_error_never_raises_and_counts(caplog):
+    clock = Clock()
+    c = RaisingClient()
+    e = HttpEmbedder(settings("http://127.0.0.1:1/v1"), clock=clock, client=c)
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            assert e.embed("x", HASH) == EmbedOutcome(None, None, "embed_unavailable")
+    assert e.embed("x", HASH).status == "breaker_open" and c.calls == 3
+    assert any(getattr(x, "error", None) == "RuntimeError" for x in caplog.records)
+
+
+def test_unexpected_error_in_half_open_trial_reopens():
+    clock = Clock()
+    c = RaisingClient()
+    e = HttpEmbedder(settings("http://127.0.0.1:1/v1"), clock=clock, client=c)
+    for _ in range(3):
+        e.embed("x", HASH)
+    clock.t += 61
+    assert e.embed("x", HASH).status == "embed_unavailable"   # the trial call
+    clock.t += 61
+    assert e.embed("x", HASH).status == "embed_unavailable"   # not stuck: a new trial after the cooldown
+    assert c.calls == 5
+
+
+def test_breaker_failed_trial_reopens_with_default_threshold():
+    clock = Clock()
+    b = Breaker(3, 60, clock)
+    for _ in range(3):
+        b.failure()
+    clock.t += 60
+    assert b.allow()
+    b.failure()
+    assert not b.allow()
+    clock.t += 59.9
+    assert not b.allow()

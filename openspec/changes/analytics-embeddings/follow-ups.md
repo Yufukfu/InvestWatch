@@ -17,3 +17,8 @@
 | R11 | review group 2 | the guard fires on send, not on build | `fix-here`: spec wording matches the guard (any request to a non-stub host fails the test); the shared conftest guard is analytics-llm-p0's |
 | R12 | review group 2, uncovered | no test pins `CONNECT_TIMEOUT_S` or `trust_env=False` | `wont-fix` for now: mirrors the LLM client, which has the same gap |
 | R13 | group 3 | `analytics-llm-p0` has no breaker yet (its group 10), so `embeddings/breaker.py` is a minimal one of our own | `new-item` after llm-p0 group 10: merge into one generic breaker if its class is shareable |
+| R14 | review group 3 | a non-UTF-8 cached value raised UnicodeDecodeError out of `embed` through a `decode_responses=True` client | `fix-here` |
+| R15 | review group 3, PLAUSIBLE | an oversized planted cache value was decoded into floats before the length check | `fix-here`: length check restored before decoding |
+| R16 | review group 3, PLAUSIBLE | an unexpected exception in a half-open trial left the breaker shut for good and escaped `embed` | `fix-here`: catch-all counts as unavailable |
+| R17 | review group 3 | failed trial not tested above threshold 1 | `fix-here` |
+| R18 | review group 3, can't verify | callers must pass a per-document, non-empty `content_hash`; Redis latency until the 1 s socket-timeout client (group 9) | `fix-here` in groups 7 and 9 |

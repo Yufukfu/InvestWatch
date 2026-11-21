@@ -38,7 +38,7 @@ class EmbedCache:
     def get(self, content_hash: str) -> np.ndarray | None:
         try:
             raw = self._r.get(cache_key(self._s, content_hash))
-        except redis.RedisError as exc:
+        except (redis.RedisError, UnicodeDecodeError) as exc:  # a decode_responses client decodes in get()
             log.warning("embedding cache read failed", extra={"reason": "embed_cache_unavailable",
                                                               "error": type(exc).__name__})
             return None
@@ -46,7 +46,9 @@ class EmbedCache:
             return None
         try:
             data = base64.b64decode(raw, validate=True)
-            # validate_vector rejects a wrong length, NaN or a zero vector: all of them are a miss.
+            if len(data) != 4 * self._s.dim:  # bounds the work on an oversized planted value
+                return None
+            # validate_vector rejects NaN or a zero vector: a miss too.
             return validate_vector(np.frombuffer(data, dtype=np.float32).tolist(), self._s.dim)
         except (binascii.Error, ValueError, EmbedMalformed):
             return None

@@ -78,6 +78,11 @@ class HttpEmbedder:
         except EmbedMalformed as exc:
             self._breaker.success()  # the endpoint answered: not an outage
             return EmbedOutcome(None, None, exc.reason)
+        except Exception as exc:  # noqa: BLE001 - never raise into the pipeline; also ends a half-open trial
+            self._breaker.failure()
+            log.warning("embed call failed", extra={"reason": "embed_unavailable", "error": type(exc).__name__,
+                                                    "embed_model": self._s.model})
+            return EmbedOutcome(None, None, "embed_unavailable")
         self._breaker.success()
         if self._cache is not None:
             self._cache.put(content_hash, vector)
