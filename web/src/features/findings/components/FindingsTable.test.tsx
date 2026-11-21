@@ -33,7 +33,7 @@ describe('FindingsTable', () => {
     render(<FindingsTable {...props} rows={[row(), row({ id: '2', title: 'Inny', score: 0.123, status: 'false_positive' })]} />);
     expect(screen.getAllByRole('row')).toHaveLength(3);
     expect(screen.getByText('Obietnica zysku')).toBeInTheDocument();
-    expect(screen.getByText('0.12')).toBeInTheDocument();
+    expect(screen.getByText('0,12')).toBeInTheDocument();
     expect(screen.getByText('Fałszywy alarm')).toBeInTheDocument();
   });
 
@@ -160,7 +160,7 @@ describe('FindingsTable', () => {
     const cells = screen.getAllByRole('cell').map((c) => c.textContent);
     expect(cells).toContain('TikTok');
     expect(cells).toContain('M3');
-    expect(cells).toContain('0.46');
+    expect(cells).toContain('0,46');
   });
 
   it('shows the raw status for a value outside the contract', () => {

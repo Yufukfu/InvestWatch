@@ -5,9 +5,10 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
-from arq.connections import RedisSettings, create_pool
+from arq.connections import RedisSettings
 
 from conftest import fast_settings
+from iw_scraper.jobs import create_queue_pool
 from iw_scraper.app import RETRY_ON, assemble
 from iw_scraper.proxy import ProxyRotator
 from iw_scraper.ratelimit import DomainLimiter
@@ -33,7 +34,7 @@ async def wait_for(condition, timeout=20.0):
 @asynccontextmanager
 async def stack(pool, storage, *, urls, addresses, workers=1):
     redis_url = os.environ["IW_TEST_REDIS_URL"]
-    redis = await create_pool(RedisSettings.from_dsn(redis_url))
+    redis = await create_queue_pool(RedisSettings.from_dsn(redis_url))
     await redis.flushdb()
     rt = assemble(
         pool, storage, redis, urls=urls, addresses=addresses, rotator=ProxyRotator([], "per_request", 90.0),

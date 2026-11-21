@@ -242,6 +242,37 @@ describe('FindingDetailPanel', () => {
     page.remove();
   });
 
+  it('keeps focus inside the dialog when the refetch after a save fails', () => {
+    const { rerender } = render(
+      <FindingDetailPanel {...base} detail={detail()} statusEditor={<button type="button">Zapisz</button>} />,
+    );
+    const save = screen.getByRole('button', { name: 'Zapisz' });
+    save.focus();
+    expect(save).toHaveFocus();
+    rerender(<FindingDetailPanel {...base} detail={detail()} isError statusEditor={<button type="button">Zapisz</button>} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się odświeżyć szczegółów');
+    expect(save).toHaveFocus();
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it('lifts inert from the page before focus goes back to the opener', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const focusSpy = vi.spyOn(opener, 'focus').mockImplementation(() => undefined);
+    let inertAtFocus: boolean | undefined;
+    const { unmount } = render(<FindingDetailPanel {...base} detail={detail()} />);
+    expect(opener).toHaveAttribute('inert');
+    focusSpy.mockImplementation(() => {
+      inertAtFocus = opener.hasAttribute('inert');
+    });
+    unmount();
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+    expect(inertAtFocus).toBe(false);
+    focusSpy.mockRestore();
+    opener.remove();
+  });
+
   it('keeps the last detail with an inline alert when a refetch failed', () => {
     render(<FindingDetailPanel {...base} detail={detail()} isError />);
     expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się odświeżyć szczegółów');

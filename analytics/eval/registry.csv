@@ -1,0 +1,6 @@
+id,name,aliases,type,country,website_domains,source_url
+5b0c1d2e-3f40-4a51-8b62-7c83d94e0a01,Zentrovia Dom Maklerski S.A.,Zentrovia DM|Zentrovia,brokerage_house,PL,zentrovia-dm.example.pl,
+5b0c1d2e-3f40-4a51-8b62-7c83d94e0a02,Bank Kwarcowy S.A. – Biuro Maklerskie,Kwarcowy BM|Bank Kwarcowy,brokerage_bank,PL,bank-kwarcowy.example.pl,
+5b0c1d2e-3f40-4a51-8b62-7c83d94e0a03,Nordavik Markets AB (oddział w Polsce),Nordavik Markets|Nordavik,foreign_branch,SE,nordavik-markets.example.com,
+5b0c1d2e-3f40-4a51-8b62-7c83d94e0a04,Maltavera Trading Ltd,Maltavera,foreign_no_branch,MT,maltavera-trading.example.com,
+5b0c1d2e-3f40-4a51-8b62-7c83d94e0a05,Lunaris Dom Maklerski S.A.,Lunaris DM|Lunaris,brokerage_house,PL,lunaris-dm.example.pl,

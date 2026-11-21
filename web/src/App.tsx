@@ -4,6 +4,7 @@ import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
+import { ToastSlotProvider } from './ToastSlotProvider';
 
 // Recharts is the largest dependency; the chart sections load as their own chunks and share it.
 const TrendPage = lazy(() => import('./features/trend/TrendPage').then((m) => ({ default: m.TrendPage })));
@@ -13,7 +14,7 @@ const CalibrationPage = lazy(() =>
 
 export function App() {
   return (
-    <>
+    <ToastSlotProvider>
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand">
@@ -54,6 +55,6 @@ export function App() {
           </SectionBoundary>
         </main>
       </div>
-    </>
+    </ToastSlotProvider>
   );
 }

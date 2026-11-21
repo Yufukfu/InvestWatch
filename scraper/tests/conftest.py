@@ -22,11 +22,11 @@ import jsonschema
 import pytest
 import pytest_asyncio
 import redis.asyncio as aioredis
-from arq.connections import RedisSettings, create_pool
+from arq.connections import RedisSettings
 from arq.worker import Worker
 
 from iw_scraper.config import contracts_dir
-from iw_scraper.jobs import QueueSettings, job_function
+from iw_scraper.jobs import ARQ_OPTIONS, QueueSettings, create_queue_pool, job_function
 from iw_scraper.types import JobError, Source
 
 
@@ -229,7 +229,7 @@ async def seeded_source(pool, source):
 @pytest.fixture
 async def redis():
     """A real Redis (REDIS_URL, see scraper/compose.test.yaml), emptied around each test."""
-    pool = await create_pool(RedisSettings.from_dsn(os.environ["REDIS_URL"]))
+    pool = await create_queue_pool(RedisSettings.from_dsn(os.environ["REDIS_URL"]))
     await pool.flushdb()
     yield pool
     await pool.flushdb()
@@ -247,6 +247,7 @@ def fast_settings(**overrides) -> QueueSettings:
         requeue_delay=0.05,
         failure_threshold=5,
         domain_cooldown=0.5,
+        max_requeues=24,
     )
     return QueueSettings(**{**base, **overrides})
 
@@ -329,14 +330,18 @@ async def start_worker(store):
     """Start in-process arq workers (each with its own Redis pool); returns the worker's task."""
     started: list[tuple[Worker, asyncio.Task]] = []
 
-    def start(run_source, recorder: Recorder, settings: QueueSettings, **worker_kwargs) -> asyncio.Task:
+    def start(run_source, recorder: Recorder, settings: QueueSettings, retry_on=None, **worker_kwargs) -> asyncio.Task:
+        ctx = {"settings": settings, "run_source": run_source, "record_error": recorder.record_error, "sources": store}
+        if retry_on is not None:
+            ctx["retry_on"] = retry_on
         worker = Worker(
             functions=[job_function(settings)],
             redis_settings=RedisSettings.from_dsn(os.environ["REDIS_URL"]),
-            ctx={"settings": settings, "run_source": run_source, "record_error": recorder.record_error, "sources": store},
+            ctx=ctx,
             poll_delay=0.02,
             max_jobs=worker_kwargs.pop("max_jobs", 10),
             handle_signals=False,
+            **ARQ_OPTIONS,
             **worker_kwargs,
         )
         task = asyncio.create_task(worker.async_run())
