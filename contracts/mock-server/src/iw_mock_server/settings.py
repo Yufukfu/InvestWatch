@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import math
 import os
 from dataclasses import dataclass, field
@@ -11,6 +10,7 @@ from pathlib import Path
 # src/iw_mock_server/settings.py -> parents[3] is the contracts/ directory in a source checkout
 _DEFAULT_CONTRACTS_DIR = Path(__file__).resolve().parents[3]
 _DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 
 def _env(name: str, default: str) -> str:
@@ -35,8 +35,8 @@ def _number(name: str, default: str, kind: type = float, minimum: float = 0, max
 
 def _log_level(name: str, default: str) -> str:
     level = _env(name, default).upper()
-    if level not in logging.getLevelNamesMapping():
-        raise ValueError(f"{name} must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL, got {level!r}")
+    if level not in _LOG_LEVELS:
+        raise ValueError(f"{name} must be one of {', '.join(_LOG_LEVELS)}, got {level!r}")
     return level
 
 

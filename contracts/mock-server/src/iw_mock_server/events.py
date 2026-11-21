@@ -98,10 +98,10 @@ class EventHub:
         source = self.store.sources.get(source_id)
         if source is not None:  # set before the 202 so a reload during the scan already sees it
             source["last_run_status"] = "running"
-        self._spawn(self._scan(source_id))
+        # generation is taken now, not inside the task, so a reset before the task starts is noticed too
+        self._spawn(self._scan(source_id, self.store.generation))
 
-    async def _scan(self, source_id: str) -> None:
-        generation = self.store.generation
+    async def _scan(self, source_id: str, generation: int) -> None:
         await self.emit("scan.started", {"source_id": source_id, "documents": None, "status": None})
         await asyncio.sleep(self.settings.scan_delay_s)
         documents = sum(1 for d in self.store.documents.values() if d.get("source_id") == source_id)

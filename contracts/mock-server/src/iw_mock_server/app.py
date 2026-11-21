@@ -21,6 +21,7 @@ from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from jsonschema import FormatChecker
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -39,12 +40,17 @@ Status = Literal["new", "in_review", "confirmed", "false_positive", "closed"]
 STATUSES: tuple[str, ...] = get_args(Status)
 
 _HTTP_URL = TypeAdapter(HttpUrl)
+_URI_FORMAT = FormatChecker()
 
 
 def _http_url(value: str) -> str:
     """Validate like HttpUrl but keep the string as sent: HttpUrl would add a trailing slash and
     lowercase the host, so the source would come back different from what the client stored."""
     _HTTP_URL.validate_python(value)
+    # HttpUrl strips whitespace and percent-encodes before checking; the stored string must itself
+    # pass source.schema.json `format: uri`
+    if value != value.strip() or not _URI_FORMAT.conforms(value, "uri"):
+        raise ValueError("url must be a valid URI (no spaces or unencoded characters)")
     return value
 
 

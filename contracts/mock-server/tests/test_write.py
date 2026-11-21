@@ -146,3 +146,10 @@ def test_source_url_is_stored_as_sent(client, url):
 
     patched = client.patch(f"/api/sources/{created['id']}", json={"url": url + "#x"}).json()
     assert patched["url"] == url + "#x"
+
+
+@pytest.mark.parametrize("url", [" https://x.example.com ", "https://x.example.com\n", "https://x.example.com/é",
+                                 "https://x.example.com/a b"])
+def test_source_url_that_is_not_a_uri_is_422(client, url):
+    # HttpUrl strips and percent-encodes, but the url is stored as sent, so it must already be a valid uri
+    assert client.post("/api/sources", json={**NEW_SOURCE, "url": url}).status_code == 422

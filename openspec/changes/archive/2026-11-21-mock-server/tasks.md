@@ -46,3 +46,4 @@
 - [x] 7.1 Sources: `target_modules` unique, `url` stored as sent; mutations: 6 tried, 6 caught
 - [x] 7.2 Settings: `LOG_LEVEL` validated, port <= 65535, finite numbers; mutations: 5 tried, 5 caught
 - [x] 7.3 Scan `running` status, trend `date_from` hour, empty findings refused; mutations: 4 tried, 4 caught
+- [x] 7.4 Review of 7.1-7.3: stored url must be a valid `uri`, five log levels only; mutations: 3 tried, 3 caught (scan `generation` taken in `start_scan`: mutations: n/a, the race window is not reachable in a test)

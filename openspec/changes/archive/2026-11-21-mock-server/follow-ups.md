@@ -46,3 +46,6 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 40 | PR #8 review | replay task not cancelled at shutdown | wont-fix (uvicorn runs on `asyncio.run`, which cancels pending tasks; see row 28) |
 | 41 | PR #8 review | `MOCK_PORT` unbounded, `inf`/`nan` accepted for delays | fix-here (port <= 65535, finite numbers only) |
 | 42 | PR #8 review | `STATUSES` duplicated the `Status` literal; imports out of order | fix-here (derived with `get_args`) |
+| 43 | review of rows 33-42 | url stored as sent could break `format: uri` (spaces, non-ASCII, which HttpUrl strips or encodes) | fix-here (stored url must pass the jsonschema `uri` check) |
+| 44 | review of rows 33-42 | scan read `generation` inside the task, so a reset before its first step went unnoticed | fix-here (taken in `start_scan`; window not reachable in a test) |
+| 45 | review of rows 33-42 | two scans on one source: the first to finish sets `ok` while the second still runs; `LOG_LEVEL` accepted WARN/FATAL/NOTSET | wont-fix for concurrent scans (mock, the dashboard scans one at a time); fix-here for log levels (only the five standard names) |
