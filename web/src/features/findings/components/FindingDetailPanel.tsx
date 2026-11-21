@@ -273,18 +273,23 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  let content: ReactNode;
-  if (notFound) content = <p role="alert">To zgłoszenie nie istnieje.</p>;
-  else if (isError && detail)
-    content = (
-      <>
-        <p role="alert">Nie udało się odświeżyć szczegółów; pokazano ostatnio pobrane dane.</p>
-        <Body d={detail} statusEditor={statusEditor} />
-      </>
-    );
-  else if (isError) content = <p role="alert">Nie udało się pobrać szczegółów zgłoszenia.</p>;
-  else if (isLoading || !detail) content = <p className="muted" role="status">Ładowanie szczegółów…</p>;
-  else content = <Body d={detail} statusEditor={statusEditor} />;
+  // Stable tree: the alert slot and the body slot are always the same two children, so a state change
+  // (for example a failed refetch after a save) never remounts the body and its status editor.
+  let alert: ReactNode = null;
+  let main: ReactNode;
+  if (notFound) alert = <p role="alert">To zgłoszenie nie istnieje.</p>;
+  else if (isError && detail) {
+    alert = <p role="alert">Nie udało się odświeżyć szczegółów; pokazano ostatnio pobrane dane.</p>;
+    main = <Body d={detail} statusEditor={statusEditor} />;
+  } else if (isError) alert = <p role="alert">Nie udało się pobrać szczegółów zgłoszenia.</p>;
+  else if (isLoading || !detail) main = <p className="muted" role="status">Ładowanie szczegółów…</p>;
+  else main = <Body d={detail} statusEditor={statusEditor} />;
+  const content = (
+    <>
+      {alert}
+      {main ?? null}
+    </>
+  );
 
   return (
     <aside
