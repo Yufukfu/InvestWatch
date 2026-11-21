@@ -36,7 +36,7 @@ Per message the worker loads the row, runs the pipeline, saves all findings in o
 
 ## Gold-set evaluation (calibration panel)
 
-[`eval/gold.jsonl`](eval/gold.jsonl) holds 67 labeled documents: 33 for M2 (every ZASÓB rule R1-R18 with a violating and a compliant example), 18 for M1 and 18 for M3, about a third of them hard cases. All of them are synthetic and use fictional firms (`doc/` has no sample ads). The labeling rules are in [`eval/README.md`](eval/README.md).
+[`eval/gold.jsonl`](eval/gold.jsonl) holds 69 labeled documents: 35 for M2 (every ZASÓB rule R1-R18 with a violating and a compliant example), 18 for M1 and 18 for M3, about a third of them hard cases. No official sample set was available (`doc/` has the criteria only), so 67 lines are synthetic and 2 are built around phrasings ZASÓB quotes (`origin: zasob-example`); all use fictional firms. The labeling rules are in [`eval/README.md`](eval/README.md).
 
 ```bash
 .venv/Scripts/python eval/run.py              # JSON report on stdout, rules-only, no database
@@ -46,14 +46,17 @@ docker compose run --rm analytics-eval        # the same in the stack
 
 The one-shot `analytics-eval` service runs `--db` on every `docker compose up`, after `api-migrate`. It stores a module's run only when the gold set, the pipeline version or the results changed, so restarts add nothing. `GET /api/calibration` adds analysts' `confirmed` / `false_positive` labels to that run's counts. The report gives precision, recall and F1 per module on the thresholds 0.05-0.95, counted the same way as the API. Per rule or signal it gives two readings: **`strict` (the headline: `uncertain` counts as not flagged)** and `review` (`uncertain` counts as flagged). Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`, no rows stored for it) or a gold document crashed the pipeline (nothing stored); 2 invalid gold set or configuration; 3 the database write failed.
 
-Latest rules-only numbers, `strict`:
+Latest rules-only numbers (build `analytics-m1-m3` 6da4f1f with this change); module points at the recommended threshold, rules as `strict` precision / recall:
 
-| Build | Module at its default threshold | Rules |
-|---|---|---|
-| this branch (worker base: M2 with R1-R3) | M2 at 0.5: precision 0.8, recall 0.19 (tp 4, fp 1, fn 17, tn 11); at 0.7: tp 0, fn 21 | R1 1.0 / 1.0, R2 1.0 / 0.667, R3 0.714 / 1.0 (precision / recall) |
-| with `analytics-m1-m3` (checked on 6121a06) | M1 at 0.6: precision 1.0, recall 0.8 (tp 8, fn 2, tn 8); M3 at 0.7: recall 0, at 0.5: tp 3, fn 7 | S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only) |
+| Module | Recommended threshold (best F1) | At it | At the old ADR 0305 default | Rules |
+|---|---|---|---|---|
+| M1 | 0.65 (F1 0.889) | precision 1.0, recall 0.8 (tp 8, fn 2, tn 8) | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
+| M2 | 0.25 (F1 0.703) | precision 0.929, recall 0.565 (tp 13, fp 1, fn 10, tn 11) | 0.5: F1 0.4 | R1 1.0 / 1.0, R2 1.0 / 1.0, R3 0.78 / 1.0 (R4-R18 not in this build) |
+| M3 | 0.25 (F1 0.706) | precision 0.857, recall 0.6 (tp 6, fp 1, fn 4, tn 7) | 0.7: F1 0 | S3.1 1.0 / 0.53, S3.8 1.0 / 1.0 |
 
-M1 and M3 are `not_run` on this branch until `analytics-m1-m3` is merged, so the service exits 1 and stores only M2. Rules-only M3 never reaches its default 0.7; the open item is in the change's `follow-ups.md`.
+S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
+
+**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md)): the recommended thresholds are the defaults the API writes when `iw:settings:thresholds` is missing (M1 0.65, M2 0.25, M3 0.25). [`eval/thresholds.json`](eval/thresholds.json) is the source. `python eval/run.py --write-thresholds` rewrites it, and the API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from it: `tests/test_eval_thresholds.py` fails until they match a fresh run. M2's value is low because only part of the 18 rules run today, and it moves when more rules or the LLM land.
 
 ## Run locally (no infrastructure)
 
