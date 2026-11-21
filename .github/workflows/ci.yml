@@ -31,11 +31,43 @@ jobs:
   python:
     name: Python services
     runs-on: ubuntu-latest
+    # Throwaway services for the tests that need real PostgreSQL, Redis and MinIO. With CI=true those tests
+    # fail when a service is missing instead of skipping, so a green run means they really ran.
+    # The values are test-only, not secrets.
+    env:
+      CI: "true"
+      IW_TEST_PG_DSN: postgresql://postgres:test@localhost:5432/iw
+      IW_TEST_REDIS_URL: redis://localhost:6379/0
+      IW_TEST_MINIO_ENDPOINT: localhost:9000
+      IW_TEST_MINIO_ACCESS_KEY: testuser
+      IW_TEST_MINIO_SECRET_KEY: testpass-123456
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: iw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d iw" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: public.ecr.aws/docker/library/redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # `services:` cannot pass `server /data`, so MinIO is started here. TODO: use the image that module C
+      # pins in `infra-compose` (quay.io/minio/minio answers 401 and the Docker Hub image is gone).
+      - name: Start MinIO for tests
+        run: |
+          docker run -d --name iw-test-minio -p 9000:9000 \
+            -e MINIO_ROOT_USER="$IW_TEST_MINIO_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$IW_TEST_MINIO_SECRET_KEY" \
+            cgr.dev/chainguard/minio:latest server /data
+          curl -fsS --retry 30 --retry-connrefused --retry-delay 1 http://localhost:9000/minio/health/ready
       - name: Test and audit each Python service that has a requirements.txt
         shell: bash
         run: |
@@ -46,6 +78,7 @@ jobs:
             dir=$(dirname "$req")
             echo "::group::$dir"
             pip install -r "$req"
+            if [ -f "$dir/requirements-dev.txt" ]; then pip install -r "$dir/requirements-dev.txt"; fi
             pip-audit -r "$req"
             if [ -d "$dir/tests" ]; then (cd "$dir" && pytest -q); fi
             echo "::endgroup::"
