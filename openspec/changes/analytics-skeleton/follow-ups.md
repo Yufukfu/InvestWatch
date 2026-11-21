@@ -18,4 +18,8 @@ Out-of-scope reviewer findings and "declined to judge" items, one disposition ea
 | 13 | review group 3 | `FIRM_TYPES` duplicates `models.RegistryType` | `wont-fix`: same values, one-line sync if the contract enum changes |
 | 14 | review group 4 | `stop\w* zwrotu` needs exactly one space; `Zyskaj dostęp` counts as a return claim | `wont-fix` for now: regex-version limits, borderline cases go to the LLM layer (plan §5) |
 | 15 | review group 4 | R2 dictionary lacks `materiał sponsorowany` / `współpraca reklamowa` | `new-item`: decide with M1 (S1.3) which labels count as an ad label for R2 |
+| 16 | review group 5 | Summary says "Sprawdzono reguły R1, R2, R3" even when a rule was `not_applicable` | `wont-fix` for now: cosmetic |
+| 17 | review group 5 | `content_excerpt` comes from the NFKC-normalized text, not the original | `wont-fix`: the contract does not say; normalized text reads better in the dashboard |
+| 18 | review group 5 | `FirmRef.authorized=True` is hard-coded for every registry match | `new-item`: revisit with the real KNF loader (warning list, revoked licences) |
+| 19 | review group 5 | The loss-denial exclusion also swallows `nie wykluczamy straty` / `bez względu na ryzyko` (a real warning) | `wont-fix` for now: rare; the LLM layer decides borderline R3 cases |
 | 9 | review group 2 | Initials like `J. Kowalski` split into two sentences | `wont-fix` for now: rare in marketing copy, only lengthens or shortens a quote |

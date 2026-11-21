@@ -247,6 +247,10 @@ def test_r3_risk_word_alone_is_a_warning(registry, catalogue):
         "Zarabiaj 10% rocznie. Nie ponosisz żadnego ryzyka.",
         "Zarabiaj 10% rocznie. Ryzyko? Minimalne.",
         "Zarabiaj 10% rocznie przy minimalnym ryzyku.",
+        "Reklama. Zarabiaj 18% rocznie i nigdy nie stracisz.",
+        "Zarabiaj 18% rocznie bez straty kapitału.",
+        "Zarabiaj 18% rocznie bez ryzyka utraty kapitału.",
+        "Zarabiaj 18% rocznie bez żadnej utraty środków.",
     ],
 )
 def test_r3_risk_denial_is_not_a_warning(text, registry, catalogue):

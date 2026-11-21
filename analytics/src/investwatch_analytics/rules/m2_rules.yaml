@@ -56,7 +56,8 @@ rules:
         - '\brisk\w*'
         - '\blos(?:s|ing|e)\b'
       risk_exclude_patterns:
-        - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:\w+\s+){0,2}ryzyk\w*'
+        - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:\w+\s+){0,2}ryzyk\w*(?:\s+(?:utrat|strat)\w*)?'
+        - '\b(?:nie|bez|żadn\w*)\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\b(?:minimaln|nisk|znikom)\w*\s+ryzyk\w*'
         - '\bryzyk\w*\s*\?'
         - '\bwoln\w* od ryzyka\b'
