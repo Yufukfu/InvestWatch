@@ -44,6 +44,7 @@ KNOWN_PARAMS = {
     "supervisor_patterns", "approval_patterns", "safety_patterns",
     "supervisor_exclude_patterns", "approval_exclude_patterns", "safety_exclude_patterns",
     "amount_patterns", "amount_return_patterns",
+    "borderline_margin",
 }
 # M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
 # the plain string lists below must hold non-empty strings.
@@ -253,7 +254,7 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
                 re.compile(value)
             except re.error as exc:
                 raise CatalogueError(f"{path}: {rule_id} {key} is an invalid regex ({exc})") from exc
-        if key in ("window", "prominent_sentences") and (
+        if key in ("window", "prominent_sentences", "borderline_margin") and (
             isinstance(value, bool) or not isinstance(value, int) or value < 0
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a non-negative integer")

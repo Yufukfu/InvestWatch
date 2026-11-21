@@ -88,8 +88,31 @@ class R3RiskNextToReturns(Rule):
             "risk_x": compile_patterns(p.get("risk_exclude_patterns", [])),
             "risk_ok": compile_patterns(p.get("risk_override_patterns", [])),
             "window": int(p.get("window", 2)),
+            "margin": int(p.get("borderline_margin", 2)),
             "footnote": tuple(p.get("footnote_markers", [])),
         }
+
+    _borderline = False  # set by evaluate() for this document; read by ask_llm() (one instance per run)
+
+    def ask_llm(self, ctx: Context, result: RuleResult) -> bool:
+        """Only the near-window proximity case (ZASÓB: the warning "bezpośrednio towarzyszy" the claim).
+
+        Never an absent warning, a footnote-only one, one farther than `borderline_margin`, or a claim matched by
+        vocabulary only (ADR 0309).
+        """
+        return self._borderline and result.result == "fail" and self.spec.llm is not None
+
+    def _is_borderline(self, sentences, uncovered: list[int], near: list[int]) -> bool:
+        p = self._p
+        if not near:
+            return False
+        for c in uncovered:
+            distance = min(abs(c - w) for w in near)
+            if distance > p["window"] + p["margin"]:  # uncovered, so already farther than `window`
+                return False
+            if not any(pat.search(sentences[c].text) for pat in p["claim"][:1]):  # a percent figure, not vocabulary
+                return False
+        return True
 
     @staticmethod
     def _hits(text: str, include: list[re.Pattern], exclude: list[re.Pattern]) -> bool:
@@ -119,6 +142,7 @@ class R3RiskNextToReturns(Rule):
         if not uncovered:
             nearest = min(near, key=lambda w: abs(w - claims[0]))
             return self.result("pass", sentences[nearest].text, "Ostrzeżenie o ryzyku towarzyszy informacji o zyskach.")
+        self._borderline = self._is_borderline(sentences, uncovered, near)
         claim = sentences[uncovered[0]].text
         if warnings:
             why = "Ostrzeżenie o ryzyku jest oddalone od obietnicy zysku lub umieszczone tylko w przypisie."

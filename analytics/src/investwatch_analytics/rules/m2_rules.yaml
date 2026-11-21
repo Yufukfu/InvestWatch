@@ -51,6 +51,8 @@ rules:
     implemented: true
     params:
       window: 2
+      # A warning window + 1 .. window + borderline_margin sentences away is the only case sent to the LLM.
+      borderline_margin: 2
       claim_patterns:
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
         - '\bzysk\w*'

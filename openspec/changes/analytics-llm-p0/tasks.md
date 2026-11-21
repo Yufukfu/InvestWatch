@@ -54,9 +54,9 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 9. R3 borderline proximity refinement (~45 min)
 
-- [ ] 9.1 Failing tests for the R3 LLM scenarios (near-window case deferred and overturned to `pass` hybrid, warning absent never deferred, footnote-only not deferred, warning farther than the margin not deferred, borderline without LLM stays rules-only `fail`); every existing R3 scenario still green
-- [ ] 9.2 R3 `ask_llm` for the near-window case only (`borderline_margin` param, validated; the rule records the nearest-warning distance while evaluating); tests green
-- [ ] 9.3 Mutation check; `mutations: N tried, N caught`
+- [x] 9.1 Failing tests for the R3 LLM scenarios (near-window case deferred and overturned to `pass` hybrid, warning absent never deferred, footnote-only not deferred, warning farther than the margin not deferred, borderline without LLM stays rules-only `fail`); every existing R3 scenario still green
+- [x] 9.2 R3 `ask_llm` for the near-window case only (`borderline_margin` param, validated; the rule records the nearest-warning distance while evaluating); tests green
+- [x] 9.3 Mutation check; `mutations: 9 tried, 9 caught` (a redundant lower-bound check removed instead of tested)
 
 ## 10. Cache, budget and circuit breaker (~1 h)
 

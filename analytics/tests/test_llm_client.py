@@ -158,9 +158,10 @@ def test_timeout(stub_llm):
     from investwatch_analytics.llm.client import LlmUnavailable
 
     stub_llm.script.append(Reply(sleep_s=3))
+    client = client_for(stub_llm, LLM_TIMEOUT_S="0.5")
     start = time.perf_counter()
     with pytest.raises(LlmUnavailable) as exc:
-        client_for(stub_llm, LLM_TIMEOUT_S="0.5").complete("s", "u")
+        client.complete("s", "u")
     assert exc.value.reason == "llm_timeout"
     assert time.perf_counter() - start < 0.5 + 1
 
@@ -277,9 +278,10 @@ def test_slow_drip_body_is_bounded_by_the_total_deadline():
     content = json.dumps({"results": []})
     body = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
     url = _drip_server(body, 0.2)
+    client = client_for(url, LLM_TIMEOUT_S="1")  # built first: creating the SSL context is not part of the call
     start = time.perf_counter()
     with pytest.raises(LlmUnavailable) as exc:
-        client_for(url, LLM_TIMEOUT_S="1").complete("s", "u")
+        client.complete("s", "u")
     assert exc.value.reason == "llm_timeout" and time.perf_counter() - start < 1 + 1
 
 

@@ -412,3 +412,83 @@ def test_module_defaults_to_the_catalogues_own(registry):
     judge = FakeJudge()
     run_rules(Catalogue([spec], module="M3"), ctx_for("Tekst.", registry), judge=judge)
     assert judge.calls[0]["module"] == "M3"
+
+
+# ---- group 9: R3 borderline proximity -----------------------------------------------------------------
+
+NEUTRAL = "Otwórz konto w kilka minut. Obsługa klienta działa całą dobę."
+
+
+def r3(registry, catalogue, text, judge=None):
+    return by_id(run_rules(catalogue, ctx_for(text, registry), judge=judge, module="M2"))["R3"]
+
+
+def test_r3_near_window_is_deferred_and_can_be_overturned(registry, catalogue):
+    warning = "Inwestowanie wiąże się z ryzykiem utraty kapitału."
+    text = f"Zarabiaj 9% rocznie. {NEUTRAL} {warning}"  # distance 3, window 2
+    assert r3(registry, catalogue, text).result == "fail"
+    judge = FakeJudge(LlmVerdict("R3", "pass", warning, "Ostrzeżenie towarzyszy obietnicy."))
+    r = r3(registry, catalogue, text, judge)
+    assert r.result == "pass" and r.method == "hybrid" and [c.rule_id for c in judge.calls[0]["checks"]] == ["R3"]
+
+
+def test_r3_margin_edge_is_deferred(registry, catalogue):
+    text = "Zarabiaj 9% rocznie. " + NEUTRAL + " Trzecie zdanie neutralne. Ryzyko utraty kapitału."  # distance 4
+    judge = FakeJudge()
+    r3(registry, catalogue, text, judge)
+    assert any(c.rule_id == "R3" for call in judge.calls for c in call["checks"])
+
+
+def test_r3_beyond_the_margin_is_not_deferred(registry, catalogue):
+    text = ("Zarabiaj 9% rocznie. " + NEUTRAL + " Trzecie zdanie neutralne. Czwarte zdanie neutralne. "
+            "Ryzyko utraty kapitału.")  # distance 5
+    judge = FakeJudge()
+    assert r3(registry, catalogue, text, judge).method == "rule"
+    assert not any(c.rule_id == "R3" for call in judge.calls for c in call["checks"])
+
+
+def test_r3_warning_absent_is_never_deferred(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R3", "pass", None, "x"))
+    r = r3(registry, catalogue, "Zysk 15% rocznie. " + NEUTRAL, judge)
+    assert r.result == "fail" and r.method == "rule" and judge.calls == []
+
+
+def test_r3_footnote_only_is_not_deferred(registry, catalogue):
+    text = "Zarabiaj 9% rocznie. " + NEUTRAL + " *Inwestowanie wiąże się z ryzykiem utraty kapitału."
+    judge = FakeJudge(LlmVerdict("R3", "pass", None, "x"))
+    r = r3(registry, catalogue, text, judge)
+    assert r.result == "fail" and r.method == "rule" and judge.calls == []
+
+
+def test_r3_vocabulary_only_claim_is_not_deferred(registry, catalogue):
+    text = "Zyskaj dostęp do platformy. " + NEUTRAL + " Ryzyko utraty kapitału."  # distance 3, no percent figure
+    judge = FakeJudge()
+    r3(registry, catalogue, text, judge)
+    assert not any(c.rule_id == "R3" for call in judge.calls for c in call["checks"])
+
+
+def test_r3_every_uncovered_claim_must_be_near(registry, catalogue):
+    text = ("Zarabiaj 9% rocznie. " + NEUTRAL + " Ryzyko utraty kapitału. Neutralne zdanie raz. Neutralne dwa. "
+            "Neutralne trzy. Neutralne cztery. Neutralne pięć. Zysk 12% w skali roku.")  # 2nd claim far away
+    judge = FakeJudge()
+    r3(registry, catalogue, text, judge)
+    assert not any(c.rule_id == "R3" for call in judge.calls for c in call["checks"])
+
+
+def test_r3_borderline_without_the_llm_stays_rules_only(registry, catalogue):
+    text = f"Zarabiaj 9% rocznie. {NEUTRAL} Ryzyko utraty kapitału."
+    r = r3(registry, catalogue, text, FakeJudge(status="unavailable"))
+    assert r.result == "fail" and r.method == "rule"
+
+
+@pytest.mark.parametrize("bad", ["borderline_margin: -1", "borderline_margin: x", "borderline_margin: true"])
+def test_bad_borderline_margin_fails_at_load(tmp_path, bad):
+    from investwatch_analytics.rules.engine import CatalogueError
+
+    src = Path(__file__).resolve().parents[1] / "src" / "investwatch_analytics" / "rules" / "m2_rules.yaml"
+    text = src.read_text(encoding="utf-8")
+    assert text.count("borderline_margin: 2") == 1
+    p = tmp_path / "rules.yaml"
+    p.write_text(text.replace("borderline_margin: 2", bad), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="borderline_margin"):
+        Catalogue.load(p)
