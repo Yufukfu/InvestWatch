@@ -315,12 +315,10 @@ def test_family_office_finding(mock, registry, cat, finding_validator):
     finding_validator.validate(f.to_contract())
 
 
-def test_m3_evidence_in_declared_fields(mock, registry, cat):
+def test_metadata_quotes_survive_the_safety_net(mock, registry, cat):
     for doc_id in (GOLD, VIP, BLOG):
-        d = mock(doc_id)
-        for r in finding(d, registry, cat).rules:
-            if r.evidence is not None:
-                assert any(r.evidence in f for f in engine.metadata_fields(d)), (r.rule_id, r.evidence)
+        for r in finding(mock(doc_id), registry, cat).rules:
+            assert "Nie udało się potwierdzić cytatu" not in (r.explanation or ""), r.rule_id
 
 
 def test_s38_needs_a_crypto_word(registry, cat):

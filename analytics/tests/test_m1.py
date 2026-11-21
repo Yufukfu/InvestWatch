@@ -313,12 +313,32 @@ def test_labeled_finding_summary(mock, registry, cat):
     assert "#współpraca" in f.summary
 
 
-def test_m1_evidence_in_declared_fields(mock, registry, cat):
+def test_metadata_quotes_survive_the_safety_net(mock, registry, cat):
+    """The quotes from the handle and the link stay `fail`; none is demoted by the engine's safety net."""
     for doc_id in (JAN, KASIA):
-        d = mock(doc_id)
-        for r in finding(d, registry, cat).rules:
-            if r.evidence is not None:
-                assert any(r.evidence in f for f in engine.metadata_fields(d)), (r.rule_id, r.evidence)
+        for r in finding(mock(doc_id), registry, cat).rules:
+            assert "Nie udało się potwierdzić cytatu" not in (r.explanation or ""), r.rule_id
+    rules = {r.rule_id: r for r in finding(mock(JAN), registry, cat).rules}
+    assert rules["S1.2"].result == rules["S1.6"].result == "fail"
+
+
+@pytest.mark.parametrize("text, quote", [("Bonus 500 złotych na start z Alfa Inwestycje.", "500 złotych"),
+                                         ("Alfa Inwestycje: depozyt od 2 tys. zł.", "2 tys. zł"),
+                                         ("Alfa Inwestycje, minimum 1000 zl", "1000 zl")])
+def test_s17_zloty_forms(registry, cat, text, quote):
+    r = signals(third_party(text=text), registry, cat)["S1.7"]
+    assert (r.result, r.evidence) == ("fail", quote)
+
+
+def test_english_ad_of_polish_brokerage_house(registry, cat):
+    from investwatch_analytics.rules.scoring import sigmoid_score
+
+    d = third_party(platform="web", url="https://blog.example.com/x", author=None,
+                    text="Alfa Inwestycje is a great broker, open an account today.")
+    f = finding(d, registry, cat)
+    s17 = next(r for r in f.rules if r.rule_id == "S1.7")
+    assert f.firm.registry_type == "brokerage_house" and s17.result == "pass"
+    assert f.score == sigmoid_score([r for r in f.rules if r.rule_id != "S1.7"], cat)
 
 
 @pytest.mark.parametrize("href", ["https://x.example.com/?q=1&xref=2", "https://x.example.com/a&ref=1"])

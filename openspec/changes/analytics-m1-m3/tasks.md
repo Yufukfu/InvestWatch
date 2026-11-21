@@ -20,7 +20,7 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 
 - [x] 3.1 Failing tests (`tests/test_m1.py`) for every scenario in `specs/m1-third-party-signals/spec.md`, on mocks `3c41441c…` and `182e5a42…` plus the hand-made cases (fuzzy-only, UTM only, `preferencje`, negated label, sponsored rel, past tense, author missing on a social post, bare mention below 0.6, S1.7 Polish-language-only, English ad of a Polish brokerage house)
 - [x] 3.2 `rules/m1.py` (S1.1-S1.7, S1.7 sharing the S3.6 detection; S1.5 rules-only `uncertain`; S1.4 `ask_llm` only on `pass`), dictionaries in `m1_signals.yaml`, `modules/m1.py` (score, Polish title and summary, `firm`, `advertiser`, `model`); tests green
-- [x] 3.3 Mutation check; `mutations: 35 tried, 35 caught` (four first survivors, a query key inside another key, a key without `?`, the first of two phrases and an over-long excerpt, got their own test cases)
+- [x] 3.3 Mutation check; `mutations: 35 tried, 35 caught` (four first survivors, a query key inside another key, a key without `?`, the first of two phrases and an over-long excerpt, got their own test cases); review fix: `mutations: 6 tried, 6 caught`
 
 ## 4. M3 signals, S3.4 gate, M3 alongside M1 and finding (≈ 2 h)
 

@@ -112,7 +112,7 @@ rules:
     implemented: true
     params:
       currency_patterns:
-        - '\d[\d\s.,]*\s?(?:zł|PLN)(?!\w)'
+        - '\d[\d\s.,]*\s?(?:(?:tys|mln|mld)\.?\s?)?(?:zł(?:ot\w*)?|zl|PLN)(?!\w)'
         - '(?<!\w)PLN\s?\d'
       phone_patterns:
         - '\+48[\s-]?\d{2,3}[\s-]?\d{2,3}[\s-]?\d{2,3}'

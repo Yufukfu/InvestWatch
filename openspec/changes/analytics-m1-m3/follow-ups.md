@@ -16,3 +16,8 @@ Out-of-scope reviewer findings, "declined to judge" items and differences from t
 | 10 | iw-reviewer, group 2 | Task 2.1 listed "`firm_own` ignores link hosts", which is routing | `fix-here`: moved to task 5.1 |
 | 11 | iw-reviewer, group 2, declined | Handle matching on a short core name or alias could route an unrelated `@handle` to M2 | `new-item`: revisit with the real KNF loader (short or generic names) |
 | 12 | iw-reviewer, group 2, declined | `_firm_by_handle` normalizes every firm on each call | `wont-fix` for now: three seed firms; cache the normalized names with the real KNF loader |
+| 13 | iw-reviewer, group 3 | The shared S1.7/S3.6 currency regex missed `500 złotych`, `2 tys. zł`, `1000 zl` | `fix-here`: word forms, `tys./mln/mld` and `zl` matched; tests for each |
+| 14 | iw-reviewer, group 3 | The "English ad of a Polish brokerage house" scenario used EuroTrade (a foreign branch) and did not check the score | `fix-here`: Alfa Inwestycje test, the score equals the score without S1.7 |
+| 15 | iw-reviewer, group 3 | The evidence-in-declared-fields tests held by construction (the safety net nulls any other quote) | `fix-here`: replaced by tests that no metadata quote is demoted by the safety net |
+| 16 | iw-reviewer, group 3, declined | `guess_language` returns `pl` on a 0/0 tie (emoji- or name-only text), so S1.7 keeps such a foreign-firm candidate | `wont-fix` for now: keeping a candidate is the safe side for an inventory; revisit with per-sentence language (skeleton follow-up 7) |
+| 17 | iw-reviewer, group 3, declined | The S1.3 label `partner` also matches neutral uses (`partner Ekstraklasy`) | `new-item`: check on real posts; the label raises certainty only, it never creates an M1 candidate by itself |
