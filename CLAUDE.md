@@ -43,7 +43,7 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 
 ## Hard rules
 
-- An agent may push its own branch and open a PR without asking, once the PR-ready criteria in [`.claude/CODE_REVIEW.md`](.claude/CODE_REVIEW.md) hold ([ADR 0207](.docs/decisions/0207-agent-push-and-pr.md)). The human approves and merges every PR: an agent never merges, never approves, never marks a PR ready for someone else. No `--force`, no amending a pushed commit, nothing straight to `main` (hook-enforced).
+- An agent may push its own branch to `origin` and open a PR in this repository without asking, once the PR-ready criteria in [`.claude/CODE_REVIEW.md`](.claude/CODE_REVIEW.md) hold ([ADR 0207](.docs/decisions/0207-agent-push-and-pr.md)). The human approves and merges every PR: an agent never merges, never approves, never marks a PR ready for someone else. No `--force`, no amending a pushed commit, nothing straight to `main`. The hook also denies another remote, deleting or updating any branch but the current one, rewiring a remote, and merging or approving through `gh api`; it reads command text only and is a guard against mistakes, not a security boundary (ADR 0207).
 - Contracts are frozen after Sat 14:30 (hook-enforced; escape `IW_CONTRACT_CHANGE=1`). Changing one needs the whole team and a version bump. Exception until Integration #1 (Sat 17:00): non-required fields are provisional and change without a bump, in a PR reviewed by their consumers ([ADR 0301](.docs/decisions/0301-contracts-v1.md)).
 - Secrets only in untracked `.env` (`.env.example` is tracked). Never print proxy credentials or keys.
 - No `console.log` in committed JS/TS (hook-enforced); Python uses the logger, not `print`; JSON logs to stdout.
