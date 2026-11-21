@@ -24,7 +24,7 @@ Docs hold the logic; `CLAUDE.md` files stay short and point at them. Update docs
 
 Everything lands in the same PR, before archiving, because nothing goes straight to `main` and there is no "after merge" step:
 
-1. Update docs per the table above, your own `.docs/STATUS.md` row (state and active changes), and any ADR drafts.
+1. Update docs per the table above, your own `.docs/STATUS.md` row (state and active changes), and the ADR for any hard-to-reverse choice the change made.
 2. Add the log row with `iw-ai-log`.
 3. Run `docs-check` (below) and fix each finding at its source.
 
@@ -40,9 +40,9 @@ Then `iw-pr-review`, then `/openspec-archive-change` as the last commit (see `op
 ## ADRs
 
 1. Copy `.docs/decisions/0000-template.md` to the next free number in your range (A `01xx`, B `02xx`, C `03xx`, so three people never pick the same number), named `NNNN-short-title.md`.
-2. An agent may fill Context, Options and Evidence (benchmarks, the real API read from the installed package, links). Set `Status: proposed`. Leave **Decision** and its rationale for the human to write; never invent a "why".
+2. The agent writes the whole ADR: Context, Options and Evidence (benchmarks, the real API read from the installed package, links), the **Decision**, and a rationale that cites that evidence; never invent a "why". Commit it with `Status: accepted`; it takes effect when the human approves and merges the PR (the human rejects it by requesting changes in review).
 3. Add the file to the table in `.docs/decisions/README.md` (the checker fails otherwise) and remove it from the candidate list.
-4. After the human accepts it, do not edit it. A later decision supersedes it with a new ADR that links the old one.
+4. After the PR merges, do not edit it. A later decision supersedes it with a new ADR that links the old one.
 
 ## Check
 

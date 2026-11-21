@@ -15,7 +15,7 @@ Criteria only. Stages are in `SDLC.md`, the commands in `.claude/skills/iw-pr-re
 
 ## What "ready" means, in order
 
-1. Deterministic checks green after the last code edit (commands in `iw-pr-review`): tests, lint, types, `openspec validate`, `docs-check`, dependency audit, and `docker compose up` once a compose file exists.
+1. Deterministic checks green after the last code edit (commands in `iw-pr-review`): tests, lint, types, a mutation-check line per task group, `openspec validate`, `docs-check`, dependency audit, and `docker compose up` once a compose file exists.
 2. A reviewer ran on the pinned range, with the security pass where the table says so.
 3. **Every finding verified against the code** before acting: real ones fixed whatever the severity, false ones rejected with a one-line evidence note. After 3 rounds on one group, stop and ask the human.
 4. No debug output left (`console.log` in JS/TS is hook-blocked; Python uses the logger, checked in review) and no `.env` or credentials tracked.
@@ -26,7 +26,7 @@ Criteria only. Stages are in `SDLC.md`, the commands in `.claude/skills/iw-pr-re
 ## Signals worth checking
 
 - Scope-narrowing words ("only", "for now", an untracked TODO) in a diff or PR body often hide a gap.
-- A test that cannot fail: name the production change that would turn it red. A mock asserted only as "called" proves nothing.
+- A test that cannot fail: name the production change that would turn it red, and ask for the group's mutation-check line. A mock asserted only as "called" proves nothing.
 - Scraper traps: empty `text` saved on a parse failure, a Chrome UA with a non-Chrome TLS profile, credentials in logs, a stored URL fetched without a domain allow-list.
 
 ## Optional: different model family
