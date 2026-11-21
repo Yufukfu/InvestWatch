@@ -3,7 +3,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from iw_renderer.render import RenderBlocked, RenderFailed, RenderRequest, playwright_proxy, render_viewport
+from iw_renderer.render import RenderBlocked, RenderFailed, RenderRefused, RenderRequest, playwright_proxy, render_viewport
 from iw_renderer.viewports import VIEWPORTS
 
 CHROME_146 = (
@@ -148,7 +148,7 @@ async def test_a_redirect_to_another_site_fails_the_render(server, browser, addr
     server.routes[("source.test", "/")] = (302, {"Location": f"http://other.test:{server.port}/"}, b"")
     server.serve("other.test", "/", "elsewhere")
 
-    with pytest.raises(RenderFailed, match="navigation away"):
+    with pytest.raises(RenderRefused, match="navigation away"):
         await render_viewport(browser, request_for(server), address_check)
 
 
@@ -245,7 +245,7 @@ async def test_a_request_for_another_host_than_the_source_is_refused(server, bro
         url=f"http://other.test:{server.port}/", source_host="source.test", viewport="desktop", headers=CHROME_146, ports=(server.port,)
     )
 
-    with pytest.raises(RenderFailed, match="navigation away"):
+    with pytest.raises(RenderRefused, match="navigation away"):
         await render_viewport(browser, elsewhere, address_check)
 
     assert server.hits("other.test") == []

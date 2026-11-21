@@ -1,6 +1,6 @@
 import math
 import os
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -117,3 +117,45 @@ def fetch_settings() -> tuple[float, int]:
     if max_bytes < 1:
         raise ValueError("FETCH_MAX_BYTES must be a whole number of bytes, at least 1")
     return timeout, max_bytes
+
+
+DEFAULT_RENDERER_URL = "http://renderer:8080"
+DEFAULT_RENDER_MAX_PER_HOUR = 20
+DEFAULT_RENDER_TIMEOUT_SECONDS = 90.0
+ATTEMPT_ROOM_SECONDS = 60.0  # what the rest of a run (robots, fetch, politeness delays, ingest) may take next to a render
+_TRUE, _FALSE = ("true", "1", "yes"), ("false", "0", "no", "")
+
+
+@dataclass(frozen=True)
+class RenderSettings:
+    enabled: bool
+    max_per_hour: int
+    url: str
+    timeout_seconds: float
+
+
+def render_settings(*, attempt_timeout: float) -> RenderSettings:
+    """The render step's switches (`SCRAPER_RENDER_ENABLED`, `SCRAPER_RENDER_MAX_PER_HOUR`, `RENDERER_URL`,
+    `RENDER_TIMEOUT_SECONDS`). With the step enabled the attempt must outlast a render, or the job's own timeout
+    would cut it off and the document with it."""
+    raw = os.environ.get("SCRAPER_RENDER_ENABLED", "false").strip().lower()  # `bool("false")` is True: parse it by hand
+    if raw not in _TRUE + _FALSE:
+        raise ValueError("SCRAPER_RENDER_ENABLED must be true or false")
+    try:
+        max_per_hour = int(os.environ.get("SCRAPER_RENDER_MAX_PER_HOUR", DEFAULT_RENDER_MAX_PER_HOUR))
+    except ValueError:
+        max_per_hour = -1
+    if max_per_hour < 0:
+        raise ValueError("SCRAPER_RENDER_MAX_PER_HOUR must be a whole number, 0 or more")
+    url = os.environ.get("RENDERER_URL", DEFAULT_RENDERER_URL).rstrip("/")
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ValueError("RENDERER_URL must be an http or https URL")
+    timeout = _positive_number("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS)
+    enabled = raw in _TRUE
+    if enabled and attempt_timeout < timeout + ATTEMPT_ROOM_SECONDS:
+        raise ValueError(
+            f"SCRAPER_ATTEMPT_TIMEOUT ({attempt_timeout:g}) must be at least RENDER_TIMEOUT_SECONDS "
+            f"({timeout:g}) plus {ATTEMPT_ROOM_SECONDS:g} seconds while SCRAPER_RENDER_ENABLED is true"
+        )
+    return RenderSettings(enabled, max_per_hour, url, timeout)

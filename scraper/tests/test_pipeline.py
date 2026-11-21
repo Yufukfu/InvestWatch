@@ -381,3 +381,216 @@ async def test_a_lowercase_z_timestamp_the_schema_accepts_is_stored(pool, storag
     result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, page)
     assert result.outcome == "inserted"
     assert (await doc_row(pool, result.document_id))["published_at"] == datetime(2026, 11, 21, 10, 0, tzinfo=timezone.utc)
+
+
+# --- render output (spec page-rendering: "Store render output with the document and clean up") ---
+
+from iw_scraper.rendering import RenderOutput  # noqa: E402
+from iw_scraper.types import JobError  # noqa: E402
+
+PNG = b"\x89PNG\r\n\x1a\nfake-"
+
+
+def rendering(output=None, *, raises=None, calls=None):
+    async def render():
+        if calls is not None:
+            calls.append(1)
+        if raises:
+            raise raises
+        return output
+
+    return PAGE | {"render": render}
+
+
+def shots(*viewports):
+    return RenderOutput({vp: PNG + vp.encode() for vp in viewports}, "147.0.7727.0", False)
+
+
+async def payload_of(pool, document_id):
+    return json.loads((await doc_row(pool, document_id))["payload"])
+
+
+async def test_render_output_is_stored_with_the_document(pool, storage, redis_client, stream_name, seeded_source):
+    page = rendering(shots("desktop", "mobile", "tablet"))
+
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, page)
+
+    payload = await payload_of(pool, result.document_id)
+    base = f"shot/{result.document_id}"
+    assert payload["screenshots"] == {vp: f"{base}/{vp}.png" for vp in ("desktop", "mobile", "tablet")}
+    assert payload["scrape_meta"]["render"] == {"browser_version": "147.0.7727.0", "truncated": False}
+    assert payload["scrape_meta"]["scraper"] == "httpx" and "render" not in payload
+    row = await doc_row(pool, result.document_id)
+    assert row["text"] == "Zysk do 20%"
+    assert sorted(payload["screenshots"].values()) == sorted(k for k in await storage.list_keys() if k.startswith("shot/"))
+
+
+async def test_the_static_text_and_hash_do_not_depend_on_the_render(pool, storage, redis_client, stream_name, seeded_source):
+    plain = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source)
+    rendered_second = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(shots("desktop"))
+    )
+
+    assert rendered_second.outcome == "duplicate" and plain.outcome == "inserted"
+
+
+async def test_a_skipped_render_is_noted_without_an_error(pool, storage, redis_client, stream_name, seeded_source):
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(RenderOutput(skipped="budget"))
+    )
+
+    payload = await payload_of(pool, result.document_id)
+    assert payload["scrape_meta"]["render"] == {"skipped": "budget"} and "screenshots" not in payload
+    assert await reasons(pool) == []
+
+
+async def test_a_render_with_nothing_to_store_is_noted_as_empty(pool, storage, redis_client, stream_name, seeded_source):
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(RenderOutput()))
+
+    assert (await payload_of(pool, result.document_id))["scrape_meta"]["render"] == {"skipped": "empty"}
+
+
+async def test_a_known_duplicate_costs_no_render(pool, storage, redis_client, stream_name, seeded_source):
+    ingestor = Ingestor(pool, storage, redis_client, stream=stream_name)
+    await run(ingestor, seeded_source)
+    calls = []
+
+    second = await run(ingestor, seeded_source, rendering(shots("desktop"), calls=calls))
+
+    assert second.outcome == "duplicate" and calls == []
+
+
+@pytest.mark.parametrize(
+    ("error", "reason"),
+    [
+        (JobError(Reason.BLOCKED, "HTTP 429"), "blocked"),
+        (JobError(Reason.BLOCKED_TARGET, "navigation away"), "blocked_target"),
+        (JobError(Reason.RENDER_FAILED, "browser error: Error"), "render_failed"),
+    ],
+)
+async def test_a_failed_render_keeps_the_document_and_records_one_error(
+    pool, storage, redis_client, stream_name, seeded_source, error, reason
+):
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(RenderOutput(errors=(error,)))
+    )
+
+    payload = await payload_of(pool, result.document_id)
+    assert result.outcome == "inserted" and "screenshots" not in payload and "blocks" not in payload
+    assert "render" not in payload["scrape_meta"]  # a failed render leaves no render meta, only the job error
+    assert await reasons(pool) == [reason]
+    assert await storage.list_keys() == [f"html/{result.document_id}.html"]
+
+
+async def test_a_render_error_detail_is_redacted(pool, storage, redis_client, stream_name, seeded_source):
+    error = JobError(Reason.RENDER_FAILED, "proxy http://user:hunter2@proxy.example:8080 refused")
+    await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(RenderOutput(errors=(error,)))
+    )
+
+    async with pool.acquire() as conn:
+        details = [r["detail"] for r in await conn.fetch("SELECT detail FROM job_errors")]
+    assert details and "hunter2" not in " ".join(details)
+
+
+async def test_a_render_that_raises_is_a_render_failed_error_and_the_document_stays(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(raises=RuntimeError("boom"))
+    )
+
+    assert result.outcome == "inserted" and await reasons(pool) == ["render_failed"]
+
+
+async def test_a_cancelled_render_leaves_no_object_behind(pool, storage, redis_client, stream_name, seeded_source):
+    with pytest.raises(asyncio.CancelledError):
+        await run(
+            Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source,
+            rendering(raises=asyncio.CancelledError()),
+        )
+
+    assert await storage.list_keys() == [] and await doc_count(pool) == 0
+
+
+async def test_render_output_the_schema_refuses_costs_the_layout_not_the_document(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(shots("desktop", "watch"))
+    )
+
+    payload = await payload_of(pool, result.document_id)
+    assert result.outcome == "inserted" and "screenshots" not in payload and "render" not in payload["scrape_meta"]
+    assert await reasons(pool) == ["render_failed"]
+    assert await storage.list_keys() == [f"html/{result.document_id}.html"]
+
+
+async def test_a_failed_screenshot_upload_degrades_and_removes_what_was_uploaded(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    class FlakyStorage(Storage):
+        async def put_screenshot(self, document_id, viewport, png):
+            if viewport == "mobile":
+                raise OSError("minio unavailable")
+            return await super().put_screenshot(document_id, viewport, png)
+
+    flaky = FlakyStorage(storage.endpoint, storage.access_key, storage.secret_key, bucket=storage.bucket)
+
+    result = await run(
+        Ingestor(pool, flaky, redis_client, stream=stream_name), seeded_source, rendering(shots("desktop", "mobile"))
+    )
+
+    payload = await payload_of(pool, result.document_id)
+    assert result.outcome == "inserted" and "screenshots" not in payload
+    assert await reasons(pool) == ["storage_error"]
+    assert await storage.list_keys() == [f"html/{result.document_id}.html"]
+
+
+async def test_a_duplicate_found_only_at_insert_removes_the_screenshots_too(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch
+):
+    ingestor = Ingestor(pool, storage, redis_client, stream=stream_name)
+    await run(ingestor, seeded_source)
+
+    async def never_a_duplicate(*_args):
+        return False
+
+    monkeypatch.setattr(pipeline, "is_duplicate", never_a_duplicate)
+    second = await run(ingestor, seeded_source, rendering(shots("desktop", "mobile")))
+
+    assert second.outcome == "duplicate" and len(await storage.list_keys()) == 1
+
+
+async def test_an_insert_that_certainly_did_not_commit_removes_the_screenshots_too(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch
+):
+    async def failing_insert(*_args):
+        raise asyncpg.DataError("bad argument")
+
+    monkeypatch.setattr(pipeline, "insert_document", failing_insert)
+
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(shots("desktop"))
+    )
+
+    assert result.outcome == "failed" and await storage.list_keys() == []
+
+
+async def test_an_insert_that_may_have_committed_keeps_the_screenshots(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch
+):
+    real_insert = pipeline.insert_document
+
+    async def commit_then_lose_the_reply(*args):
+        await real_insert(*args)
+        raise asyncpg.PostgresConnectionError("reply lost")
+
+    monkeypatch.setattr(pipeline, "insert_document", commit_then_lose_the_reply)
+
+    result = await run(
+        Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(shots("desktop"))
+    )
+
+    keys = await storage.list_keys()
+    assert result.outcome == "failed" and any(key.startswith("shot/") for key in keys)

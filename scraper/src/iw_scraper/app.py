@@ -17,17 +17,20 @@ import asyncpg
 from arq.connections import ArqRedis, RedisSettings, create_pool
 
 from iw_scraper.collect import Collector
-from iw_scraper.config import fetch_settings, proxy_settings, rate_limit_settings, target_settings
+from iw_scraper.config import fetch_settings, proxy_settings, rate_limit_settings, render_settings, target_settings
+from iw_scraper.domaingate import DomainGate
 from iw_scraper.health import check_redis, serve_health
 from iw_scraper.ingest.errors import record_error as store_job_error
 from iw_scraper.ingest.pipeline import Ingestor
 from iw_scraper.ingest.publisher import sweep
 from iw_scraper.ingest.storage import Storage
+from iw_scraper.guards import DomainHealth
 from iw_scraper.jobs import QueueSettings
 from iw_scraper.logs import configure_logging
 from iw_scraper.pgstore import PgSourceStore
 from iw_scraper.proxy import ProxyRotator
 from iw_scraper.ratelimit import DomainLimiter
+from iw_scraper.rendering import DomainPause, PageRenderer, RenderBudget, http_renderer
 from iw_scraper.scan_requests import ScanRequestConsumer, consumer_name
 from iw_scraper.scheduler import Scheduler
 from iw_scraper.supervise import CONNECTION_ERRORS
@@ -86,13 +89,34 @@ def assemble(
     limiter,
     timeout: float,
     max_bytes: int,
+    renderer: PageRenderer | None = None,
 ) -> Runtime:
     store = PgSourceStore(pool)
     collector = Collector(
         store, Ingestor(pool, storage, redis),
         urls=urls, addresses=addresses, rotator=rotator, limiter=limiter, timeout=timeout, max_bytes=max_bytes,
+        renderer=renderer,
     )
     return Runtime(pool, storage, redis, store, collector)
+
+
+def page_renderer(redis, limiter, ports) -> PageRenderer | None:
+    """The render step, or None while `SCRAPER_RENDER_ENABLED` is off. Refuses to start when the attempt is too short."""
+    queue = QueueSettings.from_env()
+    settings = render_settings(attempt_timeout=queue.attempt_timeout)
+    if not settings.enabled:
+        return None
+    gate = DomainGate(
+        redis, max_retry_after=queue.max_retry_after, failure_threshold=queue.failure_threshold,
+        pause_seconds=queue.domain_cooldown,
+    )
+    health_for = lambda domain: DomainHealth(  # noqa: E731
+        redis, domain, threshold=queue.failure_threshold, cooldown=queue.domain_cooldown
+    )
+    return PageRenderer(
+        http_renderer(settings.url), limiter, DomainPause(gate, health_for), RenderBudget(redis, settings.max_per_hour),
+        timeout_seconds=settings.timeout_seconds, ports=ports,
+    )
 
 
 @asynccontextmanager
@@ -115,13 +139,14 @@ async def runtime(redis_url: str):
             _, interval = rate_limit_settings()
             timeout, max_bytes = fetch_settings()
             store = PgSourceStore(pool)
+            limiter = DomainLimiter(redis, interval)
             yield assemble(
                 pool, storage, redis,
                 urls=allowed_urls(store, extra_hosts, ports),
                 addresses=AddressGuard(internal_hosts=internal_hosts),
                 rotator=ProxyRotator(proxies, mode, cooldown),
-                limiter=DomainLimiter(redis, interval),
-                timeout=timeout, max_bytes=max_bytes,
+                limiter=limiter, timeout=timeout, max_bytes=max_bytes,
+                renderer=page_renderer(redis, limiter, ports),
             )
         finally:
             await redis.aclose()

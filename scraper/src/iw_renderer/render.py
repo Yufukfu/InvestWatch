@@ -37,6 +37,10 @@ class RenderFailed(Exception):
         self.detail = detail
 
 
+class RenderRefused(RenderFailed):
+    """The confinement refused a request of the render (another site, an internal address, a closed port)."""
+
+
 class RenderBlocked(RenderFailed):
     """The site refused the browser (403, 429 or a challenge page). `retry_after` is the raw header, if any."""
 
@@ -120,7 +124,7 @@ async def _refuse_redirect_away(request: Request, policy: RequestPolicy) -> None
     while hop is not None:
         reason = await policy.verdict(hop.url, "document", is_navigation=True)
         if reason:
-            raise RenderFailed(reason)
+            raise RenderRefused(reason)
         hop = hop.redirected_from
 
 
@@ -219,10 +223,12 @@ async def _render(
             response = await page.goto(request.url, wait_until="load", timeout=_remaining_ms(deadline))
         except PlaywrightError as error:
             if policy.navigation_refusal:
-                raise RenderFailed(policy.navigation_refusal) from None
+                raise RenderRefused(policy.navigation_refusal) from None
             raise _failure(error) from None
         if response is None:
-            raise RenderFailed(policy.navigation_refusal or "navigation produced no document")
+            if policy.navigation_refusal:
+                raise RenderRefused(policy.navigation_refusal)
+            raise RenderFailed("navigation produced no document")
         await _refuse_redirect_away(response.request, policy)  # Playwright does not route redirect hops: check them here
         if response.status in BLOCK_STATUSES:
             raise RenderBlocked(f"HTTP {response.status}", response.headers.get("retry-after"))

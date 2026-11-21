@@ -5,6 +5,7 @@ from minio import Minio
 from minio.error import S3Error
 
 HTML_CONTENT_TYPE = "text/html; charset=utf-8"
+PNG_CONTENT_TYPE = "image/png"
 
 
 class BucketMissing(RuntimeError):
@@ -13,6 +14,10 @@ class BucketMissing(RuntimeError):
 
 def html_key(document_id: str) -> str:
     return f"html/{document_id}.html"
+
+
+def screenshot_key(document_id: str, viewport: str) -> str:
+    return f"shot/{document_id}/{viewport}.png"
 
 
 class Storage:
@@ -34,6 +39,13 @@ class Storage:
         key = html_key(document_id)
         await asyncio.to_thread(
             self._client.put_object, self.bucket, key, io.BytesIO(data), len(data), content_type=HTML_CONTENT_TYPE
+        )
+        return key
+
+    async def put_screenshot(self, document_id: str, viewport: str, png: bytes) -> str:
+        key = screenshot_key(document_id, viewport)
+        await asyncio.to_thread(
+            self._client.put_object, self.bucket, key, io.BytesIO(png), len(png), content_type=PNG_CONTENT_TYPE
         )
         return key
 

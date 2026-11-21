@@ -10,6 +10,7 @@ from iw_scraper.ingest.publisher import STREAM, mark_published, publish
 from iw_scraper.ingest.storage import Storage
 from iw_scraper.ingest.store import IngestResult, insert_document, is_duplicate
 from iw_scraper.ingest.validate import check_document
+from iw_scraper.rendering import RenderOutput
 from iw_scraper.types import JobError, Reason, Source
 
 log = logging.getLogger("iw_scraper.ingest")
@@ -66,29 +67,81 @@ class Ingestor:
         html = page.get("html")
         if not (html and html.strip()):  # the spec stores the HTML of every page; a parser that drops it must show up, not pass silently
             return await self._fail(JobError(Reason.PARSE_ERROR, "page has no html", source_id))
+        # the render runs before the first upload: a cancellation (the attempt timeout) then leaves no object behind
+        output = await self._render(page.get("render"), source_id)
+
         try:
             key = await self.storage.put_html(doc["id"], html)
         except Exception as exc:  # the minio client raises S3Error, urllib3 and OS errors alike
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"upload failed: {exc}", source_id))
         doc["html_object_key"] = key
+        keys = [key, *await self._attach_render(doc, output, source_id)]
 
         try:
             result = await insert_document(self.pool, doc)
         except asyncio.CancelledError as exc:  # e.g. the orchestrator's timeout
-            await self._discard_object(key, exc)
+            await self._discard_objects(keys, exc)
             raise
         except Exception as exc:
             # whatever went wrong after the upload (driver, pool, a value the schema let through) is recorded and
-            # never escapes; the object goes only if the row certainly was not committed
-            await self._discard_object(key, exc)
+            # never escapes; the objects go only if the row certainly was not committed
+            await self._discard_objects(keys, exc)
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"insert failed: {exc}", source_id))
 
         if result.outcome == "duplicate":
-            await self._remove_object(key)  # lost the race: another worker inserted the same page
+            for stale in keys:  # lost the race: another worker inserted the same page
+                await self._remove_object(stale)
             return result
 
         await self._announce(result.document_id, source_id)
         return result
+
+    async def _render(self, render, source_id: str) -> RenderOutput | None:
+        """Run the collector's render step. Whatever it does, the document goes on without layout."""
+        if render is None:
+            return None
+        try:
+            output = await render()
+        except Exception as exc:  # the render step reports its own failures; this is a bug in it
+            await self._record(JobError(Reason.RENDER_FAILED, f"render step failed: {type(exc).__name__}", source_id))
+            return None
+        for error in output.errors:  # one per failed render, never a queue retry: these are recorded, not returned
+            await self._record(JobError(error.reason, error.detail, source_id))
+        return output
+
+    async def _attach_render(self, doc: dict, output: RenderOutput | None, source_id: str) -> list[str]:
+        """Upload the screenshots and set `screenshots` and `scrape_meta.render`; the object keys uploaded.
+
+        A failure here costs the layout only: nothing of it is kept, and the error is recorded.
+        """
+        if output is None or output.errors:
+            return []
+        if output.skipped or not output.screenshots:
+            doc["scrape_meta"] = {**doc["scrape_meta"], "render": {"skipped": output.skipped or "empty"}}
+            return []
+        uploaded: dict[str, str] = {}
+        try:
+            for viewport, png in output.screenshots.items():
+                uploaded[viewport] = await self.storage.put_screenshot(doc["id"], viewport, png)
+        except Exception as exc:
+            await self._record(JobError(Reason.STORAGE_ERROR, f"screenshot upload failed: {exc}", source_id))
+            for key in uploaded.values():
+                await self._remove_object(key)
+            return []
+        candidate = {
+            **doc,
+            "screenshots": uploaded,
+            "scrape_meta": {
+                **doc["scrape_meta"], "render": {"browser_version": output.browser_version, "truncated": output.truncated}
+            },
+        }
+        if check_document(candidate) is not None:  # the layout is not worth a document the schema refuses
+            await self._record(JobError(Reason.RENDER_FAILED, "render output is not valid against the schema", source_id))
+            for key in uploaded.values():
+                await self._remove_object(key)
+            return []
+        doc.update(candidate)
+        return list(uploaded.values())
 
     async def _announce(self, document_id: str, source_id: str) -> None:
         try:
@@ -102,11 +155,12 @@ class Ingestor:
             # published but unmarked: the sweep may publish it again, which consumers deduplicate
             log.warning(json.dumps({"event": "mark_published_failed", "document_id": document_id, "error": redact(str(exc))}))
 
-    async def _discard_object(self, key: str, exc: BaseException) -> None:
+    async def _discard_objects(self, keys: list[str], exc: BaseException) -> None:
         if _certainly_not_committed(exc):
-            await self._remove_object(key)
+            for key in keys:
+                await self._remove_object(key)
             return
-        log.warning(json.dumps({"event": "possible_orphan", "key": key, "error": redact(f"{type(exc).__name__}: {exc}")}))
+        log.warning(json.dumps({"event": "possible_orphan", "keys": keys, "error": redact(f"{type(exc).__name__}: {exc}")}))
 
     async def _remove_object(self, key: str) -> None:
         try:

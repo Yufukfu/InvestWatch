@@ -10,6 +10,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import partial
 from email.utils import parsedate_to_datetime
 
 from iw_scraper.document import build_document
@@ -17,6 +18,7 @@ from iw_scraper.fetch import FetchDeferred, FetchFailure, close_session, fetch, 
 from iw_scraper.identities import draw_identity
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure, parse_page
+from iw_scraper.rendering import PageRenderer, wants_render
 from iw_scraper.robots import check_robots
 from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.targets import AddressGuard, UrlGuard, target_guard
@@ -73,11 +75,13 @@ class Collector:
         stages: Stages = Stages(),
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         max_bytes: int = DEFAULT_MAX_BYTES,
+        renderer: PageRenderer | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         self._store, self._ingestor = store, ingestor
         self._urls_now, self._addresses, self._rotator, self._limiter = urls, addresses, rotator, limiter
         self._stages, self._timeout, self._max_bytes, self._clock = stages, timeout, max_bytes, clock
+        self._renderer = renderer  # None while `SCRAPER_RENDER_ENABLED` is off
 
     async def run_source(self, source_id: str, started: Callable[[], Awaitable[None]]) -> AttemptResult:
         source = await self._store.get(source_id)
@@ -132,6 +136,8 @@ class Collector:
         fetched_at = self._clock()
         document = build_document(source, result, page, fetched_at)
         document["html"] = result.body.decode("utf-8", errors="replace")  # the body is already UTF-8 (`FetchResult`)
+        if self._renderer is not None and wants_render(source):  # ingest runs it after the duplicate check
+            document["render"] = partial(self._renderer.render, source, source.url, identity, proxy)
         stored = await self._ingestor.ingest(
             document, source, fetched_at=fetched_at, duration_ms=duration_ms, proxy=result.proxy_id
         )

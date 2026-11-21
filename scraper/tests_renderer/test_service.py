@@ -56,6 +56,17 @@ async def test_a_block_is_answered_403_with_its_retry_after(server, client):
     assert payload == {"error": {"kind": "blocked", "detail": "HTTP 429", "retry_after": "120"}}
 
 
+async def test_a_redirect_to_another_site_is_answered_422_refused(server, client):
+    server.routes[("source.test", "/")] = (302, {"Location": f"http://other.test:{server.port}/"}, b"")
+    server.serve("other.test", "/", "elsewhere")
+
+    response = await client.post("/render", json=body_for(server))
+    payload = await response.json()
+
+    assert response.status == 422
+    assert payload["error"]["kind"] == "refused" and "navigation away" in payload["error"]["detail"]
+
+
 async def test_another_failure_is_answered_502(server, client):
     server.routes[("source.test", "/")] = (500, {}, b"oops")
 

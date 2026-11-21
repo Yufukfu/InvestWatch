@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from aiohttp import web
 
 from iw_renderer.confine import _same_site
-from iw_renderer.render import RenderBlocked, RenderFailed, Renderer, RenderRequest
+from iw_renderer.render import RenderBlocked, RenderFailed, RenderRefused, Renderer, RenderRequest
 from iw_renderer.settings import DEFAULT_TIMEOUT_SECONDS
 from iw_renderer.viewports import VIEWPORTS
 
@@ -140,6 +140,9 @@ async def _render(request: web.Request) -> web.Response:
     except RenderBlocked as blocked:
         outcome = "blocked"
         return _error(403, "blocked", blocked.detail, retry_after=blocked.retry_after)
+    except RenderRefused as refused:
+        outcome = "refused"
+        return _error(422, "refused", refused.detail)
     except RenderFailed as failed:
         outcome = "failed"
         return _error(502, "failed", failed.detail)
