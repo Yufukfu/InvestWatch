@@ -98,4 +98,53 @@ describe('useThresholds', () => {
     act(() => result.current.save('M1', 0.9));
     await waitFor(() => expect(result.current.error).toBe('Nie zapisano progu: brak połączenia z serwerem.'));
   });
+
+  it('gives another client error its own message, not the server-failure one', async () => {
+    server.use(http.put('http://localhost/api/settings/thresholds', () => HttpResponse.json({ error: 'gone' }, { status: 404 })));
+    const { result } = renderHook(() => useThresholds(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.canSave).toBe(true));
+    act(() => result.current.save('M1', 0.9));
+    await waitFor(() => expect(result.current.error).toBe('Nie zapisano progu: serwer odrzucił żądanie.'));
+  });
+
+  it('a server failure keeps the generic message', async () => {
+    server.use(http.put('http://localhost/api/settings/thresholds', () => HttpResponse.json({ error: 'boom' }, { status: 500 })));
+    const { result } = renderHook(() => useThresholds(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.canSave).toBe(true));
+    act(() => result.current.save('M1', 0.9));
+    await waitFor(() => expect(result.current.error).toBe('Nie zapisano progu: błąd serwera.'));
+  });
+
+  it('cannot save again until the thresholds are refetched after a save', async () => {
+    let saved = { ...thresholds };
+    let slowRead = false;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.get('http://localhost/api/settings/thresholds', async () => {
+        if (slowRead) await gate;
+        return HttpResponse.json(saved);
+      }),
+      http.put('http://localhost/api/settings/thresholds', async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        slowRead = true;
+        return HttpResponse.json(saved);
+      }),
+    );
+    const { result } = renderHook(() => useThresholds(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.canSave).toBe(true));
+    act(() => result.current.save('M2', 0.7));
+    await waitFor(() => expect(result.current.saved).toBe(true));
+    await waitFor(() => expect(result.current.canSave).toBe(false));
+    release();
+    await waitFor(() => expect(result.current.canSave).toBe(true));
+    expect(result.current.thresholds?.M2).toBe(0.7);
+  });
+
+  it('reports a failed read of the thresholds, so the panel can say why saving is off', async () => {
+    server.use(http.get('http://localhost/api/settings/thresholds', () => HttpResponse.error()));
+    const { result } = renderHook(() => useThresholds(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.settingsError).toBe(true));
+    expect(result.current.canSave).toBe(false);
+  });
 });

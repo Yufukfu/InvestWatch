@@ -28,3 +28,12 @@ export function nearestIndex(points: CalibrationPoint[], threshold: number): num
   }
   return best;
 }
+
+// Label side of the two markers: the lower threshold's label goes left, the higher one's right,
+// so the two labels never sit on top of each other whichever threshold is larger.
+export type LabelSide = 'insideTopLeft' | 'insideTopRight';
+export function markerSides(current: number, selected: number): { current: LabelSide; selected: LabelSide } {
+  return current <= selected
+    ? { current: 'insideTopLeft', selected: 'insideTopRight' }
+    : { current: 'insideTopRight', selected: 'insideTopLeft' };
+}

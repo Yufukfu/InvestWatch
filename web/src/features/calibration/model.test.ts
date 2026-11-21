@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { nearestIndex } from './model';
+import { markerSides, nearestIndex } from './model';
 
 const pts = [0.3, 0.5, 0.7].map((threshold) => ({ threshold, tp: 0, fp: 0, fn: 0, tn: 0, precision: 0, recall: 0 }));
+
+describe('markerSides', () => {
+  it('puts the lower marker label on the left and the higher one on the right', () => {
+    expect(markerSides(0.5, 0.7)).toEqual({ current: 'insideTopLeft', selected: 'insideTopRight' });
+    expect(markerSides(0.7, 0.5)).toEqual({ current: 'insideTopRight', selected: 'insideTopLeft' });
+  });
+});
 
 describe('nearestIndex', () => {
   it('finds the exact point', () => {

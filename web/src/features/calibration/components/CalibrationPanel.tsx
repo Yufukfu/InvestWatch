@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { formatPercent, formatThreshold } from '../format';
 import { CALIBRATION_MODULES, type CalibrationModule, type CalibrationPoint, type CalibrationView } from '../model';
 import { CalibrationChart } from './CalibrationChart';
 
@@ -8,6 +9,8 @@ export type CalibrationPanelProps = {
   view: CalibrationView | undefined;
   isLoading: boolean;
   isError: boolean;
+  /** The thresholds (GET /settings/thresholds) could not be read, so saving is off. */
+  settingsError?: boolean;
   index: number;
   currentIndex: number;
   onIndex: (i: number) => void;
@@ -25,8 +28,6 @@ const MODULE_NAME: Record<CalibrationModule, string> = {
   M3: 'Usługi bez zezwolenia',
 };
 
-const PERCENT = new Intl.NumberFormat('pl-PL', { style: 'percent', maximumFractionDigits: 1 });
-
 type Metric = { label: string; value: (p: CalibrationPoint) => number | undefined; percent?: boolean };
 
 // Values are shown exactly as GET /calibration returns them; nothing is recalculated here.
@@ -40,10 +41,12 @@ const METRICS: Metric[] = [
   { label: 'F1', value: (p) => p.f1, percent: true },
 ];
 
-const show = (v: number, percent?: boolean) => (percent ? PERCENT.format(v) : String(v));
+const show = (v: number, percent?: boolean) => (percent ? formatPercent(v) : String(v));
+
+const SAVED_TEXT = 'Zapisano. Poziomy ryzyka zostały przeliczone.';
 
 export function CalibrationPanel(props: CalibrationPanelProps) {
-  const { module, onModule, view, isLoading, isError } = props;
+  const { module, onModule, view, isLoading, isError, isSaving, settingsError } = props;
   const id = useId();
 
   let body;
@@ -59,12 +62,23 @@ export function CalibrationPanel(props: CalibrationPanelProps) {
         <h2 id={`${id}-title`}>Kalibracja progów</h2>
         <div className="segmented" role="group" aria-label="Moduł">
           {CALIBRATION_MODULES.map((m) => (
-            <button key={m} type="button" aria-pressed={m === module} onClick={() => onModule(m)}>
+            // aria-disabled, not disabled: a disabled button drops keyboard focus to <body>. A module switch
+            // would also drop the save feedback while the PUT is still in flight, so it waits for the save.
+            <button
+              key={m}
+              type="button"
+              aria-pressed={m === module}
+              aria-disabled={isSaving}
+              onClick={() => {
+                if (!isSaving) onModule(m);
+              }}
+            >
               {m} · {MODULE_NAME[m]}
             </button>
           ))}
         </div>
       </div>
+      {settingsError && <p role="alert">Nie udało się pobrać progów; zapis jest niedostępny.</p>}
       {body}
     </section>
   );
@@ -90,14 +104,14 @@ function Body({
   // with its nearest point, and the comparison says so.
   const changed = index !== currentIndex;
   const exact = current.threshold === view.currentThreshold;
-  const beforeLabel = exact ? 'obecnie' : `najbliższy punkt (${current.threshold.toFixed(2)}):`;
+  const beforeLabel = exact ? 'obecnie' : `najbliższy punkt (${formatThreshold(current.threshold)})`;
   const warningId = `${sliderId}-warning`;
 
   return (
     <>
       <p className="muted">
-        Na podstawie {view.labeledSamples} oznaczonych próbek (decyzje analityków i zbiór wzorcowy). Przesuń suwak, aby zobaczyć skutki
-        progu; podgląd niczego nie zmienia.
+        Liczba oznaczonych próbek: {view.labeledSamples} (decyzje analityków i zbiór wzorcowy). Przesuń suwak, aby zobaczyć skutki progu;
+        podgląd niczego nie zmienia.
       </p>
       <div className="threshold-row">
         <label htmlFor={sliderId}>Próg dla {module}</label>
@@ -108,11 +122,11 @@ function Body({
           max={view.points.length - 1}
           step={1}
           value={index}
-          aria-valuetext={`próg ${selected.threshold.toFixed(2)}`}
+          aria-valuetext={`próg ${formatThreshold(selected.threshold)}`}
           onChange={(e) => onIndex(Number(e.target.value))}
         />
-        <span className="threshold-selected">{selected.threshold.toFixed(2)}</span>
-        <span className="muted">obecny próg: {view.currentThreshold.toFixed(2)}</span>
+        <span className="threshold-selected">{formatThreshold(selected.threshold)}</span>
+        <span className="muted">obecny próg: {formatThreshold(view.currentThreshold)}</span>
       </div>
 
       <div className="metrics">
@@ -150,9 +164,9 @@ function Body({
           <tbody>
             {view.points.map((p) => (
               <tr key={p.threshold}>
-                <th scope="row">{p.threshold.toFixed(2)}</th>
-                <td>{PERCENT.format(p.precision)}</td>
-                <td>{PERCENT.format(p.recall)}</td>
+                <th scope="row">{formatThreshold(p.threshold)}</th>
+                <td>{formatPercent(p.precision)}</td>
+                <td>{formatPercent(p.recall)}</td>
                 <td>{p.fp}</td>
                 <td>{p.fn}</td>
               </tr>
@@ -190,11 +204,10 @@ function Body({
             Wróć do obecnego
           </button>
           {error && <p role="alert">{error}</p>}
-          {saved && !error && !changed && (
-            <p role="status" className="saved">
-              Zapisano. Poziomy ryzyka zostały przeliczone.
-            </p>
-          )}
+          {/* Always rendered: a live region must exist before its text changes to be announced. */}
+          <p role="status" className="saved">
+            {saved && !error && !changed ? SAVED_TEXT : ''}
+          </p>
         </div>
       </div>
     </>

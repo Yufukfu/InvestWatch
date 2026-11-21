@@ -7,25 +7,10 @@ import { CalibrationPanel, type CalibrationPanelProps } from './CalibrationPanel
 const view: CalibrationView = { module: 'M2', currentThreshold: 0.5, labeledSamples: 70, points: calM2.points };
 const i50 = calM2.points.findIndex((p) => p.threshold === 0.5);
 const i70 = calM2.points.findIndex((p) => p.threshold === 0.7);
+const SAVED = 'Zapisano. Poziomy ryzyka zostały przeliczone.';
 
 function setup(over: Partial<CalibrationPanelProps> = {}) {
-  const props: CalibrationPanelProps = {
-    module: 'M2',
-    onModule: vi.fn(),
-    view,
-    isLoading: false,
-    isError: false,
-    index: i50,
-    currentIndex: i50,
-    onIndex: vi.fn(),
-    canSave: true,
-    onSave: vi.fn(),
-    isSaving: false,
-    saved: false,
-    error: undefined,
-    chartSize: { width: 500, height: 240 },
-    ...over,
-  };
+  const props = setupProps(over);
   render(<CalibrationPanel {...props} />);
   return props;
 }
@@ -43,18 +28,26 @@ describe('CalibrationPanel', () => {
     expect(p.onModule).toHaveBeenCalledWith('M3');
   });
 
+  it('does not switch module while a save is in flight', () => {
+    const p = setup({ isSaving: true, index: i70 });
+    const m1 = screen.getByRole('button', { name: 'M1 · Finfluencerzy' });
+    expect(m1).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(m1);
+    expect(p.onModule).not.toHaveBeenCalled();
+  });
+
   it('has a labelled slider over the point indexes with the threshold as its value text', () => {
     const p = setup({ index: i70 });
     const slider = screen.getByRole('slider', { name: 'Próg dla M2' });
     expect(slider).toHaveAttribute('min', '0');
     expect(slider).toHaveAttribute('max', String(calM2.points.length - 1));
     expect(slider).toHaveValue(String(i70));
-    expect(slider).toHaveAttribute('aria-valuetext', 'próg 0.70');
+    expect(slider).toHaveAttribute('aria-valuetext', 'próg 0,70');
     fireEvent.change(slider, { target: { value: String(i50) } });
     expect(p.onIndex).toHaveBeenCalledWith(i50);
-    expect(screen.getByText('0.70', { selector: '.threshold-selected' })).toBeInTheDocument();
-    expect(screen.getByText(/obecny próg: 0\.50/)).toBeInTheDocument();
-    expect(screen.getByText(/70 oznaczonych próbek/)).toBeInTheDocument();
+    expect(screen.getByText('0,70', { selector: '.threshold-selected' })).toBeInTheDocument();
+    expect(screen.getByText(/obecny próg: 0,50/)).toBeInTheDocument();
+    expect(screen.getByText(/Liczba oznaczonych próbek: 70/)).toBeInTheDocument();
   });
 
   it('shows the selected point next to the current one, as returned', () => {
@@ -74,8 +67,8 @@ describe('CalibrationPanel', () => {
   it('a current threshold off the curve: compares with the nearest point, says so, and has nothing to save yet', () => {
     const i60 = calM2.points.findIndex((p) => p.threshold === 0.6);
     setup({ view: { ...view, currentThreshold: 0.62 }, index: i60, currentIndex: i60 });
-    expect(screen.getByText(/obecny próg: 0\.62/)).toBeInTheDocument();
-    expect(metric('Fałszywe alarmy (FP)')).toHaveTextContent('najbliższy punkt (0.60):');
+    expect(screen.getByText(/obecny próg: 0,62/)).toBeInTheDocument();
+    expect(metric('Fałszywe alarmy (FP)')).toHaveTextContent('najbliższy punkt (0,60) ');
     expect(screen.getByRole('button', { name: 'Zapisz próg' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Wróć do obecnego' })).toHaveAttribute('aria-disabled', 'true');
   });
@@ -91,9 +84,13 @@ describe('CalibrationPanel', () => {
     const save = screen.getByRole('button', { name: 'Zapisz próg' });
     expect(save).toHaveAttribute('aria-disabled', 'true');
     expect(save).toHaveAccessibleDescription(/zmienia poziom ryzyka wszystkich zgłoszeń modułu M2/);
-    expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByText(/zmienia poziom ryzyka wszystkich zgłoszeń modułu M2 i próg alertów/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Wróć do obecnego' })).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('names the module in the warning for the module on screen', () => {
+    setup({ module: 'M3', index: i50 });
+    expect(screen.getByText(/zmienia poziom ryzyka wszystkich zgłoszeń modułu M3 i próg alertów/)).toBeInTheDocument();
   });
 
   it('save and reset call back with the selection', () => {
@@ -126,14 +123,40 @@ describe('CalibrationPanel', () => {
     expect(p.onSave).not.toHaveBeenCalled();
   });
 
+  it('keeps the live region mounted and fills its text only after a save', () => {
+    const { rerender } = render(<CalibrationPanel {...setupProps({})} />);
+    const region = screen.getByRole('status');
+    expect(region).toHaveTextContent('');
+    rerender(<CalibrationPanel {...setupProps({ saved: true })} />);
+    expect(screen.getByRole('status')).toBe(region);
+    expect(region).toHaveTextContent(SAVED);
+  });
+
   it('confirms a save', () => {
     setup({ saved: true, error: undefined });
-    expect(screen.getByRole('status')).toHaveTextContent('Zapisano. Poziomy ryzyka zostały przeliczone.');
+    expect(screen.getByRole('status')).toHaveTextContent(SAVED);
+  });
+
+  it('hides the confirmation once the slider moves off the saved point', () => {
+    setup({ saved: true, index: i70, currentIndex: i50 });
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.queryByText(/Zapisano/)).toBeNull();
+  });
+
+  it('does not confirm a save that also reports an error', () => {
+    setup({ saved: true, error: 'Nie zapisano progu: błąd serwera.' });
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie zapisano progu: błąd serwera.');
   });
 
   it('shows an error alert', () => {
     setup({ index: i70, error: 'Nie zapisano progu: serwer odrzucił wartość.' });
     expect(screen.getByRole('alert')).toHaveTextContent('Nie zapisano progu: serwer odrzucił wartość.');
+  });
+
+  it('explains that saving is unavailable when the thresholds could not be loaded', () => {
+    setup({ view: undefined, settingsError: true, isError: false, isLoading: false });
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się pobrać progów; zapis jest niedostępny.');
   });
 
   it('marks the selected threshold apart from the current one, once when they are equal', () => {
@@ -146,13 +169,23 @@ describe('CalibrationPanel', () => {
     expect(document.querySelectorAll('.recharts-reference-line')).toHaveLength(1);
   });
 
-  it('draws the chart with a text alternative', () => {
+  it('draws the chart with a text alternative and labels both markers', () => {
     setup({ index: i70 });
-    expect(screen.getByRole('img', { name: /Precyzja i czułość/ })).toBeInTheDocument();
+    const plot = screen.getByRole('img', { name: /Precyzja i czułość/ });
+    expect(plot).toHaveAttribute('aria-label', 'Precyzja i czułość w zależności od progu; obecny 0,50, wybrany 0,70');
+    expect(plot).toHaveTextContent('obecny');
+    expect(plot).toHaveTextContent('wybrany');
     expect(document.querySelectorAll('path.recharts-line-curve')).toHaveLength(2);
     const table = within(screen.getByText('Pokaż dane w tabeli').closest('details')!).getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(calM2.points.length + 1);
     expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Próg', 'Precyzja', 'Czułość', 'FP', 'FN']);
+  });
+
+  it('the text alternative shows precision, recall, FP and FN of each point in the right columns', () => {
+    setup({ index: i70 });
+    const table = within(screen.getByText('Pokaż dane w tabeli').closest('details')!).getByRole('table');
+    const row = within(table).getByRole('rowheader', { name: '0,70' }).closest('tr')!;
+    expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['100%', '76,7%', '0', '7']);
   });
 
   it('shows loading, error and no-data states without slider or save', () => {
