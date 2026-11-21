@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or a blocker appears; agents read it at session start. Edit only your own module's row (limits merge conflicts); the owner of a milestone edits its row.
+Last updated: 2026-11-21 (Sat) by Damian. Update this file when a milestone moves or a blocker appears; agents read it at session start. Edit only your own module's row (limits merge conflicts); the owner of a milestone edits its row.
 
 ## Milestones (from `integration-plan.md` §8)
 
@@ -19,7 +19,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 |---|---|---|---|
 | scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
 | dashboard | B | foundation: app shell, RTK Query client generated from `contracts/openapi.yaml`, mock mode, hardened container, root compose with Postgres + HTTPS gateway (`infra/`) | none (`web-setup` archived) |
-| analytics, api, contracts | C | plans written | none yet |
+| analytics, api, contracts | Damian | plans written; contracts v1 in `contracts/`; ADRs 0301-0305 in PR #3, see `.docs/decisions/README.md` | none yet |
 
 ## Blockers and open decisions
 

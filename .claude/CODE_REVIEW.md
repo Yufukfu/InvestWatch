@@ -31,6 +31,6 @@ Criteria only. Stages are in `SDLC.md`, the commands in `.claude/skills/iw-pr-re
 
 ## Optional: different model family
 
-For a high-risk diff, ask a second reviewer from another family (for example Codex or Gemini CLI) with the same pinned range and require a typed verdict per finding: `AGREE`, `DISAGREE_EVIDENCE` (cites code) or `DISAGREE_CONCERN`. Act on the verdicts, not on prose. Development-time aid only; the shipped system uses open-source models and no paid APIs. Not set up yet; add a skill when the team picks the tool.
+For a high-risk diff, ask a second reviewer from another family (for example Codex or Gemini CLI) with the same pinned range and require a typed verdict per finding: `AGREE`, `DISAGREE_EVIDENCE` (cites code) or `DISAGREE_CONCERN`. Act on the verdicts, not on prose. Development-time aid only; the shipped system's own LLM use is set by ADR 0304 (`.docs/decisions/0304-llm-serving.md`). Not set up yet; add a skill when the team picks the tool.
 
 Hard rules (push, `--force`, amend, ADRs) are in `CLAUDE.md`.
