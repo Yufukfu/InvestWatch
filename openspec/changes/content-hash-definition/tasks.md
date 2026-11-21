@@ -10,4 +10,4 @@
 ## 3. Closing
 
 - [x] 3.1 Apply iw-docs-update and add the iw-ai-log row
-- [ ] 3.2 Run iw-pr-review and fix real findings
+- [x] 3.2 Run iw-pr-review and fix real findings (iw-reviewer on 96146ce..077dfee: no defects; two low doc findings, dispositions in follow-ups.md)
