@@ -17,6 +17,11 @@ _rng = random.Random()
 
 # Lost-connection errors only. A ResponseError (WRONGTYPE, ...) is a bug and must not be retried forever.
 CONNECTION_ERRORS: tuple[type[BaseException], ...] = (RedisConnectionError, RedisTimeoutError, BusyLoadingError, OSError)
+# What a single job may treat as a lost dependency: no bare `OSError`, which would also be a full disk or a
+# permission error that no retry fixes.
+JOB_CONNECTION_ERRORS: tuple[type[BaseException], ...] = (
+    RedisConnectionError, RedisTimeoutError, BusyLoadingError, ConnectionError, TimeoutError,
+)
 
 
 async def supervise(

@@ -9,11 +9,17 @@ const TrendPage = lazy(() => import('./features/trend/TrendPage').then((m) => ({
 
 export function App() {
   return (
-    <div className="app">
+    <>
       <header className="app-header">
-        <h1>InvestWatch</h1>
-        <HealthPage />
+        <div className="app-header-inner">
+          <div className="brand">
+            <h1>InvestWatch</h1>
+            <span className="brand-sub">Monitoring ryzykownych treści inwestycyjnych</span>
+          </div>
+          <HealthPage />
+        </div>
       </header>
+      <div className="app">
       <main>
         <SummaryPage />
         <SectionBoundary
@@ -29,6 +35,7 @@ export function App() {
         </SectionBoundary>
         <FindingsPage />
       </main>
-    </div>
+      </div>
+    </>
   );
 }

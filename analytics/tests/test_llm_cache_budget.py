@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import fakeredis
 import pytest
@@ -195,7 +196,7 @@ def test_pipeline_starts_a_budget_per_document(stub_llm, monkeypatch):
     calls = []
     monkeypatch.setattr(judge, "begin_document", lambda: calls.append(1))
     doc = ScrapedDocument.model_validate(make_doc(text=TEXT))
-    analyze(doc, registry=Registry.from_csv(Settings.from_env().registry_csv), catalogue=Catalogue.load(), judge=judge)
+    analyze(doc, registry=Registry.from_csv(Path(__file__).resolve().parents[1] / "registry" / "seed.csv"), catalogue=Catalogue.load(), judge=judge)
     assert calls == [1]
 
 

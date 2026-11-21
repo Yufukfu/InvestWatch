@@ -24,6 +24,7 @@ ALFA = (
 )
 KNF = "Działamy pod nadzorem KNF – Twoje środki są bezpieczne."
 ANALYTICS = Path(__file__).resolve().parents[1]
+SEED = ANALYTICS / "registry" / "seed.csv"
 WORKER_ENV = {"DATABASE_URL": "postgresql://u:pw%zz@h/db", "REDIS_URL": "redis://127.0.0.1:1/0"}
 
 
@@ -103,7 +104,7 @@ def test_worker_passes_the_judge_to_analyze():
     store.put_document_row(make_doc(id=doc_id, text=ALFA))
     r = fakeredis.FakeRedis(decode_responses=True)
     judge = FakeJudge()
-    w = Worker(r, store, NoopPublisher(), registry=Registry.from_csv(Settings.from_env().registry_csv),
+    w = Worker(r, store, NoopPublisher(), registry=Registry.from_csv(Path(__file__).resolve().parents[1] / "registry" / "seed.csv"),
                catalogue=Catalogue.load(), config=WorkerConfig(consumer="w1", block_ms=10),
                now=lambda: NOW, sleep=lambda s: None, jitter=lambda: 0.0, judge=judge)
     w.ensure_group()
@@ -130,6 +131,7 @@ def test_cli_uses_the_judge_when_configured(stub_llm, tmp_path, capsys, monkeypa
 
     monkeypatch.setenv("LLM_BASE_URL", stub_llm.base_url)
     monkeypatch.setenv("LLM_MODEL", "gemma3:4b")
+    monkeypatch.setenv("REGISTRY_CSV", str(SEED))  # the fictional Alfa firm, not the real KNF snapshot
     stub_llm.script.append(Reply.results({"rule_id": "R17", "result": "fail", "evidence_quote": KNF,
                                           "explanation": "Sugeruje aprobatę."}))
     assert cli.main([str(write_doc(tmp_path))]) == 0
@@ -142,6 +144,7 @@ def test_cli_no_llm_forces_rules_only(stub_llm, tmp_path, capsys, monkeypatch):
 
     monkeypatch.setenv("LLM_BASE_URL", stub_llm.base_url)
     monkeypatch.setenv("LLM_MODEL", "gemma3:4b")
+    monkeypatch.setenv("REGISTRY_CSV", str(SEED))
     assert cli.main(["--no-llm", str(write_doc(tmp_path))]) == 0
     [f] = json.loads(capsys.readouterr().out)
     assert f["model"]["llm"] is None and stub_llm.requests == []

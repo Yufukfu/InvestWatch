@@ -26,7 +26,7 @@ from typing import Any
 import redis
 
 from . import logging_setup
-from .config import ConfigError, LlmSettings, Settings, WorkerSettings, uses_seed_registry
+from .config import ConfigError, LlmSettings, Settings, WorkerSettings, registry_provenance, uses_seed_registry
 from .llm import build_judge
 from .events import Publisher, RedisPublisher
 from .health import start_health_server
@@ -294,10 +294,18 @@ def main(env: Mapping[str, str] | None = None) -> int:
         # Mode only: never the URL (it could carry a host the operator considers private) or the key.
         log.info("llm configured", extra={"llm_mode": llm_settings.mode, "llm_model": llm_settings.model or None})
         registry = Registry.from_csv(settings.registry_csv)
+        meta = registry_provenance(settings.registry_csv)
+        # The snapshot date is logged so it can be shown to users later; its age is never a warning.
+        log.info("registry loaded", extra={"reason": "registry_loaded", "registry_csv": str(settings.registry_csv),
+                                           "firms": len(registry.firms),
+                                           "snapshot_date": (meta or {}).get("fetched_at")})
         if uses_seed_registry(settings):
             log.warning("bundled fictional registry in use: R1 and high-risk alerts for real firms are not "
                         "meaningful until REGISTRY_CSV names a real KNF registry",
                         extra={"reason": "registry_seed", "registry_csv": str(settings.registry_csv)})
+        elif meta is None:
+            log.warning("registry without provenance: no knf.meta.json next to it",
+                        extra={"reason": "registry_unverified", "registry_csv": str(settings.registry_csv)})
         catalogue = Catalogue.load()
         default_signal_catalogues()  # M1/M3 catalogues (analytics-m1-m3): a bad YAML stops startup, not a document
         store = PostgresStore(worker_settings.database_url, max_document_bytes=worker_settings.max_document_bytes)

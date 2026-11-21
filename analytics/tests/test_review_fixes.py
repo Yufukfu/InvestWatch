@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 from conftest import NOW, make_doc
-from investwatch_analytics.config import Settings, uses_seed_registry
+from investwatch_analytics.config import SEED_REGISTRY, Settings, uses_seed_registry
 from investwatch_analytics.models import ScrapedDocument
 from investwatch_analytics.pipeline import analyze
 from investwatch_analytics.registry import Registry
@@ -24,13 +24,17 @@ def test_settings_read_an_explicit_mapping(tmp_path):
     assert (s.registry_csv, s.log_level) == (csv, "DEBUG")
 
 
+SEED_ENV = {"REGISTRY_CSV": str(SEED_REGISTRY)}
+
+
 def test_uses_seed_registry():
-    assert uses_seed_registry(Settings.from_env({})) is True
+    assert uses_seed_registry(Settings.from_env(SEED_ENV)) is True
+    assert uses_seed_registry(Settings.from_env({})) is False  # the default is the real KNF snapshot
     assert uses_seed_registry(Settings.from_env({"REGISTRY_CSV": "/data/knf.csv"})) is False
 
 
 def test_worker_warns_when_the_bundled_seed_is_loaded(capsys):
-    assert main(dict(STOPS_AFTER_REGISTRY)) == 2
+    assert main({**STOPS_AFTER_REGISTRY, **SEED_ENV}) == 2
     out = capsys.readouterr().out
     lines = [line for line in out.splitlines() if '"registry_seed"' in line]
     assert len(lines) == 1 and '"level": "warning"' in lines[0] and "REGISTRY_CSV" in lines[0]
@@ -38,13 +42,13 @@ def test_worker_warns_when_the_bundled_seed_is_loaded(capsys):
 
 def test_no_warning_with_a_real_registry_file(tmp_path, capsys):
     real = tmp_path / "knf.csv"
-    shutil.copy(Settings.from_env({}).registry_csv, real)  # same content, another path: not the bundled seed
+    shutil.copy(SEED_REGISTRY, real)  # same content, another path: not the bundled seed
     assert main({**STOPS_AFTER_REGISTRY, "REGISTRY_CSV": str(real)}) == 2
     assert '"registry_seed"' not in capsys.readouterr().out
 
 
 def test_clean_title_names_the_checked_rules():
-    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    registry = Registry.from_csv(SEED_REGISTRY)
     text = ("Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. "
             "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału.")
     [f] = analyze(ScrapedDocument.model_validate(make_doc(text=text)), registry=registry, catalogue=Catalogue.load(), now=NOW)

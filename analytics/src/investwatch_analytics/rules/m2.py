@@ -19,13 +19,18 @@ class R1FirmIdentification(Rule):
         match = ctx.firm_match
         if match is None:
             return self.result("fail", None, "Nie zidentyfikowano w materiale firmy z rejestru KNF.")
-        quote = ctx.registry.find_name(match.firm, ctx.doc.text)
-        if quote is None:
+        # ZASÓB R1 checks the official name; a former or trade name identifies the firm only loosely.
+        if official := ctx.registry.find_official_name(match.firm, ctx.doc.text):
+            return self.result("pass", official, "Nazwa firmy jest podana w materiale.")
+        if alias := ctx.registry.find_name(match.firm, ctx.doc.text):
             return self.result(
-                "fail", None,
-                f"Nazwa firmy ({match.firm.name}) nie jest podana w treści materiału.",
+                "uncertain", alias,
+                f"W materiale użyto nazwy nieoficjalnej/dawnej: „{alias}”; oficjalna nazwa: {match.firm.name}.",
             )
-        return self.result("pass", quote, "Nazwa firmy jest podana w materiale.")
+        return self.result(
+            "fail", None,
+            f"Nazwa firmy ({match.firm.name}) nie jest podana w treści materiału.",
+        )
 
 
 @register
