@@ -1,6 +1,7 @@
 #!/bin/sh
 # Creates .env from .env.example, filling every empty *_PASSWORD and *_SECRET_KEY with a random value.
-# Never overwrites an existing file. Optional argument: the file to create (default: .env at the
+# Other values (LLM_API_KEY and the rest) are copied as they are: hosted-LLM settings are the operator's.
+# Never overwrites an existing file (exits 0 and says so). Optional argument: the file to create (default: .env at the
 # repository root); infra/tests/smoke.sh uses it for throwaway stacks.
 set -eu
 case ${1:-} in
@@ -10,8 +11,9 @@ case ${1:-} in
 esac
 cd "$(dirname "$0")/.."
 if [ -e "$out" ] || [ -L "$out" ]; then
-  echo "$out already exists, not touching it" >&2
-  exit 1
+  # Not an error: a repeated Quick Start run keeps the existing secrets.
+  echo "$out already exists, not touching it"
+  exit 0
 fi
 gen() { openssl rand -hex 24; }
 umask 077
@@ -23,7 +25,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   case $line in
     \#*) printf '%s\n' "$line" ;;
     *_PASSWORD=|*_SECRET_KEY=)
-      value=$(gen)
+      value=$(gen) || value=  # without openssl, fall through to the message below instead of dying on set -e
       if [ ${#value} -lt 32 ]; then
         echo "could not generate secrets (is openssl installed?)" >&2
         exit 1

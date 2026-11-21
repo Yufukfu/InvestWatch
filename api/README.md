@@ -77,6 +77,8 @@ The same statements in Python (SQLAlchemy) are in `src/investwatch_api/db/sql.py
 
 ## REST and Socket.IO
 
+The archived mock server (`contracts/mock-server/`), the mocks (`contracts/mocks/`) and the dashboard's mock mode stay as a test double for `web/` now that this API exists; removing or replacing them needs Damian's OK. Where this API behaves differently (for example `/calibration`, computed here from analyst labels while the mock serves fixed curves), the difference is recorded as a follow-up, not changed in the mock.
+
 All 11 paths of `contracts/openapi.yaml` under `/api`, and Socket.IO namespace `/events` on path `/socket.io` (one process on port 8000). Rules the contract leaves open:
 
 - `risk_level` on every finding (and the `risk_level` filters, `by_risk_level`, the trend filter): `high` if `score >= t`, `medium` if `score >= t - 0.2`, else `low`, with `t` the module threshold read from Redis on every request. If Redis is down the last value read (else the defaults) is used, Redis is not asked again for 5 s, and `/api/health` shows `redis: down`.

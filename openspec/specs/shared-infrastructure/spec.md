@@ -3,7 +3,6 @@
 ## Purpose
 
 The shared services every module needs (Redis, object storage, an optional local LLM), started by one `docker compose up` next to Postgres and the gateway from [ADR 0202](../../../.docs/decisions/0202-deployment-topology.md), isolated per stack, and joined by modules through a fixed contract. Network keys are `data`, `edge` and `egress`; Docker names them `<project>_data`, `<project>_edge` and `<project>_egress`. Names and payloads on Redis and in `iw-raw` are those of `.docs/integration-plan.md` §2 and §6 and ADR 0305. They are not restated here.
-
 ## Requirements
 ### Requirement: Redis service
 The stack SHALL run a `redis` service that requires a password, persists data with AOF to a named volume, uses `maxmemory-policy noeviction`, reports healthy only when it answers an authenticated `PING`, and is attached only to the internal network `data`.
@@ -21,7 +20,7 @@ The stack SHALL run a `redis` service that requires a password, persists data wi
 - **THEN** they return `noeviction` and `yes`
 
 ### Requirement: Object storage with bucket iw-raw
-The stack SHALL run an S3-compatible object store as service `minio` with a named volume and a healthcheck. A one-shot `minio-init` SHALL create the private bucket `iw-raw` and an app user whose policy allows object read, write, delete and list on `iw-raw` only, and SHALL exit 0. Re-running `minio-init` on an existing volume SHALL succeed without changing existing objects.
+The stack SHALL run an S3-compatible object store as service `minio` with a named volume and a healthcheck. A one-shot `minio-init` SHALL create the private bucket `iw-raw` and an app user whose policy allows object read, write, delete and list on `iw-raw` only, and SHALL exit 0. Re-running `minio-init` on an existing volume SHALL succeed without changing existing objects, and SHALL set anonymous access on the bucket back to none.
 
 #### Scenario: Bucket exists after start
 - **WHEN** `docker compose up` has finished and `minio-init` has exited
@@ -39,8 +38,12 @@ The stack SHALL run an S3-compatible object store as service `minio` with a name
 - **WHEN** `docker compose up` runs a second time on the same volume after an object was stored
 - **THEN** `minio-init` exits 0 and the object is unchanged
 
+#### Scenario: Init closes a public bucket
+- **WHEN** the bucket was made public by hand and `minio-init` runs again
+- **THEN** an anonymous GET on an object in `iw-raw` is denied
+
 ### Requirement: Secrets only from .env
-Every infrastructure password and key SHALL come from the untracked root `.env`, with no default in any compose file. Compose SHALL refuse to start when one is missing, naming the variable. The tracked root `.env.example` SHALL list every variable the shared services and their clients use, with secrets left empty, and `scripts/init-env.sh` SHALL fill every secret with a random value of at least 32 characters.
+Every infrastructure password and key SHALL come from the untracked root `.env`, with no default in any compose file. Compose SHALL refuse to start when one is missing, naming the variable. The tracked root `.env.example` SHALL list every variable the shared services and their clients use, with secrets left empty, and `scripts/init-env.sh` SHALL fill every secret (`*_PASSWORD`, `*_SECRET_KEY`) with a random value of at least 32 characters. It SHALL leave every other variable as in `.env.example`, including `LLM_API_KEY`, which the operator sets. Run again on an existing `.env`, it SHALL leave that file untouched and exit 0. Without `openssl` it SHALL fail with a message that names `openssl`.
 
 #### Scenario: Missing Redis password
 - **WHEN** `docker compose config` runs with `REDIS_PASSWORD` unset
@@ -53,6 +56,18 @@ Every infrastructure password and key SHALL come from the untracked root `.env`,
 #### Scenario: Generated .env is complete
 - **WHEN** `scripts/init-env.sh` runs in a clone without `.env`
 - **THEN** every secret variable in `.env` has a value of at least 32 characters and `docker compose config` succeeds
+
+#### Scenario: Existing .env is kept
+- **WHEN** `scripts/init-env.sh` runs and the target file already exists
+- **THEN** the file is unchanged, the script says it already exists, and it exits 0
+
+#### Scenario: Hosted LLM key is not generated
+- **WHEN** `scripts/init-env.sh` creates a new `.env`
+- **THEN** `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` are present and empty
+
+#### Scenario: openssl missing
+- **WHEN** `scripts/init-env.sh` runs without `openssl` on the PATH
+- **THEN** it exits non-zero with a message naming `openssl`, and no file is created
 
 ### Requirement: Optional local LLM behind a profile
 The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls `gemma3:4b`, both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `data` at `http://ollama:11434/v1`, keep the weights in a named volume, publish no host port, and SHALL NOT join a network with internet access. Only the `ollama-pull` one-shot SHALL reach the internet.
@@ -74,7 +89,7 @@ Only the gateway SHALL publish host ports in the default stack. `redis`, `minio`
 
 #### Scenario: Default stack publishes only the gateway
 - **WHEN** `docker compose up -d` has finished
-- **THEN** `docker compose ps --format json` shows published ports only for `gateway`
+- **THEN** `docker compose ps --format json` shows published ports for `gateway`, and for no other service
 
 #### Scenario: Data services have no internet
 - **WHEN** a container attached only to `data` tries to open a TCP connection to a public address
