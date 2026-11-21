@@ -72,3 +72,8 @@ def test_non_web_source_without_a_collector_is_not_collectable():
 
 def test_web_source_stays_collectable_on_any_host():
     assert source("https://example.pl/", platform="web").collectable is True
+
+
+def test_platform_the_collector_does_not_accept_is_not_collectable():
+    assert source("https://t.me/s/SubeTradingPL", platform="facebook").collectable is False
+    assert source("https://t.me/s/SubeTradingPL", platform="forum").collectable is False

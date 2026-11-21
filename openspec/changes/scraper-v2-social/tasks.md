@@ -12,7 +12,7 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 - [x] 1.2 Failing tests, then the collector registry keyed by host ("Host with a collector", "Duplicate registration") and the widened selection ("Social source with a collector is selected", "Non-web source is skipped" (now: with no collector for its host), plus the unchanged web scenarios)
 - [x] 1.3 Failing tests, then `build` of the contract fields per post (`platform` and `source_kind` from the row, `published_at` UTC, `author`, `links`, `scrape_meta` with `message_id`, `views` and `network`), validated against `scraped-document.schema.json` in the test; the "Text post", "Network marker" and "Post markup is the stored HTML" scenarios pass
 - [x] 1.4 Failing tests, then the canonical URL (else the URL) in the hash for `platform != web` in `build_document` (`ingest/document.py`; the hash is derived there after `platform` is set, so the sweep, which republishes stored rows, is unaffected): "Same text at two permalinks", "Same post collected again", "Tracking parameter on the permalink", "No canonical URL", "Web page hash is unchanged", the `social-collection` scenarios "Identical text in two posts", "Same post collected again" and "Post edited between runs" (against PostgreSQL) and the unchanged dedup scenarios pass, with one literal expected sha256 per case (no hash computed by the code under test).
-- [x] 1.5 Mutation check; mutations: 14 tried, 14 caught (document identity, collectable, registry, parser guards)
+- [x] 1.5 Mutation check; mutations: 16 tried, 16 caught (document identity, collectable and platform, registry, parser guards)
 
 ## 2. Run and paging
 

@@ -61,7 +61,7 @@ class Source:
         # imported here: the collectors import `types` (through `parsing`), so a module-level import would be a cycle
         from iw_scraper.social.registry import registry
 
-        return registry.for_url(self.url) is not None
+        return registry.accepts(self.platform, self.url)
 
 
 @dataclass(frozen=True)

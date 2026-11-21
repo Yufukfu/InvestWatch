@@ -297,3 +297,28 @@ def test_message_without_a_numeric_id_is_ignored():
 
     assert channel.posts == ()
     assert channel.skipped == 0
+
+
+def test_timestamp_without_an_offset_is_not_guessed():
+    page = channel_page(posts=text_post(5, "Cześć").replace("+00:00", ""))
+
+    channel = parse(page, SUBE_URL)
+
+    assert build_page(channel, channel.posts[0], http_status=200)["published_at"] is None
+
+
+def test_timestamp_with_an_offset_is_converted_to_utc():
+    page = channel_page(posts=text_post(5, "Cześć").replace("+00:00", "+02:00"))
+
+    channel = parse(page, SUBE_URL)
+
+    assert build_page(channel, channel.posts[0], http_status=200)["published_at"] == "2026-11-20T07:15:00+00:00"
+
+
+@pytest.mark.parametrize("href", ["https://evil.example/kanalx/5", "https://t.me/kanalx/6", "javascript:alert(1)"])
+def test_permalink_off_t_me_or_for_another_message_is_replaced_by_the_data_post_url(href):
+    page = channel_page(posts=text_post(5, "Cześć").replace("https://t.me/kanalx/5", href))
+
+    channel = parse(page, SUBE_URL)
+
+    assert channel.posts[0].permalink == "https://t.me/kanalx/5"

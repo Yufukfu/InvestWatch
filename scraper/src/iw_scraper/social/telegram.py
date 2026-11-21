@@ -106,8 +106,7 @@ def _post(wrap: html.HtmlElement, base: str) -> tuple[Post | None, bool]:
     text_element = texts[0]
     for br in text_element.iter("br"):
         br.tail = " " + (br.tail or "")
-    dates = wrap.xpath(f".//a[{_has_class('tgme_widget_message_date')}]")
-    permalink = urljoin(base, dates[0].get("href")) if dates and dates[0].get("href") else f"https://t.me/{ids[0]}"
+    permalink = f"https://t.me/{ids[0]}"  # from `data-post`, never from a link in the page: it is the document's identity
     views = wrap.xpath(f".//*[{_has_class('tgme_widget_message_views')}]")
     return (
         Post(
@@ -160,9 +159,11 @@ def _utc(timestamp: str | None) -> str | None:
     if not timestamp:
         return None
     try:
-        return datetime.fromisoformat(timestamp).astimezone(timezone.utc).isoformat()
+        moment = datetime.fromisoformat(timestamp)
     except ValueError:
         return None
+    # no offset: the zone is unknown, and `astimezone` would assume the host's own
+    return moment.astimezone(timezone.utc).isoformat() if moment.tzinfo is not None else None
 
 
 def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
