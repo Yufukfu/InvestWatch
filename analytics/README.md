@@ -58,6 +58,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a test-
 | `CLAIM_MIN_IDLE_MS` | `60000` | XAUTOCLAIM: reclaim a message idle this long (a consumer died) |
 | `MAX_DELIVERIES` | `5` | unexpected errors on one message before it is acknowledged as `max_deliveries_exceeded` |
 | `HEALTH_PORT` | `8001` | `/health` |
+| `MAX_DOCUMENT_BYTES` | `2000000` | a bigger document (`text` + `payload`) is acknowledged as `invalid_document` instead of risking an out-of-memory kill |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | empty | reserved for the LLM client (ADR 0304); unused, rules-only |
 | `CONTRACTS_DIR`, `TEST_DATABASE_URL`, `TEST_REDIS_URL` | unset | tests only |
 

@@ -19,6 +19,12 @@ from pydantic import ValidationError
 
 from .models import Finding, ScrapedDocument
 
+#: Default cap on a document's size (UTF-8 bytes of `text` plus the stored size of `payload`). The pipeline needs
+#: about 2 s and 17 MB of heap per MB of text, so a 25-30 MB row would OOM-kill a 512M container before any
+#: exception could count toward MAX_DELIVERIES, and the reclaimed message would kill it again forever. Scraped pages
+#: are far below this; a bigger row is acked as `invalid_document` (field `text`, "too large").
+DEFAULT_MAX_DOCUMENT_BYTES = 2_000_000
+
 #: Fields replaced on an update. Everything else on an existing row is kept.
 #: Mirrors `UPSERT_REPLACED` in api-db-schema (`api/src/investwatch_api/db/sql.py`).
 ANALYSIS_FIELDS = (
@@ -76,10 +82,15 @@ def document_from_row(columns: Mapping[str, Any], payload: Mapping[str, Any] | N
         raise InvalidDocument(field, first["msg"]) from exc
 
 
+def _too_large(size: int, limit: int) -> InvalidDocument:
+    return InvalidDocument("text", f"document too large: {size} bytes > MAX_DOCUMENT_BYTES {limit}")
+
+
 class InMemoryStore:
     """Test store with the same observable behaviour as the Postgres store."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_document_bytes: int = DEFAULT_MAX_DOCUMENT_BYTES) -> None:
+        self._max_document_bytes = max_document_bytes
         self._lock = threading.Lock()
         self._documents: dict[str, tuple[dict, dict | None]] = {}
         self._findings: dict[tuple[str, str], Finding] = {}
@@ -108,7 +119,13 @@ class InMemoryStore:
         row = self._documents.get(document_id)
         if row is None:
             raise NotFound(document_id)
-        return document_from_row(*row)
+        columns, payload = row
+        import json as _json
+
+        size = len(str(columns.get("text") or "").encode("utf-8")) + len(_json.dumps(payload or {}).encode("utf-8"))
+        if size > self._max_document_bytes:
+            raise _too_large(size, self._max_document_bytes)
+        return document_from_row(columns, payload)
 
     def save_findings(self, document: ScrapedDocument, findings: Sequence[Finding]) -> list[SavedFinding]:
         with self._lock:
@@ -168,6 +185,8 @@ _UPSERT_SQL = (
     + f" RETURNING {', '.join(FINDING_COLUMNS)}, (xmax = 0) AS inserted"
 )
 _LOAD_SQL = f"SELECT {', '.join(DOCUMENT_COLUMNS)}, payload FROM documents WHERE id = %s"
+#: Measured in the database first, so an oversized row is never transferred or parsed.
+_SIZE_SQL = "SELECT octet_length(text) + pg_column_size(payload) AS size FROM documents WHERE id = %s"
 _FINDINGS_SQL = f"SELECT {', '.join(FINDING_COLUMNS)} FROM findings WHERE document_id = %s ORDER BY module"
 
 
@@ -182,7 +201,9 @@ def _finding_from_row(row: Mapping[str, Any]) -> Finding:
 class PostgresStore:
     """Store on the shared Postgres (connect as `iw_app`). One connection per thread, reopened after a drop."""
 
-    def __init__(self, dsn: str, *, connect_timeout: int = 5) -> None:
+    def __init__(self, dsn: str, *, connect_timeout: int = 5,
+                 max_document_bytes: int = DEFAULT_MAX_DOCUMENT_BYTES) -> None:
+        self._max_document_bytes = max_document_bytes
         from psycopg.conninfo import conninfo_to_dict
 
         try:
@@ -249,6 +270,11 @@ class PostgresStore:
             key = uuid.UUID(document_id)
         except (ValueError, AttributeError, TypeError):
             raise NotFound(str(document_id)) from None
+        sized = self._run(lambda conn: conn.execute(_SIZE_SQL, (key,)).fetchone())
+        if sized is None:
+            raise NotFound(document_id)
+        if sized["size"] > self._max_document_bytes:
+            raise _too_large(sized["size"], self._max_document_bytes)
         row = self._run(lambda conn: conn.execute(_LOAD_SQL, (key,)).fetchone())
         if row is None:
             raise NotFound(document_id)

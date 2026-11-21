@@ -142,6 +142,12 @@ class Worker:
                     self._back_off("redis_unavailable", exc)
             except StoreUnavailable as exc:
                 self._back_off("db_unavailable", exc)
+            except StoreMisconfigured:
+                raise  # not retryable: main() exits with code 2
+            except Exception as exc:  # last resort: never crash-loop on something the loop did not foresee
+                log.error("unexpected error in the worker loop", exc_info=True,
+                          extra={"reason": "unexpected_error", "error": type(exc).__name__})
+                self._back_off("unexpected_error", exc)
 
     def run_once(self) -> int:
         """Reclaim stale messages, else read one new message; process each. Returns how many were handled."""
@@ -198,8 +204,9 @@ class Worker:
         if (set(fields) != {"document_id", "schema"} or fields.get("schema") != SCHEMA_VERSION
                 or not isinstance(document_id, str) or not _UUID.match(document_id)):
             self._ack(message_id)
+            known = {"document_id": document_id} if isinstance(document_id, str) and _UUID.match(document_id) else {}
             self._outcome(logging.WARNING, "invalid_message", message_id, started,
-                          fields=sorted(str(k) for k in fields))
+                          fields=sorted(str(k) for k in fields), **known)
             return
         try:
             doc = self._store.load_document(document_id)
@@ -252,6 +259,15 @@ class Worker:
 # ---- entry point -----------------------------------------------------------------------------------
 
 
+def stream_client(url: str, block_ms: int) -> redis.Redis:
+    """The worker's Redis client. `encoding_errors="replace"`: a stream entry with bytes that are not UTF-8 must
+    decode (and then fail the message checks as `invalid_message`), never raise while the reply is read, which
+    would leave the entry pending and crash-loop the worker on every reclaim."""
+    return redis.Redis.from_url(url, decode_responses=True, encoding_errors="replace",
+                                socket_timeout=(block_ms / 1000) + 5, socket_connect_timeout=5,
+                                health_check_interval=30)
+
+
 def install_signal_handlers(worker: Worker) -> None:
     """SIGTERM (docker stop) and SIGINT (Ctrl+C) both go to `Worker.handle_signal`."""
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -272,7 +288,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         settings = Settings.from_env() if env is os.environ else _settings_from(env)
         registry = Registry.from_csv(settings.registry_csv)
         catalogue = Catalogue.load()
-        store = PostgresStore(worker_settings.database_url)
+        store = PostgresStore(worker_settings.database_url, max_document_bytes=worker_settings.max_document_bytes)
     except (ConfigError, StoreMisconfigured) as exc:
         log.error("worker not started", extra={"reason": "config_error", "error": str(exc)})
         return 2
@@ -280,9 +296,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         log.error("worker not started", extra={"reason": "config_error", "error": f"REGISTRY_CSV / catalogue: {exc}"})
         return 2
     try:
-        client = redis.Redis.from_url(worker_settings.redis_url, decode_responses=True,
-                                      socket_timeout=(worker_settings.stream_block_ms / 1000) + 5,
-                                      socket_connect_timeout=5, health_check_interval=30)
+        client = stream_client(worker_settings.redis_url, worker_settings.stream_block_ms)
     except ValueError:
         store.close()
         log.error("worker not started", extra={"reason": "config_error", "error": "REDIS_URL is malformed"})

@@ -27,6 +27,7 @@ from investwatch_analytics.worker import (
     WorkerConfig,
     install_signal_handlers,
     main,
+    stream_client,
 )
 
 DOC_ID = "22222222-2222-4222-8222-222222222222"
@@ -257,6 +258,8 @@ def test_malformed_message_is_acked_as_invalid_message(r, store, registry, catal
     assert pending(r) == 0 and publisher.journal == [] and store.findings_for_document(DOC_ID) == []
     [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
     assert rec.outcome == "invalid_message" and rec.levelno == logging.WARNING and rec.stream_id
+    valid_id = fields.get("document_id") == DOC_ID
+    assert getattr(rec, "document_id", None) == (DOC_ID if valid_id else None)  # logged only when it is a UUID
 
 
 def test_missing_document_is_acked(r, store, registry, catalogue, caplog):
@@ -731,3 +734,61 @@ def test_main_exits_2_when_the_health_port_is_taken(capsys, monkeypatch):
         assert main(env) == 2
     out = capsys.readouterr().out
     assert "HEALTH_PORT" in out and "config_error" in out
+
+
+def test_non_utf8_message_is_acked_as_invalid_not_a_crash(store, registry, catalogue, caplog):
+    server = fakeredis.FakeServer()
+    raw = fakeredis.FakeRedis(server=server)  # a writer that sends raw bytes
+    worker_client = fakeredis.FakeRedis(server=server, decode_responses=True, encoding_errors="replace")
+    w = make_worker(worker_client, store, registry, catalogue)
+    w.ensure_group()
+    raw.xadd(STREAM, {b"document_id": b"\xff\xfe\xfd", b"schema": b"v1"})
+    xadd(worker_client)  # a valid message behind it
+    with caplog.at_level(logging.INFO):
+        w.run(max_iterations=2)
+    assert outcomes(caplog) == ["invalid_message", "stored"]
+    assert worker_client.xpending(STREAM, GROUP)["pending"] == 0
+
+
+def test_stream_client_replaces_undecodable_bytes():
+    client = stream_client("redis://127.0.0.1:1/0", 5000)
+    kwargs = client.connection_pool.connection_kwargs
+    assert kwargs["decode_responses"] is True and kwargs["encoding_errors"] == "replace"
+    assert kwargs["socket_timeout"] == 10  # longer than the 5 s block, so a blocking read never times out early
+    client.close()
+
+
+def test_unforeseen_error_in_the_loop_backs_off_instead_of_crashing(store, registry, catalogue, caplog):
+    class Odd(fakeredis.FakeRedis):
+        calls = 0
+
+        def xautoclaim(self, *a, **k):
+            self.calls += 1
+            if self.calls == 1:
+                raise ValueError("something nobody planned for")
+            return super().xautoclaim(*a, **k)
+
+    odd = Odd(decode_responses=True)
+    sleeps: list[float] = []
+    w = make_worker(odd, store, registry, catalogue)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    xadd(odd)
+    with caplog.at_level(logging.WARNING):
+        w.run(max_iterations=2)
+    assert sleeps == [1]
+    assert any(getattr(rec, "reason", None) == "unexpected_error" and rec.exc_info for rec in caplog.records)
+    assert len(store.findings_for_document(DOC_ID)) == 1  # the loop carried on
+
+
+def test_oversized_document_is_acked_as_invalid(r, registry, catalogue, caplog):
+    store = InMemoryStore(max_document_bytes=1_000)
+    store.put_document_row(make_doc(id=DOC_ID, text="Reklama. " + "z" * 5_000))
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.WARNING):
+        w.run_once()
+    assert pending(r) == 0
+    [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
+    assert (rec.outcome, rec.field) == ("invalid_document", "text")

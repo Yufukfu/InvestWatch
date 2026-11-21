@@ -47,7 +47,7 @@ A redelivered message, or a second message for the same `document_id` (the scrap
 - **THEN** its finding keeps its `id` and `status`, carries the new score and rules, and no event is published
 
 ### Requirement: Poison messages
-The worker SHALL acknowledge, without storing or publishing anything, a message that can never succeed. It SHALL log one JSON line at level `WARNING` with the stream message id, the `document_id` if known, and one of these reasons: `invalid_message` (missing or non-UUID `document_id`, or `schema` other than `v1`), `document_not_found` (no row with that id), `invalid_document` (the row fails `ScrapedDocument` validation; the log names the field), or `max_deliveries_exceeded` (the delivery count reached `MAX_DELIVERIES`, default 5, after repeated unexpected errors).
+The worker SHALL acknowledge, without storing or publishing anything, a message that can never succeed. It SHALL log one JSON line at level `WARNING` with the stream message id, the `document_id` if known, and one of these reasons: `invalid_message` (missing or non-UUID `document_id`, `schema` other than `v1`, an undefined field, or bytes that are not UTF-8, which are decoded with replacement and then fail these checks), `document_not_found` (no row with that id), `invalid_document` (the row fails `ScrapedDocument` validation, or its `text` plus `payload` exceed `MAX_DOCUMENT_BYTES`, default 2 MB, measured before the row is loaded; the log names the field), or `max_deliveries_exceeded` (the delivery count reached `MAX_DELIVERIES`, default 5, after repeated unexpected errors).
 
 #### Scenario: Malformed message
 - **WHEN** a message has no `document_id`, a `document_id` that is not a lowercase UUID, a `schema` other than `v1`, or a field the contract does not define
@@ -64,6 +64,14 @@ The worker SHALL acknowledge, without storing or publishing anything, a message 
 #### Scenario: Pipeline keeps crashing
 - **WHEN** `analyze` raises an unexpected exception for a document on every attempt
 - **THEN** the message is left pending (logged `retry_later` at `ERROR`) on each attempt below `MAX_DELIVERIES`, and acknowledged with reason `max_deliveries_exceeded` (at `ERROR`, with the traceback) on the attempt that reaches it
+
+#### Scenario: Message with bytes that are not UTF-8
+- **WHEN** a writer XADDs a `document_id` whose bytes are not valid UTF-8
+- **THEN** it is acknowledged with reason `invalid_message`, the worker does not crash, and the next message is processed
+
+#### Scenario: Oversized document
+- **WHEN** a row's `text` plus `payload` exceed `MAX_DOCUMENT_BYTES`
+- **THEN** it is acknowledged with reason `invalid_document` naming `text`, without the row being parsed
 
 #### Scenario: Poison message does not stop the loop
 - **WHEN** a poison message is followed by a valid one
@@ -114,7 +122,7 @@ The worker SHALL log JSON lines to stdout, never using `print`. One line per mes
 - **THEN** that message is committed and acknowledged (or left pending if it failed), and the process exits 0 without reading another
 
 ### Requirement: Container
-`analytics/Dockerfile` SHALL build from `python:3.13-slim` through the `public.ecr.aws/docker/library` mirror and run the worker as a non-root user. It SHALL take all configuration from env (`DATABASE_URL`, `REDIS_URL`, `REGISTRY_CSV`, `LOG_LEVEL`, `WORKER_CONSUMER`, `HEALTH_PORT`, `CLAIM_MIN_IDLE_MS`, `MAX_DELIVERIES`, `STREAM_BLOCK_MS`) and declare a HEALTHCHECK on `/health`.
+`analytics/Dockerfile` SHALL build from `python:3.13-slim` through the `public.ecr.aws/docker/library` mirror and run the worker as a non-root user. It SHALL take all configuration from env (`DATABASE_URL`, `REDIS_URL`, `REGISTRY_CSV`, `LOG_LEVEL`, `WORKER_CONSUMER`, `HEALTH_PORT`, `CLAIM_MIN_IDLE_MS`, `MAX_DELIVERIES`, `STREAM_BLOCK_MS`, `MAX_DOCUMENT_BYTES`) and declare a HEALTHCHECK on `/health`.
 
 #### Scenario: Image runs as non-root
 - **WHEN** the image is built and `id -u` runs inside it

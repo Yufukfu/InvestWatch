@@ -30,6 +30,8 @@ def start_health_server(port: int, checks: Mapping[str, Check], host: str = "0.0
     """Serve /health on `host:port` (0 = any free port) in a daemon thread; returns the server (call shutdown())."""
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = 2  # a slow or idle client cannot pin a thread
+
         def do_GET(self) -> None:  # noqa: N802 (stdlib name)
             if self.path != "/health":
                 self._reply(404, {"error": "not found"})

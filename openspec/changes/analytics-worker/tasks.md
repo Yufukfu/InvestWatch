@@ -47,4 +47,4 @@ Done between groups 4 and 5 at the owner's request, so the PR ships the full `UP
 ## 6. Closing
 
 - [x] 6.1 Apply the iw-docs-update skill (already added: the `iw:events` envelope rule in `analytics/CLAUDE.md` and `.docs/analytics-plan.md` §12.2, asked for by the api-v1 session; `analytics/README.md` run and env section, `analytics/CLAUDE.md` if a rule is easy to get wrong, the `### analytics` section of `.docs/status/platform.md` (ADR 0205: `.docs/STATUS.md` is team milestones only), `docs-check` clean) and add the iw-ai-log row
-- [ ] 6.2 Run the iw-pr-review skill and fix real findings
+- [x] 6.2 Run the iw-pr-review skill and fix real findings (normal and `focus: security` passes on the whole branch; fixes for non-UTF-8 stream bytes, oversized documents, a last-resort loop handler, `invalid_message` id logging and the health socket timeout: `mutations: 9 tried, 9 caught`; dispositions in `follow-ups.md` 13-17)

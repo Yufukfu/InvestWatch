@@ -461,3 +461,32 @@ def test_postgres_empty_text_cannot_be_stored(pg_url):
     with pytest.raises(psycopg.errors.CheckViolation):  # revision 0003 mirrored
         backend.seed(columns(text=""))
     backend.close()
+
+
+def test_oversized_document_is_rejected_before_parsing(backend):
+    big = "Reklama. " + "x" * 3_000_000  # 3 MB > the 2 MB default
+    backend.seed(columns(text=big))
+    with pytest.raises(InvalidDocument) as err:
+        load(backend)
+    assert err.value.field == "text" and "too large" in str(err.value)
+
+
+def test_document_at_the_limit_loads():
+    store = InMemoryStore(max_document_bytes=100)
+    row = columns(text="x" * 50)
+    store.put_document_row(row, {})  # 50 bytes of text + 2 bytes of "{}" = 52 <= 100
+    assert store.load_document(DOC_ID).text == "x" * 50
+    small = InMemoryStore(max_document_bytes=51)
+    small.put_document_row(row, {})
+    with pytest.raises(InvalidDocument):
+        small.load_document(DOC_ID)
+
+
+def test_postgres_size_is_measured_in_the_database(pg_url):
+    store = PostgresStore(pg_url, max_document_bytes=1_000)
+    backend = PostgresBackend(pg_url)
+    backend.seed(columns(text="Reklama. " + "y" * 2_000))
+    with pytest.raises(InvalidDocument):
+        store.load_document(DOC_ID)
+    store.close()
+    backend.close()

@@ -61,6 +61,7 @@ class WorkerSettings:
     claim_min_idle_ms: int
     max_deliveries: int
     health_port: int
+    max_document_bytes: int
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "WorkerSettings":
@@ -73,4 +74,5 @@ class WorkerSettings:
             claim_min_idle_ms=_positive_int(env, "CLAIM_MIN_IDLE_MS", 60000),
             max_deliveries=_positive_int(env, "MAX_DELIVERIES", 5),
             health_port=_positive_int(env, "HEALTH_PORT", 8001),
+            max_document_bytes=_positive_int(env, "MAX_DOCUMENT_BYTES", 2_000_000),
         )

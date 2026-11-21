@@ -108,3 +108,16 @@ def test_db_check_false_when_unreachable():
     from investwatch_analytics.storage import PostgresStore
 
     assert PostgresStore("postgresql://u@127.0.0.1:1/db", connect_timeout=1).ping() is False
+
+
+def test_idle_client_is_dropped(serve):
+    import socket
+    import time
+
+    port = serve(redis=lambda: True, db=lambda: True)
+    with socket.create_connection(("127.0.0.1", port)) as idle:  # connects and never sends a request
+        idle.settimeout(10)
+        started = time.monotonic()
+        assert idle.recv(1) == b""  # the server closes it
+        assert time.monotonic() - started < 6
+    assert get(port)[0] == 200  # still serving

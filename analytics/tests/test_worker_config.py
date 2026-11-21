@@ -15,6 +15,7 @@ def test_defaults(monkeypatch):
     s = WorkerSettings.from_env(BASE)
     assert (s.database_url, s.redis_url) == (BASE["DATABASE_URL"], BASE["REDIS_URL"])
     assert (s.stream_block_ms, s.claim_min_idle_ms, s.max_deliveries, s.health_port) == (5000, 60000, 5, 8001)
+    assert s.max_document_bytes == 2_000_000
     assert s.consumer  # hostname
 
 
