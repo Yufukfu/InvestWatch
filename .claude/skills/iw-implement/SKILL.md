@@ -13,7 +13,7 @@ description: Use at the start of any feature, fix or refactor that will become i
    - One-file fix, parser or source added to a capability that already has an active change, bug fix, docs typo: no new change. Add tasks to the existing change, or if none is active put `IW_SKIP_SPEC=1` on the commit and say so in the PR body.
    - A new capability, anything touching a contract (`contracts/`) or a service boundary, anything security-relevant: an OpenSpec change (step 4).
    - Foggy scope: run `/openspec-explore` first.
-2. **Branch name**: `<prefix>/<slug>` where the prefix is the module: `scraper/`, `analytics/`, `api/`, `web/`, `contracts/`, or `chore/` for tooling and docs. The slug equals the OpenSpec change name. (`.docs/integration-plan.md` §7 still says `dashboard/*`; the folder is `web/`, so the prefix is `web/`. `api/` and `contracts/` are C's and not in B's layout yet.)
+2. **Branch name**: `<prefix>/<slug>` where the prefix is the module: `scraper/`, `analytics/`, `api/`, `web/`, `contracts/`, or `chore/` for tooling and docs. The slug equals the OpenSpec change name. (`.docs/integration-plan.md` §7 still says `dashboard/*`; the folder is `web/`, so the prefix is `web/`. `contracts/` is C's and exists; `api/` is C's and not created yet.)
 3. **Worktree**, from your main clone (never `cd` back into the main clone afterwards):
    ```bash
    git fetch origin main

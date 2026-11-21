@@ -7,7 +7,7 @@ Frontend: findings table and filters, trend charts, real-time alerts, status cha
 
 ## Rules that are easy to get wrong
 
-- Build against mock data that matches the contract from the start; switching to the live `api` must not need component changes. Where the shared mocks live is decided with C (the integration plan expects a `contracts/` folder).
+- Build against mock data that matches the contract from the start; switching to the live `api` must not need component changes. The mocks are in [`contracts/mocks/`](../contracts/README.md) (mock-to-endpoint table in the contracts README).
 - No `console.log` in the production build; the jury checks the browser console.
 - User-facing texts are Polish; code, comments and docs are English.
 - Alerts arrive over Socket.IO (`finding.high_risk`, `finding.created`, `finding.updated`); the threshold slider must change risk levels and the FP/FN numbers live.

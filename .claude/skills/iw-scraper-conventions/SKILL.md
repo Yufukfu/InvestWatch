@@ -5,7 +5,7 @@ description: Use before writing or changing anything in scraper/ that fetches, p
 
 # iw-scraper-conventions
 
-Contract source of truth: `.docs/integration-plan.md` §3 (`ScrapedDocument`) and `contracts/*.schema.json` once frozen. Validate every record against the schema before insert.
+Contract source of truth: `.docs/integration-plan.md` §3 (`ScrapedDocument`) and `contracts/schemas/scraped-document.schema.json` (draft v1). Validate every record against the schema before insert: `python contracts/validate.py document <file>` (install `contracts/requirements.txt` first; see `contracts/README.md`).
 
 ## Fetch ladder (cheapest that works)
 

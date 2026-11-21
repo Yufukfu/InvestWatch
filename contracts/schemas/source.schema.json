@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investwatch.local/contracts/v1/source.schema.json",
+  "title": "Source",
+  "description": "A place the scraper collects content from. Stored in the `sources` table; managed by the scraper, editable from the dashboard.",
+  "type": "object",
+  "required": ["id", "name", "platform", "url", "source_kind", "target_modules", "active"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "name": { "type": "string" },
+    "platform": { "type": "string", "enum": ["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"] },
+    "url": { "type": "string", "format": "uri", "description": "Start URL, profile URL or search query URL." },
+    "source_kind": { "type": "string", "enum": ["firm_own", "third_party", "unknown"] },
+    "target_modules": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["M1", "M2", "M3"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "schedule_cron": { "type": ["string", "null"], "description": "Cron expression, e.g. '0 */6 * * *'; null = manual only." },
+    "active": { "type": "boolean" },
+    "last_run_at": { "type": ["string", "null"], "format": "date-time" },
+    "last_run_status": { "type": ["string", "null"], "enum": ["ok", "partial", "failed", "running", null] },
+    "documents_count": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

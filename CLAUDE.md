@@ -24,8 +24,9 @@ Three modules, three owners. B defined the repository layout (root [`README.md`]
 | `scraper/` | A | collectors, queue, scheduler, `documents` writer | [`scraper/CLAUDE.md`](scraper/CLAUDE.md) |
 | `analytics/` | C | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
 | `web/` | B | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
+| `contracts/` | C | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
 
-`api/` and `contracts/` (C) appear in the integration plan but not in B's layout yet. Whoever creates them adds a `CLAUDE.md` first; `docs-check` enforces it.
+`api/` (C) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
 
 ## Process in one line
 

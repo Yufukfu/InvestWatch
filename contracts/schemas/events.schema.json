@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investwatch.local/contracts/v1/events.schema.json",
+  "title": "Messages",
+  "description": "Queue and event messages. `stream_message` = Redis Stream `iw:documents` (scraper -> analytics) and `iw:scan-requests` (API -> scraper). `event` = Redis Pub/Sub `iw:events` (analytics/scraper -> API), forwarded 1:1 to Socket.IO namespace `/events` with `type` as the Socket.IO event name and `data` as the payload.",
+  "oneOf": [
+    { "$ref": "#/$defs/document_message" },
+    { "$ref": "#/$defs/scan_request" },
+    { "$ref": "#/$defs/event" }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "document_message": {
+      "description": "XADD iw:documents * document_id <uuid> schema v1 - published only after the document row is committed.",
+      "type": "object",
+      "required": ["document_id", "schema"],
+      "additionalProperties": false,
+      "properties": {
+        "document_id": { "$ref": "#/$defs/uuid" },
+        "schema": { "const": "v1" }
+      }
+    },
+    "scan_request": {
+      "description": "XADD iw:scan-requests * source_id <uuid> requested_at <iso> - manual scan triggered from the dashboard.",
+      "type": "object",
+      "required": ["source_id", "requested_at"],
+      "additionalProperties": false,
+      "properties": {
+        "source_id": { "$ref": "#/$defs/uuid" },
+        "requested_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "finding_brief": {
+      "type": "object",
+      "required": ["id", "module", "score", "title", "url", "platform"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "module": { "type": "string", "enum": ["M1", "M2", "M3"] },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "risk_level": { "type": "string", "enum": ["high", "medium", "low"] },
+        "title": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "platform": { "type": "string" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "data", "emitted_at"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["finding.created", "finding.high_risk", "finding.updated", "scan.started", "scan.finished"] },
+        "emitted_at": { "type": "string", "format": "date-time" },
+        "data": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["finding.created", "finding.high_risk"] } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/finding_brief" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "finding.updated" } } },
+          "then": {
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": ["id", "status"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "$ref": "#/$defs/uuid" },
+                  "status": { "type": "string", "enum": ["new", "in_review", "confirmed", "false_positive", "closed"] }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["scan.started", "scan.finished"] } } },
+          "then": {
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": ["source_id"],
+                "additionalProperties": false,
+                "properties": {
+                  "source_id": { "$ref": "#/$defs/uuid" },
+                  "documents": { "type": ["integer", "null"], "minimum": 0 },
+                  "status": { "type": ["string", "null"], "enum": ["ok", "partial", "failed", null] }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "status": "ok",
+  "services": {
+    "api": "ok",
+    "postgres": "ok",
+    "redis": "ok",
+    "minio": "ok",
+    "analytics": "ok",
+    "scraper": "ok",
+    "llm": "ok"
+  }
+}

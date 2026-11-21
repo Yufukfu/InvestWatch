@@ -44,7 +44,7 @@ Anything real but out of scope goes into the change's `follow-ups.md` with one d
 
 ## Parallel work
 
-Three people, three modules, a worktree per change, ownership by directory (`scraper/` A, `web/` B, `analytics/` C, plus `api/` and `contracts/` C once created). To limit merge conflicts: edit only your own row in `.docs/STATUS.md`; ADR numbers by owner (A 01xx, B 02xx, C 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
+Three people, three modules, a worktree per change, ownership by directory (`scraper/` A, `web/` B, `analytics/` and `contracts/` C, plus `api/` once created). To limit merge conflicts: edit only your own row in `.docs/STATUS.md`; ADR numbers by owner (A 01xx, B 02xx, C 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
 
 ## Not adopted from Neopadel (on purpose)
 
