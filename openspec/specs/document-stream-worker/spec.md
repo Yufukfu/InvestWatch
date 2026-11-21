@@ -34,18 +34,20 @@ For a valid message `{document_id, schema: "v1"}` the worker SHALL load the docu
 - **THEN** the message stays pending and is redelivered later, and that redelivery is handled as a duplicate delivery
 
 ### Requirement: Duplicate delivery is idempotent
-A redelivered message, or a second message for the same `document_id` (the scraper's republish sweep, a manual re-XADD), SHALL be analysed again and saved through the `(document_id, module)` upsert, so its findings are reported `updated` and publish no event. Two deliveries of the same message SHALL leave the same finding rows (same ids, `status`, `note`, `detected_at`) and the same events as one delivery; only the analysis fields and `updated_at` are refreshed. The outcome is logged as `stored` with `created: 0` and the number updated.
+A redelivered message, or a second message for the same `document_id` (the scraper's republish sweep, a manual re-XADD), SHALL be analysed again and saved through the `(document_id, module)` upsert, so its findings are reported `updated` and publish no event. Two deliveries of the same message SHALL leave the same finding rows and the same events as one delivery.
 
 #### Scenario: Same message delivered twice
 - **WHEN** the same `document_id` is delivered twice, sequentially or by two consumers
 - **THEN** exactly one finding per module exists and exactly one `finding.created` event per finding was published
+- **AND** the rows keep the same ids, `status`, `note` and `detected_at`; only the analysis fields and `updated_at` are refreshed
+- **AND** the second delivery is logged as `stored` with `created: 0` and the number updated
 
 #### Scenario: Re-analysis after a pipeline fix
 - **WHEN** a processed `document_id` is XADDed again after the rules changed
 - **THEN** its finding keeps its `id` and `status`, carries the new score and rules, and no event is published
 
 ### Requirement: Poison messages
-The worker SHALL acknowledge, without storing or publishing anything, a message that can never succeed. It SHALL log one JSON line at level `WARNING` with the stream message id, the `document_id` if known, and one of these reasons: `invalid_message` (missing or non-UUID `document_id`, `schema` other than `v1`, an undefined field, or bytes that are not UTF-8, which are decoded with replacement and then fail these checks), `document_not_found` (no row with that id), `invalid_document` (the row fails `ScrapedDocument` validation, or its `text` plus `payload` exceed `MAX_DOCUMENT_BYTES`, default 2 MB, measured before the row is loaded; the log names the field), or `max_deliveries_exceeded` (the delivery count reached `MAX_DELIVERIES`, default 5, after repeated unexpected errors).
+The worker SHALL acknowledge, without storing or publishing anything, a message that can never succeed. It SHALL log one JSON line at level `WARNING` with the stream message id, the `document_id` if known, and one of the reasons `invalid_message`, `document_not_found`, `invalid_document` or `max_deliveries_exceeded` (the delivery count reached `MAX_DELIVERIES`, default 5, after repeated unexpected errors).
 
 #### Scenario: Malformed message
 - **WHEN** a message has no `document_id`, a `document_id` that is not a lowercase UUID, a `schema` other than `v1`, or a field the contract does not define
@@ -66,10 +68,12 @@ The worker SHALL acknowledge, without storing or publishing anything, a message 
 #### Scenario: Message with bytes that are not UTF-8
 - **WHEN** a writer XADDs a `document_id` whose bytes are not valid UTF-8
 - **THEN** it is acknowledged with reason `invalid_message`, the worker does not crash, and the next message is processed
+- **AND** the bytes are decoded with replacement first, so they fail the message checks instead of raising
 
 #### Scenario: Oversized document
-- **WHEN** a row's `text` plus `payload` exceed `MAX_DOCUMENT_BYTES`
+- **WHEN** a row's `text` plus `payload` exceed `MAX_DOCUMENT_BYTES` (default 2 MB)
 - **THEN** it is acknowledged with reason `invalid_document` naming `text`, without the row being parsed
+- **AND** the size is measured in the database before the row is loaded
 
 #### Scenario: Poison message does not stop the loop
 - **WHEN** a poison message is followed by a valid one
@@ -87,11 +91,12 @@ The worker SHALL periodically run XAUTOCLAIM on the group for messages idle long
 - **THEN** it is not claimed
 
 ### Requirement: Infrastructure outages
-The worker SHALL survive an unreachable Redis or Postgres. It SHALL log the reason `redis_unavailable` or `db_unavailable`, retry with capped exponential backoff (1 s doubling up to 30 s, plus jitter, reset after a successful iteration), never acknowledge a message it could not commit, and resume without a restart once the dependency is back. Startup SHALL fail fast, with exit code 2 and an error naming the variable, when `DATABASE_URL` or `REDIS_URL` is missing, `DATABASE_URL` cannot be parsed (without quoting it), or the registry or catalogue fails to load.
+The worker SHALL survive an unreachable Redis or Postgres. It SHALL log the reason `redis_unavailable` or `db_unavailable`, retry with capped exponential backoff, never acknowledge a message it could not commit, and resume without a restart once the dependency is back. Startup SHALL fail fast, with exit code 2 and an error naming the variable, on a configuration it cannot use.
 
 #### Scenario: Postgres down while processing
 - **WHEN** the store raises a connection error while loading the document or committing the findings
 - **THEN** the message is not acknowledged, the worker backs off and retries, and after Postgres returns the message is processed once
+- **AND** the backoff doubles from 1 s up to 30 s, plus jitter, and resets after a successful iteration
 
 #### Scenario: Redis down
 - **WHEN** Redis is unreachable during XREADGROUP
@@ -100,6 +105,7 @@ The worker SHALL survive an unreachable Redis or Postgres. It SHALL log the reas
 #### Scenario: Missing configuration
 - **WHEN** `DATABASE_URL` is unset at startup
 - **THEN** the process exits non-zero with an error naming `DATABASE_URL`
+- **AND** the same holds, with exit code 2, when `REDIS_URL` is missing, `DATABASE_URL` cannot be parsed (the error never quotes it), or the registry or catalogue fails to load
 
 ### Requirement: Rules-only service run
 The worker SHALL call `analyze` with the registry and catalogue loaded once at startup and `now` set to the current UTC time. Every finding it stores SHALL have `model.llm = null` while no LLM layer exists.
@@ -109,18 +115,23 @@ The worker SHALL call `analyze` with the registry and catalogue loaded once at s
 - **THEN** the stored finding has `model.llm` null and `model.pipeline_version` set
 
 ### Requirement: Observability and graceful stop
-The worker SHALL log JSON lines to stdout, never using `print`. One line per message SHALL carry the stream id, `document_id`, outcome (`stored`, `no_findings`, `retry_later` or a poison reason), the numbers of findings created and updated, and the duration in ms. It SHALL serve `GET /health` on `HEALTH_PORT` (default 8001), returning 200 with `{"status": "ok", "redis": true, "db": true}` when both dependencies answer and 503 with the failing one marked `false` otherwise. On SIGTERM or SIGINT it SHALL finish the current message and exit 0.
+The worker SHALL log JSON lines to stdout, never using `print`, with one line per message. It SHALL serve `GET /health` on `HEALTH_PORT` (default 8001), returning 200 when both dependencies answer and 503 with the failing one marked `false` otherwise. On SIGTERM or SIGINT it SHALL finish the current message and exit 0.
 
 #### Scenario: Health with Postgres down
 - **WHEN** `/health` is called while Postgres is unreachable
 - **THEN** it answers 503 with `"db": false`
 
+#### Scenario: Health with both dependencies up
+- **WHEN** `/health` is called while Redis and Postgres answer
+- **THEN** it answers 200 with `{"status": "ok", "redis": true, "db": true}`
+
 #### Scenario: Shutdown mid-message
 - **WHEN** SIGTERM arrives while a message is being processed
 - **THEN** that message is committed and acknowledged (or left pending if it failed), and the process exits 0 without reading another
+- **AND** each handled message was logged with the stream id, `document_id`, outcome (`stored`, `no_findings`, `retry_later` or a poison reason), the numbers of findings created and updated, and the duration in ms
 
 ### Requirement: Container
-`analytics/Dockerfile` SHALL build from `python:3.13-slim` through the `public.ecr.aws/docker/library` mirror and run the worker as a non-root user. It SHALL take all configuration from env (`DATABASE_URL`, `REDIS_URL`, `REGISTRY_CSV`, `LOG_LEVEL`, `WORKER_CONSUMER`, `HEALTH_PORT`, `CLAIM_MIN_IDLE_MS`, `MAX_DELIVERIES`, `STREAM_BLOCK_MS`, `MAX_DOCUMENT_BYTES`) and declare a HEALTHCHECK on `/health`. The compose service SHALL join only infra's internal `data` network while the worker makes no outbound call, and SHALL NOT import test-only helpers (`InMemoryStore`, `NoopPublisher`).
+`analytics/Dockerfile` SHALL build from `python:3.13-slim` through the `public.ecr.aws/docker/library` mirror, run the worker as a non-root user, take all configuration from env and declare a HEALTHCHECK on `/health`. The compose service SHALL join only infra's internal `data` network while the worker makes no outbound call, and SHALL NOT import test-only helpers (`InMemoryStore`, `NoopPublisher`).
 
 #### Scenario: Image runs as non-root
 - **WHEN** the image is built and `id -u` runs inside it
@@ -129,6 +140,7 @@ The worker SHALL log JSON lines to stdout, never using `print`. One line per mes
 #### Scenario: Service in compose
 - **WHEN** `docker compose up --build` runs with Redis and the migrated Postgres available
 - **THEN** the `analytics` container becomes healthy, and a document XADDed to `iw:documents` yields a `findings` row
+- **AND** its configuration came only from env: `DATABASE_URL`, `REDIS_URL`, `REGISTRY_CSV`, `LOG_LEVEL`, `WORKER_CONSUMER`, `HEALTH_PORT`, `CLAIM_MIN_IDLE_MS`, `MAX_DELIVERIES`, `STREAM_BLOCK_MS`, `MAX_DOCUMENT_BYTES`
 
 #### Scenario: No route out
 - **WHEN** the compose configuration is rendered
