@@ -9,6 +9,7 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 | [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler | A |
 | [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM | C |
 | [`web/`](web/) | dashboard | B |
+| [`infra/`](infra/) | shared infrastructure: Postgres, HTTPS gateway | B |
 | [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI), mocks, validator – draft v1 | C |
 | [`.docs/`](.docs/) | project documentation (English): plans, decisions, AI work log | all |
 | [`doc/`](doc/) | UKNF challenge materials (Polish), removed before hand-in | – |
@@ -20,4 +21,13 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 
 ## Quick Start
 
-Not available yet. It will be added together with the deployment ADR (docker compose, single-command start).
+Requires Docker with Compose v2.20+.
+
+```bash
+./scripts/init-env.sh          # creates .env with random passwords (never committed)
+docker compose up --build      # postgres, gateway, web
+```
+
+Open https://localhost:8443 (local certificate: see [`infra/README.md`](infra/README.md)). Until `api` exists the dashboard shows "Brak połączenia z API"; for UI work without it, run `web/` in mock mode ([`web/README.md`](web/README.md)).
+
+Each module owns its `compose.yaml`; the root [`compose.yaml`](compose.yaml) only includes them. A new module adds its file to that list.
