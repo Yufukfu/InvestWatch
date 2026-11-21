@@ -16,9 +16,9 @@ Before group 1: the branch is on `origin/main` (it has PR #38; the branch was cu
 
 ## 3. Audit and docs
 
-- [ ] 3.1 Run `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt`; fix or record any finding; add the dated row (format `| date | scraper (scraper-stack) | command (versions) | result |`) and a scraper container section (credentials, networks, `/health`, untrusted input, container) to `.docs/security-audit.md`; check each claim against `scraper/compose.yaml`
-- [ ] 3.2 Write ADR 0106 (decisions 1, 3, 7, 8 with the compose files read and the stack check output as evidence) and its row in `.docs/decisions/README.md`
-- [ ] 3.3 Mutation check: n/a, documentation only (audit claims are checked against the compose file in 3.1)
+- [x] 3.1 Run `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt`; fix or record any finding; add the dated row (format `| date | scraper (scraper-stack) | command (versions) | result |`) and a scraper container section (credentials, networks, `/health`, untrusted input, container) to `.docs/security-audit.md`; check each claim against `scraper/compose.yaml`
+- [x] 3.2 Write ADR 0106 (decisions 1, 3, 7, 8 with the compose files read and the stack check output as evidence) and its row in `.docs/decisions/README.md`
+- [x] 3.3 Mutation check: n/a, documentation only (audit claims are checked against the compose file in 3.1)
 
 ## 4. Closing tasks
 
