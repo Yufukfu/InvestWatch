@@ -132,7 +132,7 @@ test('run: the session runs in a disposable clone of the PR branch, with the pro
   assert.match(c.opts.input, /untrusted-data/);
   assert.ok(!c.args.some((a) => a.includes('IGNORE') || a.includes(fx('reviews-11.json')[0].body.slice(0, 20))), 'no third-party text in argv');
   assert.ok(c.args.includes('Bash(git push origin web/fe)'));
-  assert.ok(c.args.includes('Bash(gh pr comment 11 *)'));
+  assert.ok(c.args.includes('Bash(gh pr comment 11 --body-file .iw-watch/reply.md)'));
 });
 
 test('run: a denied push leaves a draft, keeps the clone and tells the human', async () => {
@@ -255,6 +255,7 @@ test('run: a failed session needs the human, keeps the clone, and is retried onc
   fs.rmSync(s.clone(11), { recursive: true });
   await main(['run', '--mine'], s.deps);
   assert.equal(s.calls.length, 2, 'retried after the human removed the clone');
+  assert.equal(s.notices().filter((n) => /session failed/.test(n.detail)).length, 1, 'a second failure after a retry is reported again');
 });
 
 test('run: a clone left from an earlier run is not overwritten', async () => {
@@ -297,6 +298,34 @@ test('run: a clone that fails half-way is removed, so the next run retries inste
   fail = false;
   await main(['run', '--mine'], s.deps);
   assert.equal(s.calls.length, 1, 'retried on the next run');
+});
+
+test('run: uncommitted changes are never thrown away: needs-human, clone kept (live run on PR #39)', async () => {
+  const s = setup();
+  s.deps.spawnClaude = (file, args, opts) => {
+    fs.writeFileSync(path.join(opts.cwd, 'web/a.ts'), 'export const a = 3;\n');
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine'], s.deps);
+  const [n] = s.notices();
+  assert.equal(n.kind, 'needs-human');
+  assert.match(n.detail, /uncommitted/);
+  assert.ok(fs.existsSync(s.clone(11)));
+});
+
+test('run: a session that wrote no reply is not "done" or "draft-ready"; its final message is kept as summary.md', async () => {
+  for (const flags of [['--dry-run'], []]) {
+    const s = setup();
+    s.deps.spawnClaude = () => ({ status: 0, stdout: stream([{ tool_name: 'Write', tool_input: { file_path: '.iw-watch/reply.md' } }]), stderr: '' });
+    await main(['run', '--mine', ...flags], s.deps);
+    const [n] = s.notices();
+    assert.equal(n.kind, 'needs-human', flags.join(' ') || 'live');
+    assert.match(n.detail, /no reply/);
+    assert.match(n.detail, /1 command was denied/);
+    assert.ok(fs.existsSync(path.join(n.path, 'summary.md')));
+  }
 });
 
 test('run: --limit caps the sessions per run', async () => {

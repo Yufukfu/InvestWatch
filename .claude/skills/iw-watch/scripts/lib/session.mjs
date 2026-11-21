@@ -18,14 +18,21 @@ export const DENY = [
   'Bash(gh * --repo *)', 'Bash(gh * --repo=*)', 'Bash(gh * -R *)',
   'Bash(curl:*)', 'Bash(wget:*)', 'Bash(git push --force:*)', 'Bash(git remote:*)', 'Bash(git config:*)',
   'Edit(./.git/**)', 'Edit(./.claude/**)', 'Read(./.env)', 'Read(./**/.env)',
+  // read-only git forms that write or read outside the clone (whole-branch review)
+  'Bash(git * --output*)', 'Bash(git * --no-index*)', 'Bash(git blame * --contents*)',
+  // a body only from the agent's own reply files: no file elsewhere, no inline body
+  'Bash(gh * --body-file /*)', 'Bash(gh * --body-file ~*)', 'Bash(gh * --body-file ..*)', 'Bash(gh * -F *)', 'Bash(gh * --body *)', 'Bash(gh * -b *)',
   'WebFetch', 'WebSearch',
 ];
 
 const READ = [
   'Read(./**)', 'Grep', 'Glob',
   'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git blame:*)',
-  'Bash(ls:*)', 'Bash(gh pr view:*)', 'Bash(gh pr diff:*)', 'Bash(gh issue list:*)', 'Bash(gh issue view:*)',
+  'Bash(gh pr view:*)', 'Bash(gh pr diff:*)', 'Bash(gh issue list:*)', 'Bash(gh issue view:*)',
+  // Edit(./**) does not cover dot-directories (probe), so the reply folder is listed on its own
+  'Edit(./.iw-watch/**)',
 ];
+const SAFE_PATH = /^\/[A-Za-z0-9._/-]+$/;
 // Tests run code. That is acceptable on my own branch, where the text that reached the agent came only from
 // people with write access (scan.mjs TRUSTED); a review of someone else's branch never runs their code.
 const FIX = [
@@ -33,21 +40,31 @@ const FIX = [
   // a fresh clone has no node_modules: the lockfile only, and no install scripts
   'Bash(npm ci --ignore-scripts:*)',
   'Bash(node --test:*)', 'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run typecheck:*)',
-  'Bash(npx vitest run:*)', 'Bash(npx tsc:*)',
+  'Bash(npx vitest run:*)', 'Bash(npx tsc:*)', 'Bash(npx oxlint:*)',
+  // a package below the root without cd: npm --prefix web test
+  'Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test:*)', 'Bash(npm --prefix * run test:*)',
+  'Bash(npm --prefix * run lint:*)', 'Bash(npm --prefix * run typecheck:*)',
   'Bash(pytest:*)', 'Bash(python -m pytest:*)', 'Bash(uv run pytest:*)',
   'Bash(openspec validate:*)', 'Bash(node .claude/skills/iw-docs-update/scripts/docs-check.mjs:*)',
 ];
 
 /** Least privilege per session: push only this branch, comment only on this PR, nothing outward in a dry run */
-export function allowList({ kind, pr, headRef, dryRun }) {
+export function allowList({ kind, pr, headRef, dryRun, cwd }) {
   if (!Number.isInteger(pr)) throw new Error('allowList needs a PR number');
   const fixes = kind === 'address-review' || kind === 'ci-failed';
   if (fixes && !safeBranch(headRef)) throw new Error(`refusing unsafe branch name ${JSON.stringify(headRef)}`);
+  if (cwd !== undefined && !SAFE_PATH.test(cwd)) throw new Error(`refusing clone path ${JSON.stringify(cwd)}`);
   // a review edits nothing but its own reply; a fix edits the clone, never .git/ or .claude/ (see DENY)
-  const allow = [...READ, ...(fixes ? ['Edit(./**)', ...FIX] : ['Edit(./.iw-watch/**)'])];
+  const allow = [...READ, ...(fixes ? ['Edit(./**)', ...FIX] : [])];
+  // agents write `cd <clone> && git status`, and every part of a chain must be allowed (live run, PR #39)
+  if (cwd) allow.push(`Bash(cd ${cwd})`, `Bash(cd ${cwd}/*)`);
   if (!dryRun) {
     if (fixes) allow.push(`Bash(git push origin ${headRef})`, `Bash(git push -u origin ${headRef})`);
-    allow.push(`Bash(gh pr comment ${pr} *)`, 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)');
+    allow.push(
+      `Bash(gh pr comment ${pr} --body-file .iw-watch/reply.md)`,
+      'Bash(gh issue create --title * --assignee * --body-file .iw-watch/issue.md)',
+      'Bash(gh issue create --title * --body-file .iw-watch/issue.md)',
+    );
   }
   return allow;
 }
@@ -61,7 +78,7 @@ export function denyList({ kind, dryRun }) {
   return [...new Set(deny)];
 }
 
-export function claudeArgs({ kind, pr, headRef, dryRun, budgetUsd = 2, model }) {
+export function claudeArgs({ kind, pr, headRef, dryRun, budgetUsd = 2, model, cwd }) {
   return [
     '-p',
     '--permission-mode', 'dontAsk',
@@ -71,7 +88,7 @@ export function claudeArgs({ kind, pr, headRef, dryRun, budgetUsd = 2, model }) 
     '--max-budget-usd', String(budgetUsd),
     ...(model ? ['--model', model] : []),
     '--tools', ...TOOLS,
-    '--allowedTools', ...allowList({ kind, pr, headRef, dryRun }),
+    '--allowedTools', ...allowList({ kind, pr, headRef, dryRun, cwd }),
     '--disallowedTools', ...denyList({ kind, dryRun }),
   ];
 }
@@ -102,7 +119,8 @@ export const pushDenied = (denials) => denials.some((d) => /(^|[\s;&|(])git\s+pu
 /** The session's environment: no IW_* escape flags reach it, whatever the caller's shell had */
 export function childEnv(env) {
   const out = {};
-  for (const [k, v] of Object.entries(env)) if (!/^iw_/i.test(k)) out[k] = v;
+  // no IW_* escape flags, and no iw-watch secrets (webhook URL, notify command): fix sessions run tests, which can read the env
+  for (const [k, v] of Object.entries(env)) if (!/^iw_/i.test(k) && !/^iwatch_/i.test(k)) out[k] = v;
   out.IWATCH_SESSION = '1';
   return out;
 }

@@ -39,8 +39,9 @@ export function fakeGh(over = {}) {
     else if (s.startsWith('pr list') && args.includes('--author')) key = `pr list author ${args[args.indexOf('--author') + 1]}`;
     else if (s.startsWith('pr list') && s.endsWith('--json number')) key = 'pr list open';
     else if (s.startsWith('pr list')) key = 'pr list all';
+    else if (/repos\/[^/]+\/[^/]+\/pulls\/\d+$/.test(s)) key = `pr ${/pulls\/(\d+)$/.exec(s)[1]}`;
     else key = (/(pulls|issues)\/\d+\/(reviews|comments|files)/.exec(s) || [])[0];
-    const v = routes[key];
+    const v = key && key.startsWith('pr ') && !(key in routes) ? { author_association: 'COLLABORATOR' } : routes[key];
     if (v instanceof Error) throw v;
     if (v === undefined) throw new Error(`fake gh: no route for ${s}`);
     return structuredClone(v);

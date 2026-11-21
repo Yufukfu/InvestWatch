@@ -66,7 +66,7 @@ The runner SHALL resolve the owner of a path from `.github/CODEOWNERS` with GitH
 
 #### Scenario: No match or missing file
 - **WHEN** no pattern matches, or `CODEOWNERS` does not exist
-- **THEN** the owner is empty, no owner-routed issue is opened, and a `needs-human` notice names the path
+- **THEN** the owner is empty, no owner-routed issue is opened, and the agent lists the path under "Needs @me" in its reply
 
 #### Scenario: PR edits CODEOWNERS
 - **WHEN** a PR branch changes `.github/CODEOWNERS`
@@ -146,7 +146,7 @@ The runner SHALL build each session's allow-list from its item: read tools, `gh 
 
 #### Scenario: My PR
 - **WHEN** a session addresses a review on my PR #11 with branch `web/fe`
-- **THEN** the allow-list has `Bash(git push origin web/fe)` and `Bash(gh pr comment 11:*)`, and no wildcard push
+- **THEN** the allow-list has `Bash(git push origin web/fe)` and `Bash(gh pr comment 11 --body-file .iw-watch/reply.md)`, and no wildcard push
 
 #### Scenario: Someone else's PR
 - **WHEN** a session reviews PR #28 by a teammate
@@ -173,7 +173,7 @@ When the agent finds a defect in a path owned by someone else, it SHALL open one
 
 #### Scenario: Duplicate
 - **WHEN** an open issue with the same normalised title exists
-- **THEN** the agent adds a comment to it instead of opening a second issue
+- **THEN** the agent opens no second issue and links the existing one in its reply
 
 ### Requirement: Keep results as drafts on request
 With `--dry-run` the runner SHALL run the session with no push and no `gh` write allowed, save every outward result (reply text, comment, issue, branch name) to a draft file in the state directory, and emit a `draft-ready` notice with the path.

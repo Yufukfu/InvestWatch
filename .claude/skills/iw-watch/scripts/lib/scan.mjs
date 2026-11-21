@@ -27,8 +27,9 @@ export function domainFilter(rules, domains, me) {
       throw new DomainError(`--domain ${d}: no CODEOWNERS entry for that directory (known: ${rules.map((r) => norm(r.pattern)).join(', ')})`);
     }
   }
-  const res = rules.filter((r) => wanted.has(norm(r.pattern))).map((r) => r.re);
-  return (files) => files.some((f) => res.some((re) => re.test(f.replace(/^\.?\//, ''))));
+  // last match wins, as in GitHub: a file is in the domain only if the rule that owns it is one of the wanted ones
+  const owning = (f) => { let hit = null; for (const r of rules) if (r.re.test(f)) hit = r; return hit; };
+  return (files) => files.some((f) => { const r = owning(f.replace(/^\.?\//, '')); return Boolean(r && wanted.has(norm(r.pattern))); });
 }
 
 const GH_FILES_LIMIT = 100;
@@ -133,10 +134,16 @@ function minePr(gh, repo, me, pr, st, maxRounds, state) {
 }
 
 /** Someone else's PR that waits for my review at its current head sha */
-function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false } = {}) {
+function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false, warn = () => {} } = {}) {
   if (pr.isDraft || lc(pr.author?.login) === lc(me)) return [];
   const b = base(pr, repo);
   if (st.reviewedSha === b.headSha) return [];
+  // a PR is text and code by its author: only someone with write access gets an agent's review session
+  const assoc = (gh(['api', `repos/${repo}/pulls/${Number(pr.number)}`]) || {}).author_association;
+  if (!TRUSTED.has(assoc)) {
+    warn(`iw-watch: #${pr.number} is by @${pr.author?.login} (${assoc || 'unknown'}), outside the team: not handed to an agent`);
+    return [];
+  }
   const act = activity(gh, repo, pr.number);
   const mine = act.reviews.filter((r) => lc(r.user?.login) === lc(me) && r.state !== 'PENDING');
   if (mine.some((r) => r.commit_id === b.headSha)) return [];
@@ -145,7 +152,7 @@ function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false } = {}) {
   const r = rounds(act, me, st);
   if (capReached(r, maxRounds)) return [capItem(b, r, maxRounds, st)].filter(Boolean);
   const all = events(act).filter((e) => !isBot(e.user));
-  const context = all.filter((e) => e.trusted || lc(e.author) === lc(b.author)).map(strip).sort(byTime);
+  const context = all.filter((e) => e.trusted).map(strip).sort(byTime);
   return [{ ...b, id: itemId({ kind: 'review', pr: b.pr, cursor: b.headSha }), kind: 'review', rounds: r, maxRounds, events: context, checks: [], ignoredOutsiders: all.length - context.length }];
 }
 
@@ -187,7 +194,7 @@ export function scan({ gh, repo, me, mode, state, maxRounds = 3, warn = () => {}
     for (const pr of prs.filter(keep)) {
       if (done.has(pr.number)) continue;
       done.add(pr.number);
-      items.push(...reviewPr(gh, repo, me, pr, st(pr.number), maxRounds, { rereview }));
+      items.push(...reviewPr(gh, repo, me, pr, st(pr.number), maxRounds, { rereview, warn }));
     }
   }
   items.sort((x, y) => x.pr - y.pr || x.kind.localeCompare(y.kind));

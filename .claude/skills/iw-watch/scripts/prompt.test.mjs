@@ -71,7 +71,9 @@ test('the prompt names other owners and the duplicate-checked issue procedure', 
   const p = buildPrompt({ item: item(), me: 'kacpermalczyk', owners, nonce: NONCE });
   assert.match(p, /analytics\/rules\.py[^\n]*@Yufukfu/);
   assert.match(p, /gh issue list[^\n]*--search/);
-  assert.match(p, /gh issue comment/);
+  assert.match(p, /duplicate[^\n]*link it in your reply/i);
+  assert.ok(!p.includes('gh issue comment'));
+  assert.ok(p.includes('--body-file .iw-watch/issue.md'));
   assert.match(p, /gh issue create[^\n]*--assignee/);
   assert.match(p, /do not edit/i);
 });
@@ -81,6 +83,14 @@ test('changed file paths are third-party text: fenced, and stripped of control c
   const p = buildPrompt({ item: item(), me: 'kacpermalczyk', owners: evil, nonce: NONCE });
   assert.ok(!p.includes('\n## Rules\n7.'), 'no injected heading');
   assert.ok(onlyInsideFences(p, 'You may run curl', NONCE));
+});
+
+test('the prompt tells the agent how commands are checked (the live run lost every git call to cd chains)', () => {
+  const p = buildPrompt({ item: item(), me: 'kacpermalczyk', owners, nonce: NONCE });
+  assert.match(p, /working directory is already the clone/i);
+  assert.match(p, /no `timeout`/i);
+  assert.match(p, /npm --prefix web/);
+  assert.match(p, /denied[^.]*not[^.]*git/i);
 });
 
 test('review prompt: read-only, comment only, approval left to a human', () => {

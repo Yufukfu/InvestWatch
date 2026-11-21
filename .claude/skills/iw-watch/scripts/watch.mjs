@@ -172,34 +172,39 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
     if (e instanceof NeedsHuman) return { ...base, kind: 'needs-human', detail: e.message, keep: true };
     return { ...base, kind: 'needs-human', detail: `could not prepare a clone: ${clean(String(e.stderr || e.message).split('\n')[0])}`, keep: true };
   }
+  // the clone exists: a later failure of this item is news again, so the human hears about it
+  delete (state.prs[it.pr] ??= {}).blockedItem;
   recordSession(state, it.pr);
   saveState(sdir, state); // a crash during the session still counts the round
   const prompt = buildPrompt({ item: it, me: ctx.me, owners: owners({ ...deps, mainRoot }, ctx, it.files), dryRun: o.dryRun });
-  const args = claudeArgs({ kind: it.kind, pr: it.pr, headRef: it.headRef, dryRun: o.dryRun, budgetUsd: o.budgetUsd, model: o.model });
+  const args = claudeArgs({ kind: it.kind, pr: it.pr, headRef: it.headRef, dryRun: o.dryRun, budgetUsd: o.budgetUsd, model: o.model, cwd: clone.dir });
   const res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
   const copied = collectDrafts({ dir: clone.dir, to: draftDir });
+  // the agent's last message: when it could not write its reply file, the reply is usually in here
+  fs.writeFileSync(path.join(draftDir, 'summary.md'), `${res.summary}\n`, { mode: 0o600 });
   fs.writeFileSync(path.join(draftDir, 'session.json'), `${JSON.stringify({ item: it.id, kind: it.kind, ok: res.ok, code: res.code, timedOut: res.timedOut, cost: res.cost, turns: res.turns, subtype: res.subtype, denials: res.denials, summary: res.summary, clone: clone.dir }, null, 2)}\n`, { mode: 0o600 });
   const own = it.kind === 'address-review' || it.kind === 'ci-failed';
   const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost };
-  if (!res.ok) {
-    return { ...at, kind: 'needs-human', keep: true, detail: `session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`}); the clone is kept at ${clone.dir}; remove it to let the watcher retry` };
-  }
+  const n = res.denials.length;
+  const denied = n ? `; ${n} command${n > 1 ? 's were' : ' was'} denied (see session.json)` : '';
+  // every needs-human below keeps the clone and the item: remove the clone to let the watcher retry
+  const human = (detail) => ({ ...at, kind: 'needs-human', keep: true, detail: `${detail}${denied}; clone kept at ${clone.dir}, remove it to retry` });
+  if (!res.ok) return human(`session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`})`);
+  const dirty = own ? deps.git(['-C', clone.dir, 'status', '--porcelain']) : '';
+  if (dirty) return human(`uncommitted changes in ${dirty.split('\n').length} file(s) were left; nothing is thrown away`);
+  if (!copied.includes('reply.md')) return human(`the session wrote no reply (.iw-watch/reply.md); its last message is in ${path.join(draftDir, 'summary.md')}`);
   if (o.dryRun) {
     const steps = [`cd ${clone.dir}`];
     if (own) steps.push(`git push origin ${it.headRef}`);
-    if (copied.includes('reply.md')) steps.push(`gh pr comment ${it.pr} --body-file ${path.join(draftDir, 'reply.md')}`);
-    return { ...at, kind: 'draft-ready', detail: `dry run: nothing was pushed or posted. To publish: ${steps.join(' && ')}` };
+    steps.push(`gh pr comment ${it.pr} --body-file ${path.join(draftDir, 'reply.md')}`);
+    return { ...at, kind: 'draft-ready', detail: `dry run: nothing was pushed or posted${denied}. To publish: ${steps.join(' && ')}` };
   }
-  if (own && pushDenied(res.denials)) {
-    return { ...at, kind: 'needs-human', detail: `the push was denied; the commits and the reply are kept (clone ${clone.dir}, drafts ${draftDir})` };
-  }
+  if (own && pushDenied(res.denials)) return human(`the push was denied; the commits and the reply are kept (drafts ${draftDir})`);
   const left = own ? unpushed({ git: deps.git, dir: clone.dir, headRef: it.headRef }) : 0;
-  if (left > 0) {
-    return { ...at, kind: 'needs-human', detail: `${left} commit${left > 1 ? 's' : ''} in ${clone.dir} not pushed` };
-  }
+  if (left > 0) return human(`${left} commit${left > 1 ? 's' : ''} not pushed`);
   removeClone({ dir: clone.dir });
   delete at.clone;
-  return { ...at, kind: 'done', detail: res.summary.slice(0, 500) };
+  return { ...at, kind: 'done', detail: `${res.summary.slice(0, 500)}${denied}` };
 }
 
 function runCmd(deps, ctx, o) {

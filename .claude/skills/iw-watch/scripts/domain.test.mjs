@@ -101,6 +101,14 @@ test('domainFilter: a file list at the gh limit is completed from the API before
   assert.throws(() => domainFilter(rules, ['mine'], 'nobody'), /owns no directory/);
 });
 
+test('domainFilter follows last-match-wins: a subdirectory given to someone else later is not in the domain', () => {
+  const rules = parseCodeowners('/analytics/ @Yufukfu\n/analytics/docs/ @hen68\n');
+  assert.equal(domainFilter(rules, ['analytics'], ME)(['analytics/docs/a.md']), false);
+  assert.equal(domainFilter(rules, ['analytics'], ME)(['analytics/r.py']), true);
+  assert.equal(domainFilter(rules, ['mine'], 'hen68')(['analytics/docs/a.md']), true);
+  assert.equal(domainFilter(rules, ['mine'], 'hen68')(['analytics/r.py']), false);
+});
+
 test('a PR with 100 files gets its full file list before the domain filter runs', async () => {
   const many = Array.from({ length: 100 }, (_, i) => `web/f${i}.ts`);
   const big = pr(49, 'Yufukfu', many);

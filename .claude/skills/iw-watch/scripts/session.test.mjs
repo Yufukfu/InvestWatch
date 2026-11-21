@@ -42,10 +42,13 @@ test('headless mode: dontAsk, nobody to prompt, no persistence, restricted tools
 test('the allow-list for my PR: exact branch push, this PR only, no review, merge, ready, api or network', () => {
   const allow = allowList({ ...mine, dryRun: false });
   assert.ok(allow.includes('Bash(git push origin web/frontend-architecture)'));
-  assert.ok(allow.includes('Bash(gh pr comment 11 *)'), 'space-star: matches `11 --body-file x`, not `110` (probed on 2.1.330)');
+  assert.ok(allow.includes('Bash(gh pr comment 11 --body-file .iw-watch/reply.md)'), 'posting only this PR and only the reply file');
+  assert.ok(!allow.some((r) => /gh pr comment 11 \*|gh issue comment/.test(r)), 'no free-form body file, no comment on another issue or PR');
   assert.ok(allow.includes('Read(./**)') && allow.includes('Edit(./**)'), 'file tools scoped to the clone');
   assert.ok(!allow.some((r) => ['Read', 'Write', 'Edit'].includes(r)), 'no unscoped file tool');
-  assert.ok(allow.includes('Bash(gh issue create:*)'));
+  assert.ok(allow.includes('Bash(gh issue create --title * --assignee * --body-file .iw-watch/issue.md)'));
+  assert.ok(!allow.includes('Bash(gh issue create:*)'));
+  assert.ok(!allow.includes('Bash(ls:*)'), 'ls reaches outside the clone; Glob does not');
   assert.ok(allow.includes('Bash(git commit:*)'));
   assert.ok(!allow.some((r) => /git push origin:\*|git push:\*/.test(r)), 'no wildcard push');
   assert.ok(allow.includes('Bash(npm ci --ignore-scripts:*)'), 'a fresh clone can install the lockfile, without install scripts');
@@ -60,7 +63,7 @@ test('the allow-list for my PR: exact branch push, this PR only, no review, merg
 test('review of someone else\'s PR: no commit, no push, no test runners', () => {
   const allow = allowList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false });
   assert.ok(!allow.some((r) => /git push|git commit|git add|npm|pytest|node --test/.test(r)), allow.join(' '));
-  assert.ok(allow.includes('Bash(gh pr comment 28 *)'));
+  assert.ok(allow.includes('Bash(gh pr comment 28 --body-file .iw-watch/reply.md)'));
   assert.ok(allow.includes('Edit(./.iw-watch/**)'), 'a review writes only its reply');
   assert.ok(!allow.includes('Edit(./**)'));
 });
@@ -90,6 +93,31 @@ test('the deny-list blocks other repositories, git and settings files, and outwa
   assert.ok(!deny.includes('Bash(git push:*)'), 'outside a dry run the exact-branch push stays possible');
   const review = denyList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false });
   for (const d of ['Bash(git push:*)', 'Bash(git commit:*)']) assert.ok(review.includes(d), `review: ${d}`);
+});
+
+test('lessons from the live run on PR #39: cd into the clone, the reply folder, npm --prefix, oxlint', () => {
+  const cwd = '/Users/x/Projects/InvestWatch-worktrees/watch-pr-39';
+  const allow = allowList({ ...mine, dryRun: true, cwd });
+  assert.ok(allow.includes(`Bash(cd ${cwd})`) && allow.includes(`Bash(cd ${cwd}/*)`), 'agents write "cd <clone> && git status"; every part of a chain must be allowed');
+  assert.ok(!allow.some((r) => r === 'Bash(cd:*)' || r === 'Bash(cd *)'), 'cd only into the clone');
+  assert.ok(allow.includes('Edit(./.iw-watch/**)'), 'Edit(./**) does not cover dot-directories (probe), so the reply folder is listed');
+  for (const r of ['Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test:*)', 'Bash(npm --prefix * run test:*)', 'Bash(npm --prefix * run lint:*)', 'Bash(npm --prefix * run typecheck:*)', 'Bash(npx oxlint:*)']) assert.ok(allow.includes(r), r);
+  const review = allowList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false, cwd });
+  assert.ok(!review.some((r) => /npm|npx/.test(r)), 'a review still runs no code');
+  assert.ok(valueAfter(claudeArgs({ ...mine, dryRun: false, budgetUsd: 2, cwd }), '--allowedTools').includes(`Bash(cd ${cwd})`));
+  assert.throws(() => allowList({ ...mine, cwd: '/x y/z' }), /clone path/);
+});
+
+test('read-only git and gh forms that reach outside the clone are denied (whole-branch review)', () => {
+  for (const kind of ['address-review', 'review']) {
+    const deny = denyList({ kind, dryRun: false });
+    for (const d of ['Bash(git * --output*)', 'Bash(git * --no-index*)', 'Bash(git blame * --contents*)', 'Bash(gh * --body-file /*)', 'Bash(gh * --body-file ~*)', 'Bash(gh * --body-file ..*)', 'Bash(gh * -F *)', 'Bash(gh * --body *)', 'Bash(gh * -b *)']) assert.ok(deny.includes(d), `${kind}: ${d}`);
+  }
+});
+
+test('the session environment carries no iw-watch secrets (webhook, notify command)', () => {
+  const env = childEnv({ IWATCH_DISCORD_WEBHOOK: 'https://discord.com/api/webhooks/1/x', IWATCH_NOTIFY_CMD: 'n', PATH: '/bin' });
+  assert.deepEqual(Object.keys(env).sort(), ['IWATCH_SESSION', 'PATH']);
 });
 
 test('a branch name that is not safe never reaches the allow-list', () => {

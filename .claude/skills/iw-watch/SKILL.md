@@ -18,7 +18,7 @@ The deterministic part is `scripts/watch.mjs` (no model, plain `gh`): it polls, 
 | `--author <login>` | `review` of that login's PRs, or narrows the other flags |
 | `--domain <dir>` / `--domain mine` | `review` of PRs that touch a directory owned in `.github/CODEOWNERS` on the default branch (`mine`: every directory I own) |
 
-Every item also counts rounds: each comment an iw-watch agent writes ends with `<!-- iw-watch -->`. At `--max-rounds` (default 3) the item becomes `cap-reached`: stop and tell the human, once per head. Only text from accounts with write access reaches an item; others are only counted (`ignoredOutsiders`). Review requests to a team, not to me, are not watched.
+Every item also counts rounds: each comment an iw-watch agent writes ends with `<!-- iw-watch -->`. At `--max-rounds` (default 3) the item becomes `cap-reached`: stop and tell the human, once per head. Only text from accounts with write access reaches an item, and a PR by someone without write access is never handed to an agent; others are only counted (`ignoredOutsiders`). Review requests to a team, not to me, are not watched.
 
 ## In this session
 
@@ -31,7 +31,7 @@ Run `/loop 2m /iw-watch --mine` (or any flags above). On each tick:
    - `ci-failed`: reproduce the failing check locally, fix, push, reply the same way.
    - `review`: review against `.claude/CODE_REVIEW.md`, post it with `gh pr comment` (never `gh pr review`), say that approval is left to a human.
    - `cap-reached`: do nothing on GitHub; tell the human the PR needs them.
-   - A defect in a path someone else owns (CODEOWNERS): don't edit it. Look for an open issue with the same title (`gh issue list --search "<title> in:title"`), comment there, or `gh issue create --assignee <owner>` with the evidence and the marker.
+   - A defect in a path someone else owns (CODEOWNERS): don't edit it. Look for an open issue with the same title (`gh issue list --search "<title> in:title"`): if there is one, link it in your reply; otherwise `gh issue create --assignee <owner>` with the evidence and the marker.
 3. `node .claude/skills/iw-watch/scripts/watch.mjs ack <id>` for each handled item. An item stays pending until acknowledged, so a crash repeats it rather than losing it.
 
 ## Headless
@@ -39,10 +39,10 @@ Run `/loop 2m /iw-watch --mine` (or any flags above). On each tick:
 `watch.mjs run <flags> [--dry-run] [--limit 3] [--budget-usd 2] [--model <name>]` starts one `claude -p` session per item:
 
 - in a disposable clone `../InvestWatch-worktrees/watch-pr-<n>` (my own PR: its branch; a review: the base branch with the PR head as `refs/iw/pr-<n>`, so the PR's own `.claude/` never loads);
-- with `--permission-mode dontAsk` and an allow-list built for that item: push only `git push origin <that branch>`, comment only on that PR, file tools only inside the clone, no `gh pr review|merge|ready`, no `gh api`, no web tools, no `--repo`; the repository's `git-guard` hook runs as in any session; `IW_*` variables are removed from its environment;
+- with `--permission-mode dontAsk` and an allow-list built for that item: push only `git push origin <that branch>`, comment only on that PR and only from the reply file .iw-watch/reply.md, file tools only inside the clone, git forms that read or write outside it (`--output`, `--no-index`) denied, no `gh pr review|merge|ready`, no `gh api`, no web tools, no `--repo`; the repository's `git-guard` hook runs as in any session; `IW_*` variables are removed from its environment;
 - bounded by `--budget-usd` and a 20-minute timeout.
 
-Each item ends in a notice, a JSON line on stdout: `done` (clone removed), `draft-ready` (`--dry-run`: nothing pushed or posted, the notice has the commands to publish) or `needs-human` (cap reached, push denied, commits not pushed, session failed, branch name refused; the clone is kept). A failed or blocked item is not acknowledged: remove its clone and the next run retries it.
+Each item ends in a notice, a JSON line on stdout: `done` (clone removed), `draft-ready` (`--dry-run`: nothing pushed or posted, the notice has the commands to publish) or `needs-human` (cap reached, branch name refused, or, with the clone kept: push denied, commits not pushed, uncommitted changes, no reply written, session failed). An item that kept its clone is not acknowledged: look at the clone, then remove it and the next run retries the item. The agent's last message is always saved as summary.md next to the draft.
 
 Drafts, session summaries (cost, denials) and the state live outside the repo in `${XDG_STATE_HOME:-~/.local/state}/iw-watch/<owner>__<repo>/`.
 
