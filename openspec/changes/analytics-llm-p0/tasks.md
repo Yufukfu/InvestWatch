@@ -78,5 +78,6 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 13. Closing
 
+- [ ] 13.0 Run the CLI on `contracts/mocks/documents.json` (rules-only and with the stub judge) and update `follow-ups.md` with every rule result that differs from `contracts/mocks/findings.json`; `git diff --exit-code contracts/mocks contracts/mock-server web` is empty (the mocks are a test double and are never edited)
 - [ ] 13.1 Apply the iw-docs-update skill: `.docs/analytics-plan.md` §7 (object wrapper `{"results": [...]}`, `prompt_version` as prompt hash, chunk and budget defaults), §5 (P0 rules implemented); `analytics/CLAUDE.md` (LLM env variables, the "LLM only decides deferred checks" rule); `analytics/README.md`; ADRs 0309 and 0310 listed; your own row in `.docs/STATUS.md` only if the coordinator has not taken it; add the iw-ai-log row; `docs-check` clean
 - [ ] 13.2 Run the iw-pr-review skill with a normal pass and a `focus: security` pass of iw-reviewer (prompts built from scraped text, quote verification, key handling, new `httpx` dependency, outbound egress), and fix real findings

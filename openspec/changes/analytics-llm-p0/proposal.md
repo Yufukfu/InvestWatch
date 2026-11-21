@@ -34,6 +34,7 @@ Stage 2 (etap 2) of analytics. After stage 1, M2 checks only R1-R3 with regexes 
   - The gold set and `eval/run.py`.
   - The infra `ollama` service itself (PR #18).
   - Any live LLM call in tests: tests use a local stub HTTP server.
+  - The mock server and mocks, which stay as a test double (Damian's rule). This change does not delete or alter `contracts/mock-server/`, `contracts/mocks/` or the `web/` mock mode. Tests may read `contracts/mocks/*.json` but never regenerate or edit them. Where rule results differ from `contracts/mocks/findings.json`, the difference is recorded in this change's `follow-ups.md`, never "fixed" in the mocks.
 - **Owner:** Damian (`analytics/`).
 - **Contracts:** the change touches no contract, REST route or event. It fills fields that already exist in `Finding` v1: `rules[].method` (`llm`, `hybrid`), `rules[].evidence_locator` and `model.llm`. It needs no version bump.
 

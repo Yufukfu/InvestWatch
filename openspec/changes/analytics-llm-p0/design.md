@@ -184,6 +184,7 @@ All dictionaries live in `m2_rules.yaml`. Risk-warning patterns are shared with 
 
 ## Risks / Trade-offs
 
+- **Rule results differ from the mock findings.** `contracts/mocks/` and `contracts/mock-server/` stay as the web test double and are never edited or regenerated (Damian's rule). Tests assert only the scenarios in the specs, read the mocks as input, and never compare against `findings.json` wholesale. Each known difference is listed in `follow-ups.md`, and the apply phase adds any new ones.
 - **The small local model is unreliable on JSON or Polish nuance.** → Mitigations: JSON-object mode, validation per item, `uncertain` on doubt and the rules-only fallback. ADR 0304 already requires re-running the gold set after a swap.
 - **Prompt injection makes the model answer `pass` on a deferred check.** → The model never sees deterministic fails. Its quote must verify against the chunk. Answers for unrequested ids are dropped. The worst case is one borderline check flipping, which shows in the dashboard as `method: hybrid` with the model's quote. The `focus: security` review covers this.
 - **The LLM can move a borderline R3 from `fail` to `pass`**, but only in the near-window proximity case. It never reaches an absent warning (resolved question 1).
