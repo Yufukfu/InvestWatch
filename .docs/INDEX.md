@@ -12,6 +12,7 @@
 | Add or change a seeded source (`scraper/seeds/*.toml`, `python -m iw_scraper.seed`) | [../scraper/README.md](../scraper/README.md), [../scraper/CLAUDE.md](../scraper/CLAUDE.md) (`seed`) |
 | Store, dedup and announce a document (DB, MinIO, `iw:documents`, republish sweep) | [../scraper/CLAUDE.md](../scraper/CLAUDE.md) (Ingest), [decisions/0104-ingest-order-and-republish-sweep.md](decisions/0104-ingest-order-and-republish-sweep.md) |
 | Produce or consume a finding | [integration-plan.md](integration-plan.md) §4, then [../analytics/CLAUDE.md](../analytics/CLAUDE.md) |
+| Run or operate the analytics worker (env, feeding a document, poison messages, `/health`, registry caveat) | [../analytics/README.md](../analytics/README.md) "Run the worker" and "Configuration", then [../openspec/specs/document-stream-worker/spec.md](../openspec/specs/document-stream-worker/spec.md) |
 | Build or call the REST API | [integration-plan.md](integration-plan.md) §5 |
 | Know what the API does beyond the contract (risk level, filters, calibration, Socket.IO relay, limits) | [../api/README.md](../api/README.md) "REST and Socket.IO", then [../openspec/specs/rest-api/spec.md](../openspec/specs/rest-api/spec.md) and [../openspec/specs/event-relay/spec.md](../openspec/specs/event-relay/spec.md) |
 | Read or write the shared tables, or add a migration | [../api/README.md](../api/README.md) (tables and the exact SQL for writers), then [../api/CLAUDE.md](../api/CLAUDE.md) |
