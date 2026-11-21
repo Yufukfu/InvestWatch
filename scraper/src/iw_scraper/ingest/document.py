@@ -28,6 +28,7 @@ def build_document(page: dict, source: Source, *, fetched_at: datetime, duration
     `proxy` is an identifier, never credentials (contract `scrape_meta.proxy`).
     """
     doc = {key: value for key, value in page.items() if key not in _PAGE_ONLY_KEYS}
+    doc.pop("content_hash", None)  # always derived from the text here, never trusted from the page
     doc.update(
         id=str(uuid.uuid4()),
         source_id=source.id,

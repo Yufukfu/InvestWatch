@@ -5,7 +5,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from iw_scraper.ingest.document import build_document, content_hash
+from iw_scraper.ingest.document import build_document
 from iw_scraper.ingest.store import insert_document, is_duplicate
 
 FETCHED_AT = datetime(2026, 11, 21, 15, 0, 0, tzinfo=timezone.utc)
@@ -29,7 +29,7 @@ async def test_valid_document_is_inserted_with_payload(pool, seeded_source):
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM documents WHERE id = $1", uuid.UUID(doc["id"]))
     assert str(row["source_id"]) == seeded_source.id
-    assert row["content_hash"] == content_hash("Zysk do 20%")
+    assert row["content_hash"] == "35864f838dfec0cd765ac334f77c5250f3283ccedbb2e7df3eaccf16e32ccf23"
     assert row["stream_published_at"] is None
     assert json.loads(row["payload"])["text"] == "Zysk do 20%"
 

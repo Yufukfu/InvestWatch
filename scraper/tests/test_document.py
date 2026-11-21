@@ -68,6 +68,19 @@ def test_malformed_fetched_at_is_schema_invalid(source):
     assert error is not None and error.reason is Reason.SCHEMA_INVALID
 
 
+@pytest.mark.parametrize("text", ["", "   \n\t "])
+def test_blank_text_is_an_empty_text_error_not_a_document(source, text):
+    error = check_document(build(source, {**PAGE, "text": text}))
+    assert error is not None
+    assert error.reason is Reason.EMPTY_TEXT
+    assert error.source_id == source.id
+
+
+def test_page_supplied_content_hash_never_survives_without_text(source):
+    page = {"url": PAGE["url"], "content_hash": "a" * 64}
+    assert "content_hash" not in build(source, page)
+
+
 def test_document_without_source_id_is_rejected(source):
     doc = build(source)
     doc["source_id"] = None
