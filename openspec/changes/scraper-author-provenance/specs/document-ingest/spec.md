@@ -11,3 +11,7 @@ The scraper SHALL NOT copy `author` from a parsed page into a document, because 
 #### Scenario: Page supplies an author
 - **WHEN** a parsed page carries an `author` with a firm's `profile_url`
 - **THEN** the stored document has no `author`
+
+#### Scenario: Collector passes account data
+- **WHEN** a collector passes `author` explicitly
+- **THEN** the stored document has exactly that `author`
