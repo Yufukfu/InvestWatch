@@ -10,9 +10,9 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 
 ## 2. State, lock and round count
 
-- [ ] 2.1 Write the failing tests `state.test.mjs`: atomic write, corrupt file moved aside and reported, `ack` semantics, lock acquired and released, stale lock (older than 30 minutes) replaced, second runner exits 0, round count is the larger of the `<!-- iw-watch -->` comments in a fixture and the sessions in the state
-- [ ] 2.2 Implement `lib/state.mjs` and `lib/rounds.mjs`; verify the tests pass and a killed write leaves the previous file intact
-- [ ] 2.3 Mutation check: temp-then-rename, stale threshold boundary, cap comparison `>=` vs `>`, the `max` of the two counts. `mutations: _ tried, _ caught`
+- [x] 2.1 Write the failing tests `state.test.mjs`: atomic write, corrupt file moved aside and reported, `ack` semantics, lock acquired and released, stale lock (older than 30 minutes) replaced, second runner exits 0, round count is the larger of the `<!-- iw-watch -->` comments in a fixture and the sessions in the state
+- [x] 2.2 Implement `lib/state.mjs` and `lib/rounds.mjs`; verify the tests pass and a killed write leaves the previous file intact
+- [x] 2.3 Mutation check: temp-then-rename, stale threshold boundary, cap comparison `>=` vs `>`, the `max` of the two counts. `mutations: 13 tried, 13 caught`
 
 ## 3. Scan and ack without a model (`--mine`, `--review-requested`)
 
