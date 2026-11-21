@@ -15,7 +15,7 @@ Criteria only. Stages are in `SDLC.md`, the commands in `.claude/skills/iw-pr-re
 
 ## What "ready" means, in order
 
-1. Deterministic checks green after the last code edit (commands in `iw-pr-review`): tests, lint, types, a mutation-check line per task group, `openspec validate`, `docs-check`, dependency audit, and `docker compose up` once a compose file exists.
+1. Deterministic checks green after the last code edit (commands in `iw-pr-review`): tests, lint, types, a mutation-check line per task group, `openspec validate`, `docs-check`, dependency and secret scans (`.docs/supply-chain.md` §2 and §4, ADR 0208), and `docker compose up` once a compose file exists.
 2. A reviewer ran on the pinned range, with the security pass where the table says so.
 3. **Every finding verified against the code** before acting: real ones fixed whatever the severity, false ones rejected with a one-line evidence note. After 3 rounds on one group, stop and ask the human.
 4. No debug output left (`console.log` in JS/TS is hook-blocked; Python uses the logger, checked in review) and no `.env` or credentials tracked.
