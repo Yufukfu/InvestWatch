@@ -30,6 +30,11 @@ services:
       api-migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      # Makes `up --wait` check the one-shot for completion, as it does for api-migrate. A service nobody depends on is
+      # checked for "running or healthy", and a finished one-shot fails that ("no healthcheck configured" while it
+      # runs, "exited (0)" once done). required: false still starts the worker if the evaluation fails; --wait then
+      # exits 1 with "didn't complete successfully". Delays the worker only by the evaluation run (seconds).
+      analytics-eval: { condition: service_completed_successfully, required: false }
     # data only: Postgres and Redis, internal, no route out. The worker makes no outbound call yet; analytics-llm-p0
     # adds egress together with the hosted LLM client (ADR 0304).
     networks: [data]
@@ -59,7 +64,8 @@ services:
       postgres: { condition: service_healthy }
     # data only: Postgres. No Redis, no egress (no LLM in the default run).
     networks: [data]
-    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none.
+    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none. `up --wait` checks this service
+    # for completion because `analytics` depends on it (see there), so it does not need a healthcheck.
     healthcheck:
       disable: true
     read_only: true
