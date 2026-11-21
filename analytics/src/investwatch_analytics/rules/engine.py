@@ -24,6 +24,8 @@ KNOWN_PARAMS = {
     "labels", "prominent_sentences", "negation_before",
     "window", "claim_patterns", "claim_exclude_patterns", "risk_patterns",
     "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
+    # analytics-llm-p0 (M2 P0 rules)
+    "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
 }
 _RULES: dict[str, type["Rule"]] = {}
 

@@ -53,7 +53,7 @@ rules:
         - '\bprzych[óo]d\w*'
         - '\bprofit\w*'
         - '\breturns?\b'
-      claim_exclude_patterns:
+      claim_exclude_patterns: &return_figure_exclude
         # `\b`: without it every repeat of a stem inside one long word ("prowizjprowizj...") started a match
         # whose `\w*` ran to the end of the word, quadratic (PR #26 review).
         - '\b(?:prowizj|opłat|podat|marż)\w*\s+\d+(?:[.,]\d+)?\s?%'
@@ -91,7 +91,7 @@ rules:
         - '\bwoln\w* od ryzyka\b'
         - '\bno risk\b'
         - '\brisk[- ]free\b'
-      footnote_markers: ["*", "¹", "²", "³"]
+      footnote_markers: &footnote_markers ["*", "¹", "²", "³"]
 
   - {id: R4, name: Rozmiar czcionki ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565, implemented: false}
   - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
@@ -104,7 +104,48 @@ rules:
   - {id: R12a, name: Wyniki historyczne – okres, severity: medium, legal_basis: null, implemented: false}
   - {id: R12b, name: Wyniki historyczne – waluta i koszty, severity: medium, legal_basis: null, implemented: false}
   - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: null, implemented: false}
-  - {id: R14, name: Ostrzeżenie przy wynikach historycznych, severity: high, legal_basis: art. 44 ust. 4 lit. d rozp. del. 2017/565, implemented: false}
+  # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
+  # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").
+  - id: R14
+    name: Ostrzeżenie przy wynikach historycznych
+    severity: high
+    legal_basis: art. 44 ust. 4 lit. d rozp. del. 2017/565
+    implemented: true
+    params:
+      # A past-performance sentence: a return figure plus a past marker (or a year <= the fetch year
+      # with no future marker in the sentence).
+      figure_patterns:
+        - '\d+(?:[.,]\d+)?\s?%'
+      figure_exclude_patterns: *return_figure_exclude
+      past_patterns:
+        - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
+        - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
+        - '\bosiągn(?:ął|ęła|ęło|ęli|ęły|ęliśmy)\b'
+        - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
+        - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+        - '\bwzr[oó]s(?:ł|ła|ło|ły|li)\b'
+        - '\bhistoryczn\w*'
+        - '\b(?:w|przez|za)\s+ostatni\w*\s+(?:\d+\s+)?(?:lat\w*|rok\w*|miesi\w*|kwarta\w*)'
+        - '\bw\s+(?:zeszłym|ubiegłym|poprzednim)\s+(?:roku|kwartale|miesiącu)'
+        - '\bpast performance\b'
+        - '\b(?:returned|delivered|gained|grew)\b'
+      future_patterns:
+        - '\bspodziewa\w*'
+        - '\bprognoz\w*'
+        - '\bbędzie\w*'
+        - '\bbędą\b'
+        - '\bprzewidu\w*'
+        - '\bplanuje\w*'
+        - '\bcel\w*\b'
+        - '\bexpect\w*'
+        - '\bwill\b'
+        - '\bforecast\w*'
+      disclaimer_patterns:
+        - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+        - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+        - '\bpast performance\b.{0,60}?\b(?:is not|does not|isn.t|not a)\b'
+        - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
+      footnote_markers: *footnote_markers
   - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
   - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
   - {id: R17, name: Zakaz sugerowania aprobaty organu nadzoru, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}

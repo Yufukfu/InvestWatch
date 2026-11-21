@@ -124,3 +124,55 @@ class R3RiskNextToReturns(Rule):
         else:
             why = "Obietnica zysku bez jakiegokolwiek ostrzeżenia o ryzyku."
         return self.result("fail", claim, why)
+
+
+_YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
+
+
+@register
+class R14PastPerformanceDisclaimer(Rule):
+    """ZASÓB R14: a clear disclaimer must be present; no proximity requirement (unlike R3).
+
+    A footnote-only disclaimer passes: its placement is R6's ("ryzyko ukryte w przypisach").
+    """
+
+    rule_id = "R14"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "figure": compile_patterns(p.get("figure_patterns", [])),
+            "figure_x": compile_patterns(p.get("figure_exclude_patterns", [])),
+            "past": compile_patterns(p.get("past_patterns", [])),
+            "future": compile_patterns(p.get("future_patterns", [])),
+            "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
+            "footnote": tuple(p.get("footnote_markers", [])),
+        }
+
+    def _is_past_performance(self, sentence: str, fetch_year: int) -> bool:
+        p = self._p
+        if not R3RiskNextToReturns._hits(sentence, p["figure"], p["figure_x"]):
+            return False
+        if any(m.search(sentence) for m in p["past"]):
+            return True
+        if any(f.search(sentence) for f in p["future"]):
+            return False
+        return any(int(y) <= fetch_year for y in _YEAR.findall(sentence))
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        sentences = ctx.pre.sentences
+        fetch_year = ctx.doc.fetched_at.year
+        claims = [s for s in sentences if self._is_past_performance(s.text, fetch_year)]
+        if not claims:
+            return self.result("not_applicable", None, "Materiał nie prezentuje wyników historycznych.")
+        disclaimers = [s for s in sentences if any(d.search(s.text) for d in p["disclaimer"])]
+        if not disclaimers:
+            return self.result(
+                "fail", claims[0].text,
+                "Wyniki historyczne bez wyraźnego zastrzeżenia, że nie są wiarygodnym wskaźnikiem przyszłych wyników.",
+            )
+        shown = [s for s in disclaimers if not s.text.lstrip("( ").startswith(p["footnote"])]
+        quote = (shown or disclaimers)[0].text
+        return self.result("pass", quote, "Materiał zawiera zastrzeżenie dotyczące wyników historycznych.")

@@ -91,7 +91,7 @@ def test_violating_landing_page(registry, catalogue):
     raw = make_doc(text=ALFA_TEXT, url="https://alfa-inwestycje.example.com/konto-premium")
     [f] = run(raw, registry, catalogue)
     by_id = {r.rule_id: r.result for r in f.rules}
-    assert by_id == {"R1": "pass", "R2": "fail", "R3": "fail"}
+    assert {k: by_id[k] for k in ("R1", "R2", "R3")} == {"R1": "pass", "R2": "fail", "R3": "fail"}
     assert f.module == "M2" and f.score > 0.5 and f.status == "new"
     assert f.firm.name == "Alfa Inwestycje Dom Maklerski S.A." and f.firm.authorized
     assert f.firm.registry_id == "facc6bd1-c728-5348-90a4-011b0972fea9" and f.firm.registry_type == "brokerage_house"
@@ -135,7 +135,7 @@ def test_unmatched_firm_on_own_page(registry, catalogue):
 
 def test_only_implemented_rules_are_listed(registry, catalogue):
     [f] = run(make_doc(text=ALFA_TEXT), registry, catalogue)
-    assert [r.rule_id for r in f.rules] == ["R1", "R2", "R3"]
+    assert [r.rule_id for r in f.rules] == [s.id for s in catalogue.implemented]
 
 
 def test_excerpt_is_capped_at_500(registry, catalogue):
@@ -146,7 +146,8 @@ def test_excerpt_is_capped_at_500(registry, catalogue):
 def test_mock_documents_match_spec(mock_documents, registry, catalogue, finding_validator):
     docs = {d["id"]: d for d in mock_documents}
     [alfa] = run(docs[ALFA_DOC], registry, catalogue)
-    assert {r.rule_id: r.result for r in alfa.rules} == {"R1": "pass", "R2": "fail", "R3": "fail"} and alfa.score > 0.5
+    got = {r.rule_id: r.result for r in alfa.rules}
+    assert {k: got[k] for k in ("R1", "R2", "R3")} == {"R1": "pass", "R2": "fail", "R3": "fail"} and alfa.score > 0.5
     [bank] = run(docs[BANK_DOC], registry, catalogue)
     assert all(r.result != "fail" for r in bank.rules) and bank.score == 0
     for raw in mock_documents:
@@ -158,12 +159,14 @@ def test_summary_lists_only_applicable_rules(registry, catalogue):
     [f] = run(make_doc(text="Reklama. Alfa Inwestycje. Otwórz konto."), registry, catalogue)
     assert {r.rule_id: r.result for r in f.rules}["R3"] == "not_applicable"
     assert "Sprawdzono reguły R1, R2 " in f.summary
-    assert "Nie dotyczy: R3 Informacja o ryzyku." in f.summary
+    assert "Nie dotyczy: R3 Informacja o ryzyku" in f.summary
 
 
 def test_summary_without_not_applicable_rules(registry, catalogue):
     [f] = run(make_doc(text=ALFA_TEXT), registry, catalogue)
-    assert "Sprawdzono reguły R1, R2, R3 " in f.summary and "Nie dotyczy" not in f.summary
+    assert "Sprawdzono reguły R1, R2, R3" in f.summary
+    not_applicable = f.summary.split("Nie dotyczy:", 1)[1] if "Nie dotyczy:" in f.summary else ""
+    assert not any(f"{rid} " in not_applicable.split(".")[0] for rid in ("R1", "R2", "R3"))
 
 
 def test_summary_when_no_rule_applies():
