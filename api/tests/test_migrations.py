@@ -91,3 +91,17 @@ def test_application_role_has_crud_but_no_ddl(monkeypatch, empty_db):
             app.execute("ALTER TABLE documents ADD COLUMN x int")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             app.execute("UPDATE alembic_version SET version_num = 'x'")
+
+
+def test_0003_text_check_is_reversible(monkeypatch, empty_db):
+    """Downgrading 0003 removes only the non-empty text check; upgrading puts it back."""
+    upgrade(monkeypatch, empty_db.admin_url)
+    downgrade(monkeypatch, empty_db.admin_url, "0002")
+    assert "ck_documents_text_not_empty" not in _checks(empty_db.admin_url)
+    upgrade(monkeypatch, empty_db.admin_url)
+    assert "ck_documents_text_not_empty" in _checks(empty_db.admin_url)
+
+
+def _checks(url: str) -> set[str]:
+    with psycopg.connect(_plain(url)) as conn:
+        return {r[0] for r in conn.execute("SELECT conname FROM pg_constraint WHERE contype = 'c'")}

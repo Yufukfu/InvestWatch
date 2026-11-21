@@ -176,6 +176,7 @@ def test_finding_for_a_missing_document(app_engine):
     ("documents", {"content_hash": "XYZ"}),
     ("documents", {"http_status": 99}),
     ("documents", {"http_status": 600}),
+    ("documents", {"text": ""}),
     ("findings", {"module": "M4"}),
     ("findings", {"status": "archived"}),
     ("findings", {"platform": "myspace"}),
@@ -207,7 +208,7 @@ def test_out_of_contract_value_is_rejected(app_engine, table, over):
 def test_contract_boundaries_are_allowed(app_engine, over):
     with app_engine.begin() as conn:
         doc = _add_doc(conn, http_status=100, lang="pl")
-        _add_doc(conn, http_status=599)
+        _add_doc(conn, http_status=599, text=" ")  # one character, even whitespace, is not empty
         _insert(conn, findings, finding_row(doc["id"], **over))
         _insert(conn, sources, source_row(target_modules=["M1", "M2", "M3"], last_run_status="running"))
 

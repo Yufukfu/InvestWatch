@@ -19,9 +19,9 @@
 
 ## 4. Non-empty document text
 
-- [ ] 4.1 Test: inserting a document with `text = ''` fails with a check violation
-- [ ] 4.2 Revision `0003` adds `ck_documents_text_not_empty`, with downgrade; `tables.py` matches
-- [ ] 4.3 Mutation check
+- [x] 4.1 Test: inserting a document with `text = ''` fails with a check violation
+- [x] 4.2 Revision `0003` adds `ck_documents_text_not_empty`, with downgrade; `tables.py` matches
+- [x] 4.3 Mutation check — mutations: 4 tried, 4 caught
 
 ## 5. Compose
 

@@ -101,6 +101,7 @@ documents = Table(
     CheckConstraint("lang ~ '^[a-z]{2}$'", name="lang"),
     CheckConstraint("content_hash ~ '^[a-f0-9]{64}$'", name="content_hash"),
     CheckConstraint("jsonb_typeof(payload) = 'object'", name="payload_object"),
+    CheckConstraint("text <> ''", name="text_not_empty"),  # revision 0003
 )
 Index("uq_documents_source_hash", documents.c.source_id, documents.c.content_hash, unique=True,
       postgresql_nulls_not_distinct=True, postgresql_where=documents.c.content_hash.isnot(None))
