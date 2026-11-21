@@ -236,16 +236,16 @@ async def test_a_source_whose_url_has_no_host_is_not_scheduled(redis, store):
 async def test_a_restarted_scheduler_still_enqueues_a_slot_that_fell_due_while_it_was_down(redis, store):
     store.sources[A] = make_source(A, cron="0 12 * * *")
 
-    enqueued = await scheduler(redis, store).tick(datetime(2026, 11, 21, 12, 3, 20, tzinfo=UTC))
+    enqueued = await scheduler(redis, store).tick(datetime(2026, 11, 21, 12, 4, 20, tzinfo=UTC))
 
-    assert enqueued == 1
+    assert enqueued == 1  # the slot is four minutes back: the oldest of the five covered
     assert [j.decode() for j in await redis.zrange(QUEUE_NAME, 0, -1)] == [f"sched-{A}-20261121T1200Z"]
 
 
-async def test_a_fresh_scheduler_does_not_replay_slots_older_than_the_catch_up_window(redis, store):
+async def test_a_fresh_scheduler_does_not_replay_a_slot_five_minutes_back(redis, store):
     store.sources[A] = make_source(A, cron="0 12 * * *")
 
-    enqueued = await scheduler(redis, store).tick(datetime(2026, 11, 21, 12, 6, 20, tzinfo=UTC))
+    enqueued = await scheduler(redis, store).tick(datetime(2026, 11, 21, 12, 5, 20, tzinfo=UTC))
 
     assert enqueued == 0
 

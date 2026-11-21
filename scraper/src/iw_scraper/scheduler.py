@@ -14,7 +14,7 @@ from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.types import JobError, Reason
 
 MINUTE = timedelta(minutes=1)
-MAX_CATCH_UP_SLOTS = 5  # a late tick still covers the minutes it missed, but never replays hours
+MAX_CATCH_UP_SLOTS = 5  # a tick covers at most the current minute and the four before it, never hours
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,9 @@ class Scheduler:
         """Enqueue the jobs due since the last tick; returns how many this scheduler actually enqueued."""
         current = now.astimezone(UTC).replace(second=0, microsecond=0)
         if self._last_slot is None:
-            # a restart still covers the slots that fell due while it was down; the job ids of slots that already
-            # ran are rejected for as long as arq keeps their results (`RESULT_TTL`, longer than this window)
+            # a restart covers the slots current-4..current (five minutes, this one included) that fell due while it
+            # was down; the job ids of slots that already ran are rejected for as long as arq keeps their results
+            # (`RESULT_TTL`, far longer than this window)
             self._last_slot = current - MAX_CATCH_UP_SLOTS * MINUTE
         slots = self._slots_since_last_tick(current)
         enqueued = 0
