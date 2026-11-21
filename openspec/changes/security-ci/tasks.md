@@ -10,13 +10,16 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
 
 ## 2. Security workflow and Gitleaks allowlist (~1 h)
 
-- [ ] 2.1 `.gitleaks.toml`: default rules plus one `[[allowlists]]` entry (description, path `contracts/mocks/generate_mocks.py`, `regexTarget = "line"`, regex for `key="m<digit>-…"`, `condition = "AND"`). Check it with one local Gitleaks run over `origin/main` (digest-pinned image, `--redact`, the worktree `.git` mount from the runbook): 0 findings and the commit count reported. Then a scratch copy of the mock file with a credential-shaped test value on a differently shaped line still fails. That copy is never committed.
-- [ ] 2.2 `.github/workflows/security.yml` per design decisions 1-7:
+- [x] 2.1 `.gitleaks.toml`: default rules plus one allowlist entry (description, path `contracts/mocks/generate_mocks.py`, `regexTarget = "line"`, regex for `key="m<digit>-…"`, `condition = "AND"`). Check it with one local Gitleaks run over `origin/main` (digest-pinned image, `--redact`, the worktree `.git` mount from the runbook): 0 findings and the commit count reported. Then a scratch copy of the mock file with a credential-shaped test value on a differently shaped line still fails. That copy is never committed.
+  - Done: the entry sits on the `generic-api-key` rule (`[[rules.allowlists]]`), because a top-level `[[allowlists]]` with `paths` skipped the whole file in v8.28.0 whatever `condition` said, and the scratch line slipped through. Final config: `origin/main` (`c810a140`) 571 commits, 0 findings. Default rules only: 2 findings. Scratch copy with an added `upstream_api_key = "<random>"`: exactly that line is reported.
+  - The runbook's worktree mount (`-v "$PWD:$PWD"`) shows an empty directory under Docker Desktop on this Mac, so Gitleaks scanned 0 commits. The local runs mounted the worktree and the common git dir at `/repo` and `/gitcommon` and set `GIT_DIR`, `GIT_COMMON_DIR` and `GIT_WORK_TREE`. The runbook is fixed in 4.1.
+- [x] 2.2 `.github/workflows/security.yml` per design decisions 1-7:
   - triggers `pull_request` to `main` and `workflow_dispatch` with a boolean input `offline`
   - jobs `gitleaks` (`fetch-depth: 0`), `osv-scanner` (online), `pip-audit` (matrix as in `ci.yml`, `pip-audit==2.10.1`), `npm-audit` (`web/`, `--audit-level=high`) and `osv-scanner-offline` (only when `inputs.offline`)
   - `permissions: contents: read`, `concurrency`, timeouts
-- [ ] 2.3 The pin test from group 1 is green against the real workflow. Run `node --test` for the hook, script and `.github/tests` suites.
-- [ ] 2.4 Mutation check: tag one `uses:`, drop one image digest, unpin `pip-audit` (each must turn the pin test red); `mutations: N tried, N caught`
+  - added: the Gitleaks step fails when its log has no `N commits scanned` with N > 0, because Gitleaks over an unreadable history exits 0 (checked locally: 0 commits, exit 0). `safe.directory` is passed by env for the root container.
+- [x] 2.3 The pin test from group 1 is green against the real workflow. Run `node --test` for the hook, script and `.github/tests` suites. Result: 88 tests, 88 pass.
+- [x] 2.4 Mutation check: tag one `uses:`, drop one image digest, unpin `pip-audit` (each must turn the pin test red); `mutations: 3 tried, 3 caught`
 
 ## 3. First runs in GitHub Actions (~30 min, after the push)
 

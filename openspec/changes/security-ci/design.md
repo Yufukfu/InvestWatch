@@ -40,7 +40,8 @@
    - `pip install pip-audit==2.10.1`.
 4. **The Gitleaks job scans the full history on every run** (`fetch-depth: 0`, `gitleaks git`), not only the PR's commits. It takes about 5 s on this repository. It also catches a secret that was rebased in, and the allowlist already covers the old hits.
 5. **Allowlist in `.gitleaks.toml`:**
-   - The file extends the default rules (`[extend] useDefault = true`) and has one `[[allowlists]]` entry with a `description`.
+   - The file extends the default rules (`[extend] useDefault = true`) and has one allowlist entry with a `description`, on the `generic-api-key` rule (`[[rules]] id = "generic-api-key"` with `[[rules.allowlists]]`).
+   - Not a top-level `[[allowlists]]`: in v8.28.0 a top-level entry with `paths` skips the whole file whatever `condition` says, which hid a credential-shaped line added to a scratch copy of the mock file. `targetRules` on a top-level entry did not apply to the extended default rule. Both were checked locally (tasks 2.1).
    - The entry combines `paths` (`contracts/mocks/generate_mocks.py`), `regexTarget = "line"` and a regex for `key="m<digit>-…"`, joined with `condition = "AND"`.
    - Alternative rejected: `.gitleaksignore` fingerprints. They are exact per commit and line, so they break when the mock file is regenerated, and they carry no reason field.
 6. **Pin test: a dependency-free Node test, `.github/tests/workflow-pins.test.mjs`.** It reads `.github/workflows/security.yml` as text and asserts three things:

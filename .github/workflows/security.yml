@@ -1,0 +1,142 @@
+name: security
+
+# Supply-chain scans (ADR 0209, openspec change security-ci): secrets with Gitleaks, dependencies with
+# OSV-Scanner, pip-audit and npm audit. Runs on every PR to main and by hand. Not a required check: a red scan
+# is fixed or logged as a residual risk in the PR body (ADR 0209 decision 2), it does not block a merge itself.
+# Every action is pinned by commit SHA, every image by digest, pip-audit by exact version; the pin test
+# .github/tests/workflow-pins.test.mjs fails on anything unpinned. Bump them in a PR, never to a moving tag.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      offline:
+        description: Also run the offline (on-premise) OSV-Scanner job, which downloads the full database first
+        type: boolean
+        default: false
+
+# Never pull_request_target: code from a fork must not run with a write token or secrets. No secret is used here.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_GITLEAKS: zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+  IMAGE_OSV: ghcr.io/google/osv-scanner:v2.2.4@sha256:f7ba4be68bac8086b1f88fd598fdca1ca67239c79ad2c2b5c78e03a82e5187c4
+
+jobs:
+  gitleaks:
+    name: Secrets (Gitleaks, full history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0  # full history: a shallow clone would scan one commit and report clean
+          persist-credentials: false
+      # The container runs as root over a checkout owned by the runner user, so git needs safe.directory,
+      # or it reads no history and Gitleaks says "0 commits scanned, no leaks found".
+      - name: Scan every commit (values redacted)
+        shell: bash
+        run: |
+          set -uo pipefail
+          docker run --rm -v "$PWD:/repo:ro" -w /repo -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo "$IMAGE_GITLEAKS" git /repo --redact --no-banner --no-color --verbose 2>&1 | tee gitleaks.log
+          status=${PIPESTATUS[0]}
+          if ! grep -qE '\b[1-9][0-9]* commits scanned' gitleaks.log; then
+            echo "::error::Gitleaks read no git history, so a clean result would be false"
+            exit 1
+          fi
+          exit "$status"
+
+  osv-scanner:
+    name: Dependencies (OSV-Scanner, every manifest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      # Online mode: only package names and versions go to osv.dev. -r finds every lockfile and requirements file,
+      # so a new manifest is scanned without a workflow edit.
+      - name: Scan the repository
+        run: docker run --rm -v "$PWD:/src:ro" "$IMAGE_OSV" scan source -r /src
+
+  osv-scanner-offline:
+    name: Dependencies (OSV-Scanner, offline database)
+    if: github.event_name == 'workflow_dispatch' && inputs.offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      # The on-premise variant from ADR 0209: download the databases, then match locally, no per-package query.
+      - name: Download the databases and scan offline
+        run: docker run --rm -v "$PWD:/src:ro" "$IMAGE_OSV" scan source --offline-vulnerabilities --download-offline-databases -r /src
+
+  pip-audit:
+    name: Python dependencies (pip-audit, ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Requirements resolve per interpreter, so this mirrors the python versions of ci.yml and the images.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.12"
+            dirs: "contracts analytics scraper"
+          - python: "3.13"
+            dirs: "api contracts/mock-server"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Audit every requirements file
+        shell: bash
+        env:
+          DIRS: ${{ matrix.dirs }}
+          ALL_DIRS: contracts analytics scraper api contracts/mock-server  # every matrix entry above
+        run: |
+          set -euo pipefail
+          # A requirements file in a directory no matrix entry lists would go unaudited and still be green.
+          for req in $(git ls-files '*requirements*.txt'); do
+            case " $ALL_DIRS " in *" $(dirname "$req") "*) ;; *) echo "::error::$req is not covered by the pip-audit matrix"; exit 1;; esac
+          done
+          pip install pip-audit==2.10.1
+          for dir in $DIRS; do
+            args=()
+            for req in "$dir"/requirements*.txt; do [ -f "$req" ] && args+=(-r "$req"); done
+            if [ ${#args[@]} -eq 0 ]; then echo "::notice::$dir has no requirements file on this branch"; continue; fi
+            echo "::group::$dir"
+            pip-audit "${args[@]}"
+            echo "::endgroup::"
+          done
+
+  npm-audit:
+    name: Node dependencies (npm audit, high and above)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      # Moderate and low advisories are printed but do not fail the job (ADR 0209 gate).
+      - name: Audit every package-lock.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lock in $(git ls-files '*package-lock.json'); do
+            dir=$(dirname "$lock")
+            echo "::group::$dir"
+            (cd "$dir" && npm audit --audit-level=high)
+            echo "::endgroup::"
+          done
