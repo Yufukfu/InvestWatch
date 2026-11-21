@@ -16,7 +16,7 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.
 .venv/Scripts/python ../contracts/validate.py finding findings.json
 ```
 
-The CLI reads one `ScrapedDocument` or a list of them and writes `Finding`s as a JSON list to stdout. JSON logs go to stderr. Exit code 2 means bad input or bad configuration.
+The CLI reads one `ScrapedDocument` or a list of them and writes `Finding`s as a JSON list to stdout. JSON logs go to stderr. An invalid document, or one whose analysis fails, is logged and skipped. Exit codes: 0 ok; 1 at least one document failed analysis (the others' findings are still written); 2 bad input, bad configuration, or no valid document (nothing on stdout).
 
 ## Tests
 
@@ -30,7 +30,7 @@ Without `CONTRACTS_DIR`, the contract tests are skipped, not failed.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REGISTRY_CSV` | `registry/seed.csv` (fictional firms) | KNF firm registry, format in [`registry/README.md`](registry/README.md) |
+| `REGISTRY_CSV` | `registry/seed.csv` (fictional firms; only found from a source checkout or `pip install -e`, so set it in images) | KNF firm registry, format in [`registry/README.md`](registry/README.md) |
 | `LOG_LEVEL` | `INFO` | log level |
 | `CONTRACTS_DIR` | unset | tests only: path to `contracts/` |
 

@@ -12,5 +12,5 @@
 
 ## 3. Closing
 
-- [ ] 3.1 Apply iw-docs-update and add the iw-ai-log row
+- [x] 3.1 Apply iw-docs-update and add the iw-ai-log row
 - [ ] 3.2 Run iw-pr-review checks and a fresh review; fix real findings
