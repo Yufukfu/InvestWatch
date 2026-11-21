@@ -5,7 +5,7 @@ paths:
 
 # Web dashboard rules (Kacper's module)
 
-Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../../.docs/integration-plan.md) §4 (`Finding`), §5 (REST), §6 (Socket.IO). Calibration: [`.docs/analytics-plan.md`](../../.docs/analytics-plan.md) §8. The mock-first and console rules in [`web/CLAUDE.md`](../../web/CLAUDE.md) also apply.
+Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../../.docs/integration-plan.md) §4 (`Finding`), §5 (REST), §6 (Socket.IO). Calibration: [`.docs/analytics-plan.md`](../../.docs/analytics-plan.md) §8. The data-from-backend and console rules in [`web/CLAUDE.md`](../../web/CLAUDE.md) also apply.
 
 ## Architecture (code quality)
 
@@ -53,4 +53,4 @@ Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../..
 
 - `npm run lint`, `npm run typecheck` and `npm test` pass.
 - No `console.log` in the production build.
-- Feature works on the mock data from `contracts/mocks/`. Switching to the live `api` needs no component changes.
+- Feature works against the contract mock server (`contracts/mock-server/`) through the dev proxy, and its tests use the MSW fixtures in `web/src/test/`. Switching to the live `api` needs no component changes.
