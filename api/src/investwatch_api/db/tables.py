@@ -144,7 +144,7 @@ Index("ix_findings_score", findings.c.score)
 job_errors = Table(
     "job_errors", metadata,
     Column("id", Uuid, primary_key=True),
-    Column("source_id", Uuid, ForeignKey("sources.id", ondelete="CASCADE")),
+    Column("source_id", Uuid),  # no FK: errors for scan requests naming unknown sources are kept
     Column("url", Text),
     Column("reason", Text, nullable=False),
     Column("detail", Text),

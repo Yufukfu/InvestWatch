@@ -123,13 +123,13 @@ def upgrade() -> None:
     op.create_table(
         "job_errors",
         sa.Column("id", sa.Uuid(), nullable=False),
+        # No foreign key on purpose: the scraper records errors for scan requests naming unknown sources.
         sa.Column("source_id", sa.Uuid()),
         sa.Column("url", sa.Text()),
         sa.Column("reason", sa.Text(), nullable=False),
         sa.Column("detail", sa.Text()),
         _tz("occurred_at", server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id", name="pk_job_errors"),
-        sa.ForeignKeyConstraint(["source_id"], ["sources.id"], name="fk_job_errors_source_id", ondelete="CASCADE"),
         sa.CheckConstraint("reason <> ''", name="ck_job_errors_reason_not_empty"),
     )
 

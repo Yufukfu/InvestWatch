@@ -119,11 +119,15 @@ Each table SHALL store the scalar fields of its contract as typed columns and SH
 - **THEN** the plan uses an index on `detected_at`, not a sort over a sequential scan
 
 ### Requirement: Job errors table
-`job_errors` SHALL store one row per scraper failure with `id`, optional `source_id`, `url`, a non-empty `reason`, optional `detail` and `occurred_at`. The table SHALL NOT have columns for credentials, proxy URLs or request headers.
+`job_errors` SHALL store one row per scraper failure with `id`, optional `source_id`, `url`, a non-empty `reason`, optional `detail` and `occurred_at`. `source_id` SHALL have no foreign key, so an error about a source that has no `sources` row (for example a scan request naming an unknown source) is still recorded. The table SHALL NOT have columns for credentials, proxy URLs or request headers.
 
 #### Scenario: Error is recorded
 - **WHEN** the scraper inserts a job error with `reason = 'blocked'` for a source
 - **THEN** it can be read back by `source_id`, newest first
+
+#### Scenario: Error for an unknown source is recorded
+- **WHEN** the scraper inserts a job error with `reason = 'invalid_request'` and a `source_id` that has no row in `sources`
+- **THEN** the row is stored and can be read back by that `source_id`
 
 #### Scenario: Empty reason is rejected
 - **WHEN** a job error is inserted with an empty `reason`

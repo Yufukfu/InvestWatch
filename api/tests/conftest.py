@@ -1,4 +1,4 @@
-"""Fixtures for tests that need a real Postgres (design decision 10: SQLite is not a substitute).
+"""Fixtures for tests that need a real Postgres (api-db-schema design decision 11: SQLite is not a substitute).
 
 Set TEST_DATABASE_ADMIN_URL to a superuser or CREATEDB+CREATEROLE connection on any database of a
 Postgres 17 server on localhost, for example the one from api/README.md. Each test session creates its

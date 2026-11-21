@@ -246,6 +246,15 @@ def test_job_error_is_recorded_and_read_newest_first(app_engine):
         assert conn.execute(q).scalars().all() == ["blocked", "timeout"]
 
 
+def test_error_for_an_unknown_source_is_recorded(app_engine):
+    """A scan request can name a source that does not exist; its 'invalid_request' error must not be lost."""
+    unknown = uuid.uuid4()
+    with app_engine.begin() as conn:
+        _insert(conn, job_errors, dict(id=uuid.uuid4(), source_id=unknown, reason="invalid_request"))
+        q = select(job_errors.c.reason).where(job_errors.c.source_id == unknown)
+        assert conn.execute(q).scalars().all() == ["invalid_request"]
+
+
 def test_job_errors_have_no_secret_columns():
     assert set(job_errors.c.keys()) == {"id", "source_id", "url", "reason", "detail", "occurred_at"}
 
