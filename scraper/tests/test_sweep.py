@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import redis
 
+from iw_scraper.ingest import publisher
 from iw_scraper.ingest.document import build_document
 from iw_scraper.ingest.publisher import mark_published, sweep
 from iw_scraper.ingest.store import insert_document
@@ -106,3 +107,14 @@ async def test_concurrent_sweep_skips_rows_claimed_by_a_running_one(pool, stream
     assert second == 0
     assert await first == 1
     assert gated.published == [document_id]
+
+
+async def test_hung_redis_does_not_hold_the_sweep_forever(pool, stream_name, seeded_source, monkeypatch):
+    class HungRedis:
+        async def xadd(self, *args, **kwargs):
+            await asyncio.Event().wait()
+
+    monkeypatch.setattr(publisher, "PUBLISH_TIMEOUT_S", 0.05)
+    document_id = await add_document(pool, seeded_source, "a", age_seconds=300)
+    assert await asyncio.wait_for(sweep(pool, HungRedis(), grace=GRACE, stream=stream_name), 5) == 0
+    assert await published_at(pool, document_id) is None

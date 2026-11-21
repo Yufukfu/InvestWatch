@@ -1,11 +1,14 @@
 """The ingest pipeline end to end: PostgreSQL, MinIO and Redis are real, failures are injected."""
 
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import asyncpg
+import pytest
 import redis
 
-from iw_scraper.ingest import pipeline
+from iw_scraper.ingest import pipeline, publisher
 from iw_scraper.ingest.pipeline import Ingestor
 from iw_scraper.ingest.publisher import sweep
 from iw_scraper.ingest.storage import Storage
@@ -142,6 +145,7 @@ async def test_insert_failure_removes_object_and_publishes_nothing(pool, storage
     assert await storage.list_keys() == []
     assert await doc_count(pool) == 0
     assert await redis_client.xlen(stream_name) == 0
+    assert await reasons(pool) == ["storage_error"]
 
 
 async def test_invalid_page_uploads_and_inserts_nothing(pool, storage, redis_client, stream_name, seeded_source):
@@ -194,3 +198,71 @@ async def test_missing_bucket_fails_clearly_and_is_not_created(storage):
         await missing.check_bucket()  # still missing: the check must not create it
     except BucketMissing:
         pass
+
+
+class HungRedis:
+    async def xadd(self, *args, **kwargs):
+        await asyncio.Event().wait()  # never answers
+
+
+@pytest.mark.parametrize("failure", [ValueError("bad timestamp"), asyncpg.InterfaceError("pool closed"), RuntimeError("boom")])
+async def test_any_failure_after_the_upload_removes_the_object_and_records_an_error(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch, failure
+):
+    async def failing_insert(*_args):
+        raise failure
+
+    monkeypatch.setattr(pipeline, "insert_document", failing_insert)
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source)
+    assert result.outcome == "failed"
+    assert await storage.list_keys() == []
+    assert await reasons(pool) == ["storage_error"]
+
+
+async def test_cancellation_between_upload_and_insert_removes_the_object(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch
+):
+    started = asyncio.Event()
+
+    async def slow_insert(*_args):
+        started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(pipeline, "insert_document", slow_insert)
+    task = asyncio.create_task(run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source))
+    await asyncio.wait_for(started.wait(), timeout=5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert await storage.list_keys() == []
+
+
+async def test_nul_character_in_text_fails_cleanly_after_the_upload(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    page = {**PAGE, "text": "Zysk\x00do 20%"}  # PostgreSQL text cannot hold NUL
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, page)
+    assert result.outcome == "failed"
+    assert await storage.list_keys() == []
+    assert await doc_count(pool) == 0
+    assert len(await reasons(pool)) == 1
+
+
+async def test_hung_redis_is_bounded_by_the_publish_timeout(pool, storage, stream_name, seeded_source, monkeypatch):
+    monkeypatch.setattr(publisher, "PUBLISH_TIMEOUT_S", 0.05)
+    result = await asyncio.wait_for(run(Ingestor(pool, storage, HungRedis(), stream=stream_name), seeded_source), 5)
+    assert result.outcome == "inserted"
+    assert await reasons(pool) == ["publish_failed"]
+
+
+async def test_failing_dedup_check_uploads_nothing_and_records_an_error(
+    pool, storage, redis_client, stream_name, seeded_source, monkeypatch
+):
+    async def broken_check(*_args):
+        raise asyncpg.InterfaceError("pool closed")
+
+    monkeypatch.setattr(pipeline, "is_duplicate", broken_check)
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source)
+    assert result.outcome == "failed"
+    assert await storage.list_keys() == []
+    assert await reasons(pool) == ["storage_error"]

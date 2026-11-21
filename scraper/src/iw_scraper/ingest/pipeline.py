@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -6,7 +7,7 @@ import asyncpg
 from redis.exceptions import RedisError
 
 from iw_scraper.ingest.document import build_document
-from iw_scraper.ingest.errors import record_error
+from iw_scraper.ingest.errors import record_error, redact
 from iw_scraper.ingest.publisher import STREAM, mark_published, publish
 from iw_scraper.ingest.storage import Storage
 from iw_scraper.ingest.store import IngestResult, insert_document, is_duplicate
@@ -38,7 +39,7 @@ class Ingestor:
         try:
             if await is_duplicate(self.pool, source_id, doc["content_hash"]):
                 return IngestResult("duplicate")
-        except (asyncpg.PostgresError, OSError) as exc:
+        except Exception as exc:  # nothing is uploaded yet; any failure here is a recorded storage error
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"dedup check failed: {exc}", source_id))
 
         key = None
@@ -52,7 +53,12 @@ class Ingestor:
 
         try:
             result = await insert_document(self.pool, doc)
-        except (asyncpg.PostgresError, OSError) as exc:
+        except asyncio.CancelledError:
+            await self._remove_object(key)  # e.g. the orchestrator's timeout: do not leave the upload behind
+            raise
+        except Exception as exc:
+            # whatever went wrong after the upload (driver, pool, a value the schema let through), the object
+            # goes and the failure is recorded; it must never escape with an orphan behind it
             await self._remove_object(key)
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"insert failed: {exc}", source_id))
 
@@ -71,9 +77,9 @@ class Ingestor:
             return  # the row stays unpublished; the sweep republishes it
         try:
             await mark_published(self.pool, document_id)
-        except (asyncpg.PostgresError, OSError) as exc:
+        except Exception as exc:
             # published but unmarked: the sweep may publish it again, which consumers deduplicate
-            log.warning(json.dumps({"event": "mark_published_failed", "document_id": document_id, "error": str(exc)}))
+            log.warning(json.dumps({"event": "mark_published_failed", "document_id": document_id, "error": redact(str(exc))}))
 
     async def _remove_object(self, key: str | None) -> None:
         if key is None:
@@ -81,7 +87,7 @@ class Ingestor:
         try:
             await self.storage.remove(key)
         except Exception as exc:
-            log.error(json.dumps({"event": "orphan_object", "key": key, "error": str(exc)}))
+            log.error(json.dumps({"event": "orphan_object", "key": key, "error": redact(str(exc))}))
 
     async def _fail(self, error: JobError) -> IngestResult:
         await self._record(error)
@@ -90,5 +96,7 @@ class Ingestor:
     async def _record(self, error: JobError) -> None:
         try:
             await record_error(self.pool, error)
-        except (asyncpg.PostgresError, OSError) as exc:
-            log.error(json.dumps({"event": "job_error_not_recorded", "reason": error.reason.value, "error": str(exc)}))
+        except Exception as exc:  # a failing sink must not mask the failure it was recording
+            log.error(
+                json.dumps({"event": "job_error_not_recorded", "reason": error.reason.value, "error": redact(str(exc))})
+            )

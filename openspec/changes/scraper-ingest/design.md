@@ -24,6 +24,9 @@ Stateless Python async code that turns a parsed page into a stored, announced do
 
 - [Volatile page text creates new rows] -> stripping it is per-site parser work in `scraper-v1`, not hash work.
 - [Redis publish lost after commit] -> republish sweep.
+- [`job_errors.url` is never written] -> `JobError` (shared types, `scraper-v1`) has no `url` field, so the page URL is not in the sink; add the field in a follow-up change if the dashboard needs it.
+- [Orphan objects after a crash] -> cancellation and every failure after the upload remove the object, but a hard crash between upload and insert still leaves one; a periodic list-and-diff of `iw-raw` against `documents.html_object_key` is a possible follow-up.
+- [`check_bucket` is not wired] -> the startup call belongs to the service entry point in `scraper-orchestration`.
 - [Schema drift] -> the throwaway test schema mirrors module C's `0001_initial`; the real migration is exercised in `scraper-orchestration`'s end-to-end test. A new column needs a new revision from C, never an edit of an applied one.
 
 ## Open Questions
