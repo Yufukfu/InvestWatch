@@ -1,0 +1,16 @@
+# Repository-wide rules. Language-specific rules live in each service folder.
+
+# Secrets: only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Sync-conflict copies (e.g. iCloud "file 2.py")
+* [0-9].*
