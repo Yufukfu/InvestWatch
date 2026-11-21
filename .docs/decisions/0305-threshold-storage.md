@@ -1,0 +1,36 @@
+# 0305. Where module thresholds live and who emits `finding.high_risk`
+
+- Status: accepted
+- Date: 2026-11-21
+- Deciders: agent-written from Damian's choices; accepted by: pending approval of PR #3
+
+## Context
+
+Each module (M1, M2, M3) has a threshold that the calibration panel changes live (`GET/PUT /settings/thresholds` in [`contracts/openapi.yaml`](../../contracts/openapi.yaml)). The threshold turns the raw `score` into `risk_level` and decides when the dashboard gets a `finding.high_risk` alert ([integration-plan.md](../integration-plan.md) §4-§6, [`contracts/schemas/events.schema.json`](../../contracts/schemas/events.schema.json)).
+
+Two existing statements pull in different directions: §6 of the integration plan lists `finding.high_risk` among the events published on `iw:events` (which analytics writes to), while [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) says the threshold is applied in `api`, never in analytics. The Socket.IO events the dashboard receives are the same in every option below; only the producer and the storage change.
+
+## Options considered
+
+1. **Thresholds in a Redis key (for example `iw:settings:thresholds`) written by the API; analytics reads it and emits `finding.high_risk`.** Fast reads, no extra table. Analytics then applies the threshold, contrary to `analytics/CLAUDE.md`, and the setting is lost if Redis is not persistent.
+2. **Thresholds in a Postgres `settings` table; analytics reads it (cached) and emits `finding.high_risk`.** Durable and visible next to the findings. Same objection as option 1 about analytics applying the threshold; adds a table to the schema ([0303](0303-database-schema-ownership.md)).
+3. **Thresholds stored by the API (Postgres or Redis); analytics publishes only `finding.created`; the API, when relaying events to Socket.IO, adds `risk_level` and emits `finding.high_risk` itself.** Keeps analytics threshold-free as `analytics/CLAUDE.md` requires; a threshold change takes effect immediately without touching analytics. The API relay becomes slightly smarter, and §6 of the integration plan would need a one-line update about who emits the event.
+
+## Decision
+
+Option 1: **thresholds in a Redis key (`iw:settings:thresholds`) written by the API; analytics reads it and emits `finding.high_risk`.**
+
+Why (Damian):
+- It keeps the event flow of [integration-plan.md](../integration-plan.md) §6, where analytics publishes `finding.high_risk` on `iw:events`; nothing in the flow changes.
+- The API relay stays a plain pass-through from `iw:events` to Socket.IO with no threshold logic, which is less work before Integration #1.
+
+Who applies the threshold, so it happens in exactly two well-defined places:
+- **API (Damian):** owns the key. `PUT /settings/thresholds` writes it, `GET` reads it, and when the key is missing the API writes the defaults. The API derives `risk_level` for REST responses from the current key.
+- **Analytics (Damian):** stores only the raw `score` on the finding. When it creates a finding it reads the key (no cache) and, if `score` is at or above the module threshold, publishes `finding.high_risk` next to `finding.created`. Analytics never computes `risk_level`.
+
+## Consequences
+
+- No extra table and fast reads; `finding.high_risk` keeps its producer from integration-plan §6.
+- The threshold logic sits in two services that read the same key. After a slider move, REST `risk_level` follows the new threshold at once, while `finding.high_risk` alerts already sent are not re-evaluated: an alert reflects the threshold at the moment the finding was created.
+- Redis must be persistent (AOF in `docker compose`), otherwise thresholds fall back to the defaults on restart; set up by Damian together with `docker-compose.yml`.
+- Docs updated in this PR, all owned by Damian: [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) (threshold line), [integration-plan.md](../integration-plan.md) §4 (score comment) and §6 (`finding.high_risk` row), [analytics-plan.md](../analytics-plan.md) §1 (principle 4).
