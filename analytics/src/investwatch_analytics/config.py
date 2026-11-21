@@ -216,8 +216,11 @@ def _check_url(url: str, var: str, *, has_key: bool, key_var: str) -> None:
         parts = urlsplit(url)
         host = parts.hostname
         userinfo = parts.username is not None or parts.password is not None
+        parts.port  # urlsplit checks the port only when it is read
     except ValueError:
         raise ConfigError(f"{var} is not a valid URL") from None
+    if any(c.isspace() for c in url):
+        raise ConfigError(f"{var} must not contain whitespace")
     if parts.scheme not in ("http", "https") or not host:
         raise ConfigError(f"{var} must be an http(s) URL with a host, e.g. http://ollama:11434/v1")
     if userinfo or parts.query or parts.fragment:

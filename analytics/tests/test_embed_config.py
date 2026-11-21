@@ -71,12 +71,30 @@ def test_key_over_plain_http_to_remote_host_rejected():
         EmbedSettings.from_env({"EMBED_BASE_URL": "http://tei.lan/v1", "EMBED_API_KEY": "sk-emb-123"})
 
 
-def test_key_never_in_repr_or_error():
+def test_key_never_in_repr():
     s = EmbedSettings.from_env({"EMBED_BASE_URL": URL, "EMBED_API_KEY": "sk-emb-123"})
     assert s.api_key == "sk-emb-123" and "sk-emb-123" not in repr(s)
+
+
+def test_key_never_in_url_error():
     with pytest.raises(ConfigError) as exc:
-        EmbedSettings.from_env({"EMBED_BASE_URL": URL, "EMBED_API_KEY": "sk-emb-123", "EMBED_DIM": "x"})
+        EmbedSettings.from_env({"EMBED_BASE_URL": "http://tei.lan/v1", "EMBED_API_KEY": "sk-emb-123"})
     assert "sk-emb-123" not in str(exc.value)
+
+
+def test_key_over_https_to_remote_host_accepted():
+    s = EmbedSettings.from_env({"EMBED_BASE_URL": "https://tei.lan/v1", "EMBED_API_KEY": "k"})
+    assert s.enabled and s.mode == "remote"
+
+
+def test_key_over_plain_http_to_local_host_accepted():
+    assert EmbedSettings.from_env({"EMBED_BASE_URL": URL, "EMBED_API_KEY": "k"}).mode == "local"
+
+
+@pytest.mark.parametrize("url", ["http://ollama:99999/v1", "http://ollama:abc/v1", "http://ollama/v1 x"])
+def test_bad_port_or_whitespace_rejected_at_startup(url):
+    with pytest.raises(ConfigError, match="EMBED_BASE_URL"):
+        EmbedSettings.from_env({"EMBED_BASE_URL": url})
 
 
 def test_budget_with_llm_must_stay_below_claim_idle():
