@@ -127,6 +127,17 @@ async def test_a_host_any_source_uses_is_not_proposed_again(pool, active):
     assert len(await sources(pool)) == 2
 
 
+@pytest.mark.parametrize("registered", ["https://known.example./x", "https://KNOWN.Example/x", "http://www.known.example:80/x"])
+async def test_a_registered_url_is_matched_by_host_however_it_is_written(pool, registered):
+    parent = await add_source(pool, "https://alfa.example/")
+    await add_source(pool, registered, active=False)
+    await add_document(pool, parent, ["https://known.example/other"])
+
+    report = await run(pool)
+
+    assert report.inserted == 0
+
+
 async def test_existing_sources_and_documents_are_left_untouched(pool):
     parent = await add_source(pool, "https://alfa.example/")
     await add_document(pool, parent, ["https://new.example/"])

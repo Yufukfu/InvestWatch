@@ -14,10 +14,10 @@
 
 ## 3. Command line and reporting
 
-- [ ] 3.1 Write the command tests first (argument parsing for `--since`, `--limit`, `--dry-run`; JSON log lines carry the four counts; dry run inserts nothing; missing `DATABASE_URL` and an unreachable database exit non-zero with no credentials in the output; nothing is written with `print`); confirm they fail
-- [ ] 3.2 Implement `main` over the pool and `configure_logging`, and verify the command tests pass
-- [ ] 3.3 Run `python -m iw_scraper.discover --dry-run` in the image against a database seeded with a few documents and verify the logged candidates, then run it once for real and once again and verify the second run inserts nothing
-- [ ] 3.4 Mutation check: swap dry-run to write, drop the cap in `main`, and verify tests go red; record `mutations: N tried, N caught`
+- [x] 3.1 Write the command tests first (argument parsing for `--since`, `--limit`, `--dry-run`; JSON log lines carry the four counts; dry run inserts nothing; missing `DATABASE_URL` and an unreachable database exit non-zero with no credentials in the output; nothing is written with `print`); confirm they fail
+- [x] 3.2 Implement `main` over the pool and `configure_logging`, and verify the command tests pass
+- [x] 3.3 Run `python -m iw_scraper.discover --dry-run` in the image against a database seeded with a few documents and verify the logged candidates, then run it once for real and once again and verify the second run inserts nothing
+- [x] 3.4 Mutation check: swap dry-run to write, drop the cap in `main`, and verify tests go red; record `mutations: N tried, N caught`. Result: `mutations: 19 tried, 19 caught` (12 on the command, 7 on the host and SQL hardening added after the group 2 review: label and TLD shape, length caps, trailing dot, href type guard)
 
 ## 4. Closing
 

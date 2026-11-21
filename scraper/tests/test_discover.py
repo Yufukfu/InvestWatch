@@ -59,6 +59,12 @@ def test_a_host_that_only_ends_like_a_denylisted_one_is_kept():
         "https://localhost./",
         "http://127.0.0.1./a",
         "https://good..example/",
+        "https://.example.com/",
+        "https://-bad-.example.com/",
+        "https://0x7f.0x1/",
+        "https://good.123/",
+        "https://" + "a" * 189 + ".example/",
+        "https://good.example/" + "a" * 2000,
         "https://good.example。evil/",
         "https://ｌｏ.example/",
         "https://intranet/",
@@ -78,6 +84,10 @@ def test_a_host_that_only_ends_like_a_denylisted_one_is_kept():
 )
 def test_unsafe_url_shapes_are_dropped(href):
     assert clean_url(href) is None
+
+
+def test_punycode_hosts_are_accepted():
+    assert clean_url("https://xn--bcher-kva.example/a") == "https://xn--bcher-kva.example/a"
 
 
 def test_a_trailing_dot_on_the_host_is_removed():
