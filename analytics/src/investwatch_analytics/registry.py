@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import csv
 import re
+import unicodedata
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -53,8 +55,31 @@ def core_name(name: str) -> str:
     return re.sub(r"\s+", " ", stripped).strip(" -–,.")
 
 
+#: Invisible characters a scraped text may hide inside a name (zero-width space, joiners, word joiner, BOM, soft
+#: hyphen); they are dropped before names are compared (#35 review 2).
+_INVISIBLE = frozenset("\u200b\u200c\u200d\u2060\ufeff\u00ad")
+
+
+@lru_cache(maxsize=8)
+def fold(text: str) -> tuple[str, tuple[int, ...]]:
+    """NFKC per character with invisible characters removed, and for each folded character its index in `text`.
+
+    Names are compared on the folded text (so a fullwidth or zero-width variant still matches by name) while every
+    quote is cut from the original text through the index map, so evidence stays a verbatim substring.
+    """
+    out: list[str] = []
+    where: list[int] = []
+    for i, c in enumerate(text):
+        if c in _INVISIBLE:
+            continue
+        folded = unicodedata.normalize("NFKC", c) if not c.isascii() else c
+        out.append(folded)
+        where.extend([i] * len(folded))
+    return "".join(out), tuple(where)
+
+
 def _alias_pattern(alias: str) -> re.Pattern:
-    body = r"\s+".join(re.escape(t) for t in alias.split())
+    body = r"\s+".join(re.escape(t) for t in fold(alias)[0].split())
     return re.compile(rf"(?<!\w){body}(?!\w)", re.IGNORECASE)
 
 
@@ -124,16 +149,22 @@ class Registry:
         return self._by_id[firm_id]
 
     def find_name(self, firm: Firm, text: str) -> str | None:
-        """Exact quote of the firm's name or an alias in `text`, or None."""
-        m = self._find(firm, text)
-        return m.group(0) if m else None
+        """Exact quote (from the original text) of the firm's name or an alias in `text`, or None."""
+        span = self._find(firm, text)
+        return text[span[0]:span[1]] if span else None
 
-    def _find(self, firm: Firm, text: str) -> re.Match | None:
+    def _find(self, firm: Firm, text: str) -> tuple[int, int] | None:
+        """Span in the ORIGINAL text of the longest name form found in the folded text, or None."""
+        folded, where = fold(text)
         for pattern in self._patterns[firm.id]:
-            m = pattern.search(text)
+            m = pattern.search(folded)
             if m:
-                return m
+                return where[m.start()], where[m.end() - 1] + 1
         return None
+
+    def _first(self, firm: Firm, text: str) -> int:
+        folded, where = fold(text)
+        return min(where[h.start()] for p in self._patterns[firm.id] if (h := p.search(folded)))
 
     def firm_on_host(self, host: str) -> Firm | None:
         """The firm whose `website_domains` hold `host` (equal or a subdomain), or None."""
@@ -164,13 +195,13 @@ class Registry:
         page = http_host(url)
         host = _normalize_domain(page) if page else ""
         # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
-        segments = [words for seg in _PUNCT.split(text) if (words := [w.lower() for w in _WORD.findall(seg)])]
+        segments = [words for seg in _PUNCT.split(fold(text)[0]) if (words := [w.lower() for w in _WORD.findall(seg)])]
         for firm in self.firms:
             on_domain = not is_social(host) and any(host == d or host.endswith("." + d) for d in firm.domains)
-            if m := self._find(firm, text):
+            if span := self._find(firm, text):
                 # Rank by the firm's earliest mention in any form; quote its longest form.
-                pos = min(h.start() for p in self._patterns[firm.id] if (h := p.search(text)))
-                match = FirmMatch(firm, NAME_CONFIDENCE, "name", m.group(0))
+                pos = self._first(firm, text)
+                match = FirmMatch(firm, NAME_CONFIDENCE, "name", text[span[0]:span[1]])
             elif on_domain:
                 match, pos = FirmMatch(firm, DOMAIN_CONFIDENCE, "domain", None), len(text)
             elif (ratio := _best_fuzzy_in(firm.core, segments)) >= FUZZY_MIN_RATIO:

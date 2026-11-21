@@ -92,14 +92,10 @@ def test_impersonator_handles_are_not_the_firm(registry, handle):
     assert publisher_firm(doc(text="Alfa Inwestycje", author={"handle": handle}), registry) is None
 
 
-def test_publisher_by_handle(registry):
-    d = doc(text="Konto w Alfa Inwestycje.", author={"handle": "@alfainwestycje"})
-    assert publisher_firm(d, registry).id == ALFA
-
-
-def test_publisher_by_handle_of_alias(registry):
-    d = doc(text="x", author={"handle": "@AlfaInwestycjeDM"})
-    assert publisher_firm(d, registry).id == ALFA
+@pytest.mark.parametrize("handle", ["@alfainwestycje", "@AlfaInwestycjeDM"])
+def test_a_handle_alone_is_not_the_firm(registry, handle):
+    """#35 review 2: a name-like handle on any platform proves nothing; a firm domain must back it."""
+    assert publisher_firm(doc(text="Konto w Alfa Inwestycje.", author={"handle": handle}), registry) is None
 
 
 def test_fan_account_is_not_the_firm(registry):
@@ -189,8 +185,12 @@ def test_empty_page_host_never_fails_the_advertiser(registry):
 
 
 def test_firm_publisher_in_registry(registry):
-    a = build_advertiser(doc(text="x", author={"handle": "@alfainwestycje"}), registry)
+    a = build_advertiser(doc(text="x", author={"handle": "@alfainwestycje", "profile_url": "https://alfa-inwestycje.example.com/o-nas"}), registry)
     assert a.in_registry is True
+
+
+def test_handle_only_publisher_is_not_in_registry(registry):
+    assert build_advertiser(doc(text="x", author={"handle": "@alfainwestycje"}), registry).in_registry is False
 
 
 def test_page_host_keeps_original_case_and_drops_www():

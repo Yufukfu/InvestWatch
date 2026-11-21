@@ -244,8 +244,14 @@ def test_s16_social_without_author(registry, cat):
 
 
 def test_s16_firm_itself_passes(registry, cat):
-    r = signals(third_party(text="Alfa Inwestycje", author={"handle": "@alfainwestycje"}), registry, cat)["S1.6"]
+    r = signals(third_party(text="Alfa Inwestycje", author={"handle": "@alfainwestycje", "profile_url": "https://alfa-inwestycje.example.com/o-nas"}), registry, cat)["S1.6"]
     assert r.result == "pass"
+
+
+def test_s16_handle_like_the_firm_is_unconfirmed(registry, cat):
+    r = signals(third_party(text="Alfa Inwestycje", author={"handle": "@alfainwestycje"}), registry, cat)["S1.6"]
+    assert r.result == "uncertain" and r.evidence == "@alfainwestycje"
+    assert "nie potwierdzono, że konto należy do firmy" in r.explanation.lower()
 
 
 # ---- S1.7 --------------------------------------------------------------------------------------
@@ -411,3 +417,8 @@ def test_m1_texts_name_the_loaded_registry(mock, registry, cat):
     f = finding(mock(JAN), registry, cat)
     assert "rejestru KNF" not in f.summary and "z załadowanego rejestru firm (dane demonstracyjne)" in f.summary
     assert all("rejestru KNF" not in (r.explanation or "") for r in f.rules)
+
+
+def test_s16_handle_naming_another_firm_is_a_third_party(registry, cat):
+    r = signals(third_party(text="Konto w Alfa Inwestycje DM.", author={"handle": "@bankprzykladowy"}), registry, cat)["S1.6"]
+    assert (r.result, r.evidence) == ("fail", "@bankprzykladowy")

@@ -10,9 +10,9 @@ Kacper's second review of PR #35 (20:11Z). Branch `analytics/analytics-m1-m3` (p
 
 ## 2. Handle identity and confusables
 
-- [ ] 2.1 Failing tests: `@alfainwestycje` on TikTok gives M1 (not M2) with S1.6 `uncertain` and "nie potwierdzono, że konto należy do firmy"; a profile host on the firm's domain still gives M2; `Ａｌｆａ Inwestycje` and `Alfa​ Inwestycje` match by name with evidence quoted from the original text; Cyrillic stays unmatched
-- [ ] 2.2 `modules/advertiser.py` (`publisher_firm` by hosts only), `rules/m1.py` (S1.6), `registry.py` (normalized name matching with an offset map); tests green
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Failing tests: `@alfainwestycje` on TikTok gives M1 (not M2) with S1.6 `uncertain` and "nie potwierdzono, że konto należy do firmy"; a profile host on the firm's domain still gives M2; `Ａｌｆａ Inwestycje` and `Alfa​ Inwestycje` match by name with evidence quoted from the original text; Cyrillic stays unmatched
+- [x] 2.2 `modules/advertiser.py` (`publisher_firm` by hosts only), `rules/m1.py` (S1.6), `registry.py` (normalized name matching with an offset map); tests green
+- [x] 2.3 Mutation check; `mutations: 9 tried, 9 caught` (three first survivors, a handle naming another firm, a fullwidth registry name and a zero-width character inside a fuzzy name, got their own tests)
 
 ## 3. Robust ReDoS tests
 

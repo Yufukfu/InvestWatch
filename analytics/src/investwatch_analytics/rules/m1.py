@@ -10,7 +10,7 @@ import re
 from functools import cached_property
 
 from ..models import RuleResult
-from ..modules.advertiser import is_social, page_host, publisher_firm
+from ..modules.advertiser import firm_named_by_handle, is_social, page_host, publisher_firm
 from ..registry import http_host
 from .engine import Context, Rule, compile_patterns, metadata_fields, register
 
@@ -183,6 +183,10 @@ class S16AuthorNotFirm(MetadataRule):
         if match is not None and publisher is not None and publisher.id == match.firm.id:
             return self.result("pass", None, "Autorem jest sama firma.")
         author = ctx.doc.author
+        named = firm_named_by_handle(ctx.doc, ctx.registry)
+        if match is not None and named is not None and named.id == match.firm.id:
+            return self.result("uncertain", author.handle.strip(),
+                               "Nazwa konta jak nazwa firmy, ale nie potwierdzono, że konto należy do firmy (autor).")
         if author is not None and (author.handle or "").strip():
             return self.result("fail", author.handle.strip(), "Autor materiału nie jest firmą inwestycyjną.")
         if author is not None and (author.name or "").strip():

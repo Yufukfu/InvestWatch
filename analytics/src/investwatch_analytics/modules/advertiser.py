@@ -72,7 +72,13 @@ def publisher_firm(doc: ScrapedDocument, registry: Registry) -> Firm | None:
     host = http_host(doc.url)
     if host and not is_social(host) and (firm := registry.firm_on_host(host)) is not None:
         return firm
-    return _firm_by_handle(author.handle if author else None, registry)
+    # A handle alone proves nothing: anyone can register `@alfainwestycje` on any platform (#35 review 2).
+    return None
+
+
+def firm_named_by_handle(doc: ScrapedDocument, registry: Registry) -> Firm | None:
+    """The firm whose name the author's handle equals, without proof the account is the firm's (S1.6)."""
+    return _firm_by_handle(doc.author.handle if doc.author else None, registry)
 
 
 def _cut(value: str | None) -> str | None:

@@ -104,14 +104,22 @@ def test_unmatched_own_page_without_advisory(registry, catalogue, caplog):
 
 
 def test_firms_own_social_account_goes_to_m2(registry, catalogue):
-    raw = make_doc(**SOCIAL, text="Alfa Inwestycje: nowe konto IKE. Otwórz konto.", author={"handle": "@alfainwestycje"})
+    raw = make_doc(**SOCIAL, text="Alfa Inwestycje: nowe konto IKE. Otwórz konto.", author={"handle": "@alfainwestycje", "profile_url": "https://alfa-inwestycje.example.com/o-nas"})
     [f] = run(raw, registry, catalogue)
     assert f.module == "M2" and f.firm.name.startswith("Alfa") and f.firm.match_confidence == 0.95
 
 
+def test_handle_like_the_firm_on_another_platform_is_m1(registry, catalogue):
+    raw = make_doc(source_kind="third_party", platform="tiktok", url="https://www.tiktok.com/@alfainwestycje/video/1",
+                   author={"handle": "@alfainwestycje"}, text="Alfa Inwestycje: kupuj u nas, link w bio!")
+    findings = run(raw, registry, catalogue)
+    assert findings and findings[0].module == "M1" and all(f.module != "M2" for f in findings)
+    assert {r.rule_id: r.result for r in findings[0].rules}["S1.6"] == "uncertain"
+
+
 def test_firm_account_naming_another_firm_is_still_its_m2(registry, catalogue):
     raw = make_doc(**SOCIAL, text="Bank Przykładowy jest naszym bankiem depozytariuszem.",
-                   author={"handle": "@alfainwestycje"})
+                   author={"handle": "@alfainwestycje", "profile_url": "https://alfa-inwestycje.example.com/o-nas"})
     [f] = run(raw, registry, catalogue)
     assert f.module == "M2" and f.firm.name.startswith("Alfa")
     assert {r.rule_id: r.result for r in f.rules}["R1"] == "fail"
@@ -335,7 +343,7 @@ def test_six_m1_m3_mocks(mock_documents, registry, catalogue, finding_validator)
 
 def test_firm_account_naming_itself_after_another_firm(registry, catalogue):
     raw = make_doc(**SOCIAL, text="Bank Przykładowy przechowuje środki klientów Alfa Inwestycje.",
-                   author={"handle": "@alfainwestycje"})
+                   author={"handle": "@alfainwestycje", "profile_url": "https://alfa-inwestycje.example.com/o-nas"})
     [f] = run(raw, registry, catalogue)
     assert f.firm.name.startswith("Alfa") and f.firm.match_confidence == 0.95
     assert {r.rule_id: r.result for r in f.rules}["R1"] == "pass"
@@ -374,7 +382,7 @@ def test_kacpers_english_advisory_offer(registry, catalogue):
 
 
 def test_foreign_no_branch_own_account_is_out_of_scope(registry, catalogue, caplog):
-    raw = make_doc(**SOCIAL, author={"handle": "@atlanticbrokers"},
+    raw = make_doc(**SOCIAL, author={"handle": "@atlanticbrokers", "profile_url": "https://atlantic-brokers.example.com/"},
                    text="Atlantic Brokers: otwórz konto i zarabiaj 20% rocznie. Rekomendujemy kupno akcji.")
     with caplog.at_level(logging.INFO):
         assert run(raw, registry, catalogue) == []
