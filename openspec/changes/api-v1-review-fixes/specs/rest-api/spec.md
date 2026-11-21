@@ -130,7 +130,7 @@ The API SHALL compute `risk_level` for every finding it returns, and for the `ri
 - **THEN** the response is 422
 
 ### Requirement: Sources management
-`GET /api/sources` SHALL list all sources with `documents_count` computed from `documents`. `POST /api/sources` SHALL require `name`, `platform`, `url`, `source_kind` and `target_modules`, generate a UUID v4 id, default `active` to true and `schedule_cron` to null, and return 201 with the full `Source`. `PATCH /api/sources/{id}` SHALL apply a partial update where only `schedule_cron` may be set to null. `url` SHALL be an http(s) URL without credentials and SHALL be stored exactly as sent; `name` and `schedule_cron` SHALL NOT contain NUL characters.
+`GET /api/sources` SHALL list all sources with `documents_count` computed from `documents`. `POST /api/sources` SHALL require `name`, `platform`, `url`, `source_kind` and `target_modules`, generate a UUID v4 id, default `active` to true and `schedule_cron` to null, and return 201 with the full `Source`. `PATCH /api/sources/{id}` SHALL apply a partial update where only `schedule_cron` may be set to null. `url` SHALL be an http(s) URL without credentials, whitespace, control characters or backslashes, and SHALL be stored exactly as sent; `name` and `schedule_cron` SHALL NOT contain NUL characters.
 
 #### Scenario: Create a source
 - **WHEN** a client posts a valid source without `active`
@@ -143,6 +143,10 @@ The API SHALL compute `risk_level` for every finding it returns, and for the `ri
 #### Scenario: URL kept as sent
 - **WHEN** a client posts `url: "https://Alfa.example"` (no trailing slash, mixed case)
 - **THEN** the stored and returned `url` is exactly `https://Alfa.example`
+
+#### Scenario: URL a parser could read differently
+- **WHEN** a client posts a `url` with a leading space, a trailing newline, a tab, a NUL, a DEL or a backslash (for example `https://good.example\@evil.example`)
+- **THEN** the response is 422 and no row is created
 
 #### Scenario: NUL in a text field
 - **WHEN** a client posts or patches a `name` or `schedule_cron` containing a NUL character

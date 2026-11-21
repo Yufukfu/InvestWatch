@@ -59,6 +59,10 @@ def _http_url_as_sent(value):
         return value
     if not isinstance(value, str):
         raise ValueError("url must be a string")
+    # HttpUrl strips spaces, drops tabs and newlines and reads "\\" as "/" before it validates; the string we store
+    # is the raw one, so reject anything a parser could read differently (whitespace, controls, DEL, backslash).
+    if any(ord(c) <= 0x20 or ord(c) == 0x7F or c == "\\" for c in value):
+        raise ValueError("url must not contain whitespace, control characters or backslashes")
     try:
         parsed = _HTTP_URL.validate_python(value)
     except ValidationError:

@@ -252,6 +252,23 @@ def test_create_with_invalid_value(client, over):
     assert client.post("/api/sources", json={**NEW_SOURCE, **over}).status_code == 422
 
 
+BAD_URLS = {
+    "newline": "https://a.example" + chr(10),
+    "leading-space": "  https://a.example",
+    "tab": "https://a.exa" + chr(9) + "mple/x",
+    "nul": "https://a.example/" + chr(0),
+    "backslash": "https://good.example" + chr(92) + "@evil.example",
+    "del": "https://a.example/x" + chr(127),
+}
+
+
+@pytest.mark.parametrize("url", list(BAD_URLS.values()), ids=list(BAD_URLS))
+def test_url_with_control_characters_or_backslash_is_rejected(client, migrated_db, url):
+    r = client.post("/api/sources", json={**NEW_SOURCE, "url": url})
+    assert r.status_code == 422 and r.json()["error"] == "validation_error"
+    assert _rows(migrated_db.app_url, sources) == []
+
+
 def test_url_kept_as_sent(client):
     r = client.post("/api/sources", json={**NEW_SOURCE, "url": "https://Alfa.example"})
     assert r.status_code == 201 and r.json()["url"] == "https://Alfa.example"
