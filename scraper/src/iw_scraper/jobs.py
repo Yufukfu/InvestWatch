@@ -42,6 +42,7 @@ class AttemptResult:
     http_status: int | None = None
     retry_after: float | None = None
     deferral: Deferral | None = None
+    recorded: bool = False  # the collector already stored `error` as a job error, so the queue does not
 
 
 @dataclass(frozen=True)
@@ -142,7 +143,7 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, requested: bool, l
 
     status = derive_status(documents=result.documents, errors=1 if result.error else 0)
     await health.record(ok=status != "failed")
-    if result.error:
+    if result.error and not result.recorded:
         await ctx["record_error"](result.error)
     await announce_start()  # a collector that never announced still gets a start before the finish
     await _finish_if_started(ctx, source_id, status=status, documents=result.documents)

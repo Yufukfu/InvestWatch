@@ -11,7 +11,7 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 2. Runs, scan requests, schedule
 
-- [ ] 2.1 Failing tests, then `run_source(source_id)` loading the source row from PostgreSQL and wiring guards, fetch, parse and ingest into a job outcome; the active re-check at job start, deactivated-after-enqueue and manual-only scenarios pass over stubbed stages
+- [x] 2.1 Failing tests, then `run_source(source_id)` loading the source row from PostgreSQL and wiring guards, fetch, parse and ingest into a job outcome; the active re-check at job start, deactivated-after-enqueue and manual-only scenarios pass over stubbed stages (`collect.py`, `pgstore.py`; the active re-check lives in `execute_job`); `mutations: 20 tried, 20 caught` (two survivors on the `Retry-After` digit guards got test cases)
 - [x] 2.2 Failing tests, then `scan.started`/`scan.finished` once per job on `iw:events` (silent for deferred and coalesced jobs, `failed` for a requested job that cannot run), status derivation, and `sources.last_run_status` (`running`), `last_run_at` (no `documents_count`: the API counts rows); the progress and status scenarios pass
 - [x] 2.3 Failing tests, then the `iw:scan-requests` consumer (stable consumer name, claim of stale pending messages, enqueue with the `requested` flag, `invalid_request` with `scan.finished` failed for a known uuid, silent malformed, ack); the scan-request scenarios pass against a real Redis
 - [x] 2.4 Failing tests, then the scheduler (cron to unique-id jobs, one enqueue with two workers, re-read each minute, `null` skipped, invalid cron recorded once) and the sweep on its interval; the schedule scenarios pass. First check that `arq` rejects a duplicate job id; if not, use a Redis `SET NX` slot key

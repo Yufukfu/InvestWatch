@@ -152,3 +152,12 @@ async def test_domain_outcome_is_recorded_even_when_the_error_sink_fails(redis, 
         await job.result(timeout=10, poll_delay=0.05)
 
     assert int(await redis.get(f"iw:domain:{DOMAIN}:failures")) == 1
+
+
+async def test_an_error_the_collector_already_recorded_is_not_recorded_again(redis, start_worker):
+    error = JobError(Reason.STORAGE_ERROR, "upload failed", SRC)
+    run = scripted([AttemptResult(error=error, recorded=True)], [])
+
+    outcome, recorder = await run_one(redis, start_worker, run, fast_settings())
+
+    assert (outcome, recorder.errors) == ("failed", [])
