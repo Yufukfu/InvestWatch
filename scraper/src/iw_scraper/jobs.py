@@ -1,17 +1,20 @@
 """The queue wrapper around one collection job: lock, concurrency cap, retry, deferral, outcome.
 
 `ctx` carries `settings` (QueueSettings), `run_source` (async source_id -> AttemptResult) and
-`record_error` (async JobError -> None); the collector and the ingest are stubs here and supplied by
+`record_error` (async JobError -> None); `run_source` must report failures as an AttemptResult, not raise;
+the collector and the ingest are stubs here and supplied by
 `scraper-v1` and `scraper-ingest`.
 """
 
 import asyncio
+import logging
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from arq.connections import ArqRedis
 from arq.worker import Function, Retry, func
+from redis.exceptions import RedisError
 
 from iw_scraper.guards import DomainHealth, LeaseSemaphore, RunLock
 from iw_scraper.retry import backoff_delay, is_transient
@@ -23,6 +26,7 @@ ARQ_TIMEOUT_SLACK = 30.0
 ATTEMPTS_KEY_TTL = 24 * 3600
 KEEP_ALIVE_DIVISOR = 3
 
+logger = logging.getLogger(__name__)
 _rng = random.Random()
 
 
@@ -99,17 +103,21 @@ async def _run_locked(ctx: dict, source_id: str, domain: str, lock: RunLock) -> 
             )
             await _requeue(lock, cfg, delay)
 
+    await health.record(ok=result.error is None)
     if result.error:
         await ctx["record_error"](result.error)
-    await health.record(ok=result.error is None)
     await redis.delete(attempts_key)
     await lock.release()
     return "failed" if result.error else "ok"
 
 
 async def _requeue(lock: RunLock, cfg: QueueSettings, delay: float) -> None:
-    """Wait `delay` seconds and run again, keeping the lock alive across the wait."""
-    await lock.extend(delay + cfg.lease_ttl)
+    """Wait `delay` seconds and run again, keeping the lock alive across the wait.
+
+    The grace after the due time covers a busy worker starting the retry late; a lock that expires
+    first would let another job in and drop this one as coalesced.
+    """
+    await lock.extend(delay + max(cfg.lease_ttl, cfg.attempt_timeout))
     raise Retry(defer=delay)
 
 
@@ -122,11 +130,17 @@ async def _attempt(run_source, source_id, lock: RunLock, semaphore: LeaseSemapho
         return AttemptResult(error=JobError(Reason.TIMEOUT, "attempt exceeded its timeout", source_id))
     finally:
         keeper.cancel()
+        await asyncio.gather(keeper, return_exceptions=True)  # the keeper has stopped before the slot is released
         await semaphore.release(lease_id)
 
 
 async def _keep_alive(lock: RunLock, semaphore: LeaseSemaphore, lease_id: str, ttl: float) -> None:
     while True:
         await asyncio.sleep(ttl / KEEP_ALIVE_DIVISOR)
-        await lock.extend(ttl)
-        await semaphore.acquire(lease_id, ttl)
+        try:
+            if not await lock.extend(ttl):
+                logger.warning("run lock lost while the job was running")
+            if not await semaphore.acquire(lease_id, ttl):
+                logger.warning("concurrency lease lost while the job was running")
+        except (RedisError, OSError):
+            logger.warning("lock and lease renewal failed, will retry", exc_info=True)

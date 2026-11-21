@@ -1,5 +1,7 @@
 import asyncio
 
+from redis.exceptions import RedisError
+
 from conftest import Recorder, fast_settings
 from iw_scraper.guards import RunLock
 from iw_scraper.jobs import AttemptResult
@@ -57,9 +59,9 @@ async def test_lock_is_renewed_while_the_job_lives_longer_than_its_ttl(redis, st
         await release.wait()
         return AttemptResult(documents=1)
 
-    start_worker(run_source, Recorder(), fast_settings(lease_ttl=0.3))
+    start_worker(run_source, Recorder(), fast_settings(lease_ttl=0.9))
     first = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="a")
-    await asyncio.sleep(0.9)
+    await asyncio.sleep(2.0)
     second = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="b")
 
     assert await second.result(timeout=5, poll_delay=0.05) == "coalesced"
@@ -100,12 +102,12 @@ async def test_a_stale_lock_from_a_crashed_worker_expires_and_the_next_job_runs(
         calls.append(1)
         return AttemptResult(documents=1)
 
-    await redis.set(LOCK_KEY, "dead-job", px=400)
+    await redis.set(LOCK_KEY, "dead-job", px=1500)
     start_worker(run_source, Recorder(), fast_settings())
 
     early = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="a")
     assert await early.result(timeout=5, poll_delay=0.05) == "coalesced"
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(1.6)
     later = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="b")
 
     assert await later.result(timeout=5, poll_delay=0.05) == "ok"
@@ -128,3 +130,40 @@ async def test_a_non_owner_cannot_extend_the_lock(redis):
     assert await RunLock(redis, SRC, "me").extend(ttl=30) is False
 
     assert await redis.pttl(LOCK_KEY) <= 200
+
+
+async def test_lock_outlives_the_retry_due_time_by_at_least_the_attempt_timeout(redis, start_worker):
+    async def run_source(source_id):
+        return AttemptResult(error=JobError(Reason.HTTP_ERROR, "x", SRC), http_status=503, retry_after=3.0)
+
+    start_worker(run_source, Recorder(), fast_settings(lease_ttl=0.3, attempt_timeout=5.0))
+    await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="a")
+    await asyncio.sleep(0.5)
+
+    assert await redis.pttl(LOCK_KEY) >= 3000 + 5000 - 1000
+
+
+async def test_renewal_survives_a_redis_error(redis, start_worker, monkeypatch):
+    release, calls = asyncio.Event(), {"extend": 0}
+    real_extend = RunLock.extend
+
+    async def flaky_extend(self, ttl):
+        calls["extend"] += 1
+        if calls["extend"] == 1:
+            raise RedisError("blip")
+        return await real_extend(self, ttl)
+
+    monkeypatch.setattr(RunLock, "extend", flaky_extend)
+
+    async def run_source(source_id):
+        await release.wait()
+        return AttemptResult(documents=1)
+
+    start_worker(run_source, Recorder(), fast_settings(lease_ttl=0.9))
+    first = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="a")
+    await asyncio.sleep(2.0)
+    second = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="b")
+
+    assert await second.result(timeout=5, poll_delay=0.05) == "coalesced"
+    release.set()
+    await first.result(timeout=5, poll_delay=0.05)

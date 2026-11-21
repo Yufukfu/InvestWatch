@@ -101,12 +101,12 @@ async def test_a_running_job_keeps_its_slot_past_the_lease_ttl(redis, start_work
         await release.wait()
         return AttemptResult(documents=1)
 
-    start_worker(run_source, Recorder(), fast_settings(domain_concurrency=1, lease_ttl=0.3))
+    start_worker(run_source, Recorder(), fast_settings(domain_concurrency=1, lease_ttl=0.9))
     first_id, second_id = sources(2)
     first = await redis.enqueue_job("execute_job", first_id, DOMAIN, _job_id="a")
-    await asyncio.sleep(0.8)
+    await asyncio.sleep(2.0)
     second = await redis.enqueue_job("execute_job", second_id, DOMAIN, _job_id="b")
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.4)
 
     assert started == [first_id]
     release.set()

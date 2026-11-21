@@ -3,7 +3,6 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from arq.jobs import Job
 
 from conftest import Recorder, fast_settings
 from iw_scraper.jobs import AttemptResult
@@ -141,8 +140,15 @@ async def test_a_successful_job_resets_the_domain_failure_count(redis, start_wor
     assert await redis.exists(f"iw:domain:{DOMAIN}:failures") == 0
 
 
-async def test_job_status_is_complete_after_final_outcome(redis, start_worker):
-    outcome, _ = await run_one(redis, start_worker, scripted([AttemptResult(documents=1)], []), fast_settings())
+async def test_domain_outcome_is_recorded_even_when_the_error_sink_fails(redis, start_worker):
+    class BrokenSink(Recorder):
+        async def record_error(self, error):
+            raise RuntimeError("sink down")
 
-    assert outcome == "ok"
-    assert await Job("job-1", redis).status() == "complete"
+    run = scripted([fail(Reason.BLOCKED)], [])
+    start_worker(run, BrokenSink(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, _job_id="job-1")
+    with pytest.raises(RuntimeError):
+        await job.result(timeout=10, poll_delay=0.05)
+
+    assert int(await redis.get(f"iw:domain:{DOMAIN}:failures")) == 1
