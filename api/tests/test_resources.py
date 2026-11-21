@@ -187,6 +187,13 @@ def test_curve_from_analyst_labels(client, migrated_db):
                         "f1": 0.667}
 
 
+def test_false_positive_on_a_grid_threshold_counts_as_predicted_positive(client, migrated_db):
+    _labeled(migrated_db.app_url, [(0.6, "false_positive")])
+    at = {p["threshold"]: p for p in client.get("/api/calibration", params={"module": "M2"}).json()["points"]}
+    assert (at[0.6]["fp"], at[0.6]["tn"]) == (1, 0)   # score == t is >= t: predicted positive
+    assert (at[0.65]["fp"], at[0.65]["tn"]) == (0, 1)
+
+
 def test_unlabeled_findings_do_not_count(client, migrated_db):
     _labeled(migrated_db.app_url, [(0.9, "confirmed"), (0.2, "false_positive"), (0.95, "new"), (0.1, "in_review"),
                                    (0.7, "closed")])
