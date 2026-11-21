@@ -39,6 +39,11 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 - [x] 5.4 A fresh scheduler covers the last five minutes, and the slot result retention is pinned (`RESULT_TTL`); `mutations: 6 tried, 5 caught` (survivor is equivalent: a wider start is cut to the last five slots anyway)
 - [x] 5.5 `SCRAPER_DOMAIN_COOLDOWN` defaults to 600 s per the spec; `mutations: 1 tried, 1 caught`
 
+## 6. PR #38 second review round
+
+- [x] 6.1 Job requeues on a lost dependency are capped (`SCRAPER_MAX_REQUEUES`, 24) and use a narrower set than the supervisor (no bare `OSError`); Redis as the lost dependency still requeues; `scan.finished` is kept in Redis so a requeue after the finish publishes nothing, and the start marker is set only after the start went out; the real `runtime()` queue pool and the worker wiring are tested; `mutations: 20 tried, 20 caught` (one survivor on the requested-job finish flag until a test for it was added)
+- [x] 6.2 Catch-up edges pinned (a slot four minutes back is enqueued, five back is not) and described as "the current minute and the four before it"; `mutations: 2 tried, 2 caught`
+
 ## Workflow follow-up
 
 - Run `/openspec-archive-change` as the last commit of the branch, then stop and hand the PR body to the human. Never push or open the PR yourself.

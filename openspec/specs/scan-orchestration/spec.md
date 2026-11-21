@@ -42,7 +42,11 @@ The queue SHALL retry transient failures (`timeout`, HTTP 5xx) up to a cap with 
 
 #### Scenario: A lost connection is not a failure
 - **WHEN** the connection to PostgreSQL or Redis is lost while a job runs
-- **THEN** the job is requeued after a short delay, no attempt is used up and no job error is recorded
+- **THEN** the job is requeued after a short delay, no attempt is used up and no job error is recorded, up to a configured number of requeues; after that it fails like a crashed job (`scan.finished` failed, lock released)
+
+#### Scenario: Events are not repeated after a requeue
+- **WHEN** a connection is lost after `scan.finished` was published, or while `scan.started` was being announced
+- **THEN** the requeued job publishes no second `scan.finished`, and `scan.started` is published exactly once, before the finish
 
 ### Requirement: One run per source at a time
 A job SHALL hold a per-source lock in Redis from its first attempt until its final outcome, renewed while the job is alive, so a retry backoff never lets another job in. A job for a source whose lock is held is dropped as coalesced. A lock left by a crashed worker expires on its own.
@@ -132,8 +136,12 @@ Exactly one scheduler tick SHALL enqueue each due job, however many workers run,
 - **THEN** it is not scheduled and one job error with reason `invalid_request` is recorded until the value changes
 
 #### Scenario: Restart catches up
-- **WHEN** the scheduler starts at 12:03 and a source is due at 12:00
+- **WHEN** a scheduler starts at 12:04 and a source is due at 12:00 (the oldest of the five minutes it covers, the current one included)
 - **THEN** the 12:00 job is enqueued, and it does not run twice if an earlier scheduler had already enqueued or run that slot
+
+#### Scenario: Restart does not replay older slots
+- **WHEN** a scheduler starts at 12:05 and a source was due at 12:00
+- **THEN** no job is enqueued for the 12:00 slot
 
 #### Scenario: Sweep interval
 - **WHEN** the configured sweep interval elapses
