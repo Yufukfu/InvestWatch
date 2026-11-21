@@ -9,6 +9,7 @@ from iw_scraper.fetch import FetchFailure
 from iw_scraper.pgstore import PgSourceStore
 from iw_scraper.types import Reason
 
+from iw_scraper import seed as seed_module
 from iw_scraper.seed import (
     _LOCK_KEY,
     KNF_URL,
@@ -104,8 +105,9 @@ async def test_seed_all_registers_knf_and_the_seed_files_and_reports_both(pool, 
         '[[source]]\nname = "One"\nurl = "https://one.example/a"\nsource_kind = "unknown"\ntarget_modules = ["M3"]\n'
     )
 
-    first = await seed_all(pool, directory=tmp_path)
-    second = await seed_all(pool, directory=tmp_path)
+    entries = load_seed_dir(tmp_path)
+    first = await seed_all(pool, entries)
+    second = await seed_all(pool, entries)
 
     assert first.splitlines()[1] == "sources: inserted 1, already present 0"
     assert first.splitlines()[0].startswith("inserted ")
@@ -113,13 +115,18 @@ async def test_seed_all_registers_knf_and_the_seed_files_and_reports_both(pool, 
     assert await pool.fetchval("SELECT count(*) FROM sources") == 2
 
 
-async def test_seed_all_writes_nothing_when_a_seed_file_is_invalid(pool, tmp_path):
+async def test_main_writes_nothing_when_a_seed_file_is_invalid(pool, tmp_path, monkeypatch):
     (tmp_path / "bad.toml").write_text(
         '[[source]]\nname = "Bad"\nurl = "http://bad.example/a"\nsource_kind = "unknown"\ntarget_modules = ["M3"]\n'
     )
+    schema = await pool.fetchval("SELECT current_schema()")
+    dsn = os.environ["IW_TEST_PG_DSN"]
+    monkeypatch.setenv("DATABASE_URL", f"{dsn}{'&' if '?' in dsn else '?'}search_path={schema}")
+    monkeypatch.setattr("iw_scraper.seed.SEEDS_DIR", tmp_path)
+    monkeypatch.setattr("sys.argv", ["seed"])
 
-    with pytest.raises(SeedError, match="bad.toml"):
-        await seed_all(pool, directory=tmp_path)
+    with pytest.raises(SystemExit, match="bad.toml"):
+        await main()
 
     assert await pool.fetchval("SELECT count(*) FROM sources") == 0
 
@@ -165,7 +172,8 @@ async def test_concurrent_full_runs_leave_one_row_per_url_including_knf(pool, tm
     (tmp_path / "one.toml").write_text(
         '[[source]]\nname = "One"\nurl = "https://one.example/a"\nsource_kind = "unknown"\ntarget_modules = ["M3"]\n'
     )
-    await asyncio.gather(*(seed_all(pool, directory=tmp_path) for _ in range(6)))
+    entries = load_seed_dir(tmp_path)
+    await asyncio.gather(*(seed_all(pool, entries) for _ in range(6)))
 
     assert await pool.fetchval("SELECT count(*) FROM sources WHERE url = $1", KNF_URL) == 1
 
@@ -181,7 +189,7 @@ async def test_a_database_error_after_connecting_exits_with_a_fixed_message(pool
 
 
 async def test_a_bug_after_connecting_is_not_reported_as_a_database_failure(pool, monkeypatch):
-    async def broken(pool, **kwargs):
+    async def broken(*args, **kwargs):
         raise ValueError("a bug of ours")
 
     monkeypatch.setattr("iw_scraper.seed.seed_all", broken)
@@ -209,17 +217,45 @@ async def test_a_missing_database_url_exits_with_a_message(monkeypatch):
     assert failed.value.code == "DATABASE_URL is not set"
 
 
-async def test_main_exits_with_the_message_of_an_invalid_seed_file(pool, monkeypatch):
+UNREACHABLE_DSN = "postgresql://seeduser:s3cr3t-pw@127.0.0.1:1/seeddb"  # no database listens there
+
+
+async def test_main_exits_with_the_message_of_an_invalid_seed_file_without_a_database(monkeypatch):
     def refuse(directory):
         raise SeedError("sources.toml entry 1 ('X'): boom")
 
     monkeypatch.setattr("iw_scraper.seed.load_seed_dir", refuse)
-    monkeypatch.setenv("DATABASE_URL", os.environ["IW_TEST_PG_DSN"])
+    monkeypatch.setenv("DATABASE_URL", UNREACHABLE_DSN)
 
     with pytest.raises(SystemExit) as refused:
         await main()
 
     assert refused.value.code == "sources.toml entry 1 ('X'): boom"
+
+
+@pytest.mark.parametrize("schema", [None, "{", "{}", '{"properties": []}'], ids=["missing", "not-json", "no-properties", "wrong-shape"])
+async def test_main_names_an_unreadable_contract_schema_without_a_database(monkeypatch, tmp_path, schema):
+    if schema is not None:
+        (tmp_path / "schemas").mkdir()
+        (tmp_path / "schemas" / "source.schema.json").write_text(schema)
+    monkeypatch.setenv("CONTRACTS_DIR", str(tmp_path))
+    monkeypatch.setenv("DATABASE_URL", UNREACHABLE_DSN)
+
+    with pytest.raises(SystemExit) as refused:
+        await main()
+
+    assert "source contract schema" in str(refused.value.code)
+    assert str(tmp_path) in str(refused.value.code)
+
+
+def test_the_contract_schema_is_read_once_for_all_entries(monkeypatch):
+    reads = []
+    original = seed_module._contract_values
+    monkeypatch.setattr("iw_scraper.seed._contract_values", lambda: reads.append(1) or original())
+
+    load_seed_dir(SEEDS_DIR)
+
+    assert len(reads) == 1
 
 
 async def test_an_unreachable_database_exits_without_the_connection_string(monkeypatch):

@@ -53,14 +53,21 @@ HTTPS_PORT = 443
 _CRON_FIELDS = 5  # croniter.is_valid also accepts six
 
 
-def _contract_values() -> tuple[set[str], set[str], set[str]]:
+_ContractValues = tuple[set[str], set[str], set[str]]
+
+
+def _contract_values() -> _ContractValues:
     """`platform`, `source_kind` and module values of the contract `source` schema, so the seed cannot drift from it."""
-    properties = json.loads((contracts_dir() / "schemas" / "source.schema.json").read_text())["properties"]
-    return (
-        set(properties["platform"]["enum"]),
-        set(properties["source_kind"]["enum"]),
-        set(properties["target_modules"]["items"]["enum"]),
-    )
+    path = contracts_dir() / "schemas" / "source.schema.json"
+    try:
+        properties = json.loads(path.read_text())["properties"]
+        return (
+            set(properties["platform"]["enum"]),
+            set(properties["source_kind"]["enum"]),
+            set(properties["target_modules"]["items"]["enum"]),
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        raise SeedError(f"cannot read the source contract schema {path} (check CONTRACTS_DIR)") from None
 
 
 def _is_plain_https_url(url: str) -> bool:
@@ -73,7 +80,7 @@ def _is_plain_https_url(url: str) -> bool:
     )
 
 
-def _parse(raw: object) -> SeedEntry:
+def _parse(raw: object, contract: _ContractValues) -> SeedEntry:
     """One `[[source]]` table as an entry; raises ValueError with the problem."""
     if not isinstance(raw, dict):
         raise ValueError("not a table")
@@ -83,7 +90,7 @@ def _parse(raw: object) -> SeedEntry:
     missing = [key for key in _REQUIRED if key not in raw]
     if missing:
         raise ValueError(f"missing {', '.join(missing)}")
-    platforms, kinds, modules = _contract_values()
+    platforms, kinds, modules = contract
     name, url, kind = raw["name"], raw["url"], raw["source_kind"]
     platform, cron, targets = raw.get("platform", "web"), raw.get("schedule_cron"), raw["target_modules"]
     if not isinstance(name, str) or not name.strip():
@@ -102,7 +109,7 @@ def _parse(raw: object) -> SeedEntry:
     return SeedEntry(name, platform, url, kind, tuple(targets), cron)
 
 
-def _read(path: Path) -> list[tuple[str, SeedEntry]]:
+def _read(path: Path, contract: _ContractValues) -> list[tuple[str, SeedEntry]]:
     """Each entry of one file with a label naming file, position and name."""
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -116,7 +123,7 @@ def _read(path: Path) -> list[tuple[str, SeedEntry]]:
         name = raw.get("name") if isinstance(raw, dict) else None
         label = f"{path.name} entry {position}" + (f" ({name!r})" if isinstance(name, str) and name.strip() else "")
         try:
-            found.append((label, _parse(raw)))
+            found.append((label, _parse(raw, contract)))
         except ValueError as error:
             raise SeedError(f"{label}: {error}") from None
     return found
@@ -133,7 +140,7 @@ def _unique(found: list[tuple[str, SeedEntry]]) -> list[SeedEntry]:
 
 def load_seed(path: Path) -> list[SeedEntry]:
     """The entries of one seed file; any invalid entry raises SeedError and nothing is returned."""
-    return _unique(_read(path))
+    return _unique(_read(path, _contract_values()))
 
 
 def load_seed_dir(directory: Path) -> list[SeedEntry]:
@@ -141,7 +148,8 @@ def load_seed_dir(directory: Path) -> list[SeedEntry]:
     paths = sorted(directory.glob("*.toml"))
     if not paths:  # a wrong path or an image without the seeds must not look like a successful run
         raise SeedError(f"no .toml seed file in {directory}")
-    return _unique([item for path in paths for item in _read(path)])
+    contract = _contract_values()
+    return _unique([item for path in paths for item in _read(path, contract)])
 
 
 async def seed_knf(pool: asyncpg.Pool, *, cron: str | None = None) -> str | None:
@@ -182,12 +190,8 @@ async def seed_sources(pool: asyncpg.Pool, entries: list[SeedEntry]) -> tuple[in
     return inserted, len(entries) - inserted
 
 
-async def seed_all(pool: asyncpg.Pool, *, directory: Path = SEEDS_DIR, cron: str | None = None) -> str:
-    """Validate every seed file, then register the KNF source and the files' sources; the report text.
-
-    Raises SeedError before any write when a file is invalid.
-    """
-    entries = load_seed_dir(directory)
+async def seed_all(pool: asyncpg.Pool, entries: list[SeedEntry], *, cron: str | None = None) -> str:
+    """Register the KNF source and the already validated `entries` (see `load_seed_dir`); the report text."""
     knf_id = await seed_knf(pool, cron=cron)
     inserted, present = await seed_sources(pool, entries)
     knf = f"inserted {knf_id}" if knf_id else "already registered"
@@ -203,15 +207,17 @@ async def main() -> None:
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         raise SystemExit("DATABASE_URL is not set")
+    try:  # before connecting: a bad seed file or CONTRACTS_DIR must fail without a database
+        entries = load_seed_dir(SEEDS_DIR)
+    except SeedError as error:
+        raise SystemExit(str(error)) from None
     # a driver's message can hold the host, user or part of the DSN: say only what failed
     try:
         pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1)
     except _CONNECT_ERRORS:
         raise SystemExit("cannot connect to the database (check DATABASE_URL)") from None
     try:
-        report = await seed_all(pool, cron=cron_from(sys.argv))
-    except SeedError as error:
-        raise SystemExit(str(error)) from None
+        report = await seed_all(pool, entries, cron=cron_from(sys.argv))
     except _QUERY_ERRORS:
         raise SystemExit("the database failed while seeding (check DATABASE_URL and that the schema is migrated)") from None
     finally:
