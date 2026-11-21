@@ -98,7 +98,10 @@ jobs:
           done
           pip install pip-audit pytest
           for dir in $SERVICES; do
-            [ -f "$dir/requirements.txt" ] || continue
+            if [ ! -f "$dir/requirements.txt" ]; then
+              echo "::notice::$dir is in the matrix but has no requirements.txt on this branch, so it is skipped"
+              continue
+            fi
             echo "::group::$dir"
             pip install -r "$dir/requirements.txt"
             pip-audit -r "$dir/requirements.txt"
