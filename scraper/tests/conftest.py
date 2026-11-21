@@ -6,19 +6,28 @@ The ingest tests need PostgreSQL, Redis and MinIO. Their addresses come from the
 pure-logic tests still run anywhere.
 """
 
+import asyncio
+import json
 import os
 import threading
 import time
 import uuid
 from pathlib import Path
 from dataclasses import dataclass, field
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import asyncpg
+import jsonschema
 import pytest
 import pytest_asyncio
+import redis.asyncio as aioredis
+from arq.connections import RedisSettings
+from arq.worker import Worker
 
-from iw_scraper.types import Source
+from iw_scraper.config import contracts_dir
+from iw_scraper.jobs import ARQ_OPTIONS, QueueSettings, create_queue_pool, job_function
+from iw_scraper.types import JobError, Source
 
 
 @dataclass
@@ -213,3 +222,193 @@ async def seeded_source(pool, source):
             ["M3"],
         )
     return source
+
+
+# --- queue and orchestration fixtures (scraper-orchestration) ---
+
+@pytest.fixture
+async def redis():
+    """A real Redis (REDIS_URL, see scraper/compose.test.yaml), emptied around each test."""
+    pool = await create_queue_pool(RedisSettings.from_dsn(os.environ["REDIS_URL"]))
+    await pool.flushdb()
+    yield pool
+    await pool.flushdb()
+    await pool.aclose()
+
+
+def fast_settings(**overrides) -> QueueSettings:
+    base = dict(
+        max_tries=3,
+        backoff_base=0.05,
+        backoff_cap=0.5,
+        attempt_timeout=5.0,
+        domain_concurrency=2,
+        lease_ttl=1.0,
+        requeue_delay=0.05,
+        failure_threshold=5,
+        domain_cooldown=0.5,
+        max_requeues=24,
+    )
+    return QueueSettings(**{**base, **overrides})
+
+
+@dataclass
+class Recorder:
+    """Stands in for the collector stages and the job-error sink."""
+
+    errors: list[JobError] = field(default_factory=list)
+
+    async def record_error(self, error: JobError) -> None:
+        self.errors.append(error)
+
+
+def make_source(source_id, *, active=True, platform="web", cron=None, url="https://example.test/page") -> Source:
+    return Source(
+        id=source_id, name="s", platform=platform, url=url, source_kind="firm_own",
+        target_modules=("M1",), active=active, schedule_cron=cron,
+    )
+
+
+class FakeSourceStore:
+    """In-memory `sources` table. `permissive` makes any unknown id an active web source."""
+
+    def __init__(self) -> None:
+        self.sources: dict[str, Source] = {}
+        self.status: dict[str, dict] = {}
+        self.permissive = True
+
+    async def get(self, source_id):
+        if source_id in self.sources:
+            return self.sources[source_id]
+        return make_source(source_id) if self.permissive else None
+
+    async def mark_running(self, source_id) -> None:
+        self.status[source_id] = {"last_run_status": "running"}
+
+    async def mark_finished(self, source_id, *, at: datetime, status: str) -> None:
+        self.status[source_id] = {"last_run_at": at, "last_run_status": status}
+
+    async def schedulable(self):
+        return list(self.sources.values())
+
+
+@pytest.fixture
+def store() -> FakeSourceStore:
+    return FakeSourceStore()
+
+
+_EVENT_SCHEMA = json.loads((contracts_dir() / "schemas" / "events.schema.json").read_text())
+_EVENT_VALIDATOR = jsonschema.Draft202012Validator({"$ref": "#/$defs/event", "$defs": _EVENT_SCHEMA["$defs"]})
+
+
+@pytest.fixture
+async def events():
+    """Everything published on Pub/Sub `iw:events`, each message checked against the contract."""
+    client = aioredis.from_url(os.environ["REDIS_URL"])
+    pubsub = client.pubsub()
+    await pubsub.subscribe("iw:events")
+    received: list[dict] = []
+
+    async def pump():
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                body = json.loads(message["data"])
+                _EVENT_VALIDATOR.validate(body)
+                received.append(body)
+
+    task = asyncio.create_task(pump())
+    await asyncio.sleep(0.1)
+    yield received
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    await pubsub.aclose()
+    await client.aclose()
+
+
+@pytest.fixture
+async def start_worker(store):
+    """Start in-process arq workers (each with its own Redis pool); returns the worker's task."""
+    started: list[tuple[Worker, asyncio.Task]] = []
+
+    def start(run_source, recorder: Recorder, settings: QueueSettings, retry_on=None, **worker_kwargs) -> asyncio.Task:
+        ctx = {"settings": settings, "run_source": run_source, "record_error": recorder.record_error, "sources": store}
+        if retry_on is not None:
+            ctx["retry_on"] = retry_on
+        worker = Worker(
+            functions=[job_function(settings)],
+            redis_settings=RedisSettings.from_dsn(os.environ["REDIS_URL"]),
+            ctx=ctx,
+            poll_delay=0.02,
+            max_jobs=worker_kwargs.pop("max_jobs", 10),
+            handle_signals=False,
+            **ARQ_OPTIONS,
+            **worker_kwargs,
+        )
+        task = asyncio.create_task(worker.async_run())
+        started.append((worker, task))
+        return task
+
+    yield start
+    for worker, task in started:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await worker.close()
+
+
+class TcpProxy:
+    """A TCP forwarder in front of Redis that a test can switch off and on, to simulate an outage."""
+
+    def __init__(self, target_host: str, target_port: int) -> None:
+        self._target = (target_host, target_port)
+        self._server: asyncio.Server | None = None
+        self._writers: set[asyncio.StreamWriter] = set()
+        self.port = 0
+
+    @property
+    def url(self) -> str:
+        return f"redis://127.0.0.1:{self.port}/0"
+
+    async def start(self) -> None:
+        self._server = await asyncio.start_server(self._serve, "127.0.0.1", self.port)
+        self.port = self._server.sockets[0].getsockname()[1]
+
+    async def stop(self) -> None:
+        if self._server:
+            self._server.close()
+        for writer in list(self._writers):  # 3.12's wait_closed() waits for open connections
+            writer.close()
+        self._writers.clear()
+        if self._server:
+            await self._server.wait_closed()
+            self._server = None
+
+    async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            upstream_reader, upstream_writer = await asyncio.open_connection(*self._target)
+        except OSError:
+            writer.close()
+            return
+        self._writers.update({writer, upstream_writer})
+
+        async def pipe(source: asyncio.StreamReader, sink: asyncio.StreamWriter) -> None:
+            try:
+                while data := await source.read(65536):
+                    sink.write(data)
+                    await sink.drain()
+            except (ConnectionError, OSError):
+                pass
+            finally:
+                sink.close()
+
+        await asyncio.gather(pipe(reader, upstream_writer), pipe(upstream_reader, writer))
+
+
+@pytest.fixture
+async def proxy():
+    from urllib.parse import urlsplit
+
+    target = urlsplit(os.environ["REDIS_URL"])
+    forwarder = TcpProxy(target.hostname, target.port or 6379)
+    await forwarder.start()
+    yield forwarder
+    await forwarder.stop()

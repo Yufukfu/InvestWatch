@@ -45,7 +45,7 @@ Decisions from the team sync:
 ```
 
 Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
-`postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then `scraper`, `scheduler`, `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
+`postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then the scraper's `worker`, `scheduler` and one-shot `seed` (the `scraper` box in the diagram above), `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
 Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
@@ -81,7 +81,7 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
   "lang": "pl | null",                  // optional – analytics detects it anyway
   "title": "string | null",
   "text": "clean text of the whole material",
-  "content_hash": "sha256 of normalized text", // deduplication
+  "content_hash": "sha256 of normalized text", // deduplication; exact definition below
   "author": {                           // for social media / blogs
     "name": "string | null",
     "handle": "@nick | null",
@@ -118,6 +118,10 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 Machine-readable versions of all contracts in this document (JSON Schema, OpenAPI, mocks): [`contracts/`](../contracts/README.md).
 
 Minimum required for analytics to work: `id, platform, url, fetched_at, text, source_kind`.
+
+`content_hash` is the lowercase hex sha256 of the UTF-8 bytes of the normalised `text`: Unicode **NFC**, then every run of whitespace (whitespace is the set of characters for which Python's `str.isspace()` is true (and `str.split()` splits on): Unicode White_Space plus U+001C to U+001F, 29 characters in all (U+0009 to U+000D, U+001C to U+001F, U+0020, U+0085, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000); U+200B and U+FEFF are not whitespace) collapsed to one space, leading and trailing whitespace removed, case kept. Compatibility characters (ligature `ﬁ`, superscript `²`, full-width digits) are not folded, so NFKC is not part of the definition. The scraper computes and stores it (unique per `source_id`, used for dedup); consumers read the stored value or must reproduce this exact function, never their own matching normalisation ([ADR 0105](decisions/0105-content-hash-normalisation.md)).
+
+`author` is optional and is set only by a platform collector from the platform's own account fields (for example the channel handle the platform renders), never from claims the post's writer controls on a page (`<meta>`, `rel=author`, embedded JSON), because analytics' publisher match (`analytics-m1-m3`, PR #35) routes on `author.handle` / `author.profile_url`, and on the host of `url`, which must stay the guarded fetch URL, never a value from markup. No `web` source sets it today; absent means unknown, not "third party". Per-platform provenance: [`scraper/README.md`](../scraper/README.md), "Author provenance".
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
 Table `sources` (managed by the scraper, editable from the dashboard):
@@ -185,13 +189,13 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
-| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults 0.6 / 0.5 / 0.7 written when missing); analytics reads the same key (ADR 0305) |
+| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults written when missing: the gold-set evaluation's best-F1 thresholds, today 0.65 / 0.25 / 0.4, ADR 0316); analytics reads the same key (ADR 0305) |
 | GET / POST / PATCH | `/sources` | list and edit sources |
 | POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`). The scraper owns the consumer side: its consumer group on `iw:scan-requests` runs the scan and publishes `scan.started` / `scan.finished` on `iw:events` (§6). Until the scraper reads the stream, the request is queued and nothing runs |
 | GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
 | GET | `/health` | service status (for the demo) |
 
-Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed` / `false_positive`) and from the **gold set** (UKNF samples + our own labels, table `gold_labels`). This way the threshold slider shows precision and recall changing live.
+Calibration: TP/FP/FN are the sum of findings labeled by analysts (`confirmed` / `false_positive`) and the latest **gold-set** run stored in `calibration_points` by the analytics evaluation (file `analytics/eval/gold.jsonl`, not a table; ADR 0312). This way the threshold slider shows precision and recall changing live, and a few labels never replace the gold curve.
 
 ## 6. Real-time events
 

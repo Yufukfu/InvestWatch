@@ -6,10 +6,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from conftest import make_doc
 from investwatch_analytics import cli
+from investwatch_analytics.config import SEED_REGISTRY
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _seed_registry(monkeypatch):
+    """These tests check the CLI against the mocks, whose ids are the fictional seed's (change
+    analytics-knf-registry made the real KNF snapshot the default)."""
+    monkeypatch.setenv("REGISTRY_CSV", str(SEED_REGISTRY))
 
 
 def test_cli_on_mocks_passes_contract_validator(contracts_dir, tmp_path):
@@ -22,7 +31,7 @@ def test_cli_on_mocks_passes_contract_validator(contracts_dir, tmp_path):
     assert run.returncode == 0, run.stderr
     findings = json.loads(run.stdout)
     assert isinstance(findings, list) and findings
-    assert {f["module"] for f in findings} == {"M2"}
+    assert {f["module"] for f in findings} == {"M1", "M2", "M3"}
     out.write_text(run.stdout, encoding="utf-8")
     check = subprocess.run(
         [sys.executable, str(contracts_dir / "validate.py"), "finding", str(out)],
@@ -48,7 +57,7 @@ def test_cli_invalid_document_exits_2(tmp_path, capsys):
 
 def test_cli_reads_utf8_bom(tmp_path, capsys):
     path = tmp_path / "bom.json"
-    path.write_text(json.dumps([make_doc()]), encoding="utf-8-sig")
+    path.write_text(json.dumps([make_doc(text="Reklama. Konto w Alfa Inwestycje.")]), encoding="utf-8-sig")
     assert cli.main([str(path)]) == 0
     assert json.loads(capsys.readouterr().out)
 
@@ -157,3 +166,33 @@ def test_cli_catalogue_with_list_root_exits_2(tmp_path, capsys, monkeypatch):
     path.write_text(json.dumps(make_doc()), encoding="utf-8")
     assert cli.main([str(path)]) == 2
     assert capsys.readouterr().out == ""
+
+
+def test_cli_bad_signal_catalogue_exits_2(tmp_path, capsys, monkeypatch):
+    from investwatch_analytics import pipeline
+    from investwatch_analytics.rules import engine
+
+    bad = tmp_path / "m1.yaml"
+    bad.write_text("rules:\n  - {id: S1.1, name: x, severity: low, weight: 1}\n", encoding="utf-8")  # no bias
+    monkeypatch.setitem(engine.MODULE_CATALOGUES, "M1", bad)
+    pipeline.default_signal_catalogues.cache_clear()
+    try:
+        path = tmp_path / "doc.json"
+        path.write_text(json.dumps(make_doc(text="Konto w Alfa Inwestycje.")), encoding="utf-8")
+        assert cli.main([str(path)]) == 2
+        assert capsys.readouterr().out == ""
+    finally:
+        pipeline.default_signal_catalogues.cache_clear()
+
+
+def test_cli_writes_utf8_whatever_the_console_code_page(tmp_path):
+    path = tmp_path / "doc.json"
+    path.write_text(json.dumps(make_doc(source_kind="third_party", platform="instagram",
+                                        url="https://www.instagram.com/p/E1/", author={"handle": "@ola"},
+                                        text="Konto w Alfa Inwestycje DM 🚀")), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "PYTHONUTF8")}
+    env["PYTHONIOENCODING"] = "cp1250"  # a Windows console code page that cannot encode the emoji
+    run = subprocess.run([sys.executable, "-m", "investwatch_analytics.cli", str(path)], capture_output=True, env=env,
+                         cwd=ROOT)
+    assert run.returncode == 0, run.stderr.decode("utf-8", "replace")
+    assert "🚀" in json.loads(run.stdout.decode("utf-8"))[0]["content_excerpt"]

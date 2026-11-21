@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import { investWatchApi } from './api/generated';
+import { api as investWatchApi } from './api/enhanced';
 
 export const store = configureStore({
   reducer: { [investWatchApi.reducerPath]: investWatchApi.reducer },

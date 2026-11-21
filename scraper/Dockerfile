@@ -49,4 +49,4 @@ FROM base AS runtime
 RUN useradd --system --uid 10001 iw
 USER iw
 WORKDIR /app/scraper
-CMD ["python", "-m", "iw_scraper"]
+CMD ["python", "-m", "iw_scraper", "worker"]
