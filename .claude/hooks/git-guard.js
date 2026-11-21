@@ -37,8 +37,10 @@
  * against `git diff HEAD`; `git commit <paths>` stages those paths and is not seen. The hook reads the
  * command text only: `bash -c '...'`, `python -c`, a script file, environment variables such as
  * GIT_SSH_COMMAND, or editing `.git/config` with a file tool all get past it. What actually limits a push
- * is the narrowed rule `Bash(git push origin:*)` in .claude/settings.json (any other push still asks)
- * plus these checks; merges and `gh pr ready|review` stay gated by `permissions.ask`.
+ * is the narrowed rule `Bash(git push origin:*)` in .claude/settings.json (any other push matches no allow
+ * rule, so it falls to the default prompt; there is no `ask` rule for it on purpose, because an `ask` rule
+ * would override the allow rule) plus these checks; merges and `gh pr ready|review` stay gated by
+ * `permissions.ask`. settings-rules.test.js fails if an ask or deny rule ever covers an allow rule.
  */
 'use strict';
 
