@@ -19,7 +19,6 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 
 - Kacper must OK the one-line `scraper/compose.yaml` entry in the root `compose.yaml` `include:`.
 - `scraper-v3-render` task 3.2 plans to create the same `scraper/compose.yaml` with `stop_grace_period: 45s`: amend it to add only `renderer`, the `render` network and the worker's renderer settings, keeping 60 s (ADR 0106).
-
 - The first social platform (ADR 0103, criteria only) is decided in `scraper-v2`.
 - Wiring (`Ingestor`, `sweep`, `Storage.check_bucket`, the job-error sink) is done in `scraper-orchestration` (`app.py`).
 - Two redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`) and `ingest.errors.redact` (full). Keep the full one and drop the other when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).
