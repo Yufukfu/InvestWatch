@@ -6,7 +6,7 @@
 
 ## Context
 
-The jury scores "trafność klasyfikacji ryzyka przez moduły AI oraz wpływ zmian parametrów progowych na wyniki w panelu kalibracji" (`doc/Opis Wyzwania HackNation UKNF 19.11.pdf` §6), and the panel's threshold must change "liczbę wyników False Positive vs False Negative" (§2). `GET /api/calibration` (rest-api spec "Calibration curve") reads analyst labels and the latest run in `calibration_points` (migration `api/migrations/versions/0001_initial.py`), but nothing wrote runs, and a fresh `docker compose up` has no labels. `doc/` holds criteria and definitions but no sample ads, so a gold set has to be written by us. Change: [`openspec/changes/analytics-eval-calibration`](../../openspec/changes/analytics-eval-calibration/design.md).
+The jury scores "trafność klasyfikacji ryzyka przez moduły AI oraz wpływ zmian parametrów progowych na wyniki w panelu kalibracji" (`doc/Opis Wyzwania HackNation UKNF 19.11.pdf` §6), and the panel's threshold must change "liczbę wyników False Positive vs False Negative" (§2). `GET /api/calibration` (rest-api spec "Calibration curve") reads analyst labels and the latest run in `calibration_points` (migration `api/migrations/versions/0001_initial.py`), but nothing wrote runs, and a fresh `docker compose up` has no labels. `doc/` holds criteria and definitions but no sample ads, so a gold set has to be written by us. Change: [`openspec/changes/archive/2026-11-21-analytics-eval-calibration`](../../openspec/changes/archive/2026-11-21-analytics-eval-calibration/design.md).
 
 ## Options considered
 

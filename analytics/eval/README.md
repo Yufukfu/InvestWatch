@@ -1,6 +1,6 @@
 # Gold set and evaluation
 
-`gold.jsonl` is the labeled set the evaluation runs on. Each run computes precision, recall and F1 per module and per rule or signal, and gives the calibration panel its curve (`calibration_points`, read by `GET /api/calibration`). The spec is `openspec/changes/analytics-eval-calibration/specs/gold-set-evaluation/spec.md` (after archive: `openspec/specs/gold-set-evaluation/spec.md`), the decision record is ADR 0312.
+`gold.jsonl` is the labeled set the evaluation runs on. Each run computes precision, recall and F1 per module and per rule or signal, and gives the calibration panel its curve (`calibration_points`, read by `GET /api/calibration`). The spec is `openspec/specs/gold-set-evaluation/spec.md` (change: `openspec/changes/archive/2026-11-21-analytics-eval-calibration/`), the decision record is ADR 0312.
 
 ```bash
 python analytics/eval/run.py                 # report only, rules-only, no database
