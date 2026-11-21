@@ -22,4 +22,4 @@ Kacper's second review of PR #35 (20:11Z). Branch `analytics/analytics-m1-m3` (p
 ## 4. Closing
 
 - [x] 4.1 Spec deltas within 500 characters per requirement; `follow-ups.md` (M3 suppression by naming the firm, Cyrillic/Greek confusables, the glued `AlfaInwestycje`); `analytics/README.md`, your own `.docs/status/platform.md` line; the iw-ai-log row; `docs-check` and OpenSpec 2.1.1 strict clean
-- [ ] 4.2 Run the iw-pr-review skill (one reviewer pass) and fix real findings
+- [x] 4.2 Run the iw-pr-review skill (one reviewer pass with `focus: security`) and fix real findings (registry lookups capped at 200 000 characters, `text_truncated` logged, aliases that fold to nothing skipped; `mutations: 3 tried, 3 caught`)

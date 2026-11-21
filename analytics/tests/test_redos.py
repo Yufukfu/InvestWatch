@@ -251,3 +251,18 @@ def test_page_host_of_a_backslash_url_is_empty():
     from investwatch_analytics.modules.advertiser import page_host
 
     assert page_host(r"https://attacker.net\@alfa-inwestycje.example.com/") == ""
+
+
+def test_expanding_ligatures_are_bounded_in_registry_lookups():
+    """'ﬁ' folds to two characters under NFKC; R1's name lookup and the registry match read at most the 200 000-character
+    prefix, so 2 MB of them costs about what the prefix costs (review-2 security pass). Preprocessing's own NFKC of the
+    whole text is a separate follow-up."""
+    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    firm = next(f for f in registry.firms if f.name.startswith("Alfa"))
+
+    def run(size: int) -> float:
+        text = "Alfa Inwestycje. " + "ﬁ" * size
+        return elapsed(lambda: (registry.find_name(firm, text), registry.match(text, "https://x.example.com/")))
+
+    small, big = run(200_000), run(2_000_000)
+    assert big < 10.0 and big < 3 * small + 0.5, (small, big)

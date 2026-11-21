@@ -451,3 +451,12 @@ def test_m2_rules_see_the_whole_text(registry, catalogue):
     [f] = run(make_doc(text=text), registry, catalogue)
     assert f.module == "M2" and {r.rule_id: r.result for r in f.rules}["R2"] == "pass"
 
+
+
+def test_truncated_text_is_logged(registry, catalogue, caplog):
+    from investwatch_analytics.pipeline import SCAN_MAX
+
+    raw = make_doc(**SOCIAL, author={"handle": "@ola"}, text=" " * SCAN_MAX + "Alfa Inwestycje gwarantuje zysk 30%.")
+    with caplog.at_level(logging.INFO):
+        run(raw, registry, catalogue)
+    assert "text_truncated" in reasons(caplog)

@@ -18,6 +18,7 @@ from .modules import m1, m2, m3
 from .modules.advertiser import build_advertiser
 from .modules.router import route
 from .preprocessing import preprocess
+from .registry import SCAN_MAX as REGISTRY_SCAN_MAX
 from .registry import Registry
 from .rules.engine import Catalogue, Context, run_rules
 
@@ -27,7 +28,7 @@ log = logging.getLogger(__name__)
 FOREIGN_TYPES = {"foreign_no_branch"}
 #: Routing (the registry match) and the M1/M3 rules see at most this prefix of the text, so one hostile 2 MB page
 #: cannot tie up the worker (#35 review 2, item 8). A prefix keeps every evidence quote a substring of the original.
-SCAN_MAX = 200_000
+SCAN_MAX = REGISTRY_SCAN_MAX
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,10 @@ def analyze(
         return []
     signals = signals or default_signal_catalogues()
     scan = doc if len(doc.text) <= SCAN_MAX else doc.model_copy(update={"text": doc.text[:SCAN_MAX]})
+    if scan is not doc:
+        # Not silent: content past the cap is not routed or checked by M1/M3 (an accepted evasion, follow-ups).
+        log.info("text truncated", extra={"document_id": doc.id, "reason": "text_truncated",
+                                          "text_length": len(doc.text), "scanned": SCAN_MAX})
     scan_pre = pre if scan is doc else preprocess(scan.text)
     r = route(scan, registry)
     ctx = Context(doc=scan, pre=scan_pre, firm_match=r.firm_match, registry=registry)

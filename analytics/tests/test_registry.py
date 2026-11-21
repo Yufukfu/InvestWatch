@@ -312,3 +312,13 @@ def test_fullwidth_registry_name_matches_plain_text():
 def test_zero_width_inside_a_fuzzy_name(registry):
     m = registry.match("Polecam Al\u200bfa Inwestycji.", "https://x.example.org/")
     assert m is not None and m.method == "fuzzy" and m.firm.name.startswith("Alfa")
+
+
+def test_alias_of_invisible_characters_is_ignored():
+    from investwatch_analytics.registry import Firm
+
+    reg = Registry([Firm(id="9c4b8a1e-2f3d-4e5a-8b6c-7d8e9f0a1b2c", name="Omega Kapital S.A.", type="brokerage_house",
+                         country="PL", aliases=("​", "­"), domains=(), source_url=None)])
+    assert reg.match("!hello", "https://x.example.org/") is None
+    assert reg.match("", "https://x.example.org/") is None
+    assert reg.match("​​", "https://x.example.org/") is None

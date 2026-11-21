@@ -58,9 +58,12 @@ def core_name(name: str) -> str:
 #: Invisible characters a scraped text may hide inside a name (zero-width space, joiners, word joiner, BOM, soft
 #: hyphen); they are dropped before names are compared (#35 review 2).
 _INVISIBLE = frozenset("\u200b\u200c\u200d\u2060\ufeff\u00ad")
+#: Name lookups read at most this prefix of a text (#35 review 2): NFKC can expand a character ('ﬁ' -> 'fi'), so
+#: folding a 2 MB page would cost seconds and tens of MB. A prefix keeps every quote a substring of the original.
+SCAN_MAX = 200_000
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=4)
 def fold(text: str) -> tuple[str, tuple[int, ...]]:
     """NFKC per character with invisible characters removed, and for each folded character its index in `text`.
 
@@ -114,8 +117,10 @@ class Registry:
         self.demo = not any(f.source_url for f in self.firms)
         self._by_id = {f.id: f for f in firms}
         # Longest alias first, so the quote is the fullest form present in the text.
+        # A name form that folds to nothing (an alias of zero-width characters) would match every text: skip it.
         self._patterns = {
-            f.id: [_alias_pattern(a) for a in sorted({f.name, f.core, *f.aliases}, key=len, reverse=True) if a]
+            f.id: [_alias_pattern(a) for a in sorted({f.name, f.core, *f.aliases}, key=len, reverse=True)
+                   if fold(a)[0].strip()]
             for f in firms
         }
 
@@ -155,7 +160,7 @@ class Registry:
 
     def _find(self, firm: Firm, text: str) -> tuple[int, int] | None:
         """Span in the ORIGINAL text of the longest name form found in the folded text, or None."""
-        folded, where = fold(text)
+        folded, where = fold(text[:SCAN_MAX])
         for pattern in self._patterns[firm.id]:
             m = pattern.search(folded)
             if m:
@@ -163,7 +168,7 @@ class Registry:
         return None
 
     def _first(self, firm: Firm, text: str) -> int:
-        folded, where = fold(text)
+        folded, where = fold(text[:SCAN_MAX])
         return min(where[h.start()] for p in self._patterns[firm.id] if (h := p.search(folded)))
 
     def firm_on_host(self, host: str) -> Firm | None:
@@ -195,7 +200,7 @@ class Registry:
         page = http_host(url)
         host = _normalize_domain(page) if page else ""
         # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
-        segments = [words for seg in _PUNCT.split(fold(text)[0]) if (words := [w.lower() for w in _WORD.findall(seg)])]
+        segments = [words for seg in _PUNCT.split(fold(text[:SCAN_MAX])[0]) if (words := [w.lower() for w in _WORD.findall(seg)])]
         for firm in self.firms:
             on_domain = not is_social(host) and any(host == d or host.endswith("." + d) for d in firm.domains)
             if span := self._find(firm, text):
