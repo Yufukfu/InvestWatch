@@ -47,6 +47,34 @@ async def test_an_os_error_is_retried_too():
     await asyncio.wait_for(task, 2)
 
 
+async def test_a_redis_response_error_is_a_bug_and_is_not_retried():
+    from redis.exceptions import ResponseError
+
+    async def factory():
+        raise ResponseError("WRONGTYPE Operation against a key holding the wrong kind of value")
+
+    with pytest.raises(ResponseError):
+        await asyncio.wait_for(supervise(factory, name="t", stop=asyncio.Event(), base=0.05, cap=0.5), 2)
+
+
+async def test_the_error_types_to_retry_can_be_extended_for_another_dependency():
+    class DatabaseDown(Exception):
+        pass
+
+    calls = []
+
+    async def factory():
+        calls.append(1)
+        if len(calls) == 1:
+            raise DatabaseDown()
+
+    await asyncio.wait_for(
+        supervise(factory, name="t", stop=asyncio.Event(), base=0.05, cap=0.5, retry_on=(DatabaseDown,)), 3
+    )
+
+    assert len(calls) == 2
+
+
 async def test_any_other_exception_ends_the_supervisor_instead_of_looping():
     async def factory():
         raise ValueError("a bug")

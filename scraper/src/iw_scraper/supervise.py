@@ -6,21 +6,33 @@ import random
 import time
 from collections.abc import Awaitable, Callable
 
-from redis.exceptions import RedisError
+from redis.exceptions import BusyLoadingError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from iw_scraper.retry import backoff_delay
 
 logger = logging.getLogger(__name__)
 _rng = random.Random()
 
+# Lost-connection errors only. A ResponseError (WRONGTYPE, ...) is a bug and must not be retried forever.
+CONNECTION_ERRORS: tuple[type[BaseException], ...] = (RedisConnectionError, RedisTimeoutError, BusyLoadingError, OSError)
+
 
 async def supervise(
-    factory: Callable[[], Awaitable[None]], *, name: str, stop: asyncio.Event, base: float, cap: float
+    factory: Callable[[], Awaitable[None]],
+    *,
+    name: str,
+    stop: asyncio.Event,
+    base: float,
+    cap: float,
+    retry_on: tuple[type[BaseException], ...] = CONNECTION_ERRORS,
 ) -> None:
     """Run `factory()` until it returns or `stop` is set.
 
-    A lost connection (Redis or the network) is retried with exponential backoff and jitter; any other
-    exception is a bug and ends the supervisor, so the process exits instead of looping on it.
+    A lost connection (`retry_on`: Redis and the network by default; the PostgreSQL store adds its own
+    errors) is retried with exponential backoff and jitter; any other exception is a bug and ends the
+    supervisor, so the process exits instead of looping on it.
     """
     failures = 0
     while not stop.is_set():
@@ -28,7 +40,7 @@ async def supervise(
         try:
             await factory()
             return
-        except (RedisError, OSError):
+        except retry_on:
             if time.monotonic() - started > cap:
                 failures = 0  # it ran for a while: this is a new outage, not the same one
             failures += 1

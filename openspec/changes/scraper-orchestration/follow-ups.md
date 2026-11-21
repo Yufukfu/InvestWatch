@@ -21,3 +21,8 @@ Findings of the `iw-reviewer` passes on group 1 (`bdeb218..77cb671`) and group 2
 | `requested_at` is not validated and stale requests are not dropped | wont-fix | The spec asks only for a valid `source_id`. |
 | `croniter` accepts a 6-field (seconds) expression; `schedule_cron` is a 5-field cron per the contract | wont-fix | Evaluated per minute, so the seconds field has no effect beyond the minute. |
 | `pip-audit` for `croniter==7.0.0` and `jsonschema[format]==4.23.0` | docs | Closing task 4.2, with `arq` and `redis`. |
+| PostgreSQL connection errors are not in the default retry set of `supervise`, `run_worker` and `run_consumer` | fix-here | Task 2.1 passes its driver's error classes through `retry_on` when the real `SourceStore` lands; the retry set is injectable and tested. |
+| An abort (`Job.abort`) or an outer arq timeout cancels a job without requeueing it; the run lock is then held up to `max(lease_ttl, attempt_timeout)` | docs | Bounded, not a leak; aborts are not enabled (`allow_abort_jobs` is off). |
+| `GET /health` binds `0.0.0.0`, has no connection cap and names the failing dependency unauthenticated | wont-fix | It runs inside the container network and the port is not published in compose; each connection is bounded to 5 s. Keep the port unpublished. |
+| Waiting for cancelled jobs before `Worker.close()` cannot be pinned by a test | wont-fix | arq merges the job and main-task cancels of a graceful stop into one delivery; the wait stays as a guard against an interrupted requeue. |
+

@@ -11,13 +11,13 @@ from dataclasses import dataclass
 
 from arq.connections import RedisSettings
 from arq.worker import Worker
-from redis.exceptions import RedisError
 
 from iw_scraper.jobs import QueueSettings, job_function
-from iw_scraper.supervise import supervise
+from iw_scraper.supervise import CONNECTION_ERRORS, supervise
 
 logger = logging.getLogger(__name__)
 MAIN_TASK_POLL = 0.01
+CLOSE_TIMEOUT = 10.0
 
 
 @dataclass(frozen=True)
@@ -31,8 +31,15 @@ class RunnerSettings:
     consumer_block: float = 1.0
 
 
-async def run_worker(ctx: dict, queue: QueueSettings, runner: RunnerSettings, *, stop: asyncio.Event) -> None:
-    """Run the arq worker until `stop`, rebuilding it with backoff whenever Redis goes away."""
+async def run_worker(
+    ctx: dict,
+    queue: QueueSettings,
+    runner: RunnerSettings,
+    *,
+    stop: asyncio.Event,
+    retry_on: tuple[type[BaseException], ...] = CONNECTION_ERRORS,
+) -> None:
+    """Run the arq worker until `stop`, rebuilding it with backoff whenever a dependency goes away."""
 
     async def one_life() -> None:
         worker = Worker(
@@ -55,11 +62,21 @@ async def run_worker(ctx: dict, queue: QueueSettings, runner: RunnerSettings, *,
         finally:
             drain.cancel()
             await _close(worker)
+        if not stop.is_set():
+            raise OSError("the worker stopped without being asked to")  # restart it, with backoff
 
-    await supervise(one_life, name="worker", stop=stop, base=runner.reconnect_base, cap=runner.reconnect_cap)
+    await supervise(
+        one_life, name="worker", stop=stop, base=runner.reconnect_base, cap=runner.reconnect_cap, retry_on=retry_on
+    )
 
 
-async def run_consumer(consumer, runner: RunnerSettings, *, stop: asyncio.Event) -> None:
+async def run_consumer(
+    consumer,
+    runner: RunnerSettings,
+    *,
+    stop: asyncio.Event,
+    retry_on: tuple[type[BaseException], ...] = CONNECTION_ERRORS,
+) -> None:
     """Read scan requests until `stop`, reconnecting with backoff."""
 
     async def loop() -> None:
@@ -67,7 +84,14 @@ async def run_consumer(consumer, runner: RunnerSettings, *, stop: asyncio.Event)
         while not stop.is_set():
             await consumer.poll(block=runner.consumer_block)
 
-    await supervise(loop, name="scan-request consumer", stop=stop, base=runner.reconnect_base, cap=runner.reconnect_cap)
+    await supervise(
+        loop,
+        name="scan-request consumer",
+        stop=stop,
+        base=runner.reconnect_base,
+        cap=runner.reconnect_cap,
+        retry_on=retry_on,
+    )
 
 
 async def _drain_when_stopped(worker: Worker, stop: asyncio.Event) -> None:
@@ -78,7 +102,12 @@ async def _drain_when_stopped(worker: Worker, stop: asyncio.Event) -> None:
 
 
 async def _close(worker: Worker) -> None:
+    """Let cancelled jobs finish handing themselves back, then close; bounded, Redis may be gone."""
     try:
-        await worker.close()
-    except (RedisError, OSError):
-        logger.warning("worker could not close cleanly, Redis is unreachable", exc_info=True)
+        async with asyncio.timeout(CLOSE_TIMEOUT):
+            # without this, close() (which cancels every task again when signals are not handled by arq)
+            # could interrupt a job that is requeueing itself
+            await asyncio.gather(*worker.tasks.values(), return_exceptions=True)
+            await worker.close()
+    except (*CONNECTION_ERRORS, TimeoutError):
+        logger.warning("worker could not close cleanly, its dependency is unreachable", exc_info=True)

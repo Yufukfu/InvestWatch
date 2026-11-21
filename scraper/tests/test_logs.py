@@ -2,7 +2,7 @@ import io
 import json
 import logging
 
-from iw_scraper.logs import configure_logging
+from iw_scraper.logs import JsonFormatter, configure_logging
 
 
 def lines(stream: io.StringIO) -> list[str]:
@@ -54,6 +54,29 @@ def test_third_party_loggers_are_formatted_too():
     logging.getLogger("arq.worker").info("job started")
 
     assert json.loads(lines(stream)[0])["logger"] == "arq.worker"
+
+
+def test_url_credentials_are_redacted_in_messages_and_tracebacks():
+    stream = io.StringIO()
+    configure_logging(stream)
+    log = logging.getLogger("iw_scraper.fetch")
+
+    try:
+        raise ConnectionError("cannot reach http://scraper:hunter2@proxy.local:8080/path")
+    except ConnectionError:
+        log.exception("proxy http://scraper:hunter2@proxy.local:8080 failed")
+
+    [line] = lines(stream)
+    assert "hunter2" not in line
+    assert "http://***@proxy.local:8080" in json.loads(line)["message"]
+
+
+def test_a_log_call_with_bad_arguments_still_produces_a_line():
+    record = logging.LogRecord("x", logging.WARNING, __file__, 1, "needs two: %s %s", ("only-one",), None)
+
+    line = JsonFormatter().format(record)
+
+    assert "unformattable" in json.loads(line)["message"]
 
 
 def test_records_below_the_level_are_dropped():

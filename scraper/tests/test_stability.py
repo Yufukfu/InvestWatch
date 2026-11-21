@@ -145,6 +145,58 @@ async def test_the_worker_survives_a_redis_outage_and_resumes_when_it_returns(re
     assert not task.done()
 
 
+async def test_the_requeue_is_not_interrupted_by_the_close_that_follows_the_deadline(redis, start_runner, monkeypatch):
+    from iw_scraper.guards import RunLock
+
+    real_extend = RunLock.extend
+
+    async def slow_extend(self, ttl):
+        await asyncio.sleep(0.4)
+        print('EXTEND slept', flush=True)  # a slow Redis: the cancelled job is still extending its lock when close() runs
+        return await real_extend(self, ttl)
+
+    began = asyncio.Event()
+
+    async def stuck(source_id, started):
+        began.set()
+        await asyncio.sleep(60)
+
+    first, stop = start_runner(stuck, deadline=0.3)
+    await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
+    await asyncio.wait_for(began.wait(), 5)
+    monkeypatch.setattr(RunLock, "extend", slow_extend)
+    stop.set()
+    await asyncio.wait_for(first, 10)
+    await asyncio.sleep(1.3)
+
+    assert await redis.get(LOCK_KEY) == b"job-1"
+
+
+async def test_a_worker_that_stops_without_being_asked_is_restarted(redis, start_runner, monkeypatch):
+    from arq.worker import Worker
+
+    real = Worker.async_run
+    lives = []
+
+    async def stops_at_once_the_first_time(self):
+        lives.append(1)
+        if len(lives) == 1:
+            return
+        await real(self)
+
+    monkeypatch.setattr(Worker, "async_run", stops_at_once_the_first_time)
+
+    async def run_source(source_id, started=None):
+        return AttemptResult(documents=1)
+
+    task, _ = start_runner(run_source)
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, False, _job_id="job-1")
+
+    assert await job.result(timeout=15, poll_delay=0.05) == "ok"
+    assert len(lives) == 2
+    assert not task.done()
+
+
 async def test_cancelling_the_runner_itself_is_not_swallowed(redis, start_runner):
     async def run_source(source_id, started=None):
         return AttemptResult(documents=1)
@@ -175,3 +227,23 @@ async def test_the_consumer_loop_handles_requests_until_stopped(redis, store):
     await asyncio.wait_for(task, 5)
 
     assert await redis.zcard("arq:queue") == 1
+
+
+async def test_closing_a_worker_whose_redis_is_a_black_hole_gives_up_after_the_close_timeout(monkeypatch):
+    import iw_scraper.worker as module
+
+    monkeypatch.setattr(module, "CLOSE_TIMEOUT", 0.2)
+
+    class Hung:
+        def __init__(self):
+            self.tasks = {"job": asyncio.ensure_future(asyncio.sleep(60))}
+
+        async def close(self):
+            await asyncio.sleep(60)
+
+    worker = Hung()
+    started = asyncio.get_running_loop().time()
+    await asyncio.wait_for(module._close(worker), 2)
+    worker.tasks["job"].cancel()
+
+    assert asyncio.get_running_loop().time() - started < 1
