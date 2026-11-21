@@ -1,0 +1,572 @@
+"""document-stream-worker scenarios (openspec/changes/analytics-worker/specs/document-stream-worker/spec.md).
+
+fakeredis + InMemoryStore + NoopPublisher; one test against real Redis runs with TEST_REDIS_URL.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import uuid
+
+import fakeredis
+import pytest
+import redis
+
+from conftest import NOW, make_doc
+from investwatch_analytics.events import NoopPublisher
+from investwatch_analytics.registry import Registry
+from investwatch_analytics.config import Settings
+from investwatch_analytics.rules.engine import Catalogue
+from investwatch_analytics.storage import InMemoryStore, StoreError, StoreMisconfigured, StoreUnavailable
+from investwatch_analytics.worker import GROUP, STREAM, Worker, WorkerConfig, main
+
+DOC_ID = "22222222-2222-4222-8222-222222222222"
+DOC2_ID = "33333333-3333-4333-8333-333333333333"
+MISSING_ID = "99999999-9999-4999-8999-999999999999"
+
+
+@pytest.fixture(scope="module")
+def registry():
+    return Registry.from_csv(Settings.from_env().registry_csv)
+
+
+@pytest.fixture(scope="module")
+def catalogue():
+    return Catalogue.load()
+
+
+@pytest.fixture
+def r():
+    return fakeredis.FakeRedis(decode_responses=True)
+
+
+@pytest.fixture
+def store():
+    s = InMemoryStore()
+    s.put_document_row(make_doc(id=DOC_ID, text="Reklama. Alfa Inwestycje. Zarabiaj 18% rocznie!"))
+    s.put_document_row(make_doc(id=DOC2_ID, text="Reklama. Przykładowy tekst."))
+    return s
+
+
+class Recorder(NoopPublisher):
+    """NoopPublisher that also records the order of side effects relative to XACK."""
+
+    def __init__(self, journal: list[str] | None = None, **kw) -> None:
+        super().__init__(**kw)
+        self.journal = journal if journal is not None else []
+
+    def publish_findings(self, saved):
+        self.journal.append("publish")
+        return super().publish_findings(saved)
+
+
+def make_worker(r, store, registry, catalogue, *, publisher=None, consumer="w1", stream=STREAM, **cfg) -> Worker:
+    config = WorkerConfig(consumer=consumer, block_ms=10, claim_min_idle_ms=cfg.pop("claim_min_idle_ms", 60000),
+                          max_deliveries=cfg.pop("max_deliveries", 5), stream=stream)
+    return Worker(r, store, publisher or Recorder(), registry=registry, catalogue=catalogue, config=config,
+                  now=lambda: NOW, sleep=lambda s: None, jitter=lambda: 0.0)
+
+
+def xadd(r, document_id=DOC_ID, schema="v1", **extra) -> str:
+    fields = {"document_id": document_id, "schema": schema, **extra}
+    return r.xadd(STREAM, {k: v for k, v in fields.items() if v is not None})
+
+
+def pending(r) -> int:
+    return r.xpending(STREAM, GROUP)["pending"]
+
+
+def outcomes(caplog) -> list[str]:
+    return [rec.outcome for rec in caplog.records if hasattr(rec, "outcome")]
+
+
+# ---- consumer group ----------------------------------------------------------------------------
+
+
+def test_first_start_creates_stream_and_group(r, store, registry, catalogue):
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    assert r.exists(STREAM)
+    assert [g["name"] for g in r.xinfo_groups(STREAM)] == [GROUP]
+
+
+def test_existing_group_is_kept(r, store, registry, catalogue):
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    xadd(r)
+    w.run_once()
+    last = r.xinfo_groups(STREAM)[0]["last-delivered-id"]
+    w.ensure_group()  # BUSYGROUP is success
+    assert r.xinfo_groups(STREAM)[0]["last-delivered-id"] == last
+
+
+def test_backlog_from_before_the_group_is_processed(r, store, registry, catalogue):
+    xadd(r)  # the scraper published before analytics ever started
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    w.run_once()
+    assert len(store.findings_for_document(DOC_ID)) == 1
+
+
+# ---- happy path and ordering --------------------------------------------------------------------
+
+
+def test_happy_path_commit_then_publish_then_ack(r, store, registry, catalogue, caplog):
+    journal: list[str] = []
+    publisher = Recorder(journal)
+    w = make_worker(r, store, registry, catalogue, publisher=publisher)
+    w.ensure_group()
+    original_save, original_ack = store.save_findings, r.xack
+
+    def save(doc, findings):
+        journal.append("commit")
+        return original_save(doc, findings)
+
+    def ack(*args):
+        journal.append("ack")
+        return original_ack(*args)
+
+    store.save_findings, r.xack = save, ack
+    xadd(r)
+    with caplog.at_level(logging.INFO):
+        assert w.run_once() == 1
+    assert journal == ["commit", "publish", "ack"]
+    [f] = store.findings_for_document(DOC_ID)
+    assert f.module == "M2" and f.model.llm is None and f.model.pipeline_version
+    assert [e["type"] for e in publisher.sent][0] == "finding.created"
+    assert pending(r) == 0
+    [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
+    assert (rec.outcome, rec.document_id, rec.findings_created, rec.findings_updated) == ("stored", DOC_ID, 1, 0)
+    assert rec.stream_id and isinstance(rec.duration_ms, (int, float))
+
+
+def test_no_findings_is_acked_without_store_or_publish(r, store, registry, catalogue, caplog):
+    store.put_document_row(make_doc(id=DOC_ID, source_kind="third_party"))
+    publisher = Recorder()
+    w = make_worker(r, store, registry, catalogue, publisher=publisher)
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.INFO):
+        w.run_once()
+    assert store.findings_for_document(DOC_ID) == [] and publisher.journal == [] and pending(r) == 0
+    assert outcomes(caplog) == ["no_findings"]
+
+
+# ---- duplicates ---------------------------------------------------------------------------------
+
+
+def test_same_message_twice_is_idempotent(r, store, registry, catalogue, caplog):
+    publisher = Recorder()
+    w = make_worker(r, store, registry, catalogue, publisher=publisher)
+    w.ensure_group()
+    xadd(r)
+    xadd(r)  # republish sweep / manual re-XADD of the same document
+    with caplog.at_level(logging.INFO):
+        w.run_once()
+        w.run_once()
+    [f] = store.findings_for_document(DOC_ID)
+    assert [e["type"] for e in publisher.sent].count("finding.created") == 1
+    assert pending(r) == 0
+    second = [rec for rec in caplog.records if hasattr(rec, "outcome")][1]
+    assert (second.outcome, second.findings_created, second.findings_updated) == ("stored", 0, 1)
+
+
+def test_two_consumers_same_document(r, store, registry, catalogue):
+    publisher = Recorder()
+    a = make_worker(r, store, registry, catalogue, publisher=publisher, consumer="a")
+    b = make_worker(r, store, registry, catalogue, publisher=publisher, consumer="b")
+    a.ensure_group()
+    xadd(r)
+    xadd(r)
+    a.run_once()
+    b.run_once()
+    assert len(store.findings_for_document(DOC_ID)) == 1
+    assert [e["type"] for e in publisher.sent].count("finding.created") == 1
+
+
+class Crash(BaseException):
+    """Simulates the process dying (not an Exception, so nothing in the worker may swallow it)."""
+
+
+def test_crash_between_commit_and_ack_is_redelivered_without_new_events(r, store, registry, catalogue):
+    publisher = Recorder()
+    dying = make_worker(r, store, registry, catalogue, publisher=publisher, consumer="dying")
+    dying.ensure_group()
+    xadd(r)
+
+    def die(*args):
+        raise Crash
+
+    r.xack, real_ack = die, r.xack
+    with pytest.raises(Crash):
+        dying.run_once()
+    r.xack = real_ack
+    assert pending(r) == 1 and len(store.findings_for_document(DOC_ID)) == 1
+    sent_before = len(publisher.sent)
+    survivor = make_worker(r, store, registry, catalogue, publisher=publisher, consumer="survivor", claim_min_idle_ms=0)
+    survivor.run_once()
+    assert pending(r) == 0
+    assert len(publisher.sent) == sent_before  # the redelivery is an update: no new event
+    assert len(store.findings_for_document(DOC_ID)) == 1
+
+
+def test_reanalysis_after_rule_change_updates_in_place(r, store, registry, catalogue):
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    xadd(r)
+    w.run_once()
+    [before] = store.findings_for_document(DOC_ID)
+    store.set_review(DOC_ID, "M2", status="confirmed", note="ok")
+    xadd(r)
+    w.run_once()
+    [after] = store.findings_for_document(DOC_ID)
+    assert (after.id, after.status, after.note) == (before.id, "confirmed", "ok")
+
+
+# ---- poison messages ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"schema": "v1"},
+        {"document_id": "not-a-uuid", "schema": "v1"},
+        {"document_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".upper(), "schema": "v1"},  # contract: lowercase
+        {"document_id": DOC_ID, "schema": "v2"},
+        {"document_id": DOC_ID},
+        {"document_id": DOC_ID, "schema": "v1", "extra": "x"},
+    ],
+    ids=["no-id", "not-uuid", "uppercase-uuid", "schema-v2", "no-schema", "extra-field"],
+)
+def test_malformed_message_is_acked_as_invalid_message(r, store, registry, catalogue, caplog, fields):
+    publisher = Recorder()
+    w = make_worker(r, store, registry, catalogue, publisher=publisher)
+    w.ensure_group()
+    r.xadd(STREAM, fields)
+    with caplog.at_level(logging.WARNING):
+        w.run_once()
+    assert pending(r) == 0 and publisher.journal == [] and store.findings_for_document(DOC_ID) == []
+    [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
+    assert rec.outcome == "invalid_message" and rec.levelno == logging.WARNING and rec.stream_id
+
+
+def test_missing_document_is_acked(r, store, registry, catalogue, caplog):
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    xadd(r, MISSING_ID)
+    with caplog.at_level(logging.WARNING):
+        w.run_once()
+    assert pending(r) == 0
+    [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
+    assert (rec.outcome, rec.document_id, rec.levelno) == ("document_not_found", MISSING_ID, logging.WARNING)
+
+
+def test_invalid_document_is_acked_naming_the_field(r, store, registry, catalogue, caplog):
+    store.put_document_row(make_doc(id=DOC_ID, url="ftp://example.com/x"))
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.WARNING):
+        w.run_once()
+    assert pending(r) == 0
+    [rec] = [rec for rec in caplog.records if hasattr(rec, "outcome")]
+    assert (rec.outcome, rec.field) == ("invalid_document", "url")
+
+
+def test_poison_does_not_stop_the_loop(r, store, registry, catalogue):
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    r.xadd(STREAM, {"schema": "v1"})
+    xadd(r)
+    w.run_once()
+    w.run_once()
+    assert len(store.findings_for_document(DOC_ID)) == 1 and pending(r) == 0
+
+
+def test_pipeline_bug_retries_until_max_deliveries(r, store, registry, catalogue, caplog, monkeypatch):
+    import investwatch_analytics.worker as worker_mod
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("pipeline bug")
+
+    monkeypatch.setattr(worker_mod, "analyze", boom)
+    w = make_worker(r, store, registry, catalogue, max_deliveries=3, claim_min_idle_ms=0)
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.INFO):
+        w.run_once()  # delivery 1
+        assert pending(r) == 1
+        w.run_once()  # delivery 2 (claimed)
+        assert pending(r) == 1
+        w.run_once()  # delivery 3 = MAX_DELIVERIES: acked
+    assert pending(r) == 0
+    assert outcomes(caplog) == ["retry_later", "retry_later", "max_deliveries_exceeded"]
+    final = [rec for rec in caplog.records if getattr(rec, "outcome", None) == "max_deliveries_exceeded"][0]
+    assert final.levelno == logging.ERROR and final.exc_info and final.deliveries == 3
+
+
+def test_unexpected_store_error_counts_toward_max_deliveries(r, store, registry, catalogue, caplog):
+    def fk(doc, findings):
+        raise StoreError("ForeignKeyViolation (sqlstate 23503)")
+
+    store.save_findings = fk
+    w = make_worker(r, store, registry, catalogue, max_deliveries=1)
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.INFO):
+        w.run_once()
+    assert pending(r) == 0 and outcomes(caplog) == ["max_deliveries_exceeded"]
+
+
+def test_non_redis_publish_error_is_logged_and_acked(r, store, registry, catalogue, caplog):
+    class Broken(NoopPublisher):
+        def publish_findings(self, saved):
+            raise TypeError("odd client")
+
+    w = make_worker(r, store, registry, catalogue, publisher=Broken())
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.INFO):
+        w.run_once()
+    assert pending(r) == 0 and len(store.findings_for_document(DOC_ID)) == 1
+    assert any(getattr(rec, "reason", None) == "publish_failed" for rec in caplog.records)
+
+
+# ---- reclaim ------------------------------------------------------------------------------------
+
+
+def test_dead_consumer_message_is_claimed_when_stale(r, store, registry, catalogue):
+    a = make_worker(r, store, registry, catalogue, consumer="a")
+    a.ensure_group()
+    xadd(r)
+    r.xreadgroup(GROUP, "a", {STREAM: ">"}, count=1)  # a reads and dies
+    b = make_worker(r, store, registry, catalogue, consumer="b", claim_min_idle_ms=0)
+    b.run_once()
+    assert pending(r) == 0 and len(store.findings_for_document(DOC_ID)) == 1
+
+
+def test_fresh_pending_message_is_not_claimed(r, store, registry, catalogue):
+    a = make_worker(r, store, registry, catalogue, consumer="a")
+    a.ensure_group()
+    xadd(r)
+    r.xreadgroup(GROUP, "a", {STREAM: ">"}, count=1)
+    b = make_worker(r, store, registry, catalogue, consumer="b", claim_min_idle_ms=3_600_000)
+    b.run_once()
+    assert pending(r) == 1 and store.findings_for_document(DOC_ID) == []
+
+
+# ---- outages ------------------------------------------------------------------------------------
+
+
+def test_store_outage_leaves_pending_then_succeeds(r, store, registry, catalogue, caplog):
+    sleeps: list[float] = []
+    w = make_worker(r, store, registry, catalogue, claim_min_idle_ms=0)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    xadd(r)
+    store.unavailable = True
+    with caplog.at_level(logging.WARNING):
+        w.run(max_iterations=3)
+    assert pending(r) == 1 and sleeps == [1, 2, 4]
+    assert [rec.reason for rec in caplog.records if hasattr(rec, "reason")] == ["db_unavailable"] * 3
+    store.unavailable = False
+    w.run(max_iterations=1)
+    assert pending(r) == 0 and len(store.findings_for_document(DOC_ID)) == 1
+
+
+def test_backoff_is_capped_and_resets(r, store, registry, catalogue):
+    sleeps: list[float] = []
+    w = make_worker(r, store, registry, catalogue, claim_min_idle_ms=0)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    xadd(r)
+    store.unavailable = True
+    w.run(max_iterations=7)
+    assert sleeps == [1, 2, 4, 8, 16, 30, 30]
+    store.unavailable = False
+    w.run(max_iterations=1)
+    store.unavailable = True
+    xadd(r, DOC2_ID)
+    sleeps.clear()
+    w.run(max_iterations=1)
+    assert sleeps == [1]
+
+
+def test_backoff_adds_jitter(r, store, registry, catalogue):
+    sleeps: list[float] = []
+    w = make_worker(r, store, registry, catalogue, claim_min_idle_ms=0)
+    w._sleep, w._jitter = sleeps.append, lambda: 0.25
+    w.ensure_group()
+    xadd(r)
+    store.unavailable = True
+    w.run(max_iterations=1)
+    assert sleeps == [1.25]
+
+
+class FlakyRedis(fakeredis.FakeRedis):
+    """The next `failures` stream calls (XAUTOCLAIM or XREADGROUP) raise a connection error."""
+
+    failures = 0
+
+    def _maybe_fail(self) -> None:
+        if self.failures > 0:
+            self.failures -= 1
+            raise redis.ConnectionError("down")
+
+    def xreadgroup(self, *args, **kwargs):
+        self._maybe_fail()
+        return super().xreadgroup(*args, **kwargs)
+
+    def xautoclaim(self, *args, **kwargs):
+        self._maybe_fail()
+        return super().xautoclaim(*args, **kwargs)
+
+
+def test_redis_outage_backs_off_without_exiting(store, registry, catalogue, caplog):
+    fr = FlakyRedis(decode_responses=True)
+    sleeps: list[float] = []
+    w = make_worker(fr, store, registry, catalogue)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    xadd(fr)
+    fr.failures = 2
+    with caplog.at_level(logging.WARNING):
+        w.run(max_iterations=3)
+    assert sleeps == [1, 2]
+    assert [rec.reason for rec in caplog.records if hasattr(rec, "reason")] == ["redis_unavailable"] * 2
+    assert len(store.findings_for_document(DOC_ID)) == 1
+
+
+def test_misconfigured_store_stops_the_loop(r, store, registry, catalogue):
+    def bad(document_id):
+        raise StoreMisconfigured("DATABASE_URL is malformed")
+
+    store.load_document = bad
+    w = make_worker(r, store, registry, catalogue)
+    w.ensure_group()
+    xadd(r)
+    with pytest.raises(StoreMisconfigured):
+        w.run(max_iterations=5)
+    assert pending(r) == 1
+
+
+def test_group_creation_retries_while_redis_is_down(store, registry, catalogue):
+    class DownThenUp(fakeredis.FakeRedis):
+        failures = 2
+
+        def xgroup_create(self, *args, **kwargs):
+            if self.failures:
+                self.failures -= 1
+                raise redis.ConnectionError("down")
+            return super().xgroup_create(*args, **kwargs)
+
+    dr = DownThenUp(decode_responses=True)
+    sleeps: list[float] = []
+    w = make_worker(dr, store, registry, catalogue)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    assert sleeps == [1, 2] and dr.xinfo_groups(STREAM)
+
+
+# ---- stop ---------------------------------------------------------------------------------------
+
+
+def test_stop_finishes_the_current_message_and_reads_no_more(r, store, registry, catalogue):
+    class StopDuring(Recorder):
+        def publish_findings(self, saved):
+            worker.request_stop()
+            return super().publish_findings(saved)
+
+    worker = make_worker(r, store, registry, catalogue, publisher=StopDuring())
+    worker.ensure_group()
+    xadd(r)
+    xadd(r, DOC2_ID)
+    worker.run(max_iterations=10)
+    assert pending(r) == 0  # the current one was acked
+    assert store.findings_for_document(DOC2_ID) == []  # the next one was never read...
+    [[_, unread]] = r.xreadgroup(GROUP, "other", {STREAM: ">"}, count=5)
+    assert [fields["document_id"] for _, fields in unread] == [DOC2_ID]  # ...so it is still undelivered
+
+
+# ---- main ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("missing", ["DATABASE_URL", "REDIS_URL"])
+def test_main_exits_non_zero_naming_the_missing_variable(missing, capsys):
+    env = {"DATABASE_URL": "postgresql://u@127.0.0.1:1/db", "REDIS_URL": "redis://127.0.0.1:1/0"}
+    del env[missing]
+    assert main(env) == 2
+    assert missing in capsys.readouterr().out
+
+
+def test_main_exits_non_zero_on_malformed_database_url(capsys):
+    assert main({"DATABASE_URL": "postgresql://u:pw%zz@h/db", "REDIS_URL": "redis://127.0.0.1:1/0"}) == 2
+    out = capsys.readouterr().out
+    assert "DATABASE_URL is malformed" in out and "pw%zz" not in out
+
+
+def test_main_exits_non_zero_on_bad_registry(tmp_path, capsys):
+    bad = tmp_path / "r.csv"
+    bad.write_text("nope\n", encoding="utf-8")
+    env = {"DATABASE_URL": "postgresql://u@127.0.0.1:1/db", "REDIS_URL": "redis://127.0.0.1:1/0",
+           "REGISTRY_CSV": str(bad)}
+    assert main(env) == 2
+    out = capsys.readouterr().out
+    assert "REGISTRY_CSV" in out or "r.csv" in out
+
+
+# ---- real Redis ---------------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not os.environ.get("TEST_REDIS_URL"), reason="TEST_REDIS_URL not set")
+def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue):
+    real = redis.Redis.from_url(os.environ["TEST_REDIS_URL"], decode_responses=True)
+    stream = f"{STREAM}:test:{uuid.uuid4().hex[:8]}"
+    try:
+        w = make_worker(real, store, registry, catalogue, consumer="a", max_deliveries=2, claim_min_idle_ms=0,
+                        stream=stream)
+        w.ensure_group()
+        real.xadd(stream, {"document_id": DOC_ID, "schema": "v1"})
+        real.xreadgroup(GROUP, "dead", {stream: ">"}, count=1)  # delivery 1 by a consumer that dies
+        w.run_once()  # claimed: delivery 2, processed and acked
+        assert real.xpending(stream, GROUP)["pending"] == 0
+        assert len(store.findings_for_document(DOC_ID)) == 1
+    finally:
+        real.delete(stream)
+
+
+def test_store_outage_during_save_leaves_the_message_pending(r, store, registry, catalogue, caplog):
+    def down(doc, findings):
+        raise StoreUnavailable("connection lost mid-save")
+
+    store.save_findings = down
+    sleeps: list[float] = []
+    w = make_worker(r, store, registry, catalogue, max_deliveries=1)
+    w._sleep = sleeps.append
+    w.ensure_group()
+    xadd(r)
+    with caplog.at_level(logging.WARNING):
+        w.run(max_iterations=1)
+    assert pending(r) == 1 and sleeps == [1]  # retryable: not acked even at MAX_DELIVERIES
+    assert [rec.reason for rec in caplog.records if hasattr(rec, "reason")] == ["db_unavailable"]
+
+
+def test_stopped_worker_makes_no_more_redis_calls(r, store, registry, catalogue):
+    calls: list[str] = []
+
+    class Counting(fakeredis.FakeRedis):
+        def xautoclaim(self, *a, **k):
+            calls.append("xautoclaim")
+            return super().xautoclaim(*a, **k)
+
+        def xreadgroup(self, *a, **k):
+            calls.append("xreadgroup")
+            return super().xreadgroup(*a, **k)
+
+    cr = Counting(decode_responses=True)
+    w = make_worker(cr, store, registry, catalogue)
+    w.ensure_group()
+    w.request_stop()
+    w.run(max_iterations=10)
+    assert calls == []

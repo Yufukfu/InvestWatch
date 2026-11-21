@@ -50,7 +50,7 @@ A redelivered message, or a second message for the same `document_id` (the scrap
 The worker SHALL acknowledge, without storing or publishing anything, a message that can never succeed. It SHALL log one JSON line at level `WARNING` with the stream message id, the `document_id` if known, and one of these reasons: `invalid_message` (missing or non-UUID `document_id`, or `schema` other than `v1`), `document_not_found` (no row with that id), `invalid_document` (the row fails `ScrapedDocument` validation; the log names the field), or `max_deliveries_exceeded` (the delivery count reached `MAX_DELIVERIES`, default 5, after repeated unexpected errors).
 
 #### Scenario: Malformed message
-- **WHEN** a message has no `document_id`, or `schema` is `v2`
+- **WHEN** a message has no `document_id`, a `document_id` that is not a lowercase UUID, a `schema` other than `v1`, or a field the contract does not define
 - **THEN** it is acknowledged with reason `invalid_message`
 
 #### Scenario: Missing document row
@@ -63,7 +63,7 @@ The worker SHALL acknowledge, without storing or publishing anything, a message 
 
 #### Scenario: Pipeline keeps crashing
 - **WHEN** `analyze` raises an unexpected exception for a document on every attempt
-- **THEN** the message is left pending on each attempt below `MAX_DELIVERIES`, and acknowledged with reason `max_deliveries_exceeded` on the attempt that reaches it
+- **THEN** the message is left pending (logged `retry_later` at `ERROR`) on each attempt below `MAX_DELIVERIES`, and acknowledged with reason `max_deliveries_exceeded` (at `ERROR`, with the traceback) on the attempt that reaches it
 
 #### Scenario: Poison message does not stop the loop
 - **WHEN** a poison message is followed by a valid one
@@ -81,7 +81,7 @@ The worker SHALL periodically run XAUTOCLAIM on the group for messages idle long
 - **THEN** it is not claimed
 
 ### Requirement: Infrastructure outages
-The worker SHALL survive an unreachable Redis or Postgres. It SHALL log the error, retry with capped exponential backoff (1 s up to 30 s), never acknowledge a message it could not commit, and resume without a restart once the dependency is back. Startup SHALL fail fast, with a non-zero exit and an error naming the variable, only when `DATABASE_URL` or `REDIS_URL` is missing or the registry or catalogue fails to load.
+The worker SHALL survive an unreachable Redis or Postgres. It SHALL log the reason `redis_unavailable` or `db_unavailable`, retry with capped exponential backoff (1 s doubling up to 30 s, plus jitter, reset after a successful iteration), never acknowledge a message it could not commit, and resume without a restart once the dependency is back. Startup SHALL fail fast, with exit code 2 and an error naming the variable, when `DATABASE_URL` or `REDIS_URL` is missing, `DATABASE_URL` cannot be parsed (without quoting it), or the registry or catalogue fails to load.
 
 #### Scenario: Postgres down while processing
 - **WHEN** the store raises a connection error while loading the document or committing the findings
@@ -103,7 +103,7 @@ The worker SHALL call `analyze` with the registry and catalogue loaded once at s
 - **THEN** the stored finding has `model.llm` null and `model.pipeline_version` set
 
 ### Requirement: Observability and graceful stop
-The worker SHALL log JSON lines to stdout, never using `print`. One line per message SHALL carry the stream id, `document_id`, outcome (`stored`, `no_findings` or a poison reason), the numbers of findings created and updated, and the duration in ms. It SHALL serve `GET /health` on `HEALTH_PORT` (default 8001), returning 200 with `{"status": "ok", "redis": true, "db": true}` when both dependencies answer and 503 with the failing one marked `false` otherwise. On SIGTERM or SIGINT it SHALL finish the current message and exit 0.
+The worker SHALL log JSON lines to stdout, never using `print`. One line per message SHALL carry the stream id, `document_id`, outcome (`stored`, `no_findings`, `retry_later` or a poison reason), the numbers of findings created and updated, and the duration in ms. It SHALL serve `GET /health` on `HEALTH_PORT` (default 8001), returning 200 with `{"status": "ok", "redis": true, "db": true}` when both dependencies answer and 503 with the failing one marked `false` otherwise. On SIGTERM or SIGINT it SHALL finish the current message and exit 0.
 
 #### Scenario: Health with Postgres down
 - **WHEN** `/health` is called while Postgres is unreachable
