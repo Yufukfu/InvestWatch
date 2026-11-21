@@ -152,7 +152,10 @@ async def run_worker_process(stop: asyncio.Event) -> None:
         }
         health = await serve_health(checks, host=runner.health_host, port=runner.health_port)
         ctx = {"sources": rt.store, "run_source": rt.collector.run_source, "record_error": rt.record_error}
-        consumer = ScanRequestConsumer(rt.redis, rt.store, rt.record_error, consumer=consumer_name())
+        consumer = ScanRequestConsumer(
+            rt.redis, rt.store, rt.record_error,
+            consumer=consumer_name(), claim_idle=runner.claim_idle, retry_on=RETRY_ON,
+        )
         try:
             await _run_together(
                 stop,
@@ -169,7 +172,10 @@ async def run_scheduler_process(stop: asyncio.Event) -> None:
         async def republish() -> None:
             await sweep(rt.pool, rt.redis)
 
-        scheduler = asyncio.create_task(Scheduler(rt.redis, rt.store, rt.record_error, sweep=republish).run())
+        scheduler = asyncio.create_task(Scheduler(
+                rt.redis, rt.store, rt.record_error,
+                sweep=republish, tick_interval=runner.tick_interval, sweep_interval=runner.sweep_interval,
+            ).run())
         await stop.wait()
         scheduler.cancel()
         await asyncio.gather(scheduler, return_exceptions=True)

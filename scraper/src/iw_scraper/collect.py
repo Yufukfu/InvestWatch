@@ -88,12 +88,15 @@ class Collector:
             urls.check(source.url, enforce_host=False)
         except FetchFailure as failure:
             return _failed(source_id, failure.reason, failure.detail)
+        proxy = self._rotator.start_run()
+        if (deferral := proxy.deferral()) is not None:  # nothing is announced for a run that has to wait
+            return AttemptResult(deferral=deferral)
         await started()  # the guards passed and nothing has been requested yet
         stages = self._stages
         identity = stages.draw_identity()
         session = stages.open_session(identity)
         try:
-            return await self._collect(source, identity, session, urls)
+            return await self._collect(source, identity, session, urls, proxy)
         except FetchDeferred as deferred:
             return AttemptResult(deferral=deferred.deferral)
         except FetchFailure as failure:
@@ -106,11 +109,10 @@ class Collector:
         finally:
             await stages.close_session(session)
 
-    async def _collect(self, source: Source, identity, session, urls: UrlGuard) -> AttemptResult:
+    async def _collect(self, source: Source, identity, session, urls: UrlGuard, proxy) -> AttemptResult:
         stages = self._stages
         domain = domain_of(source)
         guard = target_guard(urls, self._addresses, source.url)
-        proxy = self._rotator.start_run()
 
         await self._limiter.wait_turn(domain)
         verdict = await stages.check_robots(

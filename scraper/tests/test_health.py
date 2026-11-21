@@ -33,6 +33,7 @@ async def serve():
     servers = []
 
     async def start(checks, **kwargs):
+        kwargs.setdefault("cache_ttl", 0.0)  # these tests change a dependency between requests
         server = await serve_health(checks, host="127.0.0.1", port=0, **kwargs)
         servers.append(server)
         return server
@@ -100,3 +101,36 @@ async def test_health_reports_redis_down_during_an_outage_and_ok_after(redis, pr
     await proxy.start()
     assert (await get(server))[0] == 200
     await client.aclose()
+
+
+async def test_the_verdict_is_cached_so_the_checks_do_not_follow_the_request_rate():
+    calls = []
+
+    async def counting():
+        calls.append(1)
+
+    server = await serve_health({"x": counting}, host="127.0.0.1", port=0, cache_ttl=30.0)
+    try:
+        for _ in range(3):
+            assert (await get(server))[0] == 200
+    finally:
+        server.close()
+
+    assert len(calls) == 1
+
+
+async def test_the_verdict_is_rechecked_after_the_cache_expires():
+    calls = []
+
+    async def counting():
+        calls.append(1)
+
+    server = await serve_health({"x": counting}, host="127.0.0.1", port=0, cache_ttl=0.05)
+    try:
+        await get(server)
+        await asyncio.sleep(0.1)
+        await get(server)
+    finally:
+        server.close()
+
+    assert len(calls) == 2

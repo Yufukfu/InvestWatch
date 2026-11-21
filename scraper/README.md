@@ -25,14 +25,11 @@ Environment only; defaults in `scraper/.env.example`. `config.py` reads and vali
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROXY_LIST` | empty (direct) | comma-separated `http`, `https` or `socks5` proxy URLs |
+| `PROXY_LIST` | empty (direct) | comma-separated `http`, `https` or `socks5` proxy URLs; use an egress-only proxy: behind a proxy the address guard checks our own DNS answer, but the proxy resolves the host itself |
 | `PROXY_ROTATION` | `per_request` | `per_request` or `per_session` |
 | `PROXY_COOLDOWN_SECONDS` | `90` | how long a proxy that answered 407 is skipped |
 | `REDIS_URL` | `redis://localhost:6379/0` | shared rate limit, deferrals and domain pause |
 | `DOMAIN_MIN_INTERVAL_SECONDS` | `5` | minimum gap between request starts per domain, all workers |
-| `MAX_RETRY_AFTER_SECONDS` | `300` | cap on a `Retry-After` wait |
-| `DOMAIN_FAILURE_THRESHOLD` | `5` | consecutive failure outcomes before a domain is paused |
-| `DOMAIN_PAUSE_SECONDS` | `600` | length of that pause |
 | `FETCH_TIMEOUT_SECONDS` | `20` | per-request timeout |
 | `FETCH_MAX_BYTES` | `5242880` | response size cap (5 MiB) |
 | `ALLOWED_PORTS` | `80,443` | ports the scraper may request |

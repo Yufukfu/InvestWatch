@@ -10,6 +10,7 @@ from redis.exceptions import ResponseError
 
 from iw_scraper.events import publish_scan_event
 from iw_scraper.sources import SourceStore, domain_of
+from iw_scraper.supervise import CONNECTION_ERRORS
 from iw_scraper.types import JobError, Reason
 
 STREAM = "iw:scan-requests"
@@ -39,12 +40,20 @@ def _valid_uuid(value: str | None) -> bool:
 
 class ScanRequestConsumer:
     def __init__(
-        self, redis: ArqRedis, store: SourceStore, record_error, *, consumer: str, claim_idle: float = 60.0
+        self,
+        redis: ArqRedis,
+        store: SourceStore,
+        record_error,
+        *,
+        consumer: str,
+        claim_idle: float = 60.0,
+        retry_on: tuple[type[BaseException], ...] = CONNECTION_ERRORS,
     ) -> None:
         self._redis = redis
         self._store = store
         self._record_error = record_error
         self._consumer = consumer
+        self._retry_on = retry_on
         self._claim_idle_ms = int(claim_idle * 1000)
 
     async def setup(self) -> None:
@@ -64,8 +73,19 @@ class ScanRequestConsumer:
         for _stream, batch in fresh or []:
             messages.extend(batch)
         for message_id, fields in messages:
-            await self.handle(_text(message_id), fields)
+            await self._handle_isolated(_text(message_id), fields)
         return len(messages)
+
+    async def _handle_isolated(self, message_id: str, fields: dict | None) -> None:
+        """A lost connection leaves the message pending (it is claimed again); any other error is a bug in
+        this one message, which is logged and dropped so it cannot crash the consumer in a loop."""
+        try:
+            await self.handle(message_id, fields)
+        except self._retry_on:
+            raise
+        except Exception:
+            logger.exception("scan request failed and was dropped")
+            await self._redis.xack(STREAM, GROUP, message_id)
 
     async def _claim_stale(self) -> list:
         claimed, cursor = [], "0-0"
@@ -77,9 +97,9 @@ class ScanRequestConsumer:
             if cursor in NO_MORE_PENDING:
                 return claimed
 
-    async def handle(self, message_id: str, fields: dict) -> None:
+    async def handle(self, message_id: str, fields: dict | None) -> None:
         """Enqueue or refuse one request, then acknowledge it."""
-        source_id = {_text(k): _text(v) for k, v in fields.items()}.get("source_id")
+        source_id = {_text(k): _text(v) for k, v in (fields or {}).items()}.get("source_id")
         if not _valid_uuid(source_id):
             await self._record_error(JobError(Reason.INVALID_REQUEST, "scan request without a valid source_id", None))
         else:

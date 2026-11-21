@@ -162,3 +162,44 @@ async def test_a_source_whose_url_has_no_host_is_refused(redis, store, url):
 def test_the_domain_is_lowercase_and_has_no_trailing_dot():
     assert domain_of(make_source(SRC, url="https://Example.COM./x")) == "example.com"
     assert domain_of(make_source(SRC, url="not-a-url")) == ""
+
+
+async def test_an_entry_without_fields_is_refused_and_acknowledged(redis, store):
+    recorder = Recorder()
+    consumer = await make_consumer(redis, store, recorder)
+    await redis.xadd(STREAM, {"junk": "1"})
+    [(_, [(message_id, _)])] = await redis.xreadgroup(GROUP, "w1", {STREAM: ">"}, count=1)
+
+    await consumer.handle(message_id.decode(), None)  # what a trimmed pending entry looks like to xautoclaim
+
+    assert [e.reason for e in recorder.errors] == [Reason.INVALID_REQUEST]
+    assert await pending(redis) == 0
+
+
+async def test_a_message_that_raises_is_logged_and_dropped_not_looped(redis, store, caplog):
+    async def broken(source_id):
+        raise ValueError("bug")
+
+    store.get = broken
+    consumer = await make_consumer(redis, store, Recorder())
+    await redis.xadd(STREAM, request())
+
+    await consumer.poll(block=0.2)
+
+    assert await pending(redis) == 0
+    assert "scan request failed" in caplog.text
+
+
+async def test_a_lost_connection_is_not_swallowed_and_the_message_stays_pending(redis, store):
+    async def down(source_id):
+        raise ConnectionResetError("db gone")
+
+    store.get = down
+    consumer = ScanRequestConsumer(redis, store, Recorder().record_error, consumer="w1", retry_on=(ConnectionError,))
+    await consumer.setup()
+    await redis.xadd(STREAM, request())
+
+    with pytest.raises(ConnectionResetError):
+        await consumer.poll(block=0.2)
+
+    assert await pending(redis) == 1

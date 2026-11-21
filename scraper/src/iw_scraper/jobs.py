@@ -164,6 +164,8 @@ def _started_key(job_id: str) -> str:
 
 async def _finish_failed(ctx: dict, source_id: str, requested: bool) -> None:
     """End a job that cannot continue: a job that announced its start, or a requested one, ends `failed`."""
+    if ctx.get("finished"):
+        return  # the real outcome is out; a later error must not publish a second finish
     if await ctx["redis"].exists(_started_key(ctx["job_id"])):
         await _finish_if_started(ctx, source_id, status="failed", documents=0)
     elif requested:
@@ -182,6 +184,7 @@ async def _finish_if_started(ctx: dict, source_id: str, *, status: str, document
         # the marker is gone, so this is the only chance to end the progress bar
         logger.exception("could not stamp the source after its run")
     await publish_scan_event(redis, "finished", source_id, documents=documents, status=status)
+    ctx["finished"] = True
 
 
 async def _requeue(lock: RunLock, cfg: QueueSettings, delay: float) -> None:

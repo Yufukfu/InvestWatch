@@ -45,7 +45,7 @@ async def stack(pool, storage, *, urls, addresses, workers=1):
     stop = asyncio.Event()
     tasks = []
     for number in range(workers):
-        consumer = ScanRequestConsumer(rt.redis, rt.store, rt.record_error, consumer=f"test-{number}")
+        consumer = ScanRequestConsumer(rt.redis, rt.store, rt.record_error, consumer=f"test-{number}", retry_on=RETRY_ON)
         tasks += [
             asyncio.create_task(run_worker(ctx, queue, runner, stop=stop, retry_on=RETRY_ON)),
             asyncio.create_task(run_consumer(consumer, runner, stop=stop, retry_on=RETRY_ON)),

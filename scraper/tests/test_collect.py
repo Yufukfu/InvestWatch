@@ -76,9 +76,20 @@ class Limiter:
         return 0.0
 
 
+class Run:
+    def __init__(self, deferral):
+        self._deferral = deferral
+
+    def deferral(self):
+        return self._deferral
+
+
 class Rotator:
+    def __init__(self, deferral=None):
+        self.deferral = deferral
+
     def start_run(self):
-        return object()
+        return Run(self.deferral)
 
 
 async def resolver(host):
@@ -94,7 +105,7 @@ def static_urls(hosts):
     return urls
 
 
-def make(harness, *, source_url=URL, hosts=("alfa.example.com",), source=True):
+def make(harness, *, source_url=URL, hosts=("alfa.example.com",), source=True, rotator=None):
     store = FakeSourceStore()
     store.permissive = False
     if source:
@@ -102,7 +113,7 @@ def make(harness, *, source_url=URL, hosts=("alfa.example.com",), source=True):
     ingestor = type("I", (), {"ingest": harness.ingest})()
     limiter = Limiter(harness.calls)
     collector = Collector(
-        store, ingestor, urls=static_urls(hosts), addresses=AddressGuard(resolver), rotator=Rotator(),
+        store, ingestor, urls=static_urls(hosts), addresses=AddressGuard(resolver), rotator=rotator or Rotator(),
         limiter=limiter, stages=harness.stages(), clock=lambda: NOW,
     )
     return collector, limiter
@@ -267,3 +278,14 @@ async def test_the_session_is_closed_after_success():
 )
 def test_retry_after_is_read_as_seconds_or_an_http_date(header, expected):
     assert retry_after_seconds(header, NOW) == expected
+
+
+async def test_every_proxy_cooling_defers_before_started_and_before_any_request():
+    until = NOW + timedelta(seconds=30)
+    h = Harness()
+    collector, _ = make(h, rotator=Rotator(Deferral(until)))
+
+    result = await run(collector, h)
+
+    assert (result.deferral, result.error) == (Deferral(until), None)
+    assert h.calls == []  # no `scan.started`, no request, no robots

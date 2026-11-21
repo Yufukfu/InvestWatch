@@ -20,6 +20,17 @@ def test_variables_override_fields_with_the_field_type(monkeypatch):
     assert settings.attempt_timeout == QueueSettings().attempt_timeout
 
 
+def test_the_worker_and_scheduler_intervals_are_configurable(monkeypatch):
+    monkeypatch.setenv("REDIS_URL", "redis://x:6379/0")
+    monkeypatch.setenv("SCRAPER_CLAIM_IDLE", "15")
+    monkeypatch.setenv("SCRAPER_TICK_INTERVAL", "20")
+    monkeypatch.setenv("SCRAPER_SWEEP_INTERVAL", "300.5")
+
+    settings = RunnerSettings.from_env()
+
+    assert (settings.claim_idle, settings.tick_interval, settings.sweep_interval) == (15.0, 20.0, 300.5)
+
+
 def test_a_bad_value_names_the_variable(monkeypatch):
     monkeypatch.setenv("SCRAPER_MAX_TRIES", "three")
 

@@ -265,3 +265,26 @@ async def test_the_lock_is_freed_even_when_publishing_the_failed_finish_fails(re
     await asyncio.gather(job.result(timeout=5, poll_delay=0.05), return_exceptions=True)
 
     assert await redis.exists(f"iw:lock:{SRC}") == 0
+
+
+async def test_a_redis_error_after_the_finish_does_not_publish_a_second_finish(redis, start_worker, monkeypatch, events):
+    from redis.exceptions import RedisError
+
+    from iw_scraper.guards import RunLock
+
+    real_release, calls = RunLock.release, []
+
+    async def flaky_release(self):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RedisError("blip after the finish")
+        await real_release(self)
+
+    monkeypatch.setattr(RunLock, "release", flaky_release)
+    start_worker(lambda s, started=None: _const(result_of(documents=1)), Recorder(), fast_settings())
+    job = await redis.enqueue_job("execute_job", SRC, DOMAIN, True, _job_id="job-1")
+    await asyncio.gather(job.result(timeout=5, poll_delay=0.05), return_exceptions=True)
+    await asyncio.sleep(0.3)
+
+    assert [e["type"] for e in events] == ["scan.started", "scan.finished"]
+    assert events[1]["data"]["status"] == "ok"
