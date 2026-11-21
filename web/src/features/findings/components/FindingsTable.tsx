@@ -1,6 +1,6 @@
-import { useGetFindingsQuery } from '../../api/generated';
+import type { FindingRow, FindingStatus } from '../model';
 
-const STATUS_LABEL: Record<string, string> = {
+const STATUS_LABEL: Record<FindingStatus, string> = {
   new: 'Nowe',
   in_review: 'W analizie',
   confirmed: 'Potwierdzone',
@@ -8,11 +8,12 @@ const STATUS_LABEL: Record<string, string> = {
   closed: 'Zamknięte',
 };
 
+type Props = { rows: FindingRow[] | undefined; isLoading: boolean; isError: boolean };
+
 // Scraped content is untrusted: every value is rendered as React text, never as HTML.
-export function FindingsTable() {
-  const { data, isLoading, isError } = useGetFindingsQuery({ page: 1, pageSize: 50 });
+export function FindingsTable({ rows, isLoading, isError }: Props) {
   if (isLoading) return <p>Ładowanie…</p>;
-  if (isError || !data) return <p role="alert">Nie udało się pobrać zgłoszeń.</p>;
+  if (isError || !rows) return <p role="alert">Nie udało się pobrać zgłoszeń.</p>;
   return (
     <table className="findings">
       <thead>
@@ -25,7 +26,7 @@ export function FindingsTable() {
         </tr>
       </thead>
       <tbody>
-        {data.items.map((f) => (
+        {rows.map((f) => (
           <tr key={f.id}>
             <td>{f.module}</td>
             <td>{f.title}</td>
