@@ -6,7 +6,7 @@ import re
 from bisect import bisect_left
 from functools import cached_property
 
-from ..models import RuleResult
+from ..models import Block, EvidenceLocator, RuleResult
 from .engine import Context, Rule, compile_patterns, register
 
 
@@ -176,3 +176,102 @@ class R14PastPerformanceDisclaimer(Rule):
         shown = [s for s in disclaimers if not s.text.lstrip("( ").startswith(p["footnote"])]
         quote = (shown or disclaimers)[0].text
         return self.result("pass", quote, "Materiał zawiera zastrzeżenie dotyczące wyników historycznych.")
+
+
+# ---- visual rules (blocks) ---------------------------------------------------------------------
+
+VIEWPORTS = ("desktop", "mobile", "tablet")
+_SEVERITY_ORDER = {"fail": 3, "uncertain": 2, "pass": 1}
+NO_BLOCKS = "Brak danych o renderowaniu strony – reguła wizualna nie dotyczy."
+NO_RISK_INFO = "Brak informacji o ryzyku w materiale – reguła nie dotyczy (brak ostrzeżenia ocenia R3)."
+NO_RISK_BLOCK = "Brak informacji o ryzyku w danych renderowania – reguła nie dotyczy."
+
+
+def locate(text: str, needle: str) -> str | None:
+    """`needle` as it appears in `text`: exact, else whitespace-insensitive; None when absent."""
+    needle = needle.strip()
+    if not needle:
+        return None
+    if needle in text:
+        return needle
+    m = re.search(r"\s+".join(map(re.escape, needle.split())), text)
+    return m.group(0) if m else None
+
+
+def locator_for(b: Block) -> EvidenceLocator:
+    bbox = b.bbox if b.bbox is not None and len(b.bbox) == 4 else None
+    return EvidenceLocator(viewport=b.viewport, bbox=bbox)
+
+
+class _RiskWarnings(Rule):
+    """Shared by the rules that presuppose risk information (R4, R6): R3's warning dictionary via YAML anchors."""
+
+    @cached_property
+    def _risk(self) -> dict:
+        p = self.spec.params
+        return {
+            "risk": compile_patterns(p.get("risk_patterns", [])),
+            "risk_x": compile_patterns(p.get("risk_exclude_patterns", [])),
+            "risk_ok": compile_patterns(p.get("risk_override_patterns", [])),
+            "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
+            "footnote": tuple(p.get("footnote_markers", [])),
+        }
+
+    def is_warning(self, text: str) -> bool:
+        r = self._risk
+        return (
+            any(o.search(text) for o in r["risk_ok"])
+            or any(d.search(text) for d in r["disclaimer"])
+            or R3RiskNextToReturns._hits(text, r["risk"], r["risk_x"])
+        )
+
+    def is_footnote(self, text: str) -> bool:
+        return text.lstrip("( ").startswith(self._risk["footnote"])
+
+    def no_risk_result(self, ctx: Context) -> RuleResult:
+        """not_applicable when there is no risk block; R3 carries a missing warning (ZASÓB, counted once)."""
+        in_text = any(self.is_warning(s.text) for s in ctx.pre.sentences)
+        return self.result("not_applicable", None, NO_RISK_BLOCK if in_text else NO_RISK_INFO)
+
+
+@register
+class R6HiddenRisk(_RiskWarnings):
+    """ZASÓB R6 "ryzyko ukryte w przypisach": risk only in footer / legal / footnotes, not in view on load."""
+
+    rule_id = "R6"
+
+    def _placement_hidden(self, b: Block) -> bool:
+        regions = self.spec.params.get("hiding_regions", ["footer", "legal"])
+        return b.region in regions or self.is_footnote(b.text)
+
+    def _state(self, b: Block) -> str:
+        if not self._placement_hidden(b) or b.in_viewport_on_load is True:
+            return "pass"
+        return "fail" if b.in_viewport_on_load is False else "uncertain"
+
+    def _viewport(self, blocks: list[Block]) -> tuple[str, Block]:
+        """pass if any risk block is exposed; else uncertain if any position is unknown; else fail."""
+        states = [(self._state(b), b) for b in blocks]
+        for wanted in ("pass", "uncertain", "fail"):
+            hit = next((b for st, b in states if st == wanted), None)
+            if hit is not None:
+                return wanted, hit
+        raise AssertionError("unreachable: blocks is non-empty")
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        if not ctx.doc.blocks:
+            return self.result("not_applicable", None, NO_BLOCKS)
+        verdicts = []
+        for vp in VIEWPORTS:
+            risk = [b for b in ctx.doc.blocks if b.viewport == vp and self.is_warning(b.text)]
+            if risk:
+                verdicts.append(self._viewport(risk))
+        if not verdicts:
+            return self.no_risk_result(ctx)
+        result, b = max(verdicts, key=lambda v: _SEVERITY_ORDER[v[0]])  # first (desktop-first) wins ties
+        why = {
+            "fail": f"Ostrzeżenie o ryzyku tylko w stopce, sekcji prawnej lub przypisie i niewidoczne bez przewijania ({b.viewport}).",
+            "uncertain": f"Ostrzeżenie o ryzyku w stopce, sekcji prawnej lub przypisie; brak danych, czy jest widoczne bez przewijania ({b.viewport}).",
+            "pass": "Ostrzeżenie o ryzyku jest wyeksponowane poza stopką i przypisami lub widoczne bez przewijania.",
+        }[result]
+        return self.result(result, locate(ctx.doc.text, b.text), why, locator_for(b))

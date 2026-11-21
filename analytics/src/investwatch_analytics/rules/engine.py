@@ -13,7 +13,7 @@ from typing import Any, ClassVar
 
 import yaml
 
-from ..models import RULE_ID_PATTERN, Result, RuleResult, ScrapedDocument
+from ..models import RULE_ID_PATTERN, EvidenceLocator, Result, RuleResult, ScrapedDocument
 from ..preprocessing import Preprocessed
 from ..registry import FirmMatch, Registry
 
@@ -26,6 +26,7 @@ KNOWN_PARAMS = {
     "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
     # analytics-llm-p0 (M2 P0 rules)
     "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
+    "hiding_regions",
 }
 _RULES: dict[str, type["Rule"]] = {}
 
@@ -64,7 +65,10 @@ class Rule:
     def evaluate(self, ctx: Context) -> RuleResult:  # pragma: no cover - abstract
         raise NotImplementedError
 
-    def result(self, result: Result, evidence: str | None, explanation: str) -> RuleResult:
+    def result(
+        self, result: Result, evidence: str | None, explanation: str,
+        locator: EvidenceLocator | None = None,
+    ) -> RuleResult:
         return RuleResult(
             rule_id=self.spec.id,
             name=self.spec.name,
@@ -74,6 +78,7 @@ class Rule:
             explanation=explanation,
             legal_basis=self.spec.legal_basis,
             method="rule",
+            evidence_locator=locator,
         )
 
 
@@ -159,6 +164,8 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
             isinstance(value, bool) or not isinstance(value, int) or value < 0
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a non-negative integer")
+        if key == "hiding_regions" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key.endswith("_patterns") or key == "labels":
             # An empty label becomes a regex that matches anywhere, so R2 would always pass.
             if not isinstance(value, list) or not all(isinstance(v, str) and (v or key != "labels") for v in value):

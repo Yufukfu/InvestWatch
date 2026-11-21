@@ -10,9 +10,9 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 ## 2. Evidence locator and R6 hidden risk (~1 h)
 
-- [ ] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`, no risk block `not_applicable` with `brak informacji o ryzyku`, only desktop/mobile/tablet evaluated, footnote-only past-performance disclaimer gives R6 `fail`); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
-- [ ] 2.2 `EvidenceLocator` in `models.py`; risk-block detection reusing R3's warning patterns via a YAML anchor; R6 class, `hiding_regions` param; worst viewport wins; tests green
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Failing tests: `RuleResult.evidence_locator` validates against `finding.schema.json` (skipped without `CONTRACTS_DIR`); R6 scenarios (alfa footer `fail`, main region `pass`, footer visible on load `pass`, unknown position `uncertain`, no blocks `not_applicable`, no risk block `not_applicable` with `brak informacji o ryzyku`, only desktop/mobile/tablet evaluated, footnote-only past-performance disclaimer gives R6 `fail`); a shared helper that locates a block's text in `doc.text` (exact, then whitespace-insensitive) or returns null
+- [x] 2.2 `EvidenceLocator` in `models.py`; risk-block detection reusing R3's warning patterns via a YAML anchor; R6 class, `hiding_regions` param; worst viewport wins; tests green
+- [x] 2.3 Mutation check; `mutations: 19 tried, 19 caught` (two survivors on the first run closed with tests: no-blocks explanation, hidden plus unknown position)
 
 ## 3. R4 risk font size (~45 min)
 

@@ -59,14 +59,13 @@ rules:
         - '\b(?:prowizj|opłat|podat|marż)\w*\s+\d+(?:[.,]\d+)?\s?%'
         - '\b100\s?%\s+(?:online|bezpieczn\w*|za darmo|darmow\w*)'
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s*(?:prowizj\w*|opłat\w*|marż\w*|podatk\w*|commission|fees?)'
-      risk_patterns:
-        - '\bstra(?:t[aęyo]|ci|ć)\w*'
+      risk_patterns: &risk_patterns        - '\bstra(?:t[aęyo]|ci|ć)\w*'
         - '\bryzyk\w*'
         - '\butrat\w*'
         - '\brisk\w*'
         - '\blos(?:s|ing|e)\b'
       # Double negatives ("nie są wolne od ryzyka") are warnings even though they contain a denial phrase.
-      risk_override_patterns:
+      risk_override_patterns: &risk_override_patterns
         - '\bnie\s+(?:ma|są|jest)\s+(?:\w+\s+){0,2}(?:bez\s+|woln\w*\s+od\s+)ryzyk\w*'
         - '\bno\s+\w+\s+is\s+risk[- ]free'
         - '\bnot\s+risk[- ]free'
@@ -75,7 +74,7 @@ rules:
         - '\bnie\s+(?:(?:jest|są|można|da\s+się)\s+)?wyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         # "nie gwarantujemy braku strat", "nie gwarantujemy uniknięcia straty".
         - '\bnie\s+gwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
-      risk_exclude_patterns:
+      risk_exclude_patterns: &risk_exclude_patterns
         # Affirmed exclusion of loss ("wykluczamy straty", "gwarantujemy brak straty") is a denial.
         - '\bwyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\bgwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
@@ -95,7 +94,26 @@ rules:
 
   - {id: R4, name: Rozmiar czcionki ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565, implemented: false}
   - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
-  - {id: R6, name: Zakrywanie / ukrywanie ryzyka, severity: high, legal_basis: art. 44 ust. 2 lit. e rozp. del. 2017/565, implemented: false}
+  # ZASÓB R6 "ryzyko ukryte w przypisach": a risk block only in the footer / legal region or a footnote and
+  # not in the viewport on load. Visual: not_applicable without `blocks`, never pass. Viewports desktop,
+  # mobile, tablet; the worst one is reported. `visible` is R5's, `requires_interaction` is R7's.
+  - id: R6
+    name: Zakrywanie / ukrywanie ryzyka
+    severity: high
+    legal_basis: art. 44 ust. 2 lit. e rozp. del. 2017/565
+    implemented: true
+    params:
+      hiding_regions: [footer, legal]
+      # A past-performance disclaimer is risk information too (shared with R14 below).
+      disclaimer_patterns: &past_performance_disclaimers
+        - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+        - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+        - '\bpast performance\b.{0,60}?\b(?:is not|does not|isn.t|not a)\b'
+        - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      footnote_markers: *footnote_markers
   - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
   - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
@@ -140,11 +158,7 @@ rules:
         - '\bexpect\w*'
         - '\bwill\b'
         - '\bforecast\w*'
-      disclaimer_patterns:
-        - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
-        - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
-        - '\bpast performance\b.{0,60}?\b(?:is not|does not|isn.t|not a)\b'
-        - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
+      disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
   - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
   - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
