@@ -92,3 +92,8 @@ Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14
 | R34 | `\d+(?:[.,]\d+)?\s?%` and the three excludes built on it were quadratic on a long digit run: about 25 s at 20k digits, about 4× slower when the input doubled. This includes R3's claim and exclude lists, which R14 aliases | `fix-here`: `(?<!\d)` prefix, so the pattern is tried once per number, not once per digit; regression tests on 20k-digit inputs (< 2 s). After the fix no pattern is super-linear |
 | R35 | `locate()`'s whitespace-insensitive search is O(text × needle) on a huge block | `fix-here`: only block texts up to `LOCATE_FUZZY_MAX` (2000 chars) go through the fuzzy path; longer ones match exactly or give null evidence |
 | R36 | `preprocessing._BOUNDARY` is quadratic on long whitespace runs (Kacper) | `docs`: fixed on `analytics/analytics-worker` by the worker session, arrives with the next sync; not touched here |
+
+## For the PR body
+
+- Commits `f7e07d0..672d927` (11 commits, from the R6 commit to the ReDoS fix) have an `m2_rules.yaml` that does not load. This is an artefact of the conflict resolution during the rebase onto `analytics-worker` 9bd27e8: a joined line and a dropped `shared:` block. `55a578e` repairs it. CI runs on the PR head only. The coordinator decided not to rewrite the history again (2026-11-21).
+- `egress` is re-added to `analytics/compose.yaml` together with the hosted-LLM client (group 12). Kacper's #26 review removed it until the client existed.
