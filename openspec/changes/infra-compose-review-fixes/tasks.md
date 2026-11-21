@@ -22,5 +22,5 @@
 
 ## 4. Closing
 
-- [ ] 4.1 Apply the iw-docs-update skill (docs above, Damian's `.docs/STATUS.md` row, ADRs) and add the iw-ai-log row; `docker compose up` on an isolated project with `api-migrate` exiting 0, output kept for the PR body
+- [x] 4.1 Apply the iw-docs-update skill (docs above, Damian's `.docs/STATUS.md` row, ADRs) and add the iw-ai-log row; `docker compose up` on an isolated project with `api-migrate` exiting 0, output kept for the PR body
 - [ ] 4.2 Run the iw-pr-review skill and fix real findings
