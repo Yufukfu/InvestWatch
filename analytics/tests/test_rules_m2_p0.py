@@ -590,3 +590,35 @@ def test_llm_when_defaults_to_uncertain(tmp_path):
     p = tmp_path / "rules.yaml"
     p.write_text(text.replace(anchor, anchor + "    llm: {question: 'Czy firma jest podana?'}\n"), encoding="utf-8")
     assert Catalogue.load(p).get("R1").llm == {"question": "Czy firma jest podana?", "when": "uncertain"}
+
+
+# ---- group 3 review fixes ----------------------------------------------------------------------
+
+
+def test_r14_tysiace_after_year_is_still_a_year(registry, catalogue):
+    text = "W 2023 tysiące klientów: +8%."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+def test_r14_thousands_abbreviation_is_an_amount(registry, catalogue):
+    text = "Inwestuj od 2000 tys. zł i odbierz 8% w skali roku."
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "not_applicable"
+
+
+def test_r4_zero_px_blocks_do_not_set_the_dominant_size(registry, catalogue):
+    body = "Zysk 8% rocznie na naszym koncie maklerskim przez cały rok."
+    blocks = [block("Zysk " * 30, size=0), block(body, size=20), block("Ryzyko utraty kapitału.", size=9)]
+    r = run(f"{body} Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "fail" and "20 px" in r.explanation
+
+
+def test_r4_only_zero_px_text_is_uncertain(registry, catalogue):
+    blocks = [block("Zysk " * 5, size=0), block("Ryzyko utraty kapitału.", size=0)]
+    r = run("Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "uncertain"
+
+
+def test_r4_displayed_ratio_never_contradicts_the_verdict(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie na naszym koncie maklerskim.", size=20), block("Ryzyko utraty.", size=14.99)]
+    r = run("Zysk 8% rocznie na naszym koncie maklerskim. Ryzyko utraty.", registry, catalogue, blocks=blocks)["R4"]
+    assert r.result == "fail" and "0,749" in r.explanation

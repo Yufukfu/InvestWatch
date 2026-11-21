@@ -38,3 +38,10 @@
 | R16 | review group 2, declined | A footnote-marked block in the main region and in view on load passes R6 | `wont-fix`: follows the spec's AND rule (placement and not in view) |
 | R17 | review group 2, declined | The `hiding_regions` default is in both the code and the YAML | `wont-fix`: the YAML is the source; the code default only guards a missing key |
 | R18 | review group 2, can't verify | Whether the scraper fills `region` and `in_viewport_on_load`; without `region`, R6 passes | `new-item`: confirm with Adam when the `blocks` shape is settled |
+| R19 | review group 3 | The currency lookahead `tys` also matched `tysiące`, so real past performance was missed | `fix-here`: `tys(?:\.|\b)` |
+| R20 | review group 3 | A 0 px median forced the ratio to 1.0 (pass); negative sizes were measured | `fix-here`: blocks of 0 px or less never set the dominant size; a visible risk block with no positive size gives `uncertain` |
+| R21 | review group 3 | The displayed ratio was rounded (`0,75×` on a fail against 0,75) | `fix-here`: truncated to 3 decimals |
+| R22 | review group 3 | The R4 requirement said "the risk block's text" while the code quotes the warning sentence | `fix-here`: spec and design updated |
+| R23 | review group 3, can't verify | Container blocks from the scraper (body plus warning in one block) make R4 pass on the container's size | `new-item`: with follow-up R18 (block granularity, Adam) |
+| R24 | review group 3, declined | The lower weighted median makes R4 lenient on a 50/50 split | `wont-fix` for now: threshold policy for the gold set |
+| R25 | review group 3, declined | The loader ignores unknown top-level YAML keys (`shared:` lists no rule references are never validated) | `wont-fix`: predates the change; `test_catalogue_is_complete` catches a mistyped `rules:` key |

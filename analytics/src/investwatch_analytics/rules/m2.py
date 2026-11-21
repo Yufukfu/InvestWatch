@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from bisect import bisect_left
 from functools import cached_property
@@ -129,7 +130,7 @@ class R3RiskNextToReturns(Rule):
 # A year only in a year context ("w 2025", "za 2024 r.", "2023 roku"), so amounts ("2000 zł") and
 # dates ("do 31.12.2026") are not years; an amount after a preposition ("od 2000 zł") is not either.
 _YEAR = re.compile(
-    r"\b(?:w|we|za|od|z)\s+(?:roku\s+)?((?:19|20)\d{2})(?!\d)(?!\s*(?:zł|pln|eur|usd|€|\$|tys))|(?<![\d.])((?:19|20)\d{2})\s*(?:r\.|rok\w*)",
+    r"\b(?:w|we|za|od|z)\s+(?:roku\s+)?((?:19|20)\d{2})(?!\d)(?!\s*(?:zł|pln|eur|usd|€|\$|tys(?:\.|\b)))|(?<![\d.])((?:19|20)\d{2})\s*(?:r\.|rok\w*)",
     re.IGNORECASE,
 )
 
@@ -306,7 +307,8 @@ def weighted_median(values: list[tuple[float, float]]) -> float:
 
 
 def _pl(x: float) -> str:
-    return f"{x:.2f}".replace(".", ",")
+    """Ratio for display, truncated (never rounded up) to 3 decimals so it cannot contradict the verdict."""
+    return f"{math.floor(x * 1000) / 1000:.3f}".replace(".", ",")
 
 
 def _px(x: float) -> str:
@@ -329,10 +331,13 @@ class R4RiskFontSize(_RiskWarnings):
         min_ratio = float(self.spec.params.get("min_ratio", 0.75))
         measured = []  # (ratio, risk block, dominant size)
         any_risk_block = False
+        unmeasurable = False
         for vp in VIEWPORTS:
             blocks = [b for b in ctx.doc.blocks if b.viewport == vp]
             any_risk_block |= any(self.is_warning(b.text) for b in blocks)
-            visible = [b for b in blocks if b.visible]
+            unmeasurable |= any(b.visible and b.font_size_px <= 0 and self.is_warning(b.text) for b in blocks)
+            # A 0 px (or negative) block carries no readable text: it never sets the dominant size.
+            visible = [b for b in blocks if b.visible and b.font_size_px > 0]
             risk = [b for b in visible if self.is_warning(b.text)]
             if not risk:
                 continue
@@ -340,6 +345,11 @@ class R4RiskFontSize(_RiskWarnings):
             largest = max(risk, key=lambda b: b.font_size_px)
             measured.append((largest.font_size_px / dominant if dominant else 1.0, largest, dominant))
         if not measured:
+            if unmeasurable:
+                return self.result(
+                    "uncertain", None,
+                    "Ostrzeżenie o ryzyku ma nieczytelny rozmiar czcionki (0 px) w danych renderowania – do weryfikacji.",
+                )
             if any_risk_block:
                 return self.result(
                     "not_applicable", None,
