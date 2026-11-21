@@ -9,8 +9,14 @@ Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../..
 
 ## Architecture (code quality)
 
-- Presentational components in `src/features/**` receive data and callbacks through props and import nothing from `api/`, the store or Socket.IO. Data comes from a parent (a page component or a hook) that reads the API. The existing `FindingsTable`, `SummaryCards` and `HealthBadge` call RTK Query hooks directly, so they act as containers for now; moving them is a separate refactor change, not part of unrelated work.
+- Layers (decided in [ADR 0204](../../.docs/decisions/0204-frontend-architecture.md)):
+  - `src/api/`: the generated client (`generated.ts`) and `baseApi.ts`. `src/store.ts` and the test setup also import it, because they build the store.
+  - `src/features/<name>/data/use<Name>.ts`: the feature's data hook. The only feature code that imports `generated.ts`. It calls the generated hooks and returns plain values and callbacks. Real-time (Socket.IO) subscriptions also live here, in the `alerts` feature, because they patch the RTK Query cache.
+  - `src/features/<name>/model.ts`: app-owned view-model types, only where the DTO is non-trivial (findings, with `rules`, `firm`, `advertiser`). For a flat DTO (health, summary counts) the hook returns the values the component needs and no model or mapper is added.
+  - `src/features/<name>/components/`: presentational components. Props in, JSX out. They do not import from `api/`, `data/`, the store or Socket.IO, and do not use the generated DTO types (`Finding`, `Status`, `Module`).
+  - `src/features/<name>/<Name>Page.tsx`: calls the data hook and passes its results down as props. This is the only place where data and presentation meet.
 - Server state lives in RTK Query (`src/api/baseApi.ts`, generated endpoints). No raw `fetch` in components. Local UI state (open panel, selected row) stays in the component that owns it.
+- Until the refactor change lands, the existing `FindingsTable`, `SummaryCards` and `HealthBadge` call RTK Query hooks directly. They are moved to this layout by that change, not as a side effect of unrelated work.
 - Filter, `sort` and paging state (`page`, `page_size`) use the parameter names of `GET /findings` in `contracts/openapi.yaml`; do not copy the list here. Keep them in the URL search params, so a shared link reproduces the same view.
 - Do not compute `risk_level` in the browser. The API derives it from the threshold (§4, ADR 0305). Read it from the response and show it.
 - Real-time: subscribe to `finding.high_risk`, `finding.created` and `finding.updated` in one place (a single hook or middleware). `created` and `high_risk` carry only `{id, module, score, title, url, platform}` (integration-plan §6), so invalidate the `findings` and `stats` tags on them rather than inserting rows. Patch the cache only from `finding.updated` (`{id, status}`). `high_risk` drives the toast. Do not keep a second copy of the findings list.

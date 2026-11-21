@@ -18,7 +18,7 @@ Last updated: 2026-11-21 (Sat) by Damian. Update this file when a milestone move
 | Module | Owner | State | Active OpenSpec changes |
 |---|---|---|---|
 | scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
-| dashboard | B | foundation: app shell, RTK Query client generated from `contracts/openapi.yaml`, mock mode, hardened container, root compose with Postgres + HTTPS gateway (`infra/`); chart library decided: Recharts ([ADR 0203](decisions/0203-dashboard-charts-recharts.md)), dependency not installed yet; web rules in `.claude/rules/web-dashboard.md` | none (`web-setup` archived) |
+| dashboard | B | foundation: app shell, RTK Query client generated from `contracts/openapi.yaml`, mock mode, hardened container, root compose with Postgres + HTTPS gateway (`infra/`); chart library decided: Recharts ([ADR 0203](decisions/0203-dashboard-charts-recharts.md)), dependency not installed yet; web rules in `.claude/rules/web-dashboard.md`; frontend layering decided in [ADR 0204](decisions/0204-frontend-architecture.md) (existing components still to move to it, needs an OpenSpec change) | none (`web-setup` archived) |
 | analytics, api, contracts | Damian | plans written; contracts v1 in `contracts/`; ADRs 0301-0305, see `.docs/decisions/README.md`; mock server for `web/` in `contracts/mock-server/` (REST `http://localhost:8000/api`, Socket.IO `/events`) in review | `mock-server` (branch `contracts/mock-server`) |
 
 ## Blockers and open decisions
