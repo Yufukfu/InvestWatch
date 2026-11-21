@@ -9,9 +9,9 @@
 
 ## 2. Health feature
 
-- [ ] 2.1 Write failing tests: `HealthBadge` renders each state from a `state` prop without a `Provider`; `useHealth` returns `unreachable` when the request fails and `down` when the API answers `down`, using MSW and a fresh-store helper in `src/test/`.
-- [ ] 2.2 Create `features/health/data/useHealth.ts`, `features/health/components/HealthBadge.tsx` (props only) and `features/health/HealthPage.tsx`; render `HealthPage` in `App.tsx`; remove the old `HealthBadge.tsx`. Verify the new tests, `App.test.tsx`, `npm run lint` and `npm run typecheck` pass.
-- [ ] 2.3 Mutation check on the state mapping (swap `down` and `unreachable`, drop polling) and verify the tests catch it. Record `mutations: N tried, N caught`.
+- [x] 2.1 Write failing tests: `HealthBadge` renders each state from a `state` prop without a `Provider`; `useHealth` returns `unreachable` when the request fails and `down` when the API answers `down`, using MSW and a fresh-store helper in `src/test/`.
+- [x] 2.2 Create `features/health/data/useHealth.ts`, `features/health/components/HealthBadge.tsx` (props only) and `features/health/HealthPage.tsx`; render `HealthPage` in `App.tsx`; remove the old `HealthBadge.tsx`. Verify the new tests, `App.test.tsx`, `npm run lint` and `npm run typecheck` pass.
+- [x] 2.3 Mutation check on the state mapping (swap `down` and `unreachable`, drop polling) and verify the tests catch it. Record `mutations: N tried, N caught`. mutations: 6 tried, 6 caught (one survived first, fixed with a no-status test).
 
 ## 3. Summary feature
 
