@@ -134,7 +134,7 @@ After `LLM_BREAKER_FAILURES` consecutive unavailable outcomes (connection error,
 - **THEN** later documents call the endpoint again
 
 ### Requirement: Chunking with worst chunk wins
-Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into chunks of at most that many characters, consecutive chunks overlapping by up to four sentences (R3 `window` plus `borderline_margin`) and at most half a chunk, each chunk ending later than the previous one. At most `LLM_MAX_CHUNKS` chunks SHALL be sent, one request each. Per check the merged verdict SHALL be the worst across chunks (`fail` > `uncertain` > `pass` > `not_applicable`), with its evidence and explanation from that chunk.
+Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into chunks of at most that many characters, consecutive chunks overlapping by up to four sentences (R3 `window` plus `borderline_margin`). At most `LLM_MAX_CHUNKS` chunks SHALL be sent, one request each. Per check the merged verdict SHALL be the worst across chunks (`fail` > `uncertain` > `pass` > `not_applicable`), with its evidence and explanation from that chunk.
 
 #### Scenario: Worst chunk wins
 - **WHEN** chunk 1 answers R17 `pass` and chunk 2 answers R17 `fail` with a verified quote from chunk 2
@@ -144,6 +144,7 @@ Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into ch
 #### Scenario: Claim and warning on a chunk border
 - **WHEN** a return claim is the last sentence of chunk 1 and its warning is the next sentence
 - **THEN** chunk 2 starts with the last four sentences of chunk 1, so both appear in one request
+- **AND** the overlap SHALL be at most half a chunk, and every chunk SHALL end later than the previous one
 - **AND** a single sentence longer than `LLM_CHUNK_CHARS` SHALL be cut at the limit
 
 #### Scenario: Too long
