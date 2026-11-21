@@ -82,10 +82,14 @@ def test_search_does_not_look_into_the_summary(client, store):
     assert items(client, f"q={word}") == []
 
 
-def test_search_matches_firm_name(client):
-    result = items(client, "q=alfa inwestycje")
+def test_search_matches_firm_name(client, store):
+    # "Dom Maklerski" appears only in the firm name, never in a title, excerpt or advertiser
+    expected = {f["id"] for f in store.findings.values()
+                if "Alfa Inwestycje Dom Maklerski" in (f["firm"] or {}).get("name", "")}
 
-    assert result and all("Alfa Inwestycje" in (i["firm"] or {}).get("name", "") for i in result)
+    result = items(client, "q=alfa inwestycje dom maklerski")
+
+    assert expected and {i["id"] for i in result} == expected
 
 
 @pytest.mark.parametrize("sort", ["score", "-score", "detected_at", "-detected_at"])
