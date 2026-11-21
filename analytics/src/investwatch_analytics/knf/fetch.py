@@ -20,6 +20,7 @@ BASE_PATH = "/podmioty/Podmioty_rynku_kapitalowego/Firmy_inwestycyjne_i_Agenci_f
 SUMMARY_URL = HOST + BASE_PATH
 MAX_PAGES = 100
 MAX_SKIPPED_SHARE = 0.05
+MAX_BYTES = 5_000_000  # a real list page is under 200 KB
 USER_AGENT = "InvestWatch-registry-loader/1.0 (HackNation UKNF challenge; manual run)"
 
 Fetcher = Callable[[str], str]
@@ -48,15 +49,25 @@ LISTS = (
 )
 
 
+class KnfOnlyRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only to another https page on the KNF host; anything else fails the run."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith(HOST + "/"):
+            raise KnfError("fetch_failed", f"{req.full_url}: redirect to {newurl} refused (not a KNF URL)")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class HttpFetcher:
     """GET with a timeout, at most one request per `min_interval` seconds and `attempts` tries with backoff.
     Only URLs on the KNF host are fetched."""
 
     def __init__(self, *, timeout: float = 30.0, attempts: int = 3, min_interval: float = 0.5,
                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
-                 opener: Callable = urllib.request.urlopen):
+                 opener: Callable | None = None):
         self.timeout, self.attempts, self.min_interval = timeout, attempts, min_interval
-        self._sleep, self._clock, self._open = sleep, clock, opener
+        self._sleep, self._clock = sleep, clock
+        self._open = opener or urllib.request.build_opener(KnfOnlyRedirects()).open
         self._last: float | None = None
 
     def __call__(self, url: str) -> str:
@@ -68,9 +79,13 @@ class HttpFetcher:
             try:
                 request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
                 with self._open(request, timeout=self.timeout) as response:
-                    return response.read().decode("utf-8")
+                    body = response.read(MAX_BYTES + 1)
+                if len(body) > MAX_BYTES:
+                    raise KnfError("fetch_failed", f"{url}: response larger than {MAX_BYTES} bytes")
+                return body.decode("utf-8")
             except urllib.error.HTTPError as exc:
                 detail = f"HTTP {exc.code}"
+                exc.close()
             except (urllib.error.URLError, TimeoutError, OSError, UnicodeDecodeError) as exc:
                 detail = f"{type(exc).__name__}: {getattr(exc, 'reason', exc)}"
             log.warning("knf fetch failed", extra={"url": url, "attempt": attempt, "error": detail})
@@ -107,14 +122,17 @@ def fetch_list(fetcher: Fetcher, source: ListSource, *, max_pages: int = MAX_PAG
     at the first page that adds no new record; more than `max_pages` pages means the layout changed.
     A record without a name is skipped; more than MAX_SKIPPED_SHARE of a list skipped fails the run."""
     records: list[RawRecord] = []
-    seen: set[str] = set()
-    for page in range(1, max_pages + 1):
+    previous: list[str] | None = None
+    # One page more than the cap: page max_pages + 1 must be the repeat of the last real page.
+    for page in range(1, max_pages + 2):
         page_records = parse_page(fetcher(source.page_url(page)), where=source.key, page=page)
-        new = [r for r in page_records if r.fingerprint not in seen]
-        if not new:
+        fingerprints = [r.fingerprint for r in page_records]
+        # The list ends at an empty page or one that repeats the previous page. Identical records on
+        # different pages (KNF lists some firms twice) are all kept; merging is build.py's job.
+        if not page_records or fingerprints == previous:
             break
-        seen.update(r.fingerprint for r in new)
-        records.extend(new)
+        previous = fingerprints
+        records.extend(page_records)
     else:
         raise KnfError("layout_changed", f"{source.key}: still new records after {max_pages} pages")
     named = [r for r in records if r.name_lines]

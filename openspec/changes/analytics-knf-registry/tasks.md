@@ -6,10 +6,10 @@ Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip 
 
 ## 1. Snapshots, fetching and parsing (≈ 1.5 h)
 
-- [x] 1.1 Save trimmed real snapshots (`#entityTable` and pagination kept verbatim, navigation chrome removed) to `tests/fixtures/knf/`: summary, banks, brokerage pages 1-2, branches, no-branch pages 1, 2 and 36, and `?page=99`. Derive the failure fixtures from them (renamed label, missing `entityTable`, empty list, summary without one link). Record the fetch date in a README next to the fixtures.
+- [x] 1.1 Save trimmed real snapshots (`#entityTable` and pagination kept verbatim, navigation chrome removed) to `tests/fixtures/knf/`: summary, banks, brokerage pages 1-2, branches, no-branch pages 1, 2 and 36 (the last; `?page=99` answered the same records). The failure cases (renamed label, missing `entityTable`, empty list, blank names, summary without one link) are derived from them inside the tests. Record the fetch date in a README next to the fixtures.
 - [x] 1.2 Failing tests (`tests/test_knf_parse.py`) for every scenario of the requirements "Fetching the KNF lists" and "Parsing firm records": pagination stop at the clamp page, the 101-page cap, 503 or timeout after 3 attempts, `list_moved`, `layout_changed`, the CERES former name, the PEKAO strike artifact, Admiral Markets → `EE`, unknown country, the malformed record and the 5% limit. Fetching goes through a fake fetcher.
 - [x] 1.3 `knf/fetch.py` (urllib, timeout, user agent, 2 req/s, retries with an injectable sleep) and `knf/parse.py` (`html.parser`, `th`-label mapping, line-aware strike handling, the Polish-to-ISO country map); tests green
-- [x] 1.4 Mutation check; `mutations: 18 tried, 18 caught` (first run 17/18: the end-tag container guard was redundant with the start-tag one, so it was removed and the start-tag mutant is now caught)
+- [x] 1.4 Mutation check; `mutations: 18 tried, 18 caught` (first run 17/18: the end-tag container guard was redundant with the start-tag one, so it was removed and the start-tag mutant is now caught); review fix: `mutations: 7 tried, 7 caught`
 
 ## 2. Building the registry: ids, merges, aliases, domains (≈ 2 h)
 

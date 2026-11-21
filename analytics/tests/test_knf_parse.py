@@ -5,12 +5,16 @@ from __future__ import annotations
 
 import io
 import urllib.error
+import urllib.request
 
 import pytest
 from knf_fixtures import FakeFetcher, read
 
 from investwatch_analytics.knf import KnfError
-from investwatch_analytics.knf.fetch import LISTS, SUMMARY_URL, HttpFetcher, check_summary, fetch_all, fetch_list
+from investwatch_analytics.knf import fetch as fetch_mod
+from investwatch_analytics.knf.fetch import (
+    LISTS, SUMMARY_URL, HttpFetcher, KnfOnlyRedirects, check_summary, fetch_all, fetch_list,
+)
 from investwatch_analytics.knf.parse import country_code, parse_page
 
 SOURCES = {s.key: s for s in LISTS}
@@ -37,21 +41,53 @@ def test_fetch_all_reads_every_list_and_stops_at_the_repeated_last_page():
     assert fetcher.calls[0] == SUMMARY_URL
 
 
-def test_page_99_clamp_snapshot_equals_the_last_page():
+def test_last_page_snapshot_has_the_final_twelve_records():
     last = parse_page(read("nobranch_p36.html"), where="no_branch", page=36)
     assert len(last) == 12 and last[0].name_lines == ("WisdomTree Ireland Limited",)
 
 
-def test_endless_pagination_fails_as_layout_changed():
-    class Endless(FakeFetcher):
-        def __call__(self, url):
-            n = int(url.rsplit("=", 1)[1]) if "?page=" in url else 1
-            html = read("dm_p2.html")
-            return html.replace("NOBLE Securities S.A.", f"Firma {n} S.A.")
+class _Paged(FakeFetcher):
+    """`real_pages` distinct pages, then the last one again for any higher page (KNF's clamp)."""
 
+    def __init__(self, real_pages: int):
+        super().__init__()
+        self.real_pages = real_pages
+
+    def __call__(self, url):
+        n = int(url.rsplit("=", 1)[1]) if "?page=" in url else 1
+        return read("dm_p2.html").replace("NOBLE Securities S.A.", f"Firma {min(n, self.real_pages)} S.A.")
+
+
+def test_endless_pagination_fails_as_layout_changed():
     with pytest.raises(KnfError) as e:
-        fetch_list(Endless(), SOURCES["brokerage_houses"], max_pages=100)
+        fetch_list(_Paged(10_000), SOURCES["brokerage_houses"], max_pages=100)
     assert e.value.reason == "layout_changed" and "100 pages" in e.value.message
+
+
+def test_exactly_max_pages_is_allowed():
+    result = fetch_list(_Paged(5), SOURCES["brokerage_houses"], max_pages=5)
+    assert result.pages == 5 and len(result.records) == 5 * 8
+    with pytest.raises(KnfError, match="layout_changed"):
+        fetch_list(_Paged(6), SOURCES["brokerage_houses"], max_pages=5)
+
+
+def test_identical_records_on_two_pages_are_both_kept():
+    p1, p2 = read("dm_p1.html"), read("dm_p2.html")
+    first_table = p1[p1.index("<table"):p1.index("</table>") + len("</table>")]
+    p2_with_copy = p2.replace("<table", first_table + "<table", 1)
+    fetcher = FakeFetcher(overrides={SOURCES["brokerage_houses"].page_url(2): p2_with_copy,
+                                     SOURCES["brokerage_houses"].page_url(3): p2_with_copy})
+    result = fetch_list(fetcher, SOURCES["brokerage_houses"])
+    names = [r.name_lines[0] for r in result.records]
+    assert len(result.records) == 29 and names.count("AIXON INVESTMENT MANAGEMENT SP. Z O.O.") == 2
+
+
+def test_empty_list_yields_no_records_here():
+    # count_dropped for an empty list is the writer's check (spec "Writing the registry", task group 5)
+    empty = '<html><body><div id="entityTable" class="companyList"></div></body></html>'
+    fetcher = FakeFetcher(overrides={SOURCES["banks"].url: empty})
+    result = fetch_list(fetcher, SOURCES["banks"])
+    assert result.records == [] and result.pages == 0
 
 
 def test_list_no_longer_linked_from_summary():
@@ -119,6 +155,36 @@ def test_only_knf_urls_are_fetched():
     with pytest.raises(KnfError, match="not a KNF URL"):
         fetcher("https://www.knf.gov.pl.evil.example/x")
     assert calls == []
+
+
+def test_defaults_are_two_requests_per_second_three_attempts_and_a_timeout():
+    f = HttpFetcher(opener=lambda r, timeout: None)
+    assert (f.min_interval, f.attempts, f.timeout) == (0.5, 3, 30.0)
+
+
+def test_redirect_off_the_knf_host_is_refused():
+    handler = KnfOnlyRedirects()
+    req = urllib.request.Request(SOURCES["banks"].url)
+    with pytest.raises(KnfError, match="redirect to http://evil.example/ refused"):
+        handler.redirect_request(req, None, 302, "Found", {}, "http://evil.example/")
+    with pytest.raises(KnfError, match="refused"):
+        handler.redirect_request(req, None, 301, "Moved", {}, "http://www.knf.gov.pl/x")  # downgrade
+    ok = handler.redirect_request(req, None, 302, "Found", {}, "https://www.knf.gov.pl/nowa_strona")
+    assert ok.full_url == "https://www.knf.gov.pl/nowa_strona"
+
+
+def test_default_opener_refuses_foreign_redirects():
+    f = HttpFetcher()
+    handlers = f._open.__self__.handlers  # the OpenerDirector built in __init__
+    assert any(isinstance(h, KnfOnlyRedirects) for h in handlers)
+
+
+def test_oversized_response_fails(monkeypatch):
+    monkeypatch.setattr(fetch_mod, "MAX_BYTES", 10)
+    fetcher, _, calls = _fetcher(["x" * 11])
+    with pytest.raises(KnfError, match="larger than 10 bytes"):
+        fetcher(SOURCES["banks"].url)
+    assert len(calls) == 1  # not retried
 
 
 def test_requests_are_throttled():
