@@ -118,6 +118,7 @@ Table `documents`; simple columns + `payload JSONB` for the rest.
 Machine-readable versions of all contracts in this document (JSON Schema, OpenAPI, mocks): [`contracts/`](../contracts/README.md).
 
 Minimum required for analytics to work: `id, platform, url, fetched_at, text, source_kind`.
+`author` is optional and is set only by a platform collector from the platform's own account fields (for example the channel handle the platform renders), never from claims the post's writer controls on a page (`<meta>`, `rel=author`, embedded JSON), because analytics' publisher match (`analytics-m1-m3`, PR #35) routes on `author.handle` / `author.profile_url`, and on the host of `url`, which must stay the guarded fetch URL, never a value from markup. No `web` source sets it today; absent means unknown, not "third party". Per-platform provenance: [`scraper/README.md`](../scraper/README.md), "Author provenance".
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
 Table `sources` (managed by the scraper, editable from the dashboard):
