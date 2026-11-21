@@ -8,9 +8,9 @@
 
 ## 2. Database read and insert
 
-- [ ] 2.1 Write the database tests first in `scraper/tests/test_discover_db.py` (real PostgreSQL via `IW_TEST_*`: recent versus old documents, `since` boundary, malformed `payload.links`, orphan document, candidate row shape, rerun inserts nothing, an inactive existing source blocks re-proposal, existing rows untouched); confirm they fail for the missing functions
-- [ ] 2.2 Implement the links query, the target-modules lookup and the `WHERE NOT EXISTS` insert; verify the database tests pass
-- [ ] 2.3 Mutation check: remove the `fetched_at` bound, the `NOT EXISTS`, and `active = false` from the insert in turn, and verify each makes a test fail; record `mutations: N tried, N caught`
+- [x] 2.1 Write the database tests first in `scraper/tests/test_discover_db.py` (real PostgreSQL via `IW_TEST_*`: recent versus old documents, `since` boundary, malformed `payload.links`, orphan document, candidate row shape, rerun inserts nothing, an inactive existing source blocks re-proposal, existing rows untouched); confirm they fail for the missing functions
+- [x] 2.2 Implement the links query, the target-modules lookup and the `WHERE NOT EXISTS` insert; verify the database tests pass
+- [x] 2.3 Mutation check: remove the `fetched_at` bound, the `NOT EXISTS`, and `active = false` from the insert in turn, and verify each makes a test fail; record `mutations: N tried, N caught`. Result: `mutations: 18 tried, 18 caught` (also covers the host hardening from the group 1 review: trailing dot, non-ASCII, empty label, share hosts)
 
 ## 3. Command line and reporting
 

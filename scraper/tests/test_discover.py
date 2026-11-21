@@ -28,6 +28,12 @@ def urls(selection):
         "https://bit.ly/abc",
         "https://t.co/abc",
         "https://stats.doubleclick.net/x",
+        "https://facebook.com./x",
+        "https://t.me./c",
+        "https://telegram.me/c",
+        "https://wa.me/48123",
+        "https://api.whatsapp.com/send",
+        "https://www.addthis.com/bookmark",
         "https://www.googletagmanager.com/gtm.js",
     ],
 )
@@ -50,6 +56,11 @@ def test_a_host_that_only_ends_like_a_denylisted_one_is_kept():
         "http://10.0.0.1/a",
         "http://127.1/a",
         "https://localhost/",
+        "https://localhost./",
+        "http://127.0.0.1./a",
+        "https://good..example/",
+        "https://good.example。evil/",
+        "https://ｌｏ.example/",
         "https://intranet/",
         "https://user:pw@good.example/",
         "https://user@good.example/",
@@ -67,6 +78,10 @@ def test_a_host_that_only_ends_like_a_denylisted_one_is_kept():
 )
 def test_unsafe_url_shapes_are_dropped(href):
     assert clean_url(href) is None
+
+
+def test_a_trailing_dot_on_the_host_is_removed():
+    assert clean_url("https://Good.example./a") == "https://good.example/a"
 
 
 def test_default_ports_are_accepted_and_removed():
