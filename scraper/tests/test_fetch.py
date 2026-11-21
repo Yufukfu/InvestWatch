@@ -7,6 +7,7 @@ from noble_tls import Session
 from noble_tls.exceptions.exceptions import TLSClientException
 
 import iw_scraper.fetch as fetch_module
+from iw_scraper.config import fetch_settings
 from iw_scraper.fetch import MAX_REDIRECTS, FetchFailure, Identity, _transport_failure, fetch
 from iw_scraper.parsing import parse_page
 from iw_scraper.proxy import PER_REQUEST, ProxyRotator
@@ -619,3 +620,37 @@ async def test_a_failure_on_a_redirect_target_carries_that_hops_retry_after(stub
         await fetch(stub.url("/start"), IDENTITY, None)
 
     assert caught.value.retry_after == "45"
+
+
+def test_fetch_settings_default_to_20_seconds_and_5_mib(monkeypatch):
+    monkeypatch.delenv("FETCH_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("FETCH_MAX_BYTES", raising=False)
+
+    assert fetch_settings() == (20.0, 5 * 1024 * 1024)
+
+
+def test_fetch_settings_read_the_environment(monkeypatch):
+    monkeypatch.setenv("FETCH_TIMEOUT_SECONDS", "7.5")
+    monkeypatch.setenv("FETCH_MAX_BYTES", "1000")
+
+    assert fetch_settings() == (7.5, 1000)
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("FETCH_TIMEOUT_SECONDS", "0"),
+        ("FETCH_TIMEOUT_SECONDS", "inf"),
+        ("FETCH_TIMEOUT_SECONDS", "nan"),
+        ("FETCH_TIMEOUT_SECONDS", "abc"),
+        ("FETCH_MAX_BYTES", "0"),
+        ("FETCH_MAX_BYTES", "-5"),
+        ("FETCH_MAX_BYTES", "2.5"),
+        ("FETCH_MAX_BYTES", "abc"),
+    ],
+)
+def test_unusable_fetch_settings_are_refused_by_name(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValueError, match=name):
+        fetch_settings()

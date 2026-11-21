@@ -1,4 +1,6 @@
+import asyncio
 import os
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -91,6 +93,12 @@ async def test_a_huge_retry_after_is_capped(client, prefix, clock):
 
 async def test_an_absurdly_large_number_of_seconds_is_capped_not_an_error(client, prefix, clock):
     until = await gate(client, prefix, clock).defer_for_retry_after("example.org", "9" * 30)
+
+    assert until == START + timedelta(seconds=CAP)
+
+
+async def test_a_retry_after_of_thousands_of_digits_is_capped_not_a_crash(client, prefix, clock):
+    until = await gate(client, prefix, clock).defer_for_retry_after("example.org", "9" * 5000)
 
     assert until == START + timedelta(seconds=CAP)
 
@@ -271,6 +279,34 @@ async def test_check_reports_whichever_of_deferral_and_pause_ends_later(client, 
     await other.defer_for_retry_after("two.example", "120")
 
     assert await other.check("two.example") == Deferral(until=START + timedelta(seconds=120))
+
+
+class Hung:
+    async def mget(self, *args):
+        await asyncio.sleep(3600)
+
+    async def eval(self, *args):
+        await asyncio.sleep(3600)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda g: g.check("example.org"),
+        lambda g: g.defer_for_retry_after("example.org", "30"),
+        lambda g: g.record_outcome("example.org", success=False),
+    ],
+    ids=["check", "defer", "record"],
+)
+async def test_a_redis_that_never_answers_fails_the_call_instead_of_hanging(monkeypatch, clock, call):
+    monkeypatch.setattr("iw_scraper.domaingate.REDIS_TIMEOUT_SECONDS", 0.2)
+    hung = DomainGate(Hung(), clock=clock, max_retry_after=CAP, failure_threshold=THRESHOLD, pause_seconds=PAUSE)
+    started = time.monotonic()
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(call(hung), 2)  # the outer limit only stops a gate without its own timeout
+
+    assert time.monotonic() - started < 1.5
 
 
 @pytest.mark.parametrize(

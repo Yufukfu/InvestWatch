@@ -30,6 +30,8 @@ Environment only; defaults in `scraper/.env.example`. Proxy URLs may hold creden
 | `MAX_RETRY_AFTER_SECONDS` | `300` | cap on a `Retry-After` wait |
 | `DOMAIN_FAILURE_THRESHOLD` | `5` | consecutive failure outcomes before a domain is paused |
 | `DOMAIN_PAUSE_SECONDS` | `600` | length of that pause |
+| `FETCH_TIMEOUT_SECONDS` | `20` | per-request timeout |
+| `FETCH_MAX_BYTES` | `5242880` | response size cap (5 MiB) |
 | `ALLOWED_PORTS` | `80,443` | ports the scraper may request |
 | `COMPOSE_INTERNAL_HOSTS` | empty | extra host names refused as internal (bare names are always refused) |
 | `FETCH_EXTRA_HOSTS` | empty | hosts allowed for redirects and scraped links besides the active sources |

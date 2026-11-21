@@ -6,7 +6,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 
 - [x] 1.1 Read the installed noble-tls, curl_cffi and httpx APIs and the in-house crawler repos; write ADR 0101 (`noble-tls`, `curl_cffi` fallback, Python 3.12); docs-check passes
 - [x] 1.2 Write ADR 0102 (`arq`); ADR 0103 stays criteria-only and is decided in `scraper-v2`; docs-check passes
-- [ ] 1.3 Agree with C on the `scrape_meta.scraper` value for a TLS-impersonating client (v1 enum `playwright|httpx|api|manual`; field not required; interim proposal `httpx` plus `scrape_meta.client`, or a v1 enum addition with `IW_CONTRACT_CHANGE=1` and a version bump); record in ADR 0101 and `contracts/`. Blocks nothing
+- [x] 1.3 Settle the `scrape_meta.scraper` value for a TLS-impersonating client: `httpx` plus `scrape_meta.client`, no contract change (a v1 enum addition would need `IW_CONTRACT_CHANGE=1` and a version bump after the freeze); recorded in ADR 0101
 - [x] 1.4 Spike (no production code): header order, manual redirects and IP pinning work, the size cap cannot abort mid-stream (spec adjusted), older Chrome profiles are reset by KNF, the library updater is unpinned; results in ADR 0101 Consequences
 
 ## 2. Skeleton, parser, site registry, error model
@@ -37,6 +37,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 - [x] 5.2 Failing tests, then the URL guard (`http(s)` only, host allow-list with `www.` equivalence for redirects and scraped links); the allow-list, redirect, apex-to-www and non-http scenarios pass; `ALLOWED_PORTS` (default `80,443`, scheme default ports, redirect hops and scraped links included) with the non-web-port, default-port and configured-port scenarios
 - [x] 5.3 Failing tests, then the address guard (own DNS resolution, refused ranges incl. IPv6 and mapped forms, compose names, connect to the checked address); the internal-address and DNS-change scenarios pass with a fake resolver
 - [x] 5.4 Mutation check; `mutations: 60 tried, 58 caught, 2 equivalent` (the IPv4-mapped and 6to4 unwraps in `_embedded_ipv4` are redundant on CPython 3.12.16, whose `is_global` already refuses those forms; kept because the base image tag floats and the spec names the mapped forms)
+- [x] 5.5 Added by the whole-branch review: failing tests, then `build_document` (the contract fields of a fetch and a parse as a plain dict, validated in the test against `scraped-document.schema.json`), `FETCH_TIMEOUT_SECONDS` and `FETCH_MAX_BYTES` settings, and a timeout plus an overflow guard in `DomainGate`; `mutations: 25 tried, 25 caught`
 
 ## 6. Closing
 

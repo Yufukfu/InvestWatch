@@ -18,14 +18,15 @@ from urllib.parse import SplitResult, unquote, urljoin, urlsplit
 
 from noble_tls import Client, Session
 
+from iw_scraper.config import DEFAULT_FETCH_MAX_BYTES, DEFAULT_FETCH_TIMEOUT_SECONDS
 from iw_scraper.parsing import HTML_TYPES, content_type_params
 from iw_scraper.proxy import ProxyChoice, ProxyRun
 from iw_scraper.reporting import redact
 from iw_scraper.types import Deferral, Reason
 
 _log = logging.getLogger(__name__)
-DEFAULT_TIMEOUT_SECONDS = 20.0
-DEFAULT_MAX_BYTES = 5 * 1024 * 1024
+DEFAULT_TIMEOUT_SECONDS = DEFAULT_FETCH_TIMEOUT_SECONDS
+DEFAULT_MAX_BYTES = DEFAULT_FETCH_MAX_BYTES
 MAX_REDIRECTS = 5
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _WEB_SCHEMES = frozenset({"http", "https"})

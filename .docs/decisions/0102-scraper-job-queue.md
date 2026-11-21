@@ -33,6 +33,6 @@ Rationale, from the evidence above: it is a native `async` queue with per-functi
 
 ## Consequences
 
-- `arq` cron is field-based, so `schedule_cron` strings are parsed by us; an invalid expression is a recorded `invalid_request`, not a crash. Each due job gets a unique id per source and cron slot so replicas do not double-enqueue; that relies on `arq` rejecting a duplicate job id, which nothing read here confirms, so task 9.4 verifies it.
+- `arq` cron is field-based, so `schedule_cron` strings are parsed by us; an invalid expression is a recorded `invalid_request`, not a crash. Each due job gets a unique id per source and cron slot so replicas do not double-enqueue; that relies on `arq` rejecting a duplicate job id, which nothing read here confirms, so `scraper-orchestration` verifies it with a test.
 - The evidence shows `max_jobs` per worker and no per-domain limit, so per-domain control is ours and lives in Redis: a counting semaphore for jobs running at once and a token bucket for request starts, not in-process state.
-- Nothing read shows how pending jobs behave when a worker stops mid-job; task 8.2 tests resume after restart against a real Redis before the spec's resume scenario is relied on, and this ADR is superseded if it fails.
+- Nothing read shows how pending jobs behave when a worker stops mid-job; `scraper-orchestration` tests resume after restart against a real Redis before the spec's resume scenario is relied on, and this ADR is superseded if it fails.

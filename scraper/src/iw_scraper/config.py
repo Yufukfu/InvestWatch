@@ -102,3 +102,19 @@ def target_settings() -> tuple[tuple[int, ...], frozenset[str], frozenset[str]]:
         _host_list("COMPOSE_INTERNAL_HOSTS", strip_www=False),
         _host_list("FETCH_EXTRA_HOSTS", strip_www=True),
     )
+
+
+DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
+DEFAULT_FETCH_MAX_BYTES = 5 * 1024 * 1024
+
+
+def fetch_settings() -> tuple[float, int]:
+    """(`FETCH_TIMEOUT_SECONDS`, `FETCH_MAX_BYTES`): the per-request timeout and the response size cap."""
+    timeout = _positive_number("FETCH_TIMEOUT_SECONDS", DEFAULT_FETCH_TIMEOUT_SECONDS)
+    try:
+        max_bytes = int(os.environ.get("FETCH_MAX_BYTES", DEFAULT_FETCH_MAX_BYTES))
+    except ValueError:
+        max_bytes = 0
+    if max_bytes < 1:
+        raise ValueError("FETCH_MAX_BYTES must be a whole number of bytes, at least 1")
+    return timeout, max_bytes
