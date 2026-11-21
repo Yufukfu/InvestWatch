@@ -103,6 +103,18 @@ jobs:
               continue
             fi
             echo "::group::$dir"
+            if [ "$dir" = scraper ]; then
+              # The TLS client needs a pinned native library that only scraper/Dockerfile installs (noble-tls would
+              # fetch an unpinned release through the GitHub API at run time and fail on the rate limit), so the
+              # suite runs in its own test image, on the host network to reach the services above.
+              pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt
+              docker build -f scraper/Dockerfile --target test -t iw-scraper:test .
+              docker run --rm --network host -e CI -e REDIS_URL -e IW_TEST_PG_DSN -e IW_TEST_REDIS_URL \
+                -e IW_TEST_MINIO_ENDPOINT -e IW_TEST_MINIO_ACCESS_KEY -e IW_TEST_MINIO_SECRET_KEY \
+                iw-scraper:test pytest -q -rs
+              echo "::endgroup::"
+              continue
+            fi
             pip install -r "$dir/requirements.txt"
             pip-audit -r "$dir/requirements.txt"
             if [ -f "$dir/requirements-dev.txt" ]; then
