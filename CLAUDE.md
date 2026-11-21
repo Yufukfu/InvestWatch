@@ -7,7 +7,7 @@ Lightweight separate services, one `docker compose up`, open-source and on-premi
 ## Read first
 
 - `doc/STATUS.md`: where we are, what is blocked. Update it when a milestone moves.
-- `doc/plan-integracji.md`: architecture, contracts v1 (`ScrapedDocument`, `Finding`), REST and events.
+- `doc/integration-plan.md`: architecture, contracts v1 (`ScrapedDocument`, `Finding`), REST and events.
 - `doc/INDEX.md`: map of everything else. `.claude/SDLC.md`: the process. Per-service `CLAUDE.md` before touching that service.
 
 ## Process in one screen
@@ -30,6 +30,6 @@ Spec, then test, then code, then review, one PR per OpenSpec change (details: `.
 
 ## Conventions
 
-- Language: English for code, specs, ADRs and `.claude/`. Older `doc/*.md` are Polish and are being translated.
+- Language: English for code, specs, ADRs, docs and `.claude/`; user-facing dashboard texts in Polish (team decision, `doc/ai-workflow.md`).
 - Commits: Conventional Commits, terse subject. Branches: `scraper/*`, `analytics/*`, `dashboard/*`, `chore/*`. Worktrees live in `../InvestWatch-worktrees/`.
 - Time is UTC ISO-8601, ids are UUID v4, config is env-only.

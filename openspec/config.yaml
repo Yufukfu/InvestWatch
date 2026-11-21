@@ -7,7 +7,7 @@ context: |
 
   Project: InvestWatch, a hackathon system that finds risky investment content online (UKNF challenge).
   Modules: scraper (owner A), dashboard (B), analytics + api + contracts (C). Light separate services,
-  one `docker compose up`, open-source and on-premise only. Read doc/STATUS.md and doc/plan-integracji.md
+  one `docker compose up`, open-source and on-premise only. Read doc/STATUS.md and doc/integration-plan.md
   (contracts ScrapedDocument and Finding, v1) before proposing anything. Contracts are frozen after
   Sat 14:30; a change that alters one must say so and bump the version.
 

@@ -1,14 +1,13 @@
 # Documentation index
 
-Agents: start at `CLAUDE.md`, then this map. Language is English; older files marked (PL) are Polish and being translated.
+Agents: start at `CLAUDE.md`, then this map. Docs are in English; user-facing dashboard texts are Polish.
 
 | File | What it is | Owner |
 |---|---|---|
 | `STATUS.md` | Current milestone, per-module state, blockers. Update on every milestone move. | all |
-| `plan-integracji.md` (PL) | Architecture, contracts v1, REST, events, milestones | C |
-| `plan-analityka.md` (PL) | Analytics module plan | C |
-| `ai-workflow.md` | How we use AI assistants (jury criterion) | all |
-| `ai-log.md` | Append-only evidence log for the above | all |
+| `integration-plan.md` | Architecture, contracts v1, REST, events, milestones | C |
+| `analytics-plan.md` | Analytics module plan | C |
+| `ai-workflow.md` | AI process (tools, context, controls) and the append-only AI work log table, the jury evidence | all |
 | `decisions/` | ADRs: why we chose X. Human-authored. | all |
 | `../openspec/specs/` | What the system does now | owner of module |
 | `../openspec/changes/` | Changes in flight | author |

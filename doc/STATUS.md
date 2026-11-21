@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or a blocker appears; agents read it at session start.
 
-## Milestones (from `plan-integracji.md` §8)
+## Milestones (from `integration-plan.md` §8)
 
 | When | Milestone | State |
 |---|---|---|
@@ -25,3 +25,6 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 
 - Scraper fetch library (noble-tls vs alternatives) needs an ADR after reading the real API.
 - Playwright is required for sources that must provide `blocks`/`screenshots` (rules R4-R8, R13).
+- Repository layout is defined by B (team decision). `scraper/` and the service list in `.claude/hooks/git-guard.js` (`SERVICE_DIRS`) are assumptions to confirm with B.
+- Contracts v1 still to be confirmed by A and B; rendering metadata (`blocks`, screenshots) still to be discussed with A.
+- Social media: one platform first; which one is open.

@@ -1,6 +1,6 @@
 # InvestWatch SDLC
 
-How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut down for a 24-hour hackathon and fully git-tracked so every teammate gets the same skills and hooks. Evidence of the process goes to `doc/ai-log.md`; the narrative is `doc/ai-workflow.md`.
+How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut down for a 24-hour hackathon and fully git-tracked so every teammate gets the same skills and hooks. The process narrative and its evidence (a Log table appended via `iw-ai-log`) live in `doc/ai-workflow.md`.
 
 ## Where things live
 
@@ -10,7 +10,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | What are we changing right now? | `openspec/changes/<slug>/` (proposal, specs delta, design, tasks, `follow-ups.md`) |
 | Why did we choose X? | `doc/decisions/` (ADRs, human-authored) |
 | Where are we, what is blocked? | `doc/STATUS.md` |
-| Contracts and architecture | `doc/plan-integracji.md`, later `contracts/` |
+| Contracts and architecture | `doc/integration-plan.md`, later `contracts/` |
 
 ## Stages
 

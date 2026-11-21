@@ -1,8 +1,8 @@
 # scraper (module A)
 
-Collects web and social-media content and writes `ScrapedDocument` rows (contract v1, `doc/plan-integracji.md` §3) plus HTML and screenshots to MinIO. Downstream, `analytics` consumes the Redis Stream `iw:documents`; the scraper knows nothing about analytics.
+Collects web and social-media content and writes `ScrapedDocument` rows (contract v1, `doc/integration-plan.md` §3) plus HTML and screenshots to MinIO. Downstream, `analytics` consumes the Redis Stream `iw:documents`; the scraper knows nothing about analytics.
 
-Run `iw-scraper-conventions` before writing any fetch or parse code.
+Run `iw-scraper-conventions` before writing any fetch or parse code. Team decision: start with **one** social platform, add more only if time allows.
 
 ## Stack
 
