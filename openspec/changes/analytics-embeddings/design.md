@@ -107,7 +107,7 @@ centroids:
   advisory_service:  [ "Pomogę Ci pomnożyć oszczędności, napisz na priv", … ]
 ```
 
-Matching runs on `strip_diacritics(pre.normalized.lower())`. Social posts often drop diacritics, and the gate errs toward a match. A registry firm match (`registry.match`) counts as one hit.
+Matching runs on `strip_diacritics(pre.normalized.lower())`, over the first 200k characters only. The topic shows in the headline and lead, and the cap bounds the regex cost on hostile input. Without the stretch similarity rescue, a real investment post that uses none of the vocabulary is dropped (logged as `off_topic`). That is the known cost of the dictionary-only gate. Social posts often drop diacritics, and the gate errs toward a match. A registry firm match (`registry.match`) counts as one hit.
 
 **Decision rule.** The gate drops only if `dict_hits == 0 and (vector is None or max_sim < GATE_SIM_THRESHOLD)`.
 - The embedding can only rescue a document. It never drops one the dictionary kept. That is the "low threshold, let content through" rule from plan §2.

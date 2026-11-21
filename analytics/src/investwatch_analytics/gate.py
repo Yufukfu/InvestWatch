@@ -18,6 +18,10 @@ import yaml
 from .config import GateSettings
 
 DEFAULT_TERMS = Path(__file__).with_name("gate_terms.yaml")
+#: Only the start of a document is scanned: the topic shows in the headline and lead, and the cap bounds the
+#: regex cost on hostile 2 MB input (measured ~0.6 s worst case at this size).
+MAX_GATE_CHARS = 200_000
+_KEYS = {"version", "terms", "prefixes", "centroids"}
 _POLISH_EXTRA = str.maketrans({"ł": "l", "Ł": "l"})  # NFD does not decompose ł
 
 
@@ -51,7 +55,10 @@ def _compile(terms: list[str], prefixes: list[str]) -> re.Pattern[str]:
         words = strip_diacritics(term).split()
         alternatives.append(r"\s+".join(_word(w, pre) for w in words))
     # Boundaries: a term never matches inside another word (`ETF` in `netflix`, `forex` in `forexpo`).
-    return re.compile(r"(?<!\w)(?:" + "|".join(alternatives) + r")(?!\w)")
+    # The first-character lookahead lets the engine skip positions no term can start at (digits, dots).
+    firsts = sorted({a[0] for a in (strip_diacritics(t) for t in terms + prefixes) if a})
+    first_class = "[" + "".join(re.escape(c) for c in firsts) + "]"
+    return re.compile(r"(?<!\w)(?=" + first_class + r")(?:" + "|".join(alternatives) + r")(?!\w)")
 
 
 def _fail(path: Path, key: str, why: str) -> GateTermsError:
@@ -63,12 +70,15 @@ def load_terms(path: str | Path | None = None) -> GateTerms:
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or data.get("version") != 1:
         raise _fail(p, "version", "must be 1")
+    unknown = sorted(set(data) - _KEYS)
+    if unknown:
+        raise _fail(p, unknown[0], "is not a known key (version, terms, prefixes, centroids)")
     terms = data.get("terms")
     if not isinstance(terms, list) or not terms:
         raise _fail(p, "terms", "must be a non-empty list")
     for t in terms:
-        if not isinstance(t, str) or not t.strip().replace("*", "").strip():
-            raise _fail(p, "terms", f"has an empty or non-string entry: {t!r}")
+        if not isinstance(t, str) or not t.strip() or any(w.strip("*") == "" for w in t.split()):
+            raise _fail(p, "terms", f"has an empty, non-string or bare `*` entry: {t!r}")
     prefixes = data.get("prefixes") or []
     if not isinstance(prefixes, list) or not all(isinstance(x, str) and x.strip() for x in prefixes):
         raise _fail(p, "prefixes", "must be a list of non-empty strings")
@@ -78,7 +88,7 @@ def load_terms(path: str | Path | None = None) -> GateTerms:
     for name, seeds in centroids.items():
         if not isinstance(seeds, list) or not seeds or not all(isinstance(s, str) and s.strip() for s in seeds):
             raise _fail(p, f"centroids.{name}", "must be a non-empty list of seed phrases")
-    return GateTerms(pattern=_compile([t.strip() for t in terms], [x.strip() for x in prefixes]),
+    return GateTerms(pattern=_compile([t.strip() for t in terms], [strip_diacritics(x.strip()) for x in prefixes]),
                      centroids={str(k): list(v) for k, v in centroids.items()})
 
 
@@ -101,5 +111,6 @@ def evaluate(normalized_text: str, *, source_kind: str, firm_matched: bool, term
         return GateDecision(True, "gate_disabled", 0, embedder=embedder)
     if source_kind == "firm_own":
         return GateDecision(True, "bypassed_firm_own", 0, embedder=embedder)
-    hits = sum(1 for _ in terms.pattern.finditer(strip_diacritics(normalized_text))) + int(firm_matched)
+    text = strip_diacritics(normalized_text[:MAX_GATE_CHARS])
+    hits = sum(1 for _ in terms.pattern.finditer(text)) + int(firm_matched)
     return GateDecision(hits > 0, "dictionary" if hits else "off_topic", hits, embedder=embedder)

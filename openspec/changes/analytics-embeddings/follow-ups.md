@@ -22,3 +22,8 @@
 | R16 | review group 3, PLAUSIBLE | an unexpected exception in a half-open trial left the breaker shut for good and escaped `embed` | `fix-here`: catch-all counts as unavailable |
 | R17 | review group 3 | failed trial not tested above threshold 1 | `fix-here` |
 | R18 | review group 3, can't verify | callers must pass a per-document, non-empty `content_hash`; Redis latency until the 1 s socket-timeout client (group 9) | `fix-here` in groups 7 and 9 |
+| R19 | review group 4 | common posts dropped: inflected `forexie`/`Nasdaqu`, compounds `CFDs`/`S&P500`/`BTCUSD`/`#forexsignals`, `tradować`, `finansowa`, `dochód`, WIG/GPW, ETH/USDT, `return`/`income` | `fix-here`: stems and terms added; `forexpo`/`cfdx` now pass too (recall first) |
+| R20 | review group 4 | regex scan took seconds to tens of seconds on hostile 2 MB text | `fix-here`: only the first 200k characters are scanned, plus a first-letter lookahead (worst measured about 1.6 s under load) |
+| R21 | review group 4, PLAUSIBLE | prefixes not normalized, unknown YAML keys ignored, bare `*` word accepted | `fix-here` |
+| R22 | review group 4 | tests that could not fail (embedder always None, redundant repr check), no test for uppercase or diacritic terms or the `wy` prefix | `fix-here` |
+| R23 | review group 4 | if group 5 (stretch) is cut, no test covers vocabulary-free investment posts: they are dropped by design | `docs`: noted in design §4 as the known cost of the dictionary-only gate |

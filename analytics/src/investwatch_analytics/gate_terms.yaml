@@ -30,13 +30,16 @@ terms:
   - krypto*
   - kryptowalut*
   - bitcoin*
-  - btc
+  - btc*
+  - eth
   - ethereum
+  - usdt
+  - altcoin*
+  - stablecoin*
   - token*
-  - forex
-  - cfd
-  - etf
-  - etfy
+  - forex*
+  - cfd*
+  - etf*
   - ike
   - ikze
   - dzwigni*
@@ -44,7 +47,26 @@ terms:
   - sygnal* tradingow*
   - trading*
   - trader*
+  - tradow*
+  - traduj*
   - pips*
+  - finans*
+  - dochod*
+  - wig
+  - wig20
+  - wig30
+  - mwig40
+  - swig80
+  - gpw
+  - newconnect
+  - notowan*
+  - spolk*
+  - hoss*
+  - bess*
+  - ulokuj*
+  - pomnaz*
+  - transakcj*
+  - walut*
   - kontrakt* terminow*
   - opcj* binarn*
   - doradztw* inwestycyjn*
@@ -66,8 +88,10 @@ terms:
   - dividend*
   - portfolio*
   - leverage
-  - "s&p"
-  - nasdaq
+  - "s&p*"
+  - nasdaq*
+  - return*
+  - income
 # Seed phrases per positive class for the (stretch) similarity rescue: centroids = normalized means.
 centroids:
   investment_offer:
