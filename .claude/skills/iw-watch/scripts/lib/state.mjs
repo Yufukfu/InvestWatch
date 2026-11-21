@@ -1,12 +1,19 @@
 // Seen-state and the run lock. Lives outside the repository (XDG state dir), holds no tokens.
-// state.json: { version: 1, prs: { "<n>": { seenAt, reviewedSha, capNotifiedSha, sessions } } }
+// state.json: { version: 1, prs: { "<n>": { handled, pending, reviewedSha, ciFailedSha, capNotifiedSha, sessions } } }
+// Review activity is tracked by event id, not time: GitHub dates a pending review's comments when they were
+// drafted, not when the review was submitted, so a time cursor can skip them. `scan` records the event keys of
+// each address-review item under `pending`; `ack` moves them to `handled`.
 import realFs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 export const STALE_LOCK_MS = 30 * 60 * 1000;
+export const HANDLED_MAX = 2000;
 const EMPTY = () => ({ version: 1, prs: {} });
-const KINDS = { 'address-review': 'seenAt', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha' };
+const KINDS = { 'address-review': 'handled', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha' };
+
+/** Short stable digest of a set of event keys, used as the cursor of an address-review item */
+export const digest = (keys) => createHash('sha256').update([...keys].sort().join('\n')).digest('hex').slice(0, 16);
 
 export function stateDir({ env, home, repo }) {
   if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo) || repo.split('/').some((p) => p === '..' || p === '.')) {
@@ -65,15 +72,26 @@ const entry = (state, pr) => (state.prs[pr] ??= {});
 export function ack(state, id) {
   const { pr, kind, cursor } = parseItemId(id);
   const e = entry(state, pr);
-  const field = KINDS[kind];
-  if (field === 'seenAt') {
-    if (Number.isNaN(Date.parse(cursor))) throw new Error(`item id cursor is not a time: ${JSON.stringify(cursor)}`);
-    if (!e.seenAt || Date.parse(cursor) > Date.parse(e.seenAt)) e.seenAt = cursor;
+  if (kind === 'address-review') {
+    const keys = e.pending?.[id];
+    if (!keys) throw new Error(`unknown item id ${id}: not pending (run scan first, or it was already acknowledged)`);
+    e.handled = [...new Set([...(e.handled || []), ...keys])].slice(-HANDLED_MAX);
+    delete e.pending[id];
   } else {
-    e[field] = cursor;
+    e[KINDS[kind]] = cursor;
   }
   return state;
 }
+
+/** Replace the pending address-review items of a PR with the ones the latest scan produced */
+export function setPending(state, pr, pending) {
+  const e = entry(state, pr);
+  if (Object.keys(pending).length) e.pending = pending;
+  else delete e.pending;
+  return state;
+}
+
+export const isHandled = (e, key) => Boolean(e?.handled?.includes(key));
 
 export function recordSession(state, pr) {
   const e = entry(state, pr);

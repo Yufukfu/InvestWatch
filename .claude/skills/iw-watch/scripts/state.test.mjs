@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { stateDir, loadState, saveState, ack, itemId, recordSession, dropClosed, acquireLock, releaseLock, refreshLock, STALE_LOCK_MS } from './lib/state.mjs';
+import { stateDir, loadState, saveState, ack, itemId, digest, setPending, isHandled, recordSession, dropClosed, acquireLock, releaseLock, refreshLock, STALE_LOCK_MS } from './lib/state.mjs';
 import { MARKER, countRounds, capReached } from './lib/rounds.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'iw-watch-'));
@@ -17,7 +17,7 @@ test('the state directory is outside the repository, per repository', () => {
 test('missing state starts empty; save then load round-trips', () => {
   const dir = tmp();
   assert.deepEqual(loadState(dir), { version: 1, prs: {} });
-  const s = { version: 1, prs: { 7: { seenAt: '2026-11-21T10:00:00Z' } } };
+  const s = { version: 1, prs: { 7: { sessions: 1 } } };
   saveState(dir, s);
   assert.deepEqual(loadState(dir), s);
   assert.deepEqual(fs.readdirSync(dir), ['state.json'], 'no temp file is left behind');
@@ -25,10 +25,10 @@ test('missing state starts empty; save then load round-trips', () => {
 
 test('a write that dies before the rename leaves the previous file intact', () => {
   const dir = tmp();
-  saveState(dir, { version: 1, prs: { 1: { seenAt: 'old' } } });
+  saveState(dir, { version: 1, prs: { 1: { sessions: 1 } } });
   const broken = { ...fs, renameSync: () => { throw new Error('killed'); } };
-  assert.throws(() => saveState(dir, { version: 1, prs: { 1: { seenAt: 'new' } } }, { fs: broken }), /killed/);
-  assert.equal(loadState(dir).prs[1].seenAt, 'old');
+  assert.throws(() => saveState(dir, { version: 1, prs: { 1: { sessions: 2 } } }, { fs: broken }), /killed/);
+  assert.equal(loadState(dir).prs[1].sessions, 1);
 });
 
 test('a corrupt state file is moved aside, reported, and the run starts empty', () => {
@@ -55,23 +55,26 @@ test('a ci-failed ack moves its own cursor, not the review cursor', () => {
   const s = { version: 1, prs: {} };
   ack(s, itemId({ kind: 'ci-failed', pr: 4, cursor: 'deadbeef' }));
   assert.equal(s.prs[4].ciFailedSha, 'deadbeef');
-  assert.equal(s.prs[4].seenAt, undefined);
+  assert.equal(s.prs[4].handled, undefined);
 });
 
-test('ack refuses a time cursor that is not a time', () => {
-  assert.throws(() => ack({ version: 1, prs: {} }, '3.address-review.zzz'), /time/);
+test('ack of an address-review item that is not pending is refused', () => {
+  assert.throws(() => ack({ version: 1, prs: {} }, '3.address-review.0123abcd'), /not pending/);
 });
 
-test('ack moves the cursor of the item kind and nothing else', () => {
+test('ack moves the pending event keys to handled, and the sha cursors of the other kinds', () => {
   const s = { version: 1, prs: {} };
-  ack(s, itemId({ kind: 'address-review', pr: 12, cursor: '2026-11-21T10:05:00Z' }));
-  assert.equal(s.prs[12].seenAt, '2026-11-21T10:05:00Z');
+  const id = itemId({ kind: 'address-review', pr: 12, cursor: digest(['review:1', 'comment:2']) });
+  setPending(s, 12, { [id]: ['review:1', 'comment:2'] });
+  ack(s, id);
+  assert.ok(isHandled(s.prs[12], 'review:1') && isHandled(s.prs[12], 'comment:2'));
+  assert.equal(s.prs[12].pending?.[id], undefined, 'no longer pending');
+  assert.throws(() => ack(s, id), /not pending/, 'a second ack is refused');
   assert.equal(s.prs[12].reviewedSha, undefined);
   ack(s, itemId({ kind: 'review', pr: 12, cursor: 'abc123' }));
   assert.equal(s.prs[12].reviewedSha, 'abc123');
-  // an older cursor never moves the seen time backwards
-  ack(s, itemId({ kind: 'address-review', pr: 12, cursor: '2026-11-21T09:00:00Z' }));
-  assert.equal(s.prs[12].seenAt, '2026-11-21T10:05:00Z');
+  setPending(s, 12, {});
+  assert.equal(s.prs[12].pending, undefined);
   ack(s, itemId({ kind: 'cap-reached', pr: 12, cursor: 'abc123' }));
   assert.equal(s.prs[12].capNotifiedSha, 'abc123');
   assert.throws(() => ack(s, 'garbage'), /item id/);

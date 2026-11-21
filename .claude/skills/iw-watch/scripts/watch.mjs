@@ -44,6 +44,8 @@ export function parseArgs(argv) {
   }
   if (o.author && !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(o.author)) throw new UsageError('--author must be a GitHub login');
   if (cmd === 'ack' && !o.ids.length) throw new UsageError('ack needs at least one item id');
+  if (o.domains.length) throw new UsageError('--domain is not implemented yet');
+  if (cmd === 'scan' && (o.dryRun || o.limit !== 3)) throw new UsageError('--dry-run and --limit apply to run only');
   if (cmd !== 'ack' && !o.mine && !o.reviewRequested && !o.author && !o.domains.length) {
     throw new UsageError('say what to watch: --mine, --review-requested, --author <login> or --domain <dir>');
   }
@@ -96,9 +98,12 @@ function printItems(deps, items, json) {
   }
   for (const it of items) {
     const who = it.kind === 'review' ? `by ${it.author}` : `${it.events.length} new`;
-    deps.stdout(`#${it.pr} ${it.kind.padEnd(14)} ${who.padEnd(16)} round ${it.rounds}/${it.maxRounds}  ${it.title}\n    ${it.url}\n    id: ${it.id}\n`);
+    deps.stdout(`#${it.pr} ${it.kind.padEnd(14)} ${clean(who).padEnd(16)} round ${it.rounds}/${it.maxRounds}  ${clean(it.title)}\n    ${clean(it.url)}\n    id: ${it.id}\n`);
   }
 }
+
+// Titles and logins are other people's text: no terminal escape sequences reach the terminal
+export const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '?');
 
 export async function main(argv, deps = defaultDeps()) {
   let o;
@@ -118,8 +123,8 @@ export async function main(argv, deps = defaultDeps()) {
     }
     if (o.cmd === 'scan') {
       const res = withState(deps, ctx.repo, (state) => {
-        const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode: { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author }, state, maxRounds: o.maxRounds });
-        dropClosed(state, r.open);
+        const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode: { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author }, state, maxRounds: o.maxRounds, warn: (m) => deps.stderr(`${m}\n`) });
+        if (r.open) dropClosed(state, r.open);
         return r;
       });
       if (!res.skipped) printItems(deps, res.items, o.json);
@@ -132,7 +137,7 @@ export async function main(argv, deps = defaultDeps()) {
       deps.stderr(`iw-watch: ${e.kind}: ${e.message}\n`);
       return 2;
     }
-    if (/not an item id|not a time/.test(e.message)) {
+    if (/not an item id|not pending/.test(e.message)) {
       deps.stderr(`iw-watch: ${e.message}\n`);
       return 64;
     }

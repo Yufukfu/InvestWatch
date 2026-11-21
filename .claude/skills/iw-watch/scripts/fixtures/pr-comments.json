@@ -1,6 +1,50 @@
 [
-  {"id": 7068004823, "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068004823", "user": {"login": "kacpermalczyk", "type": "User"}, "created_at": "2026-11-21T19:25:02Z", "updated_at": "2026-11-21T19:25:02Z", "body": "Thanks Adam, you were right on all three and a bit more.\n\n<!-- iw-watch -->"},
-  {"id": 7068056016, "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068056016", "user": {"login": "kacpermalczyk", "type": "User"}, "created_at": "2026-11-21T19:29:16Z", "updated_at": "2026-11-21T19:29:16Z", "body": "You're right, and it was my mistake.\n<!-- iw-watch -->"},
-  {"id": 7068060001, "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068060001", "user": {"login": "hen68", "type": "User"}, "created_at": "2026-11-21T19:31:00Z", "updated_at": "2026-11-21T19:31:00Z", "body": "Looks good now.\n\n<!-- iw-watch -->"},
-  {"id": 7068060002, "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068060002", "user": {"login": "kacpermalczyk", "type": "User"}, "created_at": "2026-11-21T19:32:00Z", "updated_at": "2026-11-21T19:32:00Z", "body": "Merging after Damian's approval (a human comment, no marker)."}
+ {
+  "id": 7068004823,
+  "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068004823",
+  "user": {
+   "login": "kacpermalczyk",
+   "type": "User"
+  },
+  "created_at": "2026-11-21T19:25:02Z",
+  "updated_at": "2026-11-21T19:25:02Z",
+  "body": "Thanks Adam, you were right on all three and a bit more.\n\n<!-- iw-watch -->",
+  "author_association": "COLLABORATOR"
+ },
+ {
+  "id": 7068056016,
+  "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068056016",
+  "user": {
+   "login": "kacpermalczyk",
+   "type": "User"
+  },
+  "created_at": "2026-11-21T19:29:16Z",
+  "updated_at": "2026-11-21T19:29:16Z",
+  "body": "You're right, and it was my mistake.\n<!-- iw-watch -->",
+  "author_association": "COLLABORATOR"
+ },
+ {
+  "id": 7068060001,
+  "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068060001",
+  "user": {
+   "login": "hen68",
+   "type": "User"
+  },
+  "created_at": "2026-11-21T19:31:00Z",
+  "updated_at": "2026-11-21T19:31:00Z",
+  "body": "Looks good now.\n\n<!-- iw-watch -->",
+  "author_association": "COLLABORATOR"
+ },
+ {
+  "id": 7068060002,
+  "html_url": "https://github.com/Yufukfu/InvestWatch/pull/27#issuecomment-7068060002",
+  "user": {
+   "login": "kacpermalczyk",
+   "type": "User"
+  },
+  "created_at": "2026-11-21T19:32:00Z",
+  "updated_at": "2026-11-21T19:32:00Z",
+  "body": "Merging after Damian's approval (a human comment, no marker).",
+  "author_association": "COLLABORATOR"
+ }
 ]

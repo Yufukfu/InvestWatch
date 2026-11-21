@@ -21,6 +21,35 @@ function classify(e, args) {
   return new GhError('other', `gh ${args.slice(0, 3).join(' ')} failed: ${stderr.trim().split('\n')[0]}`);
 }
 
+/**
+ * `gh api --paginate` on gh 2.39 (no --slurp) prints one JSON array per page back to back: `[...][...]`.
+ * Split the top-level values with a scanner that respects strings, then concatenate the arrays.
+ */
+export function parseJsonStream(text) {
+  const values = [];
+  let depth = 0; let start = -1; let inStr = false; let esc = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') { inStr = true; if (depth === 0) throw new SyntaxError('bare string at top level'); continue; }
+    if (c === '[' || c === '{') { if (depth === 0) start = i; depth += 1; }
+    else if (c === ']' || c === '}') {
+      depth -= 1;
+      if (depth < 0) throw new SyntaxError('unbalanced JSON');
+      if (depth === 0) values.push(JSON.parse(text.slice(start, i + 1)));
+    } else if (depth === 0 && !/\s/.test(c)) throw new SyntaxError(`unexpected ${JSON.stringify(c)} at top level`);
+  }
+  if (depth !== 0 || inStr) throw new SyntaxError('truncated JSON');
+  if (values.length === 1) return values[0];
+  if (values.every(Array.isArray)) return values.flat();
+  throw new SyntaxError('several top-level JSON values that are not all arrays');
+}
+
 export function makeGh({ exec = execFileSync, cwd } = {}) {
   return (args) => {
     let out;
@@ -30,6 +59,11 @@ export function makeGh({ exec = execFileSync, cwd } = {}) {
       throw classify(e, args);
     }
     const text = String(out).trim();
-    return text ? JSON.parse(text) : null;
+    if (!text) return null;
+    try {
+      return parseJsonStream(text);
+    } catch (e) {
+      throw new GhError('other', `gh ${args.slice(0, 3).join(' ')} printed something that is not JSON (${e.message})`);
+    }
   };
 }
