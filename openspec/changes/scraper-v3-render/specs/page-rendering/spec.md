@@ -57,10 +57,14 @@ The scraper SHALL call the renderer once per viewport, in the order `desktop`, `
 
 #### Scenario: Mobile identity does not pair
 - **WHEN** the mobile variant's user agent version differs from its client hints or TLS profile
-- **THEN** the pairing check rejects it at import, before any request is made
+- **THEN** the pairing check rejects it (the test suite runs the check on the variant of every table entry)
 
-#### Scenario: Identity does not match the browser
-- **WHEN** a request names a Chrome major that differs from the renderer's browser
+#### Scenario: Identity is adapted to the browser
+- **WHEN** a request names a Chrome major that differs from the renderer's browser (the pinned Chromium has no build for `CHROME_VERSION`, ADR 0105)
+- **THEN** the renderer sends a user agent and client hints with the browser's own major and keeps the platform, mobile flag and `Accept-Language` of the request
+
+#### Scenario: Identity is not Chrome
+- **WHEN** a request carries a user agent that is not Chrome
 - **THEN** the renderer refuses it before any navigation and the render ends with `render_failed`
 
 #### Scenario: One navigation per viewport
@@ -76,7 +80,7 @@ The scraper SHALL call the renderer once per viewport, in the order `desktop`, `
 - **THEN** the `mobile` blocks reflect the mobile layout, not the desktop markup scaled down
 
 ### Requirement: The browser is confined
-Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host (and its redirects within the same registrable domain) SHALL be aborted. Downloads, new pages, service workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
+Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host's site SHALL be refused without replacing the page. Chromium follows redirects without asking the interceptor (measured, ADR 0105), so every hop of the first navigation's redirect chain SHALL be checked after the load, and a render whose chain left the site or reached a non-public address SHALL fail and keep nothing of the page it landed on. Downloads, new pages, service workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
 
 #### Scenario: Private address from the page
 - **WHEN** the page's script or stylesheet references `http://169.254.169.254/` or a name that resolves to a private range
@@ -85,6 +89,10 @@ Every request the browser makes SHALL be intercepted and checked. A request SHAL
 #### Scenario: Navigation away
 - **WHEN** the page tries to navigate or redirect to another registrable domain, open a popup or start a download
 - **THEN** it is refused and the original page is measured
+
+#### Scenario: Redirect away
+- **WHEN** the first navigation is redirected to another registrable domain
+- **THEN** the render fails with `render_failed`, and no screenshot or block of the page it landed on is produced
 
 #### Scenario: Third-party styles and fonts
 - **WHEN** the page loads CSS, fonts and images from a public CDN host
@@ -95,7 +103,7 @@ Every request the browser makes SHALL be intercepted and checked. A request SHAL
 - **THEN** its environment has no `DATABASE_URL`, `REDIS_URL` or `MINIO_*` variable
 
 ### Requirement: Store one screenshot per viewport
-The scraper SHALL capture a full-page PNG for each of `desktop` (1440x900), `tablet` (820x1180) and `mobile` (390x844) CSS pixels, capped at `RENDER_MAX_PAGE_HEIGHT` CSS pixels (default 12000) and `RENDER_MAX_PNG_BYTES` bytes per image, upload each to the bucket `iw-raw` at `shot/{document_id}/{viewport}.png`, and set `screenshots.{viewport}` to that key.
+The scraper SHALL capture a full-page PNG for each of `desktop` (1440x900), `tablet` (820x1180) and `mobile` (390x844) CSS pixels, capped at `RENDER_MAX_PAGE_HEIGHT` CSS pixels (default 12000) and `RENDER_MAX_PNG_BYTES` bytes per image (default 8000000; a larger image is shortened until it fits, and a page that does not fit even one viewport height fails that viewport), upload each to the bucket `iw-raw` at `shot/{document_id}/{viewport}.png`, and set `screenshots.{viewport}` to that key.
 
 #### Scenario: Three screenshots
 - **WHEN** a page is rendered successfully
@@ -164,7 +172,7 @@ The renderer SHALL stop a render that exceeds `RENDER_TIMEOUT_SECONDS` (default 
 
 #### Scenario: Timeout
 - **WHEN** the page never finishes loading within the timeout
-- **THEN** the render ends with reason `timeout`, the browser context is closed and no process is left running
+- **THEN** the render ends with reason `render_failed` (never `timeout`: the queue retries that), the browser context is closed and no process is left running
 
 #### Scenario: Too many blocks
 - **WHEN** a viewport has more blocks than `RENDER_MAX_BLOCKS`
