@@ -13,7 +13,7 @@ The scraper SHALL provide a command that reads every supported file of a directo
 - **THEN** one `documents` row exists whose `text`, `title`, `canonical_url` and `links` equal what `parse_page` gives for that file, `html/{document_id}.html` exists in `iw-raw`, and `iw:documents` received the document id
 
 #### Scenario: Text sample
-- **WHEN** a directory holds `post.txt` or `post.md`
+- **WHEN** a directory holds a plain-text file (`post.txt`) or a Markdown file (extension md)
 - **THEN** one document is ingested whose `text` is the file content, with a non-blank `html` stored for it
 
 #### Scenario: Unsupported file

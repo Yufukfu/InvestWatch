@@ -9,6 +9,7 @@
 | See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then your domain: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
 | Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
 | Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
+| Load saved samples (data from the stand, offline demo replay) through the normal ingest | [../scraper/README.md](../scraper/README.md) (Import saved samples) |
 | Store, dedup and announce a document (DB, MinIO, `iw:documents`, republish sweep) | [../scraper/CLAUDE.md](../scraper/CLAUDE.md) (Ingest), [decisions/0104-ingest-order-and-republish-sweep.md](decisions/0104-ingest-order-and-republish-sweep.md) |
 | Produce or consume a finding | [integration-plan.md](integration-plan.md) §4, then [../analytics/CLAUDE.md](../analytics/CLAUDE.md) |
 | Run or operate the analytics worker (env, feeding a document, poison messages, `/health`, registry) | [../analytics/README.md](../analytics/README.md) "Run the worker" and "Configuration", then [../openspec/specs/document-stream-worker/spec.md](../openspec/specs/document-stream-worker/spec.md) |

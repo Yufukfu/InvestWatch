@@ -17,10 +17,10 @@
 ## 3. Usage and a rehearsal
 
 - [x] 3.1 Test the usage errors: no manifest and no `--kind`/`--modules`, a missing directory, an invalid manifest creates no source row (`mutations: 5 tried, 5 caught`)
-- [ ] 3.2 Rehearse once against the running stack, through compose with the directory mounted read-only, using two saved real pages from `scraper/tests/fixtures/` copied to a scratch directory: the documents reach `iw:documents`, analytics produces findings and a high-risk one reaches the dashboard alert (record the outcome in the PR, not a bundled demo set; if `scraper-stack` is not merged, run the image directly and say so)
-- [ ] 3.3 Commit
+- [x] 3.2 Rehearsed once in the image, as `scraper-stack` is not merged and the human chose to skip the full stack: `python -m iw_scraper.sample_import` on two saved pages from `scraper/tests/fixtures/` (scratch directory mounted read-only) against real PostgreSQL, Redis and MinIO: inserted 2, rerun duplicate 2, exit 0; no flags and no manifest exit 2; inactive source with no cron; 2 entries on `iw:documents`. Analytics findings and the dashboard alert were not exercised; record that in the PR body
+- [x] 3.3 Commit
 
 ## 4. Closing
 
-- [ ] 4.1 Apply the `iw-docs-update` skill: `scraper/README.md` (short: the command, flags, `samples.toml` keys, the author rule, no filler), `.docs/security-audit.md` only if a dependency changed (none expected), `scraper/CLAUDE.md` module list, `.docs/status/scraper.md`, `.docs/INDEX.md` if it routes sample loading; add the `iw-ai-log` row; `docs-check` prints `docs-check: ok`
+- [x] 4.1 Apply the `iw-docs-update` skill: `scraper/README.md` (short: the command, flags, `samples.toml` keys, the author rule, no filler), `.docs/security-audit.md` only if a dependency changed (none expected), `scraper/CLAUDE.md` module list, `.docs/status/scraper.md`, `.docs/INDEX.md` if it routes sample loading; add the `iw-ai-log` row; `docs-check` prints `docs-check: ok`
 - [ ] 4.2 Run the `iw-pr-review` skill and fix real findings
