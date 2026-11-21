@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Deterministic docs check, no LLM, no network. Usage: node docs-check.mjs [repoRoot]
 // Fails (exit 1) on: broken relative markdown links, backticked .md paths that do not
-// exist, ADR files missing from doc/decisions/README.md, service dirs without CLAUDE.md.
+// exist, ADR files missing from .docs/decisions/README.md, service dirs without CLAUDE.md.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SERVICE_DIRS = ['scraper', 'analytics', 'api', 'dashboard', 'contracts'];
+const SERVICE_DIRS = ['scraper', 'analytics', 'web', 'api', 'contracts'];
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.agents', '.venv', '__pycache__']);
 const SKIP_PREFIXES = ['.claude/skills/openspec-', 'openspec/changes/archive'];
 // Per-change OpenSpec files and generic names that are referred to without a fixed location.
@@ -59,13 +59,13 @@ export function checkDocs(root) {
     }
   }
 
-  const decisionsDir = path.join(root, 'doc', 'decisions');
+  const decisionsDir = path.join(root, '.docs', 'decisions');
   if (fs.existsSync(decisionsDir)) {
     const indexPath = path.join(decisionsDir, 'README.md');
     const index = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '';
     for (const name of fs.readdirSync(decisionsDir)) {
       if (!/^\d{4}-.+\.md$/.test(name) || name.startsWith('0000-')) continue;
-      if (!index.includes(name)) problems.push({ file: `doc/decisions/${name}`, line: 1, problem: `${name} is not listed in doc/decisions/README.md` });
+      if (!index.includes(name)) problems.push({ file: `.docs/decisions/${name}`, line: 1, problem: `${name} is not listed in .docs/decisions/README.md` });
     }
   }
 

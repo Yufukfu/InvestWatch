@@ -2,8 +2,8 @@
 
 Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modules M1-M3, inserts `findings` and publishes to `iw:events`. The logic lives in the docs, not here:
 
-- Pipeline, rules and LLM layer: [`doc/analytics-plan.md`](../doc/analytics-plan.md) §2 (pipeline), §4-6 (M1-M3), §7 (LLM), §8 (evaluation and calibration).
-- Input contract `ScrapedDocument`: [`doc/integration-plan.md`](../doc/integration-plan.md) §3. Output `Finding`: §4. Events: §6.
+- Pipeline, rules and LLM layer: [`.docs/analytics-plan.md`](../.docs/analytics-plan.md) §2 (pipeline), §4-6 (M1-M3), §7 (LLM), §8 (evaluation and calibration).
+- Input contract `ScrapedDocument`: [`.docs/integration-plan.md`](../.docs/integration-plan.md) §3. Output `Finding`: §4. Events: §6.
 
 ## Rules that are easy to get wrong
 
@@ -16,4 +16,4 @@ Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modu
 
 ## Stack and done
 
-Python, pytest. Done means a document from the stream yields schema-valid findings, an `iw:events` message, and the gold-set evaluation (`doc/analytics-plan.md` §8) still runs.
+Python, pytest. Done means a document from the stream yields schema-valid findings, an `iw:events` message, and the gold-set evaluation (`.docs/analytics-plan.md` §8) still runs.

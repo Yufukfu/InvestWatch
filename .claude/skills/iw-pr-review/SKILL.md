@@ -15,7 +15,7 @@ Task-group reviews already ran (`iw-commit-cycle`). This is the last pass over t
    - `node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs"` if hooks or the checker changed;
    - dependency scan of the touched module: `pip-audit` (Python) or `npm audit` (Node);
    - no debug leftovers: `git grep -nE "console\.log" -- '*.js' '*.jsx' '*.ts' '*.tsx' ':!*.test.*'` and, for Python, `git grep -nE "^\s*print\(" -- '*.py' ':!*test*'` (Python uses the logger; this one is checked by review, not by the hook); no `.env` or key material tracked;
-   - `docker compose up` still starts the stack, **once `docker-compose.yml` exists** and a service or Dockerfile changed (merge rule, `doc/integration-plan.md` §7).
+   - `docker compose up` still starts the stack, **once `docker-compose.yml` exists** and a service or Dockerfile changed (merge rule, `.docs/integration-plan.md` §7).
 3. **One whole-branch review**: dispatch `iw-reviewer` on the pinned range (`/code-review` is the fallback), with `focus: security` for contracts, credentials, proxies, outbound requests from stored URLs or LLM prompts built from scraped text. A contract or cross-module change gets both a normal and a security pass; a parser tweak gets one.
 4. **Verify every finding** against the code and fix the real ones (rules in `.claude/CODE_REVIEW.md`).
 5. **Follow-ups and PR body**: every row in `follow-ups.md` has a disposition. Draft the PR body: one sentence of why, the change name, the test command and result, and one line for every behaviour change a teammate would notice and for any `IW_*` escape that was used.

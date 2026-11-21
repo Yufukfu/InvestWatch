@@ -11,7 +11,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
 - **Scraper fetch client:** `noble-tls` (v0.1.9 on PyPI at time of writing) vs `curl_cffi` vs plain `httpx`. Read the installed package's real API first. Owner A.
-- **Playwright boundary:** which sources must be rendered, because `blocks` and screenshots (`doc/integration-plan.md` §3) feed rules R4-R8 and R13 (`doc/analytics-plan.md` §5). Owner A, with C.
+- **Playwright boundary:** which sources must be rendered, because `blocks` and screenshots (`.docs/integration-plan.md` §3) feed rules R4-R8 and R13 (`.docs/analytics-plan.md` §5). Owner A, with C.
 - **Job queue and scheduler** for the scraper: open source, undecided. Owner A.
 - **First social platform** (team decision: one platform first). Owner A.
-- **Contract v1 confirmation** by A and B (open in the team sync notes, `doc/integration-plan.md`). Owner C.
+- **Contract v1 confirmation** by A and B (open in the team sync notes, `.docs/integration-plan.md`). Owner C.

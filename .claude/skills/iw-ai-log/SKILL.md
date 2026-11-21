@@ -1,11 +1,11 @@
 ---
 name: iw-ai-log
-description: Use as part of closing an OpenSpec change (same PR, before archiving), at each integration milestone, and whenever an agent or rule misled you. Appends one row to the Log table in doc/ai-workflow.md, the team's evidence for the "AI-assisted process" jury criterion. Not a place for secrets or raw transcripts.
+description: Use as part of closing an OpenSpec change (same PR, before archiving), at each integration milestone, and whenever an agent or rule misled you. Appends one row to the Log table in .docs/ai-workflow.md, the team's evidence for the "AI-assisted process" jury criterion. Not a place for secrets or raw transcripts.
 ---
 
 # iw-ai-log
 
-`doc/ai-workflow.md` holds the process description and, at the bottom, the Log table. Append one row at the end of the table, same columns as the existing rows:
+`.docs/ai-workflow.md` holds the process description and, at the bottom, the Log table. Append one row at the end of the table, same columns as the existing rows:
 
 | When | Who | What was done with AI | Outcome / lesson |
 |---|---|---|---|

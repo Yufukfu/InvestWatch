@@ -77,9 +77,9 @@ test('denies staged .env but allows .env.example', () => {
 });
 
 test('denies console.log in code, allows it in tests', () => {
-  const code = deps({ staged: () => [{ file: 'dashboard/src/a.ts', added: ['console.log(x)'] }] });
+  const code = deps({ staged: () => [{ file: 'web/src/a.ts', added: ['console.log(x)'] }] });
   assert.match(evaluate('git commit -m x', code), /console\.log/);
-  const spec = deps({ staged: () => [{ file: 'dashboard/src/a.test.ts', added: ['console.log(x)'] }] });
+  const spec = deps({ staged: () => [{ file: 'web/src/a.test.ts', added: ['console.log(x)'] }] });
   assert.equal(evaluate('git commit -m x', spec), null);
 });
 
@@ -101,7 +101,7 @@ test('markdown inside a service directory needs no spec', () => {
 });
 
 test('docs-only commits need no spec', () => {
-  const d = deps({ staged: () => [{ file: 'doc/ai-workflow.md', added: ['x'] }], activeChanges: () => [] });
+  const d = deps({ staged: () => [{ file: '.docs/ai-workflow.md', added: ['x'] }], activeChanges: () => [] });
   assert.equal(evaluate('git commit -m x', d), null);
 });
 

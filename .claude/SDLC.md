@@ -1,6 +1,6 @@
 # InvestWatch SDLC
 
-How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut down for a 24-hour hackathon and fully git-tracked, so every teammate gets the same skills, agent and hook. **OpenSpec drives implementation**; the `iw-*` skills attach to defined points in it. The jury-facing summary and the AI log are in `doc/ai-workflow.md`.
+How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut down for a 24-hour hackathon and fully git-tracked, so every teammate gets the same skills, agent and hook. **OpenSpec drives implementation**; the `iw-*` skills attach to defined points in it. The jury-facing summary and the AI log are in `.docs/ai-workflow.md`.
 
 ## Who owns which fact (edit the owner, link from elsewhere)
 
@@ -16,14 +16,14 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | AI log row | `.claude/skills/iw-ai-log/SKILL.md` |
 | Hook behaviour and escapes | header of `.claude/hooks/git-guard.js` |
 | Closing tasks and apply/archive guidance | `openspec/config.yaml` |
-| Docs map | `doc/INDEX.md` |
+| Docs map | `.docs/INDEX.md` |
 | Behaviour now / in flight | `openspec/specs/`, `openspec/changes/` |
 
 ## Stages
 
 | # | Stage | Tool | Gate |
 |---|---|---|---|
-| 0 | Intake: docs first (`CLAUDE.md`), `doc/STATUS.md`, the owning spec | agent | none |
+| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md`, the owning spec | agent | none |
 | 1 | Size, worktree, branch | `iw-implement` | branch prefix = module |
 | 2 | Explore (only if scope is foggy) | `/openspec-explore` | none |
 | 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
@@ -44,7 +44,7 @@ Anything real but out of scope goes into the change's `follow-ups.md` with one d
 
 ## Parallel work
 
-Three people, three modules, a worktree per change, ownership by directory (`scraper/` A, `dashboard/` B, `analytics/` `api/` `contracts/` C). To limit merge conflicts: edit only your own row in `doc/STATUS.md`; ADR numbers by owner (A 01xx, B 02xx, C 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
+Three people, three modules, a worktree per change, ownership by directory (`scraper/` A, `web/` B, `analytics/` C, plus `api/` and `contracts/` C once created). To limit merge conflicts: edit only your own row in `.docs/STATUS.md`; ADR numbers by owner (A 01xx, B 02xx, C 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
 
 ## Not adopted from Neopadel (on purpose)
 

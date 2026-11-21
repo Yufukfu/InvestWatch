@@ -16,23 +16,23 @@ function repo(files) {
 
 test('a clean docs tree has no problems', () => {
   const root = repo({
-    'CLAUDE.md': 'See [plan](doc/integration-plan.md) and `doc/STATUS.md`.',
-    'doc/integration-plan.md': '# plan',
-    'doc/STATUS.md': '# status',
+    'CLAUDE.md': 'See [plan](.docs/integration-plan.md) and `.docs/STATUS.md`.',
+    '.docs/integration-plan.md': '# plan',
+    '.docs/STATUS.md': '# status',
   });
   assert.deepEqual(checkDocs(root), []);
 });
 
 test('flags a broken markdown link and reports file and line', () => {
-  const root = repo({ 'doc/a.md': 'ok\n[gone](missing.md)\n' });
+  const root = repo({ '.docs/a.md': 'ok\n[gone](missing.md)\n' });
   const [p] = checkDocs(root);
-  assert.equal(p.file, 'doc/a.md');
+  assert.equal(p.file, '.docs/a.md');
   assert.equal(p.line, 2);
   assert.match(p.problem, /missing\.md/);
 });
 
 test('flags a backticked .md path that no longer exists (renamed plan)', () => {
-  const root = repo({ 'CLAUDE.md': 'Read `doc/plan-integracji.md`.', 'doc/integration-plan.md': '#' });
+  const root = repo({ 'CLAUDE.md': 'Read `.docs/plan-integracji.md`.', '.docs/integration-plan.md': '#' });
   const problems = checkDocs(root);
   assert.equal(problems.length, 1);
   assert.match(problems[0].problem, /plan-integracji\.md/);
@@ -40,8 +40,8 @@ test('flags a backticked .md path that no longer exists (renamed plan)', () => {
 
 test('resolves paths relative to the file and to the repo root, strips anchors', () => {
   const root = repo({
-    'doc/INDEX.md': '`STATUS.md` `../.claude/SDLC.md` [x](STATUS.md#milestones) `doc/STATUS.md`',
-    'doc/STATUS.md': '#',
+    '.docs/INDEX.md': '`STATUS.md` `../.claude/SDLC.md` [x](STATUS.md#milestones) `.docs/STATUS.md`',
+    '.docs/STATUS.md': '#',
     '.claude/SDLC.md': '#',
   });
   assert.deepEqual(checkDocs(root), []);
@@ -49,17 +49,17 @@ test('resolves paths relative to the file and to the repo root, strips anchors',
 
 test('ignores URLs, globs, placeholders and per-change file names', () => {
   const root = repo({
-    'doc/a.md': '[w](https://example.com/x.md) `contracts/*.md` `<service>/CLAUDE.md` `tasks.md` `follow-ups.md` `NNNN-short-title.md`',
+    '.docs/a.md': '[w](https://example.com/x.md) `contracts/*.md` `<service>/CLAUDE.md` `tasks.md` `follow-ups.md` `NNNN-short-title.md`',
   });
   assert.deepEqual(checkDocs(root), []);
 });
 
 test('ADR files must be listed in the decisions index; the template is exempt', () => {
   const root = repo({
-    'doc/decisions/README.md': '| [0001](0001-tls-client.md) | TLS client |',
-    'doc/decisions/0000-template.md': '#',
-    'doc/decisions/0001-tls-client.md': '#',
-    'doc/decisions/0002-queue.md': '#',
+    '.docs/decisions/README.md': '| [0001](0001-tls-client.md) | TLS client |',
+    '.docs/decisions/0000-template.md': '#',
+    '.docs/decisions/0001-tls-client.md': '#',
+    '.docs/decisions/0002-queue.md': '#',
   });
   const problems = checkDocs(root);
   assert.equal(problems.length, 1);
@@ -70,7 +70,7 @@ test('every existing service directory needs its own CLAUDE.md', () => {
   const root = repo({
     'scraper/CLAUDE.md': '#',
     'analytics/main.py': 'x = 1',
-    'dashboard/CLAUDE.md': '#',
+    'web/CLAUDE.md': '#',
   });
   const problems = checkDocs(root);
   assert.equal(problems.length, 1);

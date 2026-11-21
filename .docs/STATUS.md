@@ -25,8 +25,8 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 
 - Scraper fetch library (noble-tls vs alternatives) needs an ADR after reading the real API.
 - Playwright is required for sources that must provide `blocks`/`screenshots` (rules R4-R8, R13).
-- Repository layout is defined by B (team decision). `scraper/` and the service list in `.claude/hooks/git-guard.js` (`SERVICE_DIRS`) are assumptions to confirm with B.
+- Repository layout is B's (`scraper/`, `analytics/`, `web/`, `.docs/`, `doc/` for UKNF materials). `api/` and `contracts/` from the integration plan do not exist yet; C creates them with a `CLAUDE.md` when needed.
 - Contracts v1 still to be confirmed by A and B; rendering metadata (`blocks`, screenshots) still to be discussed with A.
 - Social media: one platform first; which one is open.
-- Hand-in README (Quick Start, hardware requirements, per-service config; no filler) has no owner yet.
-- `doc/security-audit.md` is promised by `integration-plan.md` §7 and not created yet; created at the first `pip-audit` / `npm audit` run.
+- Root `README.md` exists (B); its Quick Start is pending the deployment ADR. Per-service READMEs are stubs.
+- `.docs/security-audit.md` is promised by `integration-plan.md` §7 and not created yet; created at the first `pip-audit` / `npm audit` run.

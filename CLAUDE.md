@@ -6,26 +6,26 @@ Hackathon system (HackNation, UKNF challenge) that finds risky investment conten
 
 Business logic, contracts and decisions live in the docs, not in `CLAUDE.md` files, which stay short and point here. Read in this order before changing anything, and open only what your task needs:
 
-1. [`doc/STATUS.md`](doc/STATUS.md): where we are, what is blocked.
-2. [`doc/INDEX.md`](doc/INDEX.md): "How do I…?" router from a task to the exact doc and section.
-3. [`doc/integration-plan.md`](doc/integration-plan.md): architecture (§1), contracts `ScrapedDocument` (§3) and `Finding` (§4), REST (§5), events (§6), conventions (§7), milestones (§8).
-4. Your service's `CLAUDE.md` (table below), then its plan, for example [`doc/analytics-plan.md`](doc/analytics-plan.md).
+1. [`.docs/STATUS.md`](.docs/STATUS.md): where we are, what is blocked.
+2. [`.docs/INDEX.md`](.docs/INDEX.md): "How do I…?" router from a task to the exact doc and section.
+3. [`.docs/integration-plan.md`](.docs/integration-plan.md): architecture (§1), contracts `ScrapedDocument` (§3) and `Finding` (§4), REST (§5), events (§6), conventions (§7), milestones (§8).
+4. Your service's `CLAUDE.md` (table below), then its plan, for example [`.docs/analytics-plan.md`](.docs/analytics-plan.md).
 5. [`openspec/specs/`](openspec/specs/) for what the system does now and [`openspec/changes/`](openspec/changes/) for what is in flight.
-6. [`doc/decisions/`](doc/decisions/README.md) for why we chose X, so you don't relitigate it.
+6. [`.docs/decisions/`](.docs/decisions/README.md) for why we chose X, so you don't relitigate it.
 
 A doc claim that matters is checked against the code before you rely on it. After a change, update the docs with the `iw-docs-update` skill and run `node .claude/skills/iw-docs-update/scripts/docs-check.mjs`; it fails on broken paths, an unlisted ADR, or a service without `CLAUDE.md`.
 
 ## Services
 
-Three modules, three owners. The repository layout is defined by B; confirm before adding directories.
+Three modules, three owners. B defined the repository layout (root [`README.md`](README.md) has the human-facing overview and Quick Start); confirm with B before adding directories. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
 
 | Directory | Owner | Role | Rules |
 |---|---|---|---|
 | `scraper/` | A | collectors, queue, scheduler, `documents` writer | [`scraper/CLAUDE.md`](scraper/CLAUDE.md) |
 | `analytics/` | C | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
-| `api/` | C | REST, Socket.IO, migrations | [`api/CLAUDE.md`](api/CLAUDE.md) |
-| `dashboard/` | B | frontend, alerts, calibration panel | [`dashboard/CLAUDE.md`](dashboard/CLAUDE.md) |
-| `contracts/` | C | JSON Schema and mocks, frozen v1 | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
+| `web/` | B | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
+
+`api/` and `contracts/` (C) appear in the integration plan but not in B's layout yet. Whoever creates them adds a `CLAUDE.md` first; `docs-check` enforces it.
 
 ## Process in one line
 
@@ -47,10 +47,10 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 - Stage and commit in separate tool calls. Never use an `IW_*` escape flag without telling the human.
 - Every dependency is scanned (`pip-audit` / `npm audit`) before merge.
 - Verify every reviewer finding against the code before acting.
-- ADRs in `doc/decisions/` are written by a human; agents may draft options, not the decision.
+- ADRs in `.docs/decisions/` are written by a human; agents may draft options, not the decision.
 
 ## Conventions
 
-- Language: English for code, specs, ADRs, docs and `.claude/`; user-facing dashboard texts in Polish (team decision, [`doc/ai-workflow.md`](doc/ai-workflow.md)).
-- Commits: Conventional Commits, terse subject. Branches: `scraper/*`, `analytics/*`, `api/*`, `dashboard/*`, `contracts/*`, `chore/*`. Worktrees live in `../InvestWatch-worktrees/`.
+- Language: English for code, specs, ADRs, docs and `.claude/`; user-facing dashboard texts in Polish (team decision, [`.docs/ai-workflow.md`](.docs/ai-workflow.md)).
+- Commits: Conventional Commits, terse subject. Branches: `scraper/*`, `analytics/*`, `web/*`, `api/*`, `contracts/*`, `chore/*`. Worktrees live in `../InvestWatch-worktrees/`.
 - Time is UTC ISO-8601, ids are UUID v4, config is env-only.

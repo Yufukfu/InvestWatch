@@ -10,13 +10,13 @@
 | Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
 | Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
 | Produce or consume a finding | [integration-plan.md](integration-plan.md) §4, then [../analytics/CLAUDE.md](../analytics/CLAUDE.md) |
-| Build or call the REST API | [integration-plan.md](integration-plan.md) §5, then [../api/CLAUDE.md](../api/CLAUDE.md) |
-| Handle real-time events and alerts | [integration-plan.md](integration-plan.md) §6, then [../dashboard/CLAUDE.md](../dashboard/CLAUDE.md) |
+| Build or call the REST API | [integration-plan.md](integration-plan.md) §5 |
+| Handle real-time events and alerts | [integration-plan.md](integration-plan.md) §6, then [../web/CLAUDE.md](../web/CLAUDE.md) |
 | Follow shared conventions (env vars, logs, migrations, branches) | [integration-plan.md](integration-plan.md) §7 |
 | Check milestones and deadlines | [integration-plan.md](integration-plan.md) §8 |
 | Work on the analytics pipeline, rules R1-R18, LLM layer or calibration | [analytics-plan.md](analytics-plan.md) §2, §5, §7, §8 |
-| Read the UKNF challenge and the 18 rules | the UKNF `*.pdf` and `*.docx` files in this folder (read-only) |
-| Change a contract (needs the whole team) | [../contracts/CLAUDE.md](../contracts/CLAUDE.md) |
+| Read the UKNF challenge and the 18 rules | the Polish materials in [../doc/](../doc/) (read-only, removed before hand-in) |
+| Change a contract (needs the whole team and a version bump) | [integration-plan.md](integration-plan.md) §3-§6 |
 | Find out why we chose X, or record a decision | [decisions/README.md](decisions/README.md) |
 | See what the system does now, or what is in flight | [../openspec/specs/](../openspec/specs/), [../openspec/changes/](../openspec/changes/) |
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |

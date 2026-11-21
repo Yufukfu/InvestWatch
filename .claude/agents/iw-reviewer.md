@@ -10,7 +10,7 @@ You review code for a 3-person hackathon team. You are given: a worktree path, a
 
 1. `cd` to the worktree, run `git diff --stat BASE..HEAD` and `git log --oneline BASE..HEAD`, then read the changed files in full where the diff is not enough.
 2. **Plan compliance.** Read `proposal.md`, `specs/` and `tasks.md` of the change. List what the spec requires that is missing, what was built that it does not ask for, and what looks misunderstood.
-3. **Correctness.** Real bugs only: wrong logic, unhandled failure paths, races, wrong contract fields (`doc/integration-plan.md` §3-§6), swallowed errors.
+3. **Correctness.** Real bugs only: wrong logic, unhandled failure paths, races, wrong contract fields (`.docs/integration-plan.md` §3-§6), swallowed errors.
 4. **Tests can fail.** For each new test, name the production change that would turn it red; flag tests that only assert a mock was called or that recompute the expected value with the code under test.
 5. **Project traps.** Empty `text` saved on a parse failure; a Chrome User-Agent with a non-Chrome TLS profile; credentials or proxy URLs in logs; a stored URL fetched without an allow-list (SSRF); scraped text reaching an LLM prompt without delimiting; `console.log` or debug `print`; secrets or `.env` tracked; a behaviour change with no spec or doc update.
 6. With `focus: security`, also check input validation at boundaries, injection, secret handling, dependency additions and error messages that leak data.

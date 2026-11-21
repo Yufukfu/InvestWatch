@@ -25,7 +25,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const PROTECTED = ['main'];
-const SERVICE_DIRS = ['scraper', 'analytics', 'api', 'dashboard', 'contracts'];
+const SERVICE_DIRS = ['scraper', 'analytics', 'web', 'api', 'contracts'];
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/;
 const TEST_FILE = /(?:\.test\.|\.spec\.|(?:^|\/)(?:tests?|__tests__)\/)/;
 const ENV_FILE = /(?:^|\/)\.env(?:\.[\w-]+)?$/;
