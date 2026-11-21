@@ -19,8 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Hook and docs-check tests
-        run: node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs"
+      - name: Hook and script tests
+        run: node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs" ".claude/skills/iw-pr-review/scripts/*.test.mjs"
       - name: Docs check (paths, ADR index, service CLAUDE.md)
         run: node .claude/skills/iw-docs-update/scripts/docs-check.mjs
       - name: Validate OpenSpec specs and changes

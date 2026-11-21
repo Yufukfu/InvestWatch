@@ -13,7 +13,8 @@ Task-group reviews already ran (`iw-commit-cycle`). This is the last pass over t
    - every task group has its `mutations: N tried, N caught` line (`iw-commit-cycle` step 3); a group with surviving mutants or no line is not done;
    - `openspec validate --all --strict`;
    - `node .claude/skills/iw-docs-update/scripts/docs-check.mjs`, and `iw-docs-update` has been applied;
-   - `node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs"` if hooks or the checker changed;
+   - `node .claude/skills/iw-pr-review/scripts/test-diff-check.mjs --base origin/main` (use the PR's base branch): flags a deleted test file, added skip/xfail/only markers or fewer assertions than at the merge-base. A flag is a question, not a verdict: explain it in the PR body or fix it;
+   - `node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs" ".claude/skills/iw-pr-review/scripts/*.test.mjs"` if hooks or the scripts changed;
    - dependency scan of the touched module: `pip-audit` (Python) or `npm audit` (Node);
    - no debug leftovers: `git grep -nE "console\.log" -- '*.js' '*.jsx' '*.ts' '*.tsx' ':!*.test.*'` and, for Python, `git grep -nE "^\s*print\(" -- '*.py' ':!*test*'` (Python uses the logger; this one is checked by review, not by the hook); no `.env` or key material tracked;
    - `docker compose up` still starts the stack, **once `docker-compose.yml` exists** and a service or Dockerfile changed (merge rule, `.docs/integration-plan.md` §7).

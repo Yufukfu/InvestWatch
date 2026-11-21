@@ -6,7 +6,9 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
 | ADR | Decision | Status |
 |---|---|---|
-| none yet | | |
+| [0101](0101-scraper-fetch-client.md) | Scraper fetch client | proposed (agent draft, no decision) |
+| [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | proposed (agent draft, no decision) |
+| [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
