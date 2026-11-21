@@ -5,6 +5,8 @@ Copied from the archived mock server's exception handlers (design decision 2).
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -32,6 +34,12 @@ def install(api: FastAPI) -> None:
     async def request_validation_error(_: Request, exc: RequestValidationError):
         details = [{"loc": list(e.get("loc", [])), "msg": e.get("msg")} for e in exc.errors()]
         return JSONResponse({"error": "validation_error", "details": details}, status_code=422)
+
+    @api.exception_handler(Exception)
+    async def unexpected(_: Request, exc: Exception):
+        # Contract error shape for anything unforeseen (database down, driver errors); only the class is logged.
+        logging.getLogger("investwatch_api").error("unhandled error", extra={"reason": type(exc).__name__})
+        return JSONResponse({"error": "internal error"}, status_code=500)
 
     @api.exception_handler(ServiceUnavailable)
     async def service_unavailable(_: Request, exc: ServiceUnavailable):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -20,6 +21,9 @@ from ..queries import like_pattern, risk_level_expr
 router = APIRouter()
 log = logging.getLogger("investwatch_api.findings")
 EVENTS_CHANNEL = "iw:events"
+PUBLISH_TIMEOUT_S = 1.0
+MAX_PAGE = 100_000  # keeps OFFSET far below bigint
+TEXT_PARAM = r"^[^\x00]*$"  # Postgres rejects NUL in text
 SORTS = {
     "-detected_at": (findings.c.detected_at.desc(), findings.c.id),
     "detected_at": (findings.c.detected_at.asc(), findings.c.id),
@@ -53,15 +57,15 @@ async def list_findings(
     request: Request,
     module: Module | None = None,
     status: str | None = None,
-    platform: str | None = None,
+    platform: Annotated[str | None, Query(max_length=32, pattern=TEXT_PARAM)] = None,
     source_id: UUID | None = None,
     risk_level: RiskLevel | None = None,
     score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    q: str | None = None,
+    q: Annotated[str | None, Query(max_length=200, pattern=TEXT_PARAM)] = None,
     sort: Annotated[str, Query(pattern="^-?(detected_at|score)$")] = "-detected_at",
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 50,
 ):
     svc = request.app.state.services
@@ -127,7 +131,7 @@ async def publish_event(redis, event_type: str, data: dict) -> None:
     message = {"type": event_type, "emitted_at": format_time(datetime.now(timezone.utc).replace(microsecond=0)),
                "data": data}
     try:
-        await redis.publish(EVENTS_CHANNEL, json.dumps(message))
+        await asyncio.wait_for(redis.publish(EVENTS_CHANNEL, json.dumps(message)), PUBLISH_TIMEOUT_S)
     except Exception as exc:
         log.error("event publish failed", extra={"event": event_type, "reason": type(exc).__name__})
 

@@ -278,3 +278,18 @@ def test_redis_down_after_commit(migrated_db, app_engine, caplog):
     assert r.status_code == 200 and r.json()["status"] == "closed"
     assert _stored(migrated_db, f["id"])["status"] == "closed"
     assert any(rec.levelname == "ERROR" and "publish" in rec.getMessage() for rec in caplog.records)
+
+
+@pytest.mark.parametrize("params", [{"page": 10**12}, {"q": "a\x00b"}, {"q": "x" * 201}, {"platform": "web\x00"}])
+def test_hostile_query_values_are_422_not_500(client, params):
+    r = client.get("/api/findings", params=params)
+    assert r.status_code == 422 and r.json()["error"] == "validation_error"
+
+
+def test_database_down_gives_the_error_shape(redis_clean):
+    from apiutil import DEAD_PG
+
+    app = create_app(lambda: make_services(DEAD_PG, redis_clean, FakeObjectStore()))
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.get("/api/findings")
+    assert r.status_code == 500 and r.json() == {"error": "internal error"}
