@@ -23,10 +23,12 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import logging_setup
-from .config import ConfigError, LlmSettings, Settings
+from .config import ConfigError, EmbedSettings, GateSettings, LlmSettings, Settings
+from .embeddings import build_embedder
+from .gate import GateTermsError
 from .llm import build_judge
 from .models import ScrapedDocument
-from .pipeline import analyze, default_signal_catalogues
+from .pipeline import Gate, analyze, default_signal_catalogues
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
 
@@ -37,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="investwatch_analytics.cli", description=__doc__.splitlines()[0])
     parser.add_argument("file", type=Path, help="JSON file with one ScrapedDocument or a list of them")
     parser.add_argument("--no-llm", action="store_true", help="rules-only, even when LLM_BASE_URL is set")
+    parser.add_argument("--no-embed", action="store_true", help="no embeddings, even when EMBED_BASE_URL is set")
     args = parser.parse_args(argv)
     settings = Settings.from_env()
     try:
@@ -48,10 +51,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         llm_settings = LlmSettings.from_env()
-    except ConfigError as exc:
+        embed_settings = EmbedSettings.from_env()
+        gate = Gate.from_settings(GateSettings.from_env())
+    except (ConfigError, GateTermsError) as exc:
         log.error("invalid configuration", extra={"error": str(exc)})
         return 2
     judge = None if args.no_llm else build_judge(llm_settings)  # no Redis here: the CLI never caches
+    # No Redis: no embedding cache and no near-dup index (both need shared state across runs).
+    embedder = None if args.no_embed else build_embedder(embed_settings)
     try:
         registry = Registry.from_csv(settings.registry_csv)
         catalogue = Catalogue.load()
@@ -75,7 +82,8 @@ def main(argv: list[str] | None = None) -> int:
     for doc in docs:
         try:
             findings.extend(f.to_contract() for f in analyze(doc, registry=registry, catalogue=catalogue,
-                                                             signals=signals, judge=judge))
+                                                             signals=signals, judge=judge, gate=gate,
+                                                             embedder=embedder))
         except Exception as exc:  # one bad document must not cost the batch; a bug still shows in the exit code
             failed += 1
             # Type only: exception messages can carry scraped text.

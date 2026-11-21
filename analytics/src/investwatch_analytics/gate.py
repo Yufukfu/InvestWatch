@@ -7,6 +7,7 @@ page a firm publishes itself. The caller logs a drop with `GateDecision.log_extr
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -16,6 +17,10 @@ from typing import Any
 import yaml
 
 from .config import GateSettings
+
+log = logging.getLogger(__name__)
+STATS_KEY = "iw:stats:gate"
+_COUNTER_FIELD = {"off_topic": "dropped", "bypassed_firm_own": "bypassed"}  # anything else passed
 
 DEFAULT_TERMS = Path(__file__).with_name("gate_terms.yaml")
 #: Only the start of a document is scanned: the topic shows in the headline and lead, and the cap bounds the
@@ -114,3 +119,12 @@ def evaluate(normalized_text: str, *, source_kind: str, firm_matched: bool, term
     text = strip_diacritics(normalized_text[:MAX_GATE_CHARS])
     hits = sum(1 for _ in terms.pattern.finditer(text)) + int(firm_matched)
     return GateDecision(hits > 0, "dictionary" if hits else "off_topic", hits, embedder=embedder)
+
+
+def count_decision(client: Any, decision: GateDecision) -> None:
+    """HINCRBY `iw:stats:gate` passed | dropped | bypassed; a Redis error is logged, never raised."""
+    try:
+        client.hincrby(STATS_KEY, _COUNTER_FIELD.get(decision.reason, "passed"), 1)
+    except Exception as exc:  # noqa: BLE001 - a counter must never fail a document
+        log.warning("gate counter not updated", extra={"reason": "gate_counter_unavailable",
+                                                       "error": type(exc).__name__})

@@ -8,7 +8,7 @@
 | R2 | review group 1 | bad port, `:abc` and whitespace in `EMBED_BASE_URL` passed startup | `fix-here` (eecc55b). `_check_base_url` (LLM, analytics-llm-p0) has the same gap: told the coordinator |
 | R3 | review group 1 | key-leak test half tautological | `fix-here` (eecc55b) |
 | R4 | review group 1, PLAUSIBLE | `ollama` host name counts as local, so a key may go over plain http to it | `wont-fix`: same accepted rule as the LLM (`_LOCAL_HOSTS`), compose service name |
-| R5 | review group 1, can't verify | callers must pass the real `llm_doc_budget_s` to `EmbedSettings.from_env` (default 0 skips the combined check) | `fix-here` in group 9 (worker wiring) |
+| R5 | review group 1, can't verify | callers must pass the real `llm_doc_budget_s` to `EmbedSettings.from_env` (default 0 skips the combined check) | `fix-here` (group 9): `preprocessing_from_env` passes the LLM budget plus its 3 s connect margin when the LLM is on |
 | R6 | review group 2 | huge integer values (OverflowError) and deep JSON nesting (RecursionError) escaped untyped | `fix-here` (both are `EmbedMalformed`). `llm/client.py:_content` has the same RecursionError hole: told the coordinator |
 | R7 | review group 2 | a lone surrogate in scraped text raised UnicodeEncodeError before the request | `fix-here`: ASCII-escaped JSON body |
 | R8 | review group 2 | timing tests counted SSL context setup | `fix-here`: client built before the clock starts |
@@ -34,7 +34,7 @@
 | R28 | review group 6 | determinism only checked in one process; estimate-dependent tests had no preconditions; long-text test timing only | `fix-here`: golden signature and bucket key, precondition asserts, shingle-count bound |
 | R29 | review group 6 | two workers observing near-identical documents at the same instant can both become originals | `wont-fix`: one missed grouping and possibly one extra alert, no corruption (MULTI/EXEC pipeline) |
 | R30 | review group 8a | all claims of a save were taken before any PUBLISH, so a failed publish could silence whole groups for the TTL | `fix-here`: the claim is taken right before its own `finding.high_risk` |
-| R31 | review group 8a | the claim TTL is a constant, not `NEARDUP_TTL_S` | `fix-here` in group 9: the worker passes `alert_ttl_s=NEARDUP_TTL_S` (task 9.1) |
+| R31 | review group 8a | the claim TTL is a constant, not `NEARDUP_TTL_S` | `fix-here` (group 9): the worker passes `alert_ttl_s=NEARDUP_TTL_S` |
 | R32 | review group 8a | no-groups tests did not prove Redis is untouched | `fix-here` |
 | R33 | review group 8a, PLAUSIBLE | one scam template naming different impersonated firms forms one group, so only the first firm alerts | `docs`: design §5 names it; per-firm claims would need the firm in the key, a product call for Damian |
 | R34 | coordinator | scipy is heavy for the image: does datasketch need it at runtime? | `fix-here`: yes (package `__init__` imports `lsh.py` -> `scipy.integrate`), so datasketch is replaced by our own numpy MinHash; about -115 MB |
@@ -42,3 +42,6 @@
 | R36 | review MinHash refactor | the "datasketch legacy value for value" claim had no test after removal | `fix-here`: golden vector of datasketch 2.0.0 `scheme="legacy"` on a 3000-item, multi-chunk set |
 | R37 | review MinHash refactor | a tautological self-equality assert | `fix-here`: removed |
 | R38 | review MinHash refactor | `.docs/analytics-plan.md` §2 still names `datasketch` | `docs`: closing task 10.1 (iw-docs-update) |
+| R39 | group 9 testing | the gate dropped real M3 advisory offers that carry no market word ("grupa VIP, codziennie mówię co kupić, płatna subskrypcja") | `fix-here`: advisory cues in `gate_terms.yaml` (co kupić, rekomend*, porad*, konsultacj*, subskrypcj*, vip, premium, mentoring*) and a test that the gate keeps those posts' M3 findings. The gold set should get gate negatives and advisory positives to measure this |
+| R40 | group 9 | the gold-set evaluation (`evaluation/runner.py`) calls `analyze` without the gate, so calibration does not see gate drops | `new-item`: run the evaluation once with the gate and report how many gold positives it drops (target 0) |
+| R41 | review group 7 | the similarity rescue (stretch) is not wired: the gate runs before the embedding | `docs`: group 5 stays stretch; if built, the embedding moves before the gate (design §4) |

@@ -28,7 +28,27 @@ services:
       LLM_CACHE_TTL_S: ${LLM_CACHE_TTL_S:-}
       LLM_BREAKER_FAILURES: ${LLM_BREAKER_FAILURES:-}
       LLM_BREAKER_COOLDOWN_S: ${LLM_BREAKER_COOLDOWN_S:-}
-      # Must stay above (LLM_DOC_BUDGET_S + 3 s) * 1000 (the worker refuses to start otherwise); 90000 for hosted Gemma.
+      # Embeddings (ADR 0313): local only. Empty EMBED_BASE_URL = off (model.embedder = null, dictionary-only gate).
+      # With --profile llm and bge-m3 pulled (issue #65): EMBED_BASE_URL=http://ollama:11434/v1. Limits: analytics/.env.example.
+      EMBED_BASE_URL: ${EMBED_BASE_URL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
+      EMBED_API_KEY: ${EMBED_API_KEY:-}
+      EMBED_DIM: ${EMBED_DIM:-}
+      EMBED_TIMEOUT_S: ${EMBED_TIMEOUT_S:-}
+      EMBED_MAX_CHARS: ${EMBED_MAX_CHARS:-}
+      EMBED_CACHE_TTL_S: ${EMBED_CACHE_TTL_S:-}
+      EMBED_BREAKER_FAILURES: ${EMBED_BREAKER_FAILURES:-}
+      EMBED_BREAKER_COOLDOWN_S: ${EMBED_BREAKER_COOLDOWN_S:-}
+      # Topic gate and near-duplicates (ADR 0314); defaults in analytics/.env.example.
+      GATE_ENABLED: ${GATE_ENABLED:-}
+      GATE_SIM_THRESHOLD: ${GATE_SIM_THRESHOLD:-}
+      NEARDUP_NUM_PERM: ${NEARDUP_NUM_PERM:-}
+      NEARDUP_BANDS: ${NEARDUP_BANDS:-}
+      NEARDUP_THRESHOLD: ${NEARDUP_THRESHOLD:-}
+      NEARDUP_MAX_CHARS: ${NEARDUP_MAX_CHARS:-}
+      NEARDUP_TTL_S: ${NEARDUP_TTL_S:-}
+      # Must stay above (LLM_DOC_BUDGET_S + 3 s + EMBED_TIMEOUT_S) * 1000 (the worker refuses to start otherwise);
+      # 90000 for hosted Gemma.
       CLAIM_MIN_IDLE_MS: ${CLAIM_MIN_IDLE_MS:-}
       # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
       # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).

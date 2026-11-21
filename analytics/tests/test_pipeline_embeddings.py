@@ -232,15 +232,17 @@ def test_no_sentence(group):
     assert neardup_sentence(group) is None
 
 
-def test_repost_summary_names_the_original(registry, catalogue):
+def test_repost_summary_names_the_original(registry, catalogue, finding_validator):
     idx = NearDupIndex(fakeredis.FakeRedis(decode_responses=True), NearDupSettings())
     first = run(doc(LONG, id="11111111-1111-4111-8111-111111111111"), registry, catalogue, neardup=idx)
     second = run(doc(LONG, id="22222222-2222-4222-8222-222222222222", url="https://www.instagram.com/p/R2/"),
                  registry, catalogue, neardup=idx)
+    assert first.findings and second.findings
     assert all("niemal identyczna" not in (f.summary or "") for f in first.findings)
     for f in second.findings:
         assert f.summary.count("niemal identyczna") == 1 and "https://www.instagram.com/p/R1/" in f.summary
         assert f.summary.endswith("(w grupie 2 materiały).") and f.url == "https://www.instagram.com/p/R2/"
+        finding_validator.validate(f.to_contract())
     again = run(doc(LONG, id="11111111-1111-4111-8111-111111111111"), registry, catalogue, neardup=idx)
     assert all("niemal identyczna" not in (f.summary or "") for f in again.findings)
 
@@ -268,3 +270,15 @@ def test_analyze_wrapper_passes_every_argument(registry, catalogue, monkeypatch)
 
 def test_original_with_a_url_has_no_sentence():
     assert neardup_sentence(NearDupResult("g", True, 3, None, "https://a")) is None
+
+
+@pytest.mark.parametrize("text", [
+    "Dołącz do mojej grupy VIP, codziennie mówię co kupić, płatna subskrypcja 99 zł.",
+    "Konsultacje 1:1, pomogę Ci wybrać co kupić. Pierwsza rozmowa gratis, napisz DM.",
+])
+def test_advisory_offer_without_market_words_passes_the_gate(registry, catalogue, text):
+    """The gate must not drop what M3 flags: same findings with and without the gate."""
+    d = doc(text, author={"handle": "@a"})
+    without = analyze(d, registry=registry, catalogue=catalogue, now=NOW)
+    a = run(d, registry, catalogue, gate=GATE)
+    assert without and a.gate.passed and [f.module for f in a.findings] == [f.module for f in without]

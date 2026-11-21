@@ -75,6 +75,18 @@ terms:
   - knf
   - rynek* kapitalow*
   - instrument* finansow*
+  # Advisory offers (M3, shadow advisory) often carry no market word: keep the gate a superset of M3's cues.
+  - co kupic
+  - co sprzedac
+  - kupuj*
+  - sprzedawaj*
+  - rekomend*
+  - porad*
+  - konsultacj*
+  - subskrypcj*
+  - vip
+  - premium
+  - mentoring*
   # English
   - invest*
   - profit*

@@ -49,6 +49,8 @@ Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is
 
 Split on the coordinator's instruction: 8a (alert claim in `events.py`, standalone) first; 8b (summary sentence with group 7, gate counter with group 9) on the merged base.
 
+- [x] 8b.3 Gate counter `gate.count_decision` (`passed` / `dropped` / `bypassed`, Redis errors logged), called by the worker on its short-timeout client; tests and mutations with group 9
+
 - [x] 8b.1 Failing tests: sentence plural forms (2-4, 5+, 12-14, 22, 102, 112), no sentence for no index, a lone member, the original (also with a URL) or a missing URL; a repost's findings name the original's URL once and keep their own `url`
 - [x] 8b.2 `pipeline.neardup_sentence()` applied in `analyze_document`; tests green (mutations counted in 7.3)
 
@@ -62,9 +64,9 @@ Split on the coordinator's instruction: 8a (alert claim in `events.py`, standalo
 
 ## 9. Wiring: worker, CLI, compose (~45 min)
 
-- [ ] 9.1 Failing tests: the worker builds embedder and near-dup index from env with its Redis client and passes them to `analyze`; the worker builds `RedisPublisher(..., alert_ttl_s=NEARDUP_TTL_S)` and passes `groups` (document id -> near-dup group id) to `publish_findings`; `embed_mode` logged (`local` for `ollama` or loopback host, `remote` otherwise, `disabled`); the CLI uses the embedder when `EMBED_BASE_URL` is set (stub) and `--no-embed` forces it off; CLI output on `contracts/mocks/documents.json` still passes `contracts/validate.py finding` in both modes
-- [ ] 9.2 `worker.py`, `cli.py`; `analytics/compose.yaml` passes `EMBED_*`, `GATE_*`, `NEARDUP_*`; `analytics/.env.example` documents them (empty `EMBED_BASE_URL` = off; local values `http://ollama:11434/v1`, `bge-m3`; no hosted embeddings example); tests green; `docker compose config` valid with and without `--profile llm`
-- [ ] 9.3 Mutation check; `mutations: N tried, N caught`
+- [x] 9.1 Failing tests (`tests/test_worker_embeddings.py`): the worker builds embedder and near-dup index from env with its Redis client and passes them to `analyze`; the worker builds `RedisPublisher(..., alert_ttl_s=NEARDUP_TTL_S)` and passes `groups` (document id -> near-dup group id) to `publish_findings`; `embed_mode` logged (`local` for `ollama` or loopback host, `remote` otherwise, `disabled`); the CLI uses the embedder when `EMBED_BASE_URL` is set (stub) and `--no-embed` forces it off; CLI output on `contracts/mocks/documents.json` still passes `contracts/validate.py finding` in both modes
+- [x] 9.2 `worker.py` (`preprocessing_from_env`, short-timeout side client, `Analysis` from `analyze_document`, gate counter, groups to the publisher), `cli.py` (gate, embedder, `--no-embed`), `gate.count_decision`; `analytics/compose.yaml` passes `EMBED_*`, `GATE_*`, `NEARDUP_*`; `analytics/.env.example` documents them (empty `EMBED_BASE_URL` = off; local values `http://ollama:11434/v1`, `bge-m3`; no hosted embeddings example); tests green; `docker compose config` valid with and without `--profile llm`
+- [x] 9.3 Mutation check (with 8b's gate counter); `mutations: 15 tried, 15 caught` (first run 14 of 15: a spy test proves the CLI passes the gate). Found while testing: the gate dropped real M3 advisory offers with no market word ("grupa VIP… co kupić… subskrypcja"); advisory cues added to `gate_terms.yaml` and a test that the gate keeps every M3 finding of those posts (follow-ups R39)
 - [ ] 9.4 Manual, outside pytest: with `--profile llm` and `bge-m3` pulled by hand, run the CLI on the mock documents and the gate fixtures; record latency per document (and, if group 5 was done, the similarity of each fixture and whether 0.45 separates them), in the AI log and as input for the gold-set calibration, never in a test
 
 ## 10. Closing

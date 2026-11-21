@@ -26,11 +26,25 @@ from typing import Any
 import redis
 
 from . import logging_setup
-from .config import ConfigError, LlmSettings, Settings, WorkerSettings, registry_provenance, uses_seed_registry
+from .config import (
+    ConfigError,
+    EmbedSettings,
+    GateSettings,
+    LlmSettings,
+    NearDupSettings,
+    Settings,
+    WorkerSettings,
+    registry_provenance,
+    uses_seed_registry,
+)
 from .llm import build_judge
+from .embeddings import build_embedder
+from .gate import DEFAULT_TERMS as GATE_TERMS_PATH
+from .gate import GateTermsError, count_decision, load_terms
+from .neardup import build_index
 from .events import Publisher, RedisPublisher
 from .health import start_health_server
-from .pipeline import analyze, default_signal_catalogues
+from .pipeline import Gate, analyze_document, default_signal_catalogues
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
 from .storage import InvalidDocument, NotFound, StoreMisconfigured, StoreUnavailable
@@ -74,8 +88,18 @@ class Worker:
         sleep: Callable[[float], None] | None = None,
         jitter: Callable[[], float] = lambda: random.uniform(0, 0.5),
         judge: Any = None,
+        gate: Gate | None = None,
+        embedder: Any = None,
+        neardup: Any = None,
+        side_client: Any = None,
     ) -> None:
         self._judge = judge  # an LlmJudge or None (rules-only); the only extra I/O analyze() may do
+        # analytics-embeddings: topic gate, embedder and near-dup index (each optional; none can fail a document).
+        self._gate = gate
+        self._embedder = embedder
+        self._neardup = neardup
+        # Short-timeout client for the gate counter (the stream client's socket timeout is the block time + 5 s).
+        self._side = side_client if side_client is not None else client
         self._redis = client
         self._store = store
         self._publisher = publisher
@@ -228,8 +252,12 @@ class Worker:
             self._unexpected(message_id, document_id, started, exc)
             return
         try:
-            findings = analyze(doc, registry=self._registry, catalogue=self._catalogue, now=self._now(),
-                               judge=self._judge)
+            analysis = analyze_document(doc, registry=self._registry, catalogue=self._catalogue, now=self._now(),
+                                        judge=self._judge, gate=self._gate, embedder=self._embedder,
+                                        neardup=self._neardup)
+            findings = analysis.findings
+            if analysis.gate is not None:
+                count_decision(self._side, analysis.gate)
             saved = self._store.save_findings(doc, findings) if findings else []
         except (StoreUnavailable, StoreMisconfigured):
             raise
@@ -238,7 +266,10 @@ class Worker:
             return
         if saved:
             try:
-                self._publisher.publish_findings(saved)
+                if analysis.neardup is not None:  # one finding.high_risk per near-dup group and module
+                    self._publisher.publish_findings(saved, groups={doc.id: analysis.neardup.group_id})
+                else:
+                    self._publisher.publish_findings(saved)
             except Exception:  # findings are committed; events are at most once (RedisError is handled inside)
                 log.warning("event publish failed; findings stay committed", exc_info=True, extra={
                     "reason": "publish_failed", "finding_ids": [s.finding.id for s in saved if s.outcome == "created"],
@@ -278,6 +309,35 @@ def install_signal_handlers(worker: Worker) -> None:
         signal.signal(sig, lambda *_: worker.handle_signal())
 
 
+@dataclass(frozen=True)
+class Preprocessing:
+    """Settings for the analytics-embeddings extras, validated at start (a bad value is exit 2, not a document)."""
+
+    gate: Gate
+    embed: EmbedSettings
+    neardup: NearDupSettings
+
+
+def preprocessing_from_env(env: Mapping[str, str], *, claim_min_idle_ms: int,
+                           llm_settings: LlmSettings) -> Preprocessing:
+    # The embedding call runs after the LLM's worst case (budget + 3 s connect, ADR 0310): both before XAUTOCLAIM.
+    llm_worst_s = llm_settings.doc_budget_s + 3 if llm_settings.enabled else 0
+    embed = EmbedSettings.from_env(env, claim_min_idle_ms=claim_min_idle_ms, llm_doc_budget_s=llm_worst_s)
+    try:
+        terms = load_terms(GATE_TERMS_PATH)
+    except (GateTermsError, OSError) as exc:
+        raise ConfigError(f"{GATE_TERMS_PATH.name}: {exc}") from None
+    gate = Gate.from_settings(GateSettings.from_env(env), terms)
+    return Preprocessing(gate=gate, embed=embed, neardup=NearDupSettings.from_env(env))
+
+
+def side_client(url: str) -> redis.Redis:
+    """Short-timeout client for the embedding cache, the near-dup index and the gate counter: a slow Redis costs
+    a document one second, never the stream client's block time."""
+    return redis.Redis.from_url(url, decode_responses=True, encoding_errors="replace", socket_timeout=1,
+                                socket_connect_timeout=1)
+
+
 def main(env: Mapping[str, str] | None = None) -> int:
     """Start the worker. Returns the process exit code: 0 after a clean stop, 2 on a configuration error."""
     import os
@@ -293,6 +353,11 @@ def main(env: Mapping[str, str] | None = None) -> int:
         llm_settings = LlmSettings.from_env(env, claim_min_idle_ms=worker_settings.claim_min_idle_ms)
         # Mode only: never the URL (it could carry a host the operator considers private) or the key.
         log.info("llm configured", extra={"llm_mode": llm_settings.mode, "llm_model": llm_settings.model or None})
+        prep = preprocessing_from_env(env, claim_min_idle_ms=worker_settings.claim_min_idle_ms,
+                                      llm_settings=llm_settings)
+        log.info("embeddings configured", extra={"embed_mode": prep.embed.mode,
+                                                 "embed_model": prep.embed.model if prep.embed.enabled else None,
+                                                 "gate_enabled": prep.gate.settings.enabled})
         registry = Registry.from_csv(settings.registry_csv)
         meta = registry_provenance(settings.registry_csv)
         # The snapshot date is logged so it can be shown to users later; its age is never a warning.
@@ -321,8 +386,11 @@ def main(env: Mapping[str, str] | None = None) -> int:
         store.close()
         log.error("worker not started", extra={"reason": "config_error", "error": "REDIS_URL is malformed"})
         return 2
-    worker = Worker(client, store, RedisPublisher(client), registry=registry, catalogue=catalogue,
-                    judge=build_judge(llm_settings, redis=client),
+    aux = side_client(worker_settings.redis_url)
+    worker = Worker(client, store, RedisPublisher(client, alert_ttl_s=prep.neardup.ttl_s), registry=registry,
+                    catalogue=catalogue, judge=build_judge(llm_settings, redis=client),
+                    gate=prep.gate, embedder=build_embedder(prep.embed, redis=aux),
+                    neardup=build_index(prep.neardup, aux), side_client=aux,
                     config=WorkerConfig(consumer=worker_settings.consumer,
                                         block_ms=worker_settings.stream_block_ms,
                                         claim_min_idle_ms=worker_settings.claim_min_idle_ms,
@@ -337,7 +405,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
     except OSError as exc:  # port taken or not allowed
         log.error("worker not started", extra={"reason": "config_error",
                                                "error": f"HEALTH_PORT {worker_settings.health_port}: {exc.strerror}"})
-        for closable in (health_redis, health_store, store, client):
+        for closable in (health_redis, health_store, store, client, aux):
             closable.close()
         return 2
     log.info("worker starting", extra={"consumer": worker_settings.consumer, "stream": STREAM, "group": GROUP,
@@ -354,6 +422,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         health_redis.close()
         store.close()
         client.close()
+        aux.close()
     log.info("worker stopped", extra={"reason": "signal"})
     return 0
 
