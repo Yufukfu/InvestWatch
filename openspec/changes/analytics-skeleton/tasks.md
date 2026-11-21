@@ -20,9 +20,9 @@
 
 ## 4. Rule engine and R1-R3
 
-- [ ] 4.1 Failing tests for the catalogue, evidence and R1/R2/R3 scenarios
-- [ ] 4.2 `rules/engine.py`, `rules/m2_rules.yaml` (19 entries, R1-R3 implemented), `rules/m2.py`; tests green
-- [ ] 4.3 Mutation check; `mutations: N tried, N caught`
+- [x] 4.1 Failing tests for the catalogue, evidence and R1/R2/R3 scenarios
+- [x] 4.2 `rules/engine.py`, `rules/m2_rules.yaml` (19 entries, R1-R3 implemented), `rules/m2.py`; tests green
+- [x] 4.3 Mutation check; `mutations: 24 tried, 24 caught`
 
 ## 5. Router, M2 module and pipeline
 
