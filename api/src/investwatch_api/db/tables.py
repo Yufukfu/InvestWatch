@@ -90,7 +90,7 @@ documents = Table(
     Column("text", Text, nullable=False),
     Column("content_hash", Text),
     Column("html_object_key", Text),
-    # author, links, media, screenshots, blocks, scrape_meta (integration-plan ง3)
+    # author, links, media, screenshots, blocks, scrape_meta (integration-plan ยง3)
     Column("payload", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     # set once the document is announced on Redis Stream iw:documents; not the contract's published_at
     _tz("stream_published_at"),
@@ -134,6 +134,12 @@ findings = Table(
     CheckConstraint("char_length(content_excerpt) <= 500", name="content_excerpt"),
     CheckConstraint("jsonb_typeof(rules) = 'array'", name="rules_array"),
 )
+# Revision 0002: GET /findings filters and default sort, /stats/trend.
+Index("ix_findings_detected_at", findings.c.detected_at.desc())
+Index("ix_findings_module", findings.c.module, findings.c.detected_at.desc())
+Index("ix_findings_status", findings.c.status)
+Index("ix_findings_platform", findings.c.platform)
+Index("ix_findings_score", findings.c.score)
 
 job_errors = Table(
     "job_errors", metadata,
@@ -145,6 +151,7 @@ job_errors = Table(
     _tz("occurred_at", nullable=False, server_default=func.now()),
     CheckConstraint("reason <> ''", name="reason_not_empty"),
 )
+Index("ix_job_errors_source_id_occurred_at", job_errors.c.source_id, job_errors.c.occurred_at.desc())
 
 calibration_points = Table(
     "calibration_points", metadata,

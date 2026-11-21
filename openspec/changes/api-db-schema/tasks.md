@@ -27,8 +27,8 @@ Lands before change `api-v1`: groups 1-3 unblock `scraper-v1` group 5 (Adam) and
 
 ## 4. Query indexes
 
-- [ ] 4.1 Failing tests, then the indexes on `findings` (`detected_at DESC`, `module`, `status`, `platform`, `score`) and `job_errors (source_id, occurred_at)` in revision `0002_query_indexes`: "Default list query uses an index" and "Sweep query uses the index" pass on seeded data
-- [ ] 4.2 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 4.1 Failing tests, then the indexes on `findings` (`detected_at DESC`, `module`, `status`, `platform`, `score`) and `job_errors (source_id, occurred_at)` in revision `0002_query_indexes`: "Default list query uses an index" and "Sweep query uses the index" pass on seeded data
+- [x] 4.2 Mutation check; mutations: 5 tried, 5 caught
 
 ## 5. Closing
 
