@@ -22,6 +22,7 @@ from urllib.parse import urlsplit, urlunsplit
 import asyncpg
 
 from iw_scraper.logs import configure_logging
+from iw_scraper.ratelimit import host_key as _fold_www
 
 log = logging.getLogger("iw_scraper.discover")  # not __name__: the module also runs as __main__
 
@@ -47,6 +48,8 @@ _LABEL = re.compile(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?")
 _TLD = re.compile(r"[a-z]{2,}|xn--[a-z0-9-]+")  # no numeric TLD: `0x7f.0x1` and `127.1` are addresses, not names
 _MAX_HOST = 188  # the API caps `name` at 200 and ours is "[candidate] " + host
 _MAX_URL = 2000
+_MAX_LABEL = 63
+_MAX_SINCE_HOURS = 24 * 3650
 
 
 @dataclass(frozen=True)
@@ -73,9 +76,16 @@ class Selection:
 
 
 def host_key(host: str) -> str:
-    """The form in which hosts are compared: lower case, without a leading `www.`."""
-    host = host.lower().rstrip(".")
-    return host[4:] if host.startswith("www.") else host
+    """The form in which hosts are compared: lower case, no trailing dot, no leading `www.` (as `ratelimit.host_key`)."""
+    return _fold_www(host.lower().removesuffix("."))
+
+
+def _hostname(url: str) -> str | None:
+    """The host of a registered source URL, or None for a row we cannot parse (other writers exist)."""
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None
 
 
 def _is_denied(host: str) -> bool:
@@ -92,7 +102,7 @@ def _is_hostname(host: str) -> bool:
     return (
         len(host) <= _MAX_HOST
         and len(labels) >= 2
-        and all(_LABEL.fullmatch(label) for label in labels)
+        and all(len(label) <= _MAX_LABEL and _LABEL.fullmatch(label) for label in labels)
         and _TLD.fullmatch(labels[-1]) is not None
     )
 
@@ -114,7 +124,7 @@ def clean_url(href: str) -> str | None:
         port = parts.port
     except ValueError:
         return None
-    host = (parts.hostname or "").lower().rstrip(".")  # `localhost.` and `facebook.com.` are the same hosts
+    host = (parts.hostname or "").lower().removesuffix(".")  # `localhost.` and `facebook.com.` are the same hosts
     if not host.isascii() or parts.scheme not in _DEFAULT_PORTS or not host or "@" in parts.netloc:
         return None
     if port not in (None, _DEFAULT_PORTS[parts.scheme]) or not _is_hostname(host) or _is_denied(host):
@@ -197,7 +207,7 @@ async def discover(
     since = (now or datetime.now(UTC)) - timedelta(hours=since_hours)
     source_rows = await pool.fetch("SELECT id, url, target_modules FROM sources")
     modules_of = {row["id"]: tuple(row["target_modules"]) for row in source_rows}
-    known_hosts = [host for row in source_rows if (host := urlsplit(row["url"]).hostname)]  # `host_key` folds the rest
+    known_hosts = [host for row in source_rows if (host := _hostname(row["url"]))]  # `host_key` folds the rest
 
     links = [Link(href=row["href"], modules=modules_of.get(row["source_id"], ())) for row in await pool.fetch(_LINKS, since)]
     selection = select_candidates(links, known_hosts, limit)
@@ -217,8 +227,8 @@ def _non_negative_int(text: str) -> int:
 
 def _positive_float(text: str) -> float:
     value = float(text)
-    if value <= 0:
-        raise argparse.ArgumentTypeError("must be more than 0")
+    if not 0 < value <= _MAX_SINCE_HOURS:  # also false for nan
+        raise argparse.ArgumentTypeError(f"must be more than 0 and at most {_MAX_SINCE_HOURS}")
     return value
 
 
@@ -240,7 +250,7 @@ async def main(argv: list[str], environ: Mapping[str, str]) -> int:
         return 1
     try:
         pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1)
-    except (OSError, asyncpg.PostgresError) as exc:
+    except (OSError, ValueError, asyncpg.InterfaceError, asyncpg.PostgresError) as exc:  # ValueError: malformed DSN
         log.error("cannot connect to the database: %s: %s", type(exc).__name__, exc)  # the formatter redacts secrets
         return 1
     try:

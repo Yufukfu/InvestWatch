@@ -5,6 +5,7 @@ import os
 import uuid
 from datetime import UTC, datetime
 
+import asyncpg
 import pytest
 
 from iw_scraper.discover import main, parse_args
@@ -46,7 +47,8 @@ def test_options_are_parsed():
     assert (args.since, args.limit, args.dry_run) == (12.5, 3, True)
 
 
-@pytest.mark.parametrize("argv", [["--limit", "-1"], ["--since", "0"], ["--since", "-5"], ["--limit", "x"]])
+@pytest.mark.parametrize("argv", [["--limit", "-1"], ["--since", "0"], ["--since", "-5"], ["--limit", "x"], ["--since", "nan"], ["--since", "inf"],
+                  ["--since", "1e9"]])
 def test_out_of_range_options_are_refused(argv):
     with pytest.raises(SystemExit) as refused:
         parse_args(argv)
@@ -108,3 +110,23 @@ async def test_a_failing_query_exits_one_with_a_logged_error_and_inserts_nothing
     lines = log_lines(capsys)
     assert code == 1
     assert [line["level"] for line in lines] == ["ERROR"] and "discovery failed" in lines[0]["message"]
+
+
+async def test_a_connection_error_that_echoes_the_dsn_is_redacted_in_the_log(monkeypatch, capsys):
+    async def refuse(dsn, **kwargs):
+        raise OSError(f"cannot reach {dsn}")
+
+    monkeypatch.setattr(asyncpg, "create_pool", refuse)
+
+    code = await main([], {"DATABASE_URL": "postgresql://user:secretpw@db.example/x"})
+
+    out = capsys.readouterr().out
+    assert code == 1 and "secretpw" not in out and "cannot reach postgresql://***@db.example/x" in out
+
+
+@pytest.mark.parametrize("dsn", ["not a dsn", "postgresql://user:secretpw@[::1/x"])
+async def test_a_malformed_dsn_is_a_logged_error_and_exit_one(dsn, capsys):
+    code = await main([], {"DATABASE_URL": dsn})
+
+    out = capsys.readouterr().out
+    assert code == 1 and "secretpw" not in out and json.loads(out.splitlines()[-1])["level"] == "ERROR"

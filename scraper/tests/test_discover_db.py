@@ -138,6 +138,16 @@ async def test_a_registered_url_is_matched_by_host_however_it_is_written(pool, r
     assert report.inserted == 0
 
 
+async def test_a_source_row_with_an_unparseable_url_does_not_stop_the_run(pool):
+    parent = await add_source(pool, "https://alfa.example/")
+    await add_source(pool, "http://[abc")
+    await add_document(pool, parent, ["https://new.example/"])
+
+    report = await run(pool)
+
+    assert report.inserted == 1
+
+
 async def test_existing_sources_and_documents_are_left_untouched(pool):
     parent = await add_source(pool, "https://alfa.example/")
     await add_document(pool, parent, ["https://new.example/"])

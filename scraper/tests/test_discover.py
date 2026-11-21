@@ -59,6 +59,8 @@ def test_a_host_that_only_ends_like_a_denylisted_one_is_kept():
         "https://localhost./",
         "http://127.0.0.1./a",
         "https://good..example/",
+        "https://good.example../",
+        "https://" + "a" * 64 + ".example/",
         "https://.example.com/",
         "https://-bad-.example.com/",
         "https://0x7f.0x1/",
