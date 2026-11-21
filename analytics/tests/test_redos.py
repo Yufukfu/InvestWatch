@@ -37,12 +37,13 @@ def elapsed(fn, *args) -> float:
     "text",
     [
         "." + " " * 50_000,
+        "a." + " " * 100_000 + "x",  # #35 review 2: the `_BOUNDARY` shape Kacper timed (fixed on #26, 9bd27e8)
         ". " + " " * 40_000 + "abc",
         "S.A. Ab " * 6_000,  # abbreviation chain: every boundary is skipped, `start` never moves
         "ok. 1 " * 8_000,
         "\n" + " " * 50_000 + "x",
     ],
-    ids=["dot-spaces", "dot-spaces-lowercase", "abbrev-chain", "abbrev-before-digit", "newline-spaces"],  # the last was already linear
+    ids=["dot-spaces", "dot-letter-spaces-100k", "dot-spaces-lowercase", "abbrev-chain", "abbrev-before-digit", "newline-spaces"],  # the last was already linear
 )
 def test_split_is_fast_on_hostile_input(text):
     assert elapsed(split_sentences, text) < 1.0
@@ -117,8 +118,21 @@ def test_r3_coverage_unchanged_by_bisect():
 
 SEED = Path(__file__).resolve().parents[1] / "registry" / "seed.csv"
 FILLERS = ["1 ", " ", ".", "9", "@", ",", "1.", "1 zł ", "kod ", "nie udzielamy ", "akcja ", "utm_", "ref", "\t"]
-SIZE = 40_000
-BUDGET_S = 0.5  # a quadratic pattern needs minutes at this size; a linear one well under a tenth of a second
+SIZE = 20_000
+#: Robust on a loaded runner (#35 review 2): a generous absolute limit, plus a growth check: doubling the input
+#: may at most about double the time (a quadratic pattern quadruples it).
+BUDGET_S = 3.0
+
+
+def grows_linearly(run, size: int) -> None:
+    small, big = run(size), run(2 * size)
+    assert big < BUDGET_S and big < 3 * small + 0.05, (small, big)
+
+
+def timed(fn) -> float:
+    start = time.perf_counter()
+    fn()
+    return time.perf_counter() - start
 
 
 def _patterns():
@@ -134,10 +148,49 @@ def _patterns():
 def test_catalogue_pattern_is_linear_on_adversarial_runs(pattern):
     rx = re.compile(pattern, re.IGNORECASE)
     for filler in FILLERS:
-        text = filler * (SIZE // len(filler)) + "x"
-        start = time.perf_counter()
-        list(rx.finditer(text))
-        assert time.perf_counter() - start < BUDGET_S, (pattern, filler)
+        grows_linearly(lambda n: timed(lambda: list(rx.finditer(filler * (n // len(filler)) + "x"))), SIZE)
+
+
+@pytest.mark.parametrize("rule_id, module", [("R2", "M2"), ("S1.3", "M1")])
+def test_negation_before_is_linear(rule_id, module):
+    """R2/S1.3 look back at most 40 characters before each label; a run of negations and labels stays linear."""
+    from investwatch_analytics.rules import engine
+    from investwatch_analytics.preprocessing import preprocess
+    from investwatch_analytics.rules.engine import Context
+
+    cat = Catalogue.load() if module == "M2" else Catalogue.load_module("M1")
+    rule = engine._RULES[rule_id](cat.get(rule_id))
+    registry = Registry.from_csv(SEED)
+
+    def run(n: int) -> float:
+        unit = "nie nie to nie jest reklama " if rule_id == "R2" else "nie nie to nie współpraca reklamowa "
+        doc = ScrapedDocument.model_validate(make_doc(text=unit * (n // len(unit))))
+        ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=None, registry=registry)
+        return timed(lambda: rule.evaluate(ctx))
+
+    grows_linearly(run, SIZE)
+
+
+@pytest.mark.parametrize("href_body", ["ref" * 7_000, "utm_" * 5_000, "&utm_" * 4_000, "&ref=1" * 3_000, "?" * 20_000])
+def test_s12_query_regexes_are_linear(href_body):
+    from investwatch_analytics.rules import engine
+
+    rule = engine._RULES["S1.2"](Catalogue.load_module("M1").get("S1.2"))
+    referral, tracking = rule._query
+
+    def run(n: int) -> float:
+        href = "https://x.example.com/?" + href_body[: n]
+        return timed(lambda: (rule._query_part(href, referral), rule._query_part(href, tracking)))
+
+    grows_linearly(run, SIZE)
+
+
+@pytest.mark.parametrize("unit", ["współpraca ", "#reklama", "partner reklamowy ", "a" * 50])
+def test_word_patterns_are_linear(unit):
+    from investwatch_analytics.rules.m1 import word_patterns
+
+    labels = word_patterns(Catalogue.load_module("M1").get("S1.3").params["labels"])
+    grows_linearly(lambda n: timed(lambda: [list(p.finditer(unit * (n // len(unit)))) for p in labels]), SIZE)
 
 
 @pytest.fixture(scope="module")

@@ -16,10 +16,10 @@ Kacper's second review of PR #35 (20:11Z). Branch `analytics/analytics-m1-m3` (p
 
 ## 3. Robust ReDoS tests
 
-- [ ] 3.1 `tests/test_redos.py`: absolute budget plus a 2x growth check; `"a." + " " * 100_000 + "x"`; `negation_before`, the S1.2 query regexes, `word_patterns`; the fuzzy ratio at exactly 88 matches and below it does not
-- [ ] 3.2 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 `tests/test_redos.py`: absolute budget plus a 2x growth check; `"a." + " " * 100_000 + "x"`; `negation_before`, the S1.2 query regexes, `word_patterns`; the fuzzy ratio at exactly 88 matches and below it does not
+- [x] 3.2 Mutation check; `mutations: 4 tried, 4 caught`: unbounded lookback in R2 and in S1.3, the old unbounded number prefix in S3.5, and an unanchored S1.2 query key (no measurable slowdown at the tested size; caught by `test_m1.py::test_s12_key_must_be_a_whole_query_key`). Two tests first needed inputs that reach the pattern (an S1.3 label in the negation text, an href body without `&`)
 
 ## 4. Closing
 
-- [ ] 4.1 Spec deltas within 500 characters per requirement; `follow-ups.md` (M3 suppression by naming the firm, Cyrillic/Greek confusables, the glued `AlfaInwestycje`); `analytics/README.md`, your own `.docs/status/platform.md` line; the iw-ai-log row; `docs-check` and OpenSpec 2.1.1 strict clean
+- [x] 4.1 Spec deltas within 500 characters per requirement; `follow-ups.md` (M3 suppression by naming the firm, Cyrillic/Greek confusables, the glued `AlfaInwestycje`); `analytics/README.md`, your own `.docs/status/platform.md` line; the iw-ai-log row; `docs-check` and OpenSpec 2.1.1 strict clean
 - [ ] 4.2 Run the iw-pr-review skill (one reviewer pass) and fix real findings
