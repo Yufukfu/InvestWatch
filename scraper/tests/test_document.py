@@ -1,137 +1,106 @@
-"""Building, validating and hashing a document (no services needed)."""
-
-import hashlib
+import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from jsonschema import Draft202012Validator, FormatChecker
 
-from iw_scraper.ingest.document import build_document, content_hash, normalise_text
-from iw_scraper.ingest.validate import check_document
-from iw_scraper.types import Reason
+from iw_scraper.config import contracts_dir
+from iw_scraper.document import build_document
+from iw_scraper.fetch import FetchResult
+from iw_scraper.parsing import ParsedPage
+from iw_scraper.types import Source
 
-FETCHED_AT = datetime(2026, 11, 21, 15, 0, 0, tzinfo=timezone.utc)
-PAGE = {"url": "https://alfa.example.com/konto", "text": "Zysk do 20%", "title": "Konto", "html": "<p>x</p>"}
-
-
-def build(source, page=PAGE, **kw):
-    return build_document(page, source, fetched_at=FETCHED_AT, duration_ms=120, proxy="proxy-1", **kw)
+FETCHED = datetime(2026, 11, 21, 12, 30, 5, tzinfo=timezone.utc)
 
 
-def test_build_sets_contract_minimum_and_source_fields(source):
-    doc = build(source)
-    assert doc["platform"] == "web"
-    assert doc["source_kind"] == "firm_own"
-    assert doc["source_id"] == source.id
-    assert doc["url"] == PAGE["url"]
-    assert doc["text"] == "Zysk do 20%"
-    assert doc["fetched_at"] == "2026-11-21T15:00:00Z"
+def source(kind: str = "firm_own", platform: str = "web") -> Source:
+    return Source(
+        id=str(uuid.uuid4()), name="KNF", platform=platform, url="https://example.pl/start", source_kind=kind,
+        target_modules=("m1",), active=True,
+    )
 
 
-def test_build_generates_uuid_v4_per_document(source):
-    first, second = build(source), build(source)
-    assert uuid.UUID(first["id"]).version == 4
-    assert first["id"] != second["id"]
+def result(proxy_id: str | None = None, status: int = 200) -> FetchResult:
+    return FetchResult(
+        url="https://www.example.pl/final", status=status, content_type="text/html; charset=utf-8",
+        body=b"<html></html>", headers={}, proxy_id=proxy_id,
+    )
 
 
-def test_build_records_scrape_meta_without_credentials(source):
-    meta = build(source)["scrape_meta"]
-    assert meta == {"scraper": "httpx", "duration_ms": 120, "proxy": "proxy-1"}
-
-
-def test_build_does_not_store_raw_html_in_the_document(source):
-    assert "html" not in build(source)
-
-
-def test_build_drops_a_page_supplied_html_object_key(source):
-    # only the pipeline sets it, after a real upload; a page must not point a row at an arbitrary object
-    doc = build(source, {"url": PAGE["url"], "text": "Zysk", "html_object_key": "html/someone-elses.html"})
-    assert "html_object_key" not in doc
-
-
-def test_build_does_not_mutate_the_page(source):
-    page = dict(PAGE)
-    build(source, page)
-    assert page == PAGE
-
-
-def test_valid_document_passes_schema(source):
-    assert check_document(build(source)) is None
-
-
-def test_missing_text_is_schema_invalid(source):
-    page = {k: v for k, v in PAGE.items() if k != "text"}
-    error = check_document(build(source, page))
-    assert error is not None
-    assert error.reason is Reason.SCHEMA_INVALID
-    assert error.source_id == source.id
-
-
-def test_malformed_fetched_at_is_schema_invalid(source):
-    doc = build(source)
-    doc["fetched_at"] = "yesterday"
-    error = check_document(doc)
-    assert error is not None and error.reason is Reason.SCHEMA_INVALID
-
-
-@pytest.mark.parametrize("text", ["", "   \n\t "])
-def test_blank_text_is_an_empty_text_error_not_a_document(source, text):
-    error = check_document(build(source, {**PAGE, "text": text}))
-    assert error is not None
-    assert error.reason is Reason.EMPTY_TEXT
-    assert error.source_id == source.id
-
-
-def test_page_supplied_content_hash_never_survives_without_text(source):
-    page = {"url": PAGE["url"], "content_hash": "a" * 64}
-    assert "content_hash" not in build(source, page)
-
-
-def test_document_without_source_id_is_rejected(source):
-    doc = build(source)
-    doc["source_id"] = None
-    error = check_document(doc)
-    assert error is not None and error.reason is Reason.SCHEMA_INVALID
-
-
-def test_whitespace_only_difference_has_the_same_hash():
-    expected = hashlib.sha256("Zysk do 20%".encode()).hexdigest()
-    assert content_hash("Zysk  do 20%\n") == expected
-    assert content_hash("Zysk do 20%") == expected
-
-
-def test_case_difference_changes_the_hash():
-    assert content_hash("Zysk do 20%") != content_hash("ZYSK DO 20%")
-
-
-def test_nfc_equivalent_text_has_the_same_hash():
-    assert content_hash("é") == content_hash("é")
-
-
-@pytest.mark.parametrize("raw,expected", [("  a \t\n b  ", "a b"), ("", ""), (" x ", "x")])
-def test_normalise_text(raw, expected):
-    assert normalise_text(raw) == expected
-
-
-def test_a_scrape_meta_key_the_page_supplied_survives_and_the_fetch_facts_are_added(source):
-    meta = build(source, PAGE | {"scrape_meta": {"client": "chrome_146", "duration_ms": 1}})["scrape_meta"]
-    assert meta == {"client": "chrome_146", "scraper": "httpx", "duration_ms": 120, "proxy": "proxy-1"}
-
-
-def test_a_scraper_value_the_page_supplied_is_kept(source):
-    assert build(source, PAGE | {"scrape_meta": {"scraper": "playwright"}})["scrape_meta"]["scraper"] == "playwright"
-
-
-@pytest.mark.parametrize(
-    "field,value",
-    [
-        ("url", "javascript:alert(1)"),
-        ("canonical_url", "javascript:alert(1)"),
-        ("canonical_url", "data:text/html,x"),
-        ("author", {"name": "a", "profile_url": "javascript:alert(1)"}),
-    ],
+PAGE = ParsedPage(
+    title="Akcje: ryzyko",
+    canonical_url="https://www.example.pl/canonical",
+    text="Treść strony z ostrzeżeniem.",
+    links=("https://www.example.pl/kontakt", "https://other.example/x"),
 )
-def test_a_non_web_url_scheme_is_schema_invalid(source, field, value):
-    error = check_document(build(source, PAGE | {field: value}))
-    assert error is not None and error.reason is Reason.SCHEMA_INVALID
-    assert "http or https" in error.detail
+
+
+def schema_errors(document: dict) -> list[str]:
+    schema = json.loads((contracts_dir() / "schemas" / "scraped-document.schema.json").read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    full = {"id": str(uuid.uuid4()), **document}  # `id` and `content_hash` are added when the document is stored
+    return [e.message for e in validator.iter_errors(full)]
+
+
+def test_the_document_carries_the_fetch_and_parse_fields():
+    document = build_document(source(), result(), PAGE, FETCHED)
+
+    assert document["url"] == "https://www.example.pl/final"
+    assert document["canonical_url"] == "https://www.example.pl/canonical"
+    assert document["http_status"] == 200
+    assert document["title"] == "Akcje: ryzyko"
+    assert document["text"] == "Treść strony z ostrzeżeniem."
+    assert document["links"] == [{"href": "https://www.example.pl/kontakt"}, {"href": "https://other.example/x"}]
+
+
+def test_platform_source_kind_and_source_id_come_from_the_source_row_not_the_page():
+    page = ParsedPage(title="third_party", canonical_url="https://x.example/", text="source_kind: third_party", links=())
+    row = source("firm_own")
+
+    document = build_document(row, result(), page, FETCHED)
+
+    assert document["source_kind"] == "firm_own"
+    assert document["platform"] == "web"
+    assert document["source_id"] == row.id
+
+
+def test_status_and_platform_are_copied_not_assumed():
+    document = build_document(source(platform="forum"), result(status=203), PAGE, FETCHED)
+
+    assert document["http_status"] == 203
+    assert document["platform"] == "forum"
+
+
+def test_fetched_at_is_utc_whatever_zone_the_clock_gave():
+    plus_two = timezone(timedelta(hours=2))
+
+    document = build_document(source(), result(), PAGE, FETCHED.astimezone(plus_two))
+
+    assert document["fetched_at"] == "2026-11-21T12:30:05+00:00"
+
+
+def test_a_naive_fetch_time_is_refused():
+    with pytest.raises(ValueError, match="timezone"):
+        build_document(source(), result(), PAGE, datetime(2026, 11, 21, 12, 30, 5))
+
+
+def test_scrape_meta_names_the_client_and_holds_a_proxy_identifier_never_a_url():
+    document = build_document(source(), result("proxy-1a2b3c4d"), PAGE, FETCHED)
+
+    assert document["scrape_meta"] == {"scraper": "httpx", "client": "noble-tls", "proxy": "proxy-1a2b3c4d"}
+
+
+def test_a_direct_request_has_a_null_proxy():
+    assert build_document(source(), result(None), PAGE, FETCHED)["scrape_meta"]["proxy"] is None
+
+
+def test_the_document_conforms_to_the_contract_schema():
+    assert schema_errors(build_document(source(), result("proxy-1a2b3c4d"), PAGE, FETCHED)) == []
+    assert schema_errors(build_document(source("unknown"), result(), ParsedPage(None, "https://x.example/", "t", ()), FETCHED)) == []
+
+
+def test_a_page_without_title_stays_null_not_empty():
+    page = ParsedPage(title=None, canonical_url="https://x.example/", text="t", links=())
+
+    assert build_document(source(), result(), page, FETCHED)["title"] is None

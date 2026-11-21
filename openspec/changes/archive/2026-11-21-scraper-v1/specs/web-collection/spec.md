@@ -252,6 +252,21 @@ For every request the scraper SHALL resolve the host itself, refuse a loopback, 
 - **WHEN** a host resolves to a public address at the check and the connection would resolve it to `127.0.0.1`
 - **THEN** the connection uses the checked address, never a second resolution
 
+### Requirement: Fetch only allowed ports
+The scraper SHALL request only ports listed in `ALLOWED_PORTS` (default `80,443`), for the source URL, every redirect hop and every URL taken from scraped content. A URL with no explicit port uses its scheme's default (80 for `http`, 443 for `https`). The check applies behind a proxy too, since the port is part of the URL. A refusal records `blocked_target` and makes no request.
+
+#### Scenario: Non-web port
+- **WHEN** a source URL, a redirect `Location` or a scraped link names `https://example.pl:6379/`
+- **THEN** no request is made and a job error with reason `blocked_target` is recorded
+
+#### Scenario: Default and explicit web ports
+- **WHEN** a URL is `http://example.pl/`, `https://example.pl/` or `https://example.pl:443/`
+- **THEN** the port check passes
+
+#### Scenario: Configured extra port
+- **WHEN** `ALLOWED_PORTS` is `80,443,8443` and a URL names `https://example.pl:8443/`
+- **THEN** the port check passes
+
 ### Requirement: Treat scraped content as untrusted
 The scraper SHALL store scraped text verbatim and SHALL NOT template it.
 

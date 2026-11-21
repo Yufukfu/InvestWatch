@@ -5,17 +5,19 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 ## State
 
 - SDLC merged.
-- `scraper-ingest` implemented against Damian's `0001_initial` (document build, validation, dedup insert, MinIO, `iw:documents` after commit, republish sweep, `job_errors` sink), in review.
-- `scraper-v1` and `scraper-orchestration` in progress.
-- ADRs 0101, 0102 and 0104 accepted with this change, 0103 criteria only.
+- `scraper-v1` (fetch, parse, politeness, guards) is merged (PR #19).
+- `scraper-ingest` (database sink, `documents`, `iw:documents`, republish sweep) is implemented against Damian's `0001_initial`, in review (PR #22) and archived in that PR.
+- `scraper-orchestration` (queue, schedule, scan requests, the run that joins the pieces) not started.
+- ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
 ## Active OpenSpec changes
 
-- `scraper-ingest` (in review), `scraper-v1`, `scraper-orchestration`
+- none (`scraper-v1` archived; `scraper-ingest` archived in PR #22)
 
 ## Blockers and open decisions
 
-- Scraper fetch client and job queue are decided in ADRs 0101 and 0102 (agent-written, effective when the `scraper-ingest` PR merges). The first social platform is open: ADR 0103 has criteria only, no research yet.
-- Open with Damian before `scraper-v1` can be applied: the `scrape_meta.scraper` value for a TLS-impersonating client (v1 enum is `playwright|httpx|api|manual`). The Alembic migration is settled: Damian's `0001_initial` in `api/migrations/` has the `documents` unique index, `job_errors` and `stream_published_at`; `redis`, `minio` and `minio-init` come with Damian's `infra-compose`.
+- The first social platform (ADR 0103, criteria only) is decided in `scraper-v2`.
+- Wiring is unassigned: nothing calls `Ingestor`, `sweep` or `Storage.check_bucket` yet, and the v1 `JobErrorSink` is synchronous while `record_error` is async; to be settled in `scraper-orchestration` (follow-up 1 of `scraper-ingest`).
+- `scrape_meta.scraper` is settled without a contract change: `httpx` plus `scrape_meta.client` (ADR 0101).
 - Playwright is required for sources that must provide `blocks`/`screenshots` (rules R4-R8, R13).
 - Social media: one platform first; which one is open (ADR 0103).
