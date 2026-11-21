@@ -1,4 +1,6 @@
-# api/ deployment unit (owner C). Included from the root compose.yaml next to infra/compose.yaml.
+# api/ deployment unit (owner C). Included from the root compose.yaml next to infra/compose.yaml, which owns
+# the `postgres` service and the `data` network this file uses (so neither is declared here).
+# Without the root file, run it together with infra: docker compose -f infra/compose.yaml -f api/compose.yaml up
 # api-migrate applies the shared schema once and exits; scraper, analytics and api start only after it:
 #   depends_on:
 #     api-migrate: { condition: service_completed_successfully }
@@ -25,7 +27,3 @@ services:
       resources:
         limits: { cpus: "0.5", memory: 256M }
 
-networks:
-  data:
-    name: iw-data
-    internal: true

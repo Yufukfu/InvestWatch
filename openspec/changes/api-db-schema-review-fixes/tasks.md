@@ -25,9 +25,9 @@
 
 ## 5. Compose
 
-- [ ] 5.1 Root `compose.yaml` includes `api/compose.yaml`; `api/compose.yaml` does not redeclare the data network and depends on `infra/compose.yaml`'s `postgres`
-- [ ] 5.2 Hand-run `docker compose up` on an empty volume with a throwaway project name: `api-migrate` exits 0 (output kept for the PR body)
-- [ ] 5.3 Mutation check
+- [x] 5.1 Root `compose.yaml` includes `api/compose.yaml`; `api/compose.yaml` does not redeclare the data network and depends on `infra/compose.yaml`'s `postgres`
+- [x] 5.2 Hand-run `docker compose up` on an empty volume with a throwaway project name: `api-migrate` exits 0 (output kept for the PR body)
+- [x] 5.3 Mutation check — mutations: n/a, config-only group (compose values, no logic); verified by `docker compose config` against `infra/compose.yaml` on `main` and on `chore/infra-compose`, and by the hand-run `up`
 
 ## 6. Closing
 

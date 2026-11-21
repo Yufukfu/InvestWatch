@@ -3,7 +3,7 @@
 REST API and real-time (Socket.IO) gateway between the shared database and the dashboard, and the home of the database migrations for the whole stack.
 
 - **Owner:** Damian (module C)
-- **Status:** the shared schema (change `api-db-schema`) is implemented: Alembic revisions `0001` (tables) and `0002` (query indexes), and the one-shot `api-migrate` container in `api/compose.yaml`. The root `compose.yaml` does not include it yet (added together with the `infra-compose` change). REST and Socket.IO come with change `api-v1`.
+- **Status:** the shared schema (change `api-db-schema`) is implemented: Alembic revisions `0001` (tables), `0002` (query indexes) and `0003` (non-empty `documents.text`), and the one-shot `api-migrate` container in `api/compose.yaml`, which the root `compose.yaml` includes. REST and Socket.IO come with change `api-v1`.
 
 ## What it does
 
@@ -21,7 +21,7 @@ Columns follow `contracts/schemas/` v1; every enumerated field has a CHECK const
 | Table | Written by | Columns | Keys and indexes |
 |---|---|---|---|
 | `sources` | API (dashboard edits); the scraper writes only `last_run_at` and `last_run_status` | `id, name, platform, url, source_kind, target_modules text[], schedule_cron, active, last_run_at, last_run_status, created_at, updated_at` | pk `id` |
-| `documents` | scraper | `id, source_id → sources, platform, source_kind, url, canonical_url, fetched_at, published_at, http_status, lang, title, text, content_hash, html_object_key, payload jsonb, stream_published_at, created_at` | unique `uq_documents_source_hash (source_id, content_hash) NULLS NOT DISTINCT WHERE content_hash IS NOT NULL`; partial `ix_documents_unpublished (created_at) WHERE stream_published_at IS NULL` |
+| `documents` | scraper | `id, source_id → sources, platform, source_kind, url, canonical_url, fetched_at, published_at, http_status, lang, title, text (non-empty), content_hash, html_object_key, payload jsonb, stream_published_at, created_at` | unique `uq_documents_source_hash (source_id, content_hash) NULLS NOT DISTINCT WHERE content_hash IS NOT NULL`; partial `ix_documents_unpublished (created_at) WHERE stream_published_at IS NULL` |
 | `findings` | analytics (upsert), API (`status`, `note`) | `id, document_id → documents (cascade), module, score, status, title, summary, firm jsonb, advertiser jsonb, rules jsonb, content_excerpt, url, platform, note, detected_at, updated_at, model jsonb` | unique `uq_findings_document_module (document_id, module)`; indexes on `detected_at DESC`, `(module, detected_at DESC)`, `status`, `platform`, `score` |
 | `job_errors` | scraper | `id, source_id (no foreign key: errors about unknown sources are kept), url, reason (non-empty), detail, occurred_at` | `(source_id, occurred_at DESC)` |
 | `calibration_points` | analytics eval | `id (identity), run_id, module, threshold, tp, fp, fn, tn, precision, recall, f1, labeled_samples, computed_at` | unique `(run_id, module, threshold)`; `(module, computed_at DESC)` |
@@ -30,6 +30,7 @@ Columns follow `contracts/schemas/` v1; every enumerated field has a CHECK const
 - Documents without a source (`source_id` null) deduplicate among themselves by `content_hash`; rows without a `content_hash` never collide.
 - `documents.stream_published_at` is the "announced on `iw:documents`" marker. It is not the contract's `published_at` (the content's publication date).
 - `documents_count` in the `Source` contract is not stored: the API counts the source's `documents` rows on read.
+- A null `firm`, `advertiser` or `model` is SQL `NULL` (`firm IS NULL` works). From SQLAlchemy pass `None`; in hand-written SQL write `NULL`, never `'null'::jsonb`.
 - `findings` has no `risk_level` column: the API derives it on read ([ADR 0305](../.docs/decisions/0305-threshold-storage.md)).
 
 ## SQL the other services use
@@ -74,7 +75,7 @@ The same statements in Python (SQLAlchemy) are in `src/investwatch_api/db/sql.py
 
 ## Running it
 
-Migrations, in the stack: once the root `compose.yaml` includes `api/compose.yaml` (pending, with `infra-compose`), `api-migrate` runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. The admin URL is built from `POSTGRES_ADMIN_*` without percent-encoding, so a hand-set password must not contain `@ : / # %` (`scripts/init-env.sh` generates hex). A service that writes the database waits for it:
+Migrations, in the stack: the root `compose.yaml` includes `api/compose.yaml`, whose `api-migrate` uses the `postgres` service and `data` network of `infra/compose.yaml` and runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. The admin URL is built from `POSTGRES_ADMIN_*` without percent-encoding, so a hand-set password must not contain `@ : / # %` (`scripts/init-env.sh` generates hex). A service that writes the database waits for it:
 
 ```yaml
 depends_on:
@@ -88,7 +89,7 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt   # Wi
 DATABASE_ADMIN_URL=postgresql://iw_admin:<password>@localhost:5432/investwatch .venv/Scripts/alembic upgrade head
 ```
 
-New revision: add `migrations/versions/NNNN_<slug>.py` by hand (copy the style of `0001_initial.py`), update `src/investwatch_api/db/tables.py` to match, and run the tests: `test_models_match_the_migrations` fails if the two differ. Never edit an applied revision.
+New revision: add `migrations/versions/NNNN_<slug>.py` by hand (copy the style of `0001_initial.py`), update `src/investwatch_api/db/tables.py` to match, and run the tests: `test_models_match_the_migrations` fails if tables, columns, types, indexes or unique constraints differ. It does not diff CHECK constraints: `test_enum_checks_match_the_contracts` and the rejection tests in `tests/test_constraints.py` cover those. Never edit an applied revision.
 
 ## Tests
 
