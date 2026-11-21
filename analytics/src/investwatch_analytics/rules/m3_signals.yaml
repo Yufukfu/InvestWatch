@@ -29,6 +29,11 @@ rules:
         - '(?<!\w)zarządzani\w*\s+portfel\w*'
         - '(?<!\w)indywidualn\w*\s+strategi\w*'
         - '(?<!\w)investment\s+advi[cs]\w*'
+        # The challenge's own terms (p.1: "wealth management, investment consulting, family offices").
+        - '(?<!\w)investment\s+consult\w*'
+        - '(?<!\w)wealth\s+advis\w*'
+        - '(?<!\w)doradztw\w*\s+finansow\w*'
+        - '(?<!\w)zarządzani\w*\s+majątk\w*'
 
   - id: S3.3
     name: Personalizacja
@@ -112,6 +117,11 @@ rules:
         # Bounded number part, as in S3.6 (ReDoS, whole-branch review).
         - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:zł|PLN)\s?/\s?mies\w*'
         - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:zł|PLN)\s+miesięcznie(?!\w)'
+        # English pricing (#35 review): "2000 PLN per month", "49 EUR/month", "$99 monthly", a subscription.
+        - '(?<![\d.,])\d(?:[\d.,]|\s(?=\d)){0,24}\s?(?:zł|PLN|EUR|USD|€|\$)\s?(?:/\s?(?:month|mo)(?!\w)|per\s+month(?!\w)|a\s+month(?!\w)|monthly(?!\w))'
+        - '(?<![\w$€])[$€]\s?\d[\d.,]{0,12}\s?(?:/\s?(?:month|mo)(?!\w)|per\s+month(?!\w)|a\s+month(?!\w)|monthly(?!\w))'
+        - '(?<!\w)subscriptions?(?!\w)'
+        - '(?<!\w)monthly\s+(?:fee|plan|membership)s?(?!\w)'
 
   - id: S3.6
     name: Kierowanie do Polski

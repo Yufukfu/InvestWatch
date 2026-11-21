@@ -22,8 +22,9 @@ from .registry import Registry
 from .rules.engine import Catalogue, Context, run_rules
 
 log = logging.getLogger(__name__)
-#: Foreign firms are in M1 scope only through ads aimed at Polish readers (design decision 5).
-FOREIGN_TYPES = {"foreign_branch", "foreign_no_branch"}
+#: Foreign firms without a Polish branch are in M1 scope only through ads aimed at Polish readers (a branch
+#: is registered in Poland; #35 review).
+FOREIGN_TYPES = {"foreign_no_branch"}
 
 
 @dataclass(frozen=True)

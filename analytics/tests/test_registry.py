@@ -18,8 +18,11 @@ def registry() -> Registry:
     return Registry.from_csv(SEED)
 
 
-def test_seed_loads_three_fictional_firms(registry):
-    assert {f.id for f in registry.firms} == {ALFA_ID, BANK_ID, EURO_ID}
+ATLANTIC_ID = "5b0c3e9a-7d2f-4a61-9c83-2f6e1a4d8b17"  # foreign_no_branch, for the M1 Polish-targeting filter
+
+
+def test_seed_loads_the_fictional_firms(registry):
+    assert {f.id for f in registry.firms} == {ALFA_ID, BANK_ID, EURO_ID, ATLANTIC_ID}
 
 
 def test_default_registry_path_is_seed(monkeypatch):

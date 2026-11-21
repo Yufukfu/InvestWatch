@@ -16,9 +16,9 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 
 ## 3. M3 vocabulary and the Polish-marker filter (items 5, 6)
 
-- [ ] 3.1 Failing tests: the four new S3.2 terms; English monthly prices for S3.5; Kacper's English example gives an M3 finding; a `foreign_no_branch` firm's English ad gives no finding, a `foreign_branch` one gives M1; `test_redos.py` covers every new pattern
-- [ ] 3.2 `rules/m3_signals.yaml`, `pipeline.py` (`FOREIGN_TYPES`), `registry/seed.csv` (one fictional `foreign_no_branch` firm); tests green
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 Failing tests: the four new S3.2 terms; English monthly prices for S3.5; Kacper's English example gives an M3 finding; a `foreign_no_branch` firm's English ad gives no finding, a `foreign_branch` one gives M1; `test_redos.py` covers every new pattern
+- [x] 3.2 `rules/m3_signals.yaml`, `pipeline.py` (`FOREIGN_TYPES`), `registry/seed.csv` (one fictional `foreign_no_branch` firm); tests green
+- [x] 3.3 Mutation check; `mutations: 11 tried, 11 caught`
 
 ## 4. Titles, notes and the excerpt (items 7, 8, 10)
 

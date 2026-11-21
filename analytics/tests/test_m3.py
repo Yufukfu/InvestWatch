@@ -414,3 +414,21 @@ def test_legal_bases_are_sourced(cat):
     assert cat.get("S3.1").legal_basis is None
     assert cat.get("S3.3").legal_basis == cat.get("S3.4").legal_basis == "art. 76 u.o.i.f. (załącznik do tematu 3)"
     assert cat.get("S3.8").legal_basis == "art. 2 u.o.i.f. (załącznik do tematu 3)"
+
+
+@pytest.mark.parametrize("term", ["investment consulting", "wealth advisory", "doradztwo finansowe",
+                                  "zarządzanie majątkiem", "Investment Consultants"])
+def test_s32_challenge_vocabulary(registry, cat, term):
+    r = signals(page(f"Oferujemy: {term} dla klientów."), registry, cat)["S3.2"]
+    assert r.result == "fail" and r.evidence.lower().startswith(term.lower().split()[0])
+
+
+@pytest.mark.parametrize("text", ["Fee: 2000 PLN per month.", "Only 49 EUR/month.", "Just $99 monthly.",
+                                  "Join with a subscription.", "Low monthly fee for members.", "Cena 1 200 zł a month."])
+def test_s35_english_pricing(registry, cat, text):
+    assert signals(page(text), registry, cat)["S3.5"].result == "fail"
+
+
+def test_s35_no_price(registry, cat):
+    assert signals(page("Free monthly newsletter about markets, 2000 readers."), registry, cat)["S3.5"].result == "pass"
+

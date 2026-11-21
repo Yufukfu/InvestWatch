@@ -125,7 +125,7 @@ def test_third_party_post_about_registered_firm(mock_documents, registry, catalo
 
 def test_foreign_firm_ad_not_aimed_at_poland(registry, catalogue, caplog):
     raw = make_doc(source_kind="third_party", platform="web", url="https://blog.example.com/x",
-                   text="EuroTrade Markets is a great broker for international traders.")
+                   text="Atlantic Brokers is a great broker for international traders.")
     with caplog.at_level(logging.INFO):
         assert run(raw, registry, catalogue) == []
     assert "not_targeting_poland" in reasons(caplog)
@@ -343,8 +343,28 @@ def test_firm_account_naming_itself_after_another_firm(registry, catalogue):
 
 def test_foreign_ad_not_aimed_at_poland_gives_no_m3_either(registry, catalogue, caplog):
     raw = make_doc(source_kind="third_party", platform="web", url="https://blog.example.com/x", author={"handle": "@fx_joe"},
-                   text="EuroTrade Markets is my broker and I trade with it every single day of the week. "
+                   text="Atlantic Brokers is my broker and I trade with it every single day of the week. "
                         "Join my private group where I post the trades: co kupić z akcji.")
     with caplog.at_level(logging.INFO):
         assert run(raw, registry, catalogue) == []
     assert "not_targeting_poland" in reasons(caplog)
+
+
+# ---- review of #35, items 5 and 6 -------------------------------------------------------------------
+
+
+def test_foreign_branch_advertised_in_english(registry, catalogue):
+    raw = make_doc(source_kind="third_party", platform="web", url="https://blog.example.com/x",
+                   text="EuroTrade Markets is a great broker for international traders.")
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M1" and f.firm.registry_type == "foreign_branch"
+    assert {r.rule_id: r.result for r in f.rules}["S1.7"] == "pass"
+
+
+def test_kacpers_english_advisory_offer(registry, catalogue):
+    raw = make_doc(source_kind="unknown", platform="web", url="https://advisors.example.com/",
+                   text="We offer investment consulting and wealth advisory for Polish clients. Fee: 2000 PLN per month.")
+    [f] = run(raw, registry, catalogue)
+    rules = {r.rule_id: r.result for r in f.rules}
+    assert f.module == "M3" and rules["S3.2"] == "fail" and rules["S3.5"] == "fail"
+
