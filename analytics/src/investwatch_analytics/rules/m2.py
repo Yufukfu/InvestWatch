@@ -37,12 +37,36 @@ class R2AdLabel(Rule):
             for label in self.spec.params.get("labels", [])
         ]
 
+    @cached_property
+    def _negation(self) -> re.Pattern | None:
+        pattern = self.spec.params.get("negation_before")
+        return re.compile(pattern, re.IGNORECASE) if pattern else None
+
+    def _negated(self, text: str, start: int) -> bool:
+        return bool(self._negation and self._negation.search(text[max(0, start - 40):start]))
+
     def evaluate(self, ctx: Context) -> RuleResult:
-        hits = [m for p in self._labels if (m := p.search(ctx.doc.text))]
+        text = ctx.doc.text
+        hits = sorted(
+            (m for p in self._labels for m in p.finditer(text) if not self._negated(text, m.start())),
+            key=lambda m: m.start(),
+        )
         if not hits:
             return self.result("fail", None, "Brak oznaczenia materiału jako reklamy.")
-        first = min(hits, key=lambda m: m.start())
-        return self.result("pass", first.group(0), "Materiał jest oznaczony jako reklama.")
+        k = int(self.spec.params.get("prominent_sentences", 2))
+        sentences = ctx.pre.sentences
+        edges = [s for i, s in enumerate(sentences) if i < k or i >= len(sentences) - k]
+
+        def prominent(m: re.Match) -> bool:
+            return m.group(0).startswith("#") or any(s.start <= m.start() < s.end for s in edges)
+
+        shown = next((m for m in hits if prominent(m)), None)
+        if shown is not None:
+            return self.result("pass", shown.group(0), "Materiał jest oznaczony jako reklama.")
+        return self.result(
+            "uncertain", hits[0].group(0),
+            "Oznaczenie reklamy występuje tylko w środku tekstu, bez wyeksponowania – do weryfikacji.",
+        )
 
 
 @register

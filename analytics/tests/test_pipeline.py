@@ -152,3 +152,23 @@ def test_mock_documents_match_spec(mock_documents, registry, catalogue, finding_
     for raw in mock_documents:
         for f in run(raw, registry, catalogue):
             assert [e.message for e in finding_validator.iter_errors(f.to_contract())] == []
+
+
+def test_summary_lists_only_applicable_rules(registry, catalogue):
+    [f] = run(make_doc(text="Reklama. Alfa Inwestycje. Otwórz konto."), registry, catalogue)
+    assert {r.rule_id: r.result for r in f.rules}["R3"] == "not_applicable"
+    assert "Sprawdzono reguły R1, R2 " in f.summary
+    assert "Nie dotyczy: R3 Informacja o ryzyku." in f.summary
+
+
+def test_summary_without_not_applicable_rules(registry, catalogue):
+    [f] = run(make_doc(text=ALFA_TEXT), registry, catalogue)
+    assert "Sprawdzono reguły R1, R2, R3 " in f.summary and "Nie dotyczy" not in f.summary
+
+
+def test_summary_when_no_rule_applies():
+    from investwatch_analytics.modules.m2 import _texts
+
+    _, summary = _texts([rr("not_applicable", "high")], None)
+    assert "Sprawdzono" not in summary and "Żadna z reguł nie miała zastosowania" in summary
+    assert "Nie dotyczy: R1 x." in summary

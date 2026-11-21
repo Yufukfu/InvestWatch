@@ -67,14 +67,20 @@ def _texts(rules: list[RuleResult], firm: FirmRef | None) -> tuple[str, str]:
     who = firm.name if firm else "Nieznana firma"
     failed = [r for r in rules if r.result == "fail"]
     unsure = [r for r in rules if r.result == "uncertain"]
-    checked = ", ".join(r.rule_id for r in rules)
+    checked = ", ".join(r.rule_id for r in rules if r.result != "not_applicable")
+    skipped = [r for r in rules if r.result == "not_applicable"]
     if failed:
         title = f"{who}: naruszenia – " + ", ".join(r.name for r in failed)
     elif unsure:
         title = f"{who}: do weryfikacji – " + ", ".join(r.name for r in unsure)
     else:
         title = f"{who}: brak naruszeń w sprawdzonych regułach"
-    parts = [f"Sprawdzono reguły {checked} w trybie regułowym (bez modelu językowego)."]
+    if checked:
+        parts = [f"Sprawdzono reguły {checked} w trybie regułowym (bez modelu językowego)."]
+    else:
+        parts = ["Żadna z reguł nie miała zastosowania (tryb regułowy, bez modelu językowego)."]
+    if skipped:
+        parts.append("Nie dotyczy: " + "; ".join(f"{r.rule_id} {r.name}" for r in skipped) + ".")
     if failed:
         parts.append("Niespełnione: " + "; ".join(f"{r.rule_id} {r.name}" for r in failed) + ".")
     if unsure:

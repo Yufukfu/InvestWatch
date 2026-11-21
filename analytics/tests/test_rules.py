@@ -303,3 +303,63 @@ def test_r3_double_negative_disclaimer_is_a_warning(warning, registry, catalogue
 def test_r3_english_warning_counts(registry, catalogue):
     text = "Nasi klienci zarobili średnio 34% w 2025 roku. Risk warning: you may lose money."
     assert results(text, registry, catalogue)["R3"].result == "pass"
+
+
+@pytest.mark.parametrize(
+    "warning",
+    [
+        "Nie jest wykluczona utrata kapitału.",
+        "Nie można wykluczyć straty części środków.",
+        "Nie da się wykluczyć utraty kapitału.",
+        "Nie wykluczamy strat.",
+        "Nie gwarantujemy braku strat.",
+    ],
+)
+def test_r3_negated_exclusion_of_loss_is_a_warning(warning, registry, catalogue):
+    r = results(f"Zarabiaj 8% rocznie. {warning}", registry, catalogue)["R3"]
+    assert r.result == "pass" and r.evidence == warning
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "To nie jest reklama, to edukacja. Zarabiaj z nami.",
+        "Nie reklama, tylko rzetelna informacja.",
+        "This is not an advertisement.",
+        "To nie jest żadna reklama.",
+    ],
+)
+def test_r2_negated_label_does_not_count(text, registry, catalogue):
+    r = results(text, registry, catalogue)["R2"]
+    assert r.result == "fail" and r.evidence is None
+
+
+def test_r2_negated_and_real_label(registry, catalogue):
+    r = results("To nie jest reklama, to edukacja. Treść. Reklama.", registry, catalogue)["R2"]
+    assert r.result == "pass" and r.evidence == "Reklama"
+
+
+MIDDLE = "Jeden. Dwa. Materiał reklamowy. Cztery. Pięć. Sześć."
+
+
+def test_r2_label_buried_mid_text_is_uncertain(registry, catalogue):
+    r = results(MIDDLE, registry, catalogue)["R2"]
+    assert r.result == "uncertain" and r.evidence == "Materiał reklamowy"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Jeden. Materiał reklamowy. Trzy. Cztery. Pięć. Sześć.",  # second sentence
+        "Jeden. Dwa. Trzy. Cztery. Materiał reklamowy. Sześć.",  # second to last
+        "Jeden. Dwa. Trzy #reklama. Cztery. Pięć. Sześć.",  # hashtag anywhere
+    ],
+)
+def test_r2_prominent_label_passes(text, registry, catalogue):
+    assert results(text, registry, catalogue)["R2"].result == "pass"
+
+
+def test_r2_prominent_label_beats_earlier_buried_one(registry, catalogue):
+    text = "Jeden. Dwa. Reklama w środku. Cztery. Pięć. Materiał marketingowy."
+    r = results(text, registry, catalogue)["R2"]
+    assert r.result == "pass" and r.evidence == "Materiał marketingowy"

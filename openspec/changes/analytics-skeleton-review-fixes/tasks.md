@@ -12,9 +12,9 @@
 
 ## 3. Rules and summary
 
-- [ ] 3.1 Test: negated R2 label fails, mid-text label is `uncertain`; R3 accepts `nie jest wykluczona utrata`; summary skips `not_applicable` rules
-- [ ] 3.2 R2 negation and prominence, R3 override patterns, summary wording
-- [ ] 3.3 Mutation check
+- [x] 3.1 Test: negated R2 label fails, mid-text label is `uncertain`; R3 accepts `nie jest wykluczona utrata`; summary skips `not_applicable` rules
+- [x] 3.2 R2 negation and prominence, R3 override patterns, summary wording
+- [x] 3.3 Mutation check — mutations: 14 tried, 14 caught
 
 ## 4. Sentences and logging docs
 
