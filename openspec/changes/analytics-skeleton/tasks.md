@@ -26,9 +26,9 @@
 
 ## 5. Router, M2 module and pipeline
 
-- [ ] 5.1 Failing tests for routing and M2 finding assembly (alfa landing, bank OK, unmatched firm, third-party skip, score formula)
-- [ ] 5.2 `modules/router.py`, `modules/m2.py`, `pipeline.py`; tests green
-- [ ] 5.3 Mutation check; `mutations: N tried, N caught`
+- [x] 5.1 Failing tests for routing and M2 finding assembly (alfa landing, bank OK, unmatched firm, third-party skip, score formula)
+- [x] 5.2 `modules/router.py`, `modules/m2.py`, `pipeline.py`; tests green
+- [x] 5.3 Mutation check; `mutations: 14 tried, 14 caught`
 
 ## 6. CLI
 
