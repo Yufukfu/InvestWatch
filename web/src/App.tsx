@@ -1,22 +1,27 @@
 import { lazy, Suspense } from 'react';
 import { SectionBoundary } from './SectionBoundary';
+import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
+import { ToastSlotProvider } from './ToastSlotProvider';
 
 // Recharts is the largest dependency; load the trend section as its own chunk.
 const TrendPage = lazy(() => import('./features/trend/TrendPage').then((m) => ({ default: m.TrendPage })));
 
 export function App() {
   return (
-    <>
+    <ToastSlotProvider>
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand">
             <h1>InvestWatch</h1>
             <span className="brand-sub">Monitoring ryzykownych treści inwestycyjnych</span>
           </div>
-          <HealthPage />
+          <div className="header-status">
+            <AlertsPage />
+            <HealthPage />
+          </div>
         </div>
       </header>
       <div className="app">
@@ -36,6 +41,6 @@ export function App() {
         <FindingsPage />
       </main>
       </div>
-    </>
+    </ToastSlotProvider>
   );
 }
