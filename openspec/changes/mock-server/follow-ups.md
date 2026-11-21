@@ -34,3 +34,5 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 29 | mutation check | the `"*"` → string conversion for Socket.IO origins was a no-op (a list with `"*"` works the same) | fix-here (conversion removed) |
 | 30 | mutation check | smoke test blocked on `stdout.read()` while the server was still running | fix-here (terminate first, then read) |
 | 19 | group 4 | uvicorn without `websockets` silently falls back to long-polling | fix-here (`websockets` pinned in `requirements.txt`) |
+| 31 | whole-branch review | `openapi.yaml` `SourceInput` has no `required` list, but `POST /sources` must return a full `Source`; the mock requires name, platform, url, source_kind, target_modules on POST and treats PATCH as partial | new-item (contract gap for the team, together with row 8) |
+| 32 | whole-branch review | README: `MOCK_HOST` missing, `.env` not loaded, relative screenshot URLs; AI log scenario count | fix-here (README and log row corrected) |

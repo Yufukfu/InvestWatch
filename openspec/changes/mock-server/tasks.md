@@ -39,4 +39,4 @@
 ## 6. Closing tasks
 
 - [x] 6.1 Apply the iw-docs-update skill (docs, own row in `.docs/STATUS.md`, ADR drafts if any) and add the iw-ai-log row
-- [ ] 6.2 Run the iw-pr-review skill and fix real findings
+- [x] 6.2 Run the iw-pr-review skill and fix real findings

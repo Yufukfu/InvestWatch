@@ -58,10 +58,11 @@ Addresses for `web/`:
 | REST base URL | `http://localhost:8000/api` |
 | Socket.IO | `io("http://localhost:8000/events")` (server path `/socket.io`, namespace `/events`) |
 
-Configuration (environment variables, all optional; see `mock-server/.env.example`):
+Configuration (environment variables, all optional). The server reads only the process environment, not a `.env` file: export the variables, or use `docker run --env-file contracts/mock-server/.env` (template: `mock-server/.env.example`).
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `MOCK_HOST` | `0.0.0.0` | bind address |
 | `MOCK_PORT` | `8000` | HTTP port |
 | `MOCK_CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173` | browser origins allowed for REST and Socket.IO; `*` allows any |
 | `MOCK_REPLAY_INTERVAL_S` | `10` | every N seconds a new finding (cloned from a mock one) is added and `finding.created` / `finding.high_risk` are emitted, while a client is connected; `0` disables |
@@ -74,6 +75,7 @@ Behaviour worth knowing:
 - Writes (`PATCH /api/findings/{id}`, `PUT /api/settings/thresholds`, `POST`/`PATCH /api/sources`, `POST /api/scans`) change an in-memory copy only. Restart or `POST /__mock/reset` restores the mocks.
 - `risk_level` is computed on every read from `score` and the current thresholds, so moving the calibration slider changes the list immediately.
 - `GET /api/stats/trend` without `risk_level` returns the mock background series plus findings added at runtime. With `risk_level` the series is recomputed from the findings themselves, so its scale is much smaller than the unfiltered one.
+- `screenshot_urls` in a finding detail are relative (`/api/documents/…`): prefix them with the REST origin, or proxy `/api` in the dev server.
 - Timestamps in query strings must be URL-encoded (`+01:00` becomes `%2B01:00`), or use the `Z` form.
 - `finding.created` and `finding.high_risk` for the same finding are sent separately; do not rely on their order.
 - Replay runs only while at least one client is connected to `/events`.
