@@ -20,8 +20,13 @@
 ## 4. Closing
 
 - [x] 4.1 Apply `iw-docs-update`: `.claude/rules/web-dashboard.md` wording for types-only `model.ts`, AI log row, `docs-check` clean.
-- [ ] 4.2 Run `iw-pr-review`; fix real findings.
+- [x] 4.2 Run `iw-pr-review`; fix real findings.
 
 ## Workflow follow-up
 
 - Archive as the last commit, push, update the PR body (counts), reply to the review.
+
+## Review follow-ups (iw-pr-review)
+
+- `SummaryPage` failure test waited only for the request to be sent; it now waits for the settled failure in the store. Mutant: an error `<p>` rendered on failure is caught. mutations: 1 tried, 1 caught.
+- Not fixed, recorded: an alias import (`@/features/x/data/y`) would bypass the patterns (no alias exists in the repo yet; extend the patterns when one is added); the polling test pins the exact call shape of the mocked hook; CI still has no separate `lint`/`typecheck` step (workflow change, owner B).

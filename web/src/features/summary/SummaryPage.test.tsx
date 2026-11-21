@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
+import { investWatchApi } from '../../api/generated';
 import summary from '../../mocks/fixtures/summary.json';
 import { server } from '../../test/setup';
-import { storeWrapper } from '../../test/store';
+import { makeStore, storeWrapper } from '../../test/store';
 import { SummaryPage } from './SummaryPage';
 
 describe('SummaryPage', () => {
@@ -15,16 +17,16 @@ describe('SummaryPage', () => {
     expect(region).toHaveTextContent(`${summary.by_status.new}Nowe`);
   });
 
-  it('renders nothing when the request fails', async () => {
-    let hit = false;
-    server.use(
-      http.get('http://localhost/api/stats/summary', () => {
-        hit = true;
-        return HttpResponse.error();
-      }),
+  it('renders nothing once the request has failed', async () => {
+    server.use(http.get('http://localhost/api/stats/summary', () => HttpResponse.error()));
+    const store = makeStore();
+    const { container } = render(
+      <Provider store={store}>
+        <SummaryPage />
+      </Provider>,
     );
-    const { container } = render(<SummaryPage />, { wrapper: storeWrapper() });
-    await expect.poll(() => hit).toBe(true);
+    // Wait for the settled failure, not just for the request to be sent.
+    await expect.poll(() => investWatchApi.endpoints.getStatsSummary.select()(store.getState()).isError).toBe(true);
     expect(container).toBeEmptyDOMElement();
   });
 });
