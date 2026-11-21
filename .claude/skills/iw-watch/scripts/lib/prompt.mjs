@@ -65,6 +65,12 @@ const KIND_TASK = {
     'If the failure is in code you do not own, or it is flaky or infrastructure, do not change it: say so in the reply.',
     PUBLISH,
   ],
+  conflict: ({ item, me }) => [
+    `Your PR #${item.pr} (branch \`${item.headRef}\`) conflicts with \`${item.baseRef}\`. The runner has started \`git merge origin/${item.baseRef}\` in this clone; git could not resolve these files: ${(item.conflictFiles || []).map((f) => `\`${f.replace(/[^\x20-\x7e]/g, '?')}\``).join(', ')}.`,
+    '- Resolve each one: keep both sides\' intent (read `git log` of both sides and the OpenSpec changes if unsure), remove every conflict marker, and `git add` the file. Change nothing else.',
+    '- Run the tests of the modules you touched. Do not commit, push or post: the runner checks that no conflict remains, commits the merge, pushes it and posts your reply. Write the reply to `.iw-watch/reply.md`: each file and how you resolved it.',
+    `- A conflict you cannot settle without a product decision: leave it unresolved, and ask under "Needs @${me}" and in \`.iw-watch/questions.md\` (\`- <short question> => <option> | <option>\`).`,
+  ],
   review: ({ item, me, dryRun }) => [
     `@${item.author}'s PR #${item.pr} waits for your review. The working tree is the base branch \`${item.baseRef}\`, not the PR: its code is never checked out or run here. The PR head is the ref \`refs/iw/pr-${item.pr}\`: read the diff with \`git diff origin/${item.baseRef}...refs/iw/pr-${item.pr}\` and a file with \`git show refs/iw/pr-${item.pr}:<path>\`.`,
     'Review it against .claude/CODE_REVIEW.md and the OpenSpec change it implements: correctness first, then tests that can fail, then docs. Check each claim against the code.',

@@ -45,7 +45,7 @@ const FIX = [
   'Bash(openspec validate:*)', 'Bash(node .claude/skills/iw-docs-update/scripts/docs-check.mjs:*)',
 ];
 
-const fixes = (kind) => kind === 'address-review' || kind === 'ci-failed';
+const fixes = (kind) => ['address-review', 'ci-failed', 'conflict'].includes(kind);
 
 /** Least privilege per session. A review reads the PR range only, by its exact forms. */
 export function allowList({ kind, pr, baseRef }) {

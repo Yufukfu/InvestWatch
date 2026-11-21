@@ -547,3 +547,78 @@ test('run: a fix branch with a symlink, a .Claude/ in another case or a .npmrc g
     assert.match(s.notices()[0].detail, how === 'symlink' ? /symlink/ : /changes/, file);
   }
 });
+
+// main moves on: `files` are written on main and pushed; the PR is reported CONFLICTING by GitHub
+function conflicted(files) {
+  const s = setup({ over: { 'pulls/11/reviews': [], 'pulls/11/comments': [] } });
+  git(s.mainRoot, 'checkout', '-q', 'main');
+  for (const [f, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(s.mainRoot, f)), { recursive: true });
+    fs.writeFileSync(path.join(s.mainRoot, f), text);
+  }
+  git(s.mainRoot, 'add', '.');
+  git(s.mainRoot, 'commit', '-q', '-m', 'main moves');
+  git(s.mainRoot, 'push', '-q', 'origin', 'HEAD:main');
+  git(s.mainRoot, 'checkout', '-q', 'web/fe');
+  s.deps.gh = fakeGh({ 'pr list mine': [{ ...s.pr11, mergeable: 'CONFLICTING' }], 'pr list open': [{ number: 11 }], 'pulls/11/reviews': [], 'pulls/11/comments': [] }).gh;
+  const fake = s.deps.gh;
+  const posted = [];
+  s.deps.gh = (args) => { if (args.includes('POST')) posted.push(args); return fake(args); };
+  s.posts = () => posted;
+  return s;
+}
+
+const resolver = (content, { add = true } = {}) => (file, args, opts) => {
+  fs.writeFileSync(path.join(opts.cwd, 'web/a.ts'), content);
+  if (add) git(opts.cwd, 'add', 'web/a.ts');
+  fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+  fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'web/a.ts: kept both');
+  return { status: 0, stdout: stream(), stderr: '' };
+};
+
+test('run: a PR in conflict with main: the runner merges, the agent resolves, the runner commits the merge, pushes and posts', async () => {
+  const s = conflicted({ 'web/a.ts': 'export const a = 9;\n', '.claude/settings.json': '{"from":"main"}\n' });
+  let prompt;
+  const resolve = resolver('export const a = 1;\nexport const b = 9;\n');
+  s.deps.spawnClaude = (file, args, opts) => { prompt = opts.input; return resolve(file, args, opts); };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.match(prompt, /conflicts with `main`[\s\S]*`web\/a\.ts`/);
+  const head = git(s.origin, 'rev-parse', 'web/fe');
+  assert.equal(git(s.origin, 'rev-list', '--parents', '-n', '1', head).split(' ').length, 3, 'a merge commit, two parents');
+  assert.equal(git(s.origin, 'show', `${head}:web/a.ts`), 'export const a = 1;\nexport const b = 9;');
+  assert.equal(s.notices()[0].kind, 'done', 'main\'s own .claude/ change is not the agent\'s: the push goes through');
+  assert.equal(s.posts().length, 1);
+});
+
+test('run: a merge git resolves on its own needs no session: merged, pushed, a short reply', async () => {
+  const s = conflicted({ 'README.md': 'main readme\n' });
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(s.calls.length, 0, 'no agent');
+  assert.equal(git(s.origin, 'show', 'web/fe:README.md'), 'main readme');
+  assert.equal(s.notices()[0].kind, 'done');
+});
+
+test('run: conflict markers left, or a conflict not staged, are never committed or pushed', async () => {
+  for (const [content, add] of [['<<<<<<< HEAD\nexport const a = 1;\n=======\nexport const a = 9;\n>>>>>>> origin/main\n', true], ['export const a = 1;\n', false]]) {
+    const s = conflicted({ 'web/a.ts': 'export const a = 9;\n' });
+    s.deps.spawnClaude = resolver(content, { add });
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, 'nothing pushed');
+    assert.deepEqual(s.posts(), []);
+    assert.match(s.notices()[0].detail, add ? /conflict markers are left in web\/a\.ts/ : /unresolved conflicts: web\/a\.ts/);
+  }
+});
+
+test('run: a conflict inside .claude/ is not given to an agent', async () => {
+  const s = conflicted({ '.claude/settings.json': '{"from":"main"}\n' });
+  git(s.mainRoot, 'checkout', '-q', 'main');
+  // make the branch side touch it too, from a base that is the old main
+  git(s.mainRoot, 'checkout', '-q', 'web/fe');
+  s.deps.spawnClaude = () => { throw new Error('no session expected'); };
+  // simulate git reporting the conflict there
+  const real = s.deps.git;
+  s.deps.git = (args, opts) => (args.includes('--diff-filter=U') ? '.claude/settings.json' : (real || ((a, o) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...o }).trim()))(args, opts));
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.match(s.notices()[0].detail, /conflicts in \.claude\/settings\.json/);
+  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha);
+});

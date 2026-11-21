@@ -107,3 +107,15 @@ test('notify (in-session mode): the agent\'s questions file becomes /iw comments
   assert.equal(sent[0][2], `https://github.com/${REPO}/pull/40`, 'a link outside this PR is replaced by the PR link');
   assert.equal(await main(['notify', 'oops', '--pr', '40'], deps), 64);
 });
+
+test('scan: my PR in conflict with its base is a conflict item, once per head', () => {
+  const pr = { number: 11, title: 't', url: 'u', isDraft: false, mergeable: 'CONFLICTING', author: { login: ME }, headRefName: 'web/fe', headRefOid: 'd'.repeat(40), baseRefName: 'main', files: [] };
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'pr list open': [{ number: 11 }], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  const state = { version: 1, prs: {} };
+  const [it] = scan({ gh, repo: REPO, me: ME, mode: { mine: true }, state }).items;
+  assert.equal(it.kind, 'conflict');
+  ack(state, it.id);
+  assert.deepEqual(scan({ gh, repo: REPO, me: ME, mode: { mine: true }, state }).items, []);
+  const fine = fakeGh({ 'pr list mine': [{ ...pr, mergeable: 'MERGEABLE' }], 'pr list open': [{ number: 11 }], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  assert.deepEqual(scan({ gh: fine.gh, repo: REPO, me: ME, mode: { mine: true }, state: { version: 1, prs: {} } }).items, []);
+});

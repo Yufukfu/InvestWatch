@@ -10,7 +10,7 @@ import { randomUUID, createHash } from 'node:crypto';
 export const STALE_LOCK_MS = 30 * 60 * 1000;
 export const HANDLED_MAX = 2000;
 const EMPTY = () => ({ version: 1, prs: {} });
-const KINDS = { 'address-review': 'handled', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha' };
+const KINDS = { 'address-review': 'handled', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha', conflict: 'conflictSha' };
 
 /** Short stable digest of a set of event keys, used as the cursor of an address-review item */
 export const digest = (keys) => createHash('sha256').update([...keys].sort().join('\n')).digest('hex').slice(0, 16);

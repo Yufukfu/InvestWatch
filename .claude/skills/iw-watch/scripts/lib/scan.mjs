@@ -41,7 +41,7 @@ function filesOf(gh, repo, pr) {
   return (gh(['api', '--paginate', `repos/${repo}/pulls/${Number(pr.number)}/files?per_page=100`]) || []).map((f) => f.filename);
 }
 
-export const PR_FIELDS = 'number,title,url,isDraft,isCrossRepository,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files';
+export const PR_FIELDS = 'number,title,url,isDraft,isCrossRepository,mergeable,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files';
 export const LIST_LIMIT = 100;
 export const OPEN_LIMIT = 500;
 // A superseded run is CANCELLED; that is not a failure to fix.
@@ -127,6 +127,8 @@ function minePr(gh, repo, me, pr, st, maxRounds, state) {
   const work = [];
   if (fresh.length) work.push({ kind: 'address-review', cursor: digest(fresh.map((e) => e.key)), events: fresh });
   if (checks.length && st.ciFailedSha !== b.headSha) work.push({ kind: 'ci-failed', cursor: b.headSha, events: [], checks });
+  // GitHub computes mergeability lazily (UNKNOWN at first); the next poll sees CONFLICTING
+  if (pr.mergeable === 'CONFLICTING' && st.conflictSha !== b.headSha) work.push({ kind: 'conflict', cursor: b.headSha, events: [], checks: [] });
   const pending = {};
   let items = [];
   if (work.length) {

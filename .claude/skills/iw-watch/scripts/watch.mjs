@@ -17,7 +17,7 @@ import { stateDir, loadState, saveState, ack, dropClosed, acquireLock, releaseLo
 import { loadCodeowners, ownerOf } from './lib/codeowners.mjs';
 import { buildPrompt, safeBranch } from './lib/prompt.mjs';
 import { claudeArgs, runSession, childEnv, denyReadPaths } from './lib/session.mjs';
-import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman, newCommitPaths, pushBranch, installDeps, findEnvFiles, gitSnapshot } from './lib/worktree.mjs';
+import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman, newCommitPaths, pushBranch, installDeps, findEnvFiles, gitSnapshot, startMerge, finishMerge } from './lib/worktree.mjs';
 import { makeNotifier, KINDS } from './lib/notify.mjs';
 import { parseQuestions, questionsText } from './lib/questions.mjs';
 import { MARKER } from './lib/rounds.mjs';
@@ -206,7 +206,7 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (!safeBranch(it.headRef) || !safeBranch(it.baseRef)) {
     return { ...base, kind: 'needs-human', detail: `refused branch name ${JSON.stringify(clean(it.headRef))}: only [A-Za-z0-9._/-] is handled` };
   }
-  const own = it.kind === 'address-review' || it.kind === 'ci-failed';
+  const own = ['address-review', 'ci-failed', 'conflict'].includes(it.kind);
   // the push target: this repository's PR branch, never a fork's, never the base or default branch
   if (own && it.crossRepo) return { ...base, kind: 'needs-human', detail: `#${it.pr} comes from a fork; an agent does not push to it` };
   if (own && [it.baseRef, ctx.defaultBranch, 'main', 'master'].includes(it.headRef)) {
@@ -233,10 +233,25 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (own) installDeps({ run: deps.exec, dir: clone.dir, files: it.files, env: childEnv(deps.env) });
   const before = gitSnapshot({ dir: clone.dir });
   const fileOwners = owners({ ...deps, mainRoot }, ctx, it.files);
-  const prompt = buildPrompt({ item: it, me: ctx.me, owners: fileOwners, dryRun: o.dryRun });
-  const denyRead = denyReadPaths({ home: deps.home, stateDir: sdir, configDir: deps.env.CLAUDE_CONFIG_DIR, envFiles: findEnvFiles({ mainRoot }) });
-  const args = claudeArgs({ kind: it.kind, pr: it.pr, baseRef: it.baseRef, budgetUsd: o.budgetUsd, model: o.model, denyRead });
-  const res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
+  const safe = (args, opts) => deps.git(['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args], opts);
+  let res;
+  if (it.kind === 'conflict') {
+    // the runner merges the base; the agent only resolves what git could not, and the runner commits the merge
+    const merged = startMerge({ git: safe, dir: clone.dir, baseRef: it.baseRef });
+    if (merged.refused) return { ...base, kind: 'needs-human', clone: clone.dir, keep: true, detail: `${merged.refused}; clone kept at ${clone.dir}, remove it to retry` };
+    it.conflictFiles = merged.files;
+    if (!merged.files.length) {
+      fs.mkdirSync(path.join(clone.dir, '.iw-watch'), { recursive: true });
+      fs.writeFileSync(path.join(clone.dir, '.iw-watch', 'reply.md'), `Merged \`origin/${it.baseRef}\` into \`${it.headRef}\`: git resolved it without conflicts here. No other change.\n`);
+      res = { ok: true, denials: [], cost: 0, summary: `merged origin/${it.baseRef} without conflicts` };
+    }
+  }
+  if (!res) {
+    const prompt = buildPrompt({ item: it, me: ctx.me, owners: fileOwners, dryRun: o.dryRun });
+    const denyRead = denyReadPaths({ home: deps.home, stateDir: sdir, configDir: deps.env.CLAUDE_CONFIG_DIR, envFiles: findEnvFiles({ mainRoot }) });
+    const args = claudeArgs({ kind: it.kind, pr: it.pr, baseRef: it.baseRef, budgetUsd: o.budgetUsd, model: o.model, denyRead });
+    res = runSession({ spawn: deps.spawnClaude, cwd: clone.dir, prompt, args, env: deps.env });
+  }
   const copied = collectDrafts({ dir: clone.dir, to: draftDir });
   // questions for the human, each answer as a command to copy (Discord shows them)
   const questions = copied.includes('questions.md') ? parseQuestions(fs.readFileSync(path.join(draftDir, 'questions.md'), 'utf8')) : [];
@@ -251,12 +266,16 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (!res.ok) return human(`session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`})`);
   // sandboxed code can write .git/: a changed config or hook would run, outside the sandbox, in the git calls below
   if (gitSnapshot({ dir: clone.dir }) !== before) return human('the session changed .git/config, .git/hooks or .git/info/attributes; the runner runs no git in this clone');
-  const git = (args, opts) => deps.git(['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args], opts);
+  const git = safe;
+  if (it.kind === 'conflict') {
+    const left = finishMerge({ git, dir: clone.dir, files: it.conflictFiles, headRef: it.headRef, baseRef: it.baseRef });
+    if (left) return human(left);
+  }
   const dirty = own ? git(['-C', clone.dir, 'status', '--porcelain']) : '';
   if (dirty) return human(`uncommitted changes in ${dirty.split('\n').length} file(s) were left; nothing is thrown away`);
   if (!copied.includes('reply.md')) return human(`the session wrote no reply (.iw-watch/reply.md); its last message is in ${path.join(draftDir, 'summary.md')}`);
   // the agent's commits are checked before anything leaves the machine
-  const bad = own ? newCommitPaths({ git, dir: clone.dir, headRef: it.headRef }) : [];
+  const bad = own ? newCommitPaths({ git, dir: clone.dir, headRef: it.headRef, baseRef: it.baseRef }) : [];
   if (bad.length) return human(`the agent's commits change ${bad.slice(0, 3).join(', ')}; the runner does not push settings, hooks, CI or agent instructions`);
   const body = postBody({ me: ctx.me, it, text: fs.readFileSync(path.join(draftDir, 'reply.md'), 'utf8') });
   const issueText = copied.includes('issue.md') ? fs.readFileSync(path.join(draftDir, 'issue.md'), 'utf8') : '';

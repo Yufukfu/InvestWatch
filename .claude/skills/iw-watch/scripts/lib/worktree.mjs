@@ -27,7 +27,7 @@ export function prepareClone({ git = realGit, fs = realFs, mainRoot, item }) {
   if (fs.existsSync(dir)) throw new NeedsHuman(`${dir} is left from an earlier run; look at it, then remove it to let the watcher retry`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const url = git(['-C', mainRoot, 'remote', 'get-url', 'origin']);
-  const own = item.kind === 'address-review' || item.kind === 'ci-failed';
+  const own = ['address-review', 'ci-failed', 'conflict'].includes(item.kind);
   // core.commitGraph=false: a stale commit-graph in the reference repo made checkout fail with
   // "unable to parse commit" on the first live run (PR #39); the objects themselves were fine
   try {
@@ -73,9 +73,15 @@ export const prRef = (pr) => `refs/iw/pr-${Number(pr)}`;
 const PROTECTED = /^(\.claude\/|\.github\/|\.mcp\.json$|\.iw-watch\/)|(^|\/)(CLAUDE\.md|\.npmrc|\.yarnrc(\.yml)?)$/i;
 export const protectedPaths = (nameOnly) => String(nameOnly || '').split('\n').map((s) => s.trim()).filter((f) => f && PROTECTED.test(f));
 
-/** The agent's new commits, checked before the runner pushes them */
-export function newCommitPaths({ git = realGit, dir, headRef }) {
-  return protectedPaths(git(['-C', dir, 'diff', '--name-only', `refs/remotes/origin/${headRef}..HEAD`]));
+/**
+ * Protected paths the agent changed, checked before the runner pushes: they differ from the PR branch AND from
+ * the base. A merge brings the base's own .claude/ changes, which differ only from the branch.
+ */
+export function newCommitPaths({ git = realGit, dir, headRef, baseRef }) {
+  const vsBranch = protectedPaths(git(['-C', dir, 'diff', '--name-only', `refs/remotes/origin/${headRef}`, 'HEAD']));
+  if (!baseRef) return vsBranch;
+  const vsBase = new Set(protectedPaths(git(['-C', dir, 'diff', '--name-only', `refs/remotes/origin/${baseRef}`, 'HEAD'])));
+  return vsBranch.filter((f) => vsBase.has(f));
 }
 
 /** The runner pushes, not the session: never force, only to the PR's own branch name */
@@ -128,6 +134,33 @@ export function findEnvFiles({ fs = realFs, mainRoot }) {
   };
   for (const r of roots) walk(r, 0);
   return out;
+}
+
+const MARKER_LINE = /^(<{7}|>{7}|={7})( |$)/m;
+
+/** Merge origin/<base> into the PR branch; returns the files git could not resolve, or why it refused */
+export function startMerge({ git, dir, baseRef }) {
+  try {
+    git(['-C', dir, 'merge', '--no-ff', '--no-commit', '--no-edit', `origin/${baseRef}`]);
+  } catch { /* conflicts: git exits 1 and leaves them in the index */ }
+  const files = git(['-C', dir, 'diff', '--name-only', '--diff-filter=U']).split('\n').filter(Boolean);
+  const bad = protectedPaths(files.join('\n'));
+  if (bad.length) {
+    try { git(['-C', dir, 'merge', '--abort']); } catch { /* nothing to abort */ }
+    return { refused: `the merge with ${baseRef} conflicts in ${bad.slice(0, 3).join(', ')}: settings, hooks or agent instructions, over to you`, files };
+  }
+  if (!files.length) git(['-C', dir, 'commit', '--quiet', '--no-edit']);
+  return { files };
+}
+
+/** After the session: every conflict resolved and staged, no markers left; then the runner commits the merge */
+export function finishMerge({ fs = realFs, git, dir, files, headRef, baseRef }) {
+  const unmerged = git(['-C', dir, 'diff', '--name-only', '--diff-filter=U']).split('\n').filter(Boolean);
+  if (unmerged.length) return `${unmerged.length} file(s) still have unresolved conflicts: ${unmerged.slice(0, 3).join(', ')}`;
+  const marked = (files || []).filter((f) => { try { return MARKER_LINE.test(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return false; } });
+  if (marked.length) return `conflict markers are left in ${marked.slice(0, 3).join(', ')}`;
+  if (fs.existsSync(path.join(dir, '.git', 'MERGE_HEAD'))) git(['-C', dir, 'commit', '--quiet', '--no-edit', '-m', `Merge origin/${baseRef} into ${headRef}`]);
+  return null;
 }
 
 /** What git would run or obey in the clone: config, hooks, attributes. Compared before and after a session. */
