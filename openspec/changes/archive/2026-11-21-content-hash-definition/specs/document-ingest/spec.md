@@ -32,5 +32,5 @@ The scraper SHALL compute `content_hash` as the sha256 (lowercase hex, of the UT
 - **THEN** its `content_hash` is the sha256 of exactly that text, which differs from the hash of `"finanse"`, `"m2"` or `"123%"`
 
 #### Scenario: Canonically equivalent text
-- **WHEN** two pages differ only in composed versus decomposed form (`"é"` and `"é"`)
+- **WHEN** two pages differ only in composed versus decomposed form (`"\u00e9"`, U+00E9, and `"e\u0301"`, U+0065 U+0301)
 - **THEN** their `content_hash` values are equal
