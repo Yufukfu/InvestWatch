@@ -237,15 +237,11 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
 
-  // Focus moves into the panel on open and back to where it was on close.
+  // Modal: everything outside the panel is inert and the page does not scroll while it is open.
+  // Focus moves into the panel on open and back to where it was on close. One effect, so the cleanup
+  // lifts `inert` before restoring focus: browsers ignore focus() inside an inert subtree.
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    closeRef.current?.focus();
-    return () => previous?.focus();
-  }, []);
-
-  // Modal: everything outside the panel is inert and the page does not scroll while it is open.
-  useEffect(() => {
     const panel = panelRef.current;
     const others = Array.from(document.body.children).filter(
       (el): el is HTMLElement => el instanceof HTMLElement && !el.contains(panel) && !el.hasAttribute('inert'),
@@ -253,9 +249,11 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
     others.forEach((el) => el.setAttribute('inert', ''));
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
     return () => {
       others.forEach((el) => el.removeAttribute('inert'));
       document.body.style.overflow = overflow;
+      previous?.focus();
     };
   }, []);
 

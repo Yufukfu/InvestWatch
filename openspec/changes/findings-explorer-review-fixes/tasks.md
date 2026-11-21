@@ -17,4 +17,4 @@
 - [x] 3.1 Enable `react/exhaustive-deps` in `web/.oxlintrc.json`; inputs and chips get `#6b7280` borders. `npm run lint` clean; check the contrast values in a browser run.
 - [x] 3.2 Browser run against the mock at 375/768/1280 px: keyboard sort and paging keep focus, save keeps focus in the panel, Escape behaviour, console clean in the production build.
 - [x] 3.3 Add a note to the archived `findings-explorer/tasks.md` mutation lines; apply `iw-docs-update` (`.docs/status/dashboard.md`) and add the `iw-ai-log` row.
-- [ ] 3.4 Run `iw-pr-review`, fix real findings, then reply on PR #39 to each review point.
+- [x] 3.4 Run `iw-pr-review`, fix real findings, then reply on PR #39 to each review point (reviewer: focus restore on close ran before `inert` was lifted; merged into one effect, checked in Chrome).
