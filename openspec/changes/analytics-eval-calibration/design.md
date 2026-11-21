@@ -13,7 +13,7 @@
 
 **Goals:** a labeled, reviewable gold set for M1, M2 and M3; measured precision/recall/F1 per module and per rule or signal; a stored run the calibration panel shows on a fresh stack; one deterministic command; failure paths that never write a partial or misleading run.
 
-**Non-Goals:** changing the API's curve or its labels-vs-run choice; a `gold_labels` table; tuning weights; the web panel; new rules.
+**Non-Goals:** a `gold_labels` table; a schema or contract change; tuning weights; the web panel; new rules.
 
 ## Decisions
 
@@ -50,15 +50,15 @@ Both are reported with the `uncertain` count. Neither goes to the database (the 
 
 ### 5. Validation before running
 
-The loader reads every line before analyzing anything and fails with exit 2, naming the line number and the field (never the document text), on: no labeled line at all (empty file, only blank lines), invalid JSON, a `document` that fails `ScrapedDocument`, a module outside M1/M2/M3, a label outside the allowed values, a duplicate `id`, a rule or signal id that is in no loaded catalogue (typos like `R3 ` or `S1.9`), or a rule id from another module's catalogue (`R3` under `M1`). A label for a known but not implemented rule is valid.
+The loader reads every line before analyzing anything and fails with exit 2, naming the line number and the field (never the document text), on: no labeled line at all (empty file, only blank lines), invalid JSON, a `document` that fails `ScrapedDocument`, a module outside M1/M2/M3, a label outside the allowed values, a duplicate `id`, a rule or signal id that is in no loaded catalogue (typos like `R3 ` or `S1.9`), or a rule id from another module's catalogue (`R3` under `M1`). The known ids are the union of the loaded catalogues and a static list `evaluation/known_ids.py` copied from the stage-2 catalogues (M2 R1-R11, R12a, R12b, R13-R18; M1 S1.1-S1.7; M3 S3.1-S3.8), so the gold set can label M1/M3 and the new M2 rules before those changes are merged into this build. A known id that the loaded catalogue marks `implemented: false` is reported `not_implemented`; a known id missing from the loaded catalogue is `not_in_build`. Both are valid labels. `origin: uknf-sample` items need no code change: the loader treats them like synthetic ones, and the report counts items per origin.
 
 ### 6. Parity with the API instead of shared code
 
 `api/` and `analytics/` are separate services with separate images, so the evaluation cannot import `investwatch_api.routes.calibration.curve`. `evaluation/metrics.py` reimplements it (about 15 lines) and a parity test pins both the rest-api spec scenario (scores 0.9/0.4 positive, 0.6/0.2 negative: at 0.5 `tp 1, fp 1, fn 1, tn 1, precision 0.5, recall 0.5, f1 0.5`) and the two edge conventions. The grid is the same literal `round(0.05 * i, 2) for i in 1..19`. A future change to the API's convention has to change both; the parity tests point at the spec, so a drift shows in review.
 
-### 7. Store: one run, one transaction
+### 7. Store: one run, one transaction, idempotent
 
-`run_id` = uuid4, `computed_at` = one UTC timestamp for the whole run (both injectable for tests). All rows of all evaluated modules are inserted with one `executemany` in one transaction; any error rolls back, so the API never serves half a run. `f1` is always written (the API copies it when not null). `labeled_samples` = number of gold documents labeled for that module. A module reported `not_run` (decision 8) gets no rows, so the API keeps serving the previous run for it. Connection errors map to `StoreUnavailable` (exit 3), an unparsable `DATABASE_URL` to `StoreMisconfigured` (exit 2); the message never quotes the URL.
+`computed_at` = one UTC timestamp for the whole run (injectable for tests). For a rules-only run, `run_id` = `uuid5(NAMESPACE, sha256(gold file bytes) + pipeline_version + sha256(canonical JSON of the module points))`, so the same gold set, pipeline version and results always give the same id (a deliberate exception to the UUID v4 convention, recorded in ADR 0312). Including the points means a rule change without a version bump still produces a new run. Per module, in one transaction: if the latest stored run of the module (the API's ordering) already has this `run_id`, nothing is written (`stored: unchanged`); if rows with this `run_id` exist but another run is newer (code rolled back), their `computed_at` is moved to now so the API serves them again (`stored: refreshed`); otherwise the 19 rows are inserted (`stored: inserted`). An `--llm` run is not reproducible, so it always gets a uuid4 and is inserted. All rows of all evaluated modules are inserted with one `executemany` in one transaction; any error rolls back, so the API never serves half a run. `f1` is always written (the API copies it when not null). `labeled_samples` = number of gold documents labeled for that module. A module reported `not_run` (decision 8) gets no rows, so the API keeps serving the previous run for it. Connection errors map to `StoreUnavailable` (exit 3), an unparsable `DATABASE_URL` to `StoreMisconfigured` (exit 2); the message never quotes the URL.
 
 ### 8. "Module never ran"
 
@@ -70,21 +70,25 @@ A module that has at least one gold label but produced no finding on any gold do
 
 ### 10. LLM optional
 
-`--llm` builds the judge as the worker does from `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY`; without those it is an error (exit 2), not a silent rules-only run. When the endpoint fails, `analyze` degrades per document as it already does; the report counts documents with `model.llm = null`. The compose service stays rules-only (deterministic, no egress).
+`--llm` builds the judge as the worker does from `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY`; without those it is an error (exit 2), not a silent rules-only run. A build whose `analyze` has no `judge` parameter (before `analytics-llm-p0`) also exits 2 with "no LLM judge in this build". When the endpoint fails, `analyze` degrades per document as it already does; the report counts documents with `model.llm = null`. The compose service stays rules-only (deterministic, no egress).
 
-### 11. One-shot compose service on every `up`
+### 11. One-shot compose service in the default stack
 
-`analytics-eval` in `analytics/compose.yaml`: same image, `command: ["python", "-m", "investwatch_analytics.evaluation", "--db"]`, `restart: "no"`, `depends_on: api-migrate (completed_successfully), postgres (healthy)`, network `data` only, same hardening as the worker. The Dockerfile copies `eval/`. Running on every `up` adds a run each time (19 × 3 rows, harmless; the latest wins). A profile would leave the panel empty unless someone remembers a command during the demo. Alternative considered: a seed migration in `api/` (wrong owner of the data, and the numbers would not follow rule changes).
+Damian's decision: Opis §3 asks for the whole stack with one command, and the jury tests the calibration panel on the default stack. `analytics-eval` in `analytics/compose.yaml`, without a profile: same image, `command: ["python", "-m", "investwatch_analytics.evaluation", "--db"]`, `restart: "no"`, `depends_on: api-migrate (completed_successfully), postgres (healthy)`, network `data` only, same hardening as the worker. The Dockerfile copies `eval/`. Thanks to decision 7 a restart writes nothing new. A profile would leave the panel empty unless someone remembers a command during the demo. Alternative considered: a seed migration in `api/` (wrong owner of the data, and the numbers would not follow rule changes).
 
-### 12. ADR 0312
+### 12. Analyst labels plus the gold run in the API
 
-Decisions 2, 4, 6 and 11 are recorded as ADR 0312 "Gold-set evaluation feeds the calibration panel" (fictional eval registry, strict/review readings, API-parity counting, one-shot service). Written in task group 1 as `Status: accepted`, effective when the PR merges.
+Damian's decision: the panel must never collapse to one or two labels. `GET /api/calibration` computes the label curve as today and, when the module also has a stored run, adds the run's `tp/fp/fn/tn` to the label counts per threshold (both use the same grid; a stored point at a threshold outside the grid is ignored), recomputes `precision`, `recall` and `f1` with the same conventions, and returns `labeled_samples` = labels + run samples. With only one source it returns that source unchanged. No query parameter (the contract is frozen) and no response change. A source switch (`source=gold|labels|both`) is a follow-up if Kacper's panel wants it.
+
+### 13. ADR 0312
+
+Decisions 2, 4, 6, 7 (deterministic run id), 11 and 12 are recorded as ADR 0312 "Gold-set evaluation feeds the calibration panel" (fictional eval registry, strict/review readings, API-parity counting, one-shot service). Written in task group 1 as `Status: accepted`, effective when the PR merges.
 
 ## Risks / Trade-offs
 
 - [The gold set is ours, not UKNF's, so it measures how well we encoded our own reading of the criteria] → every line names its `basis`; labels are written from the ZASÓB text and annex 3, not from what the rules currently output (labels first, run second, task groups 6-7); the README says so plainly.
 - [Small set (about 60 documents): one example moves precision by several points] → the report shows counts next to ratios; the demo talks about FP/FN counts, which is what Opis §2 asks.
-- [Analyst labels hide the gold run: one `confirmed` finding switches the M2 curve to a one-sample curve] → open question 1; out of scope here.
+- [Combining labels with gold mixes two populations: real scraped findings and our synthetic set] → the panel shows `labeled_samples`; the README says the curve is gold plus analyst labels.
 - [Weights tuned on the same gold set overfit it] → this change does not tune; a later tuning change should hold out the hard cases.
 - [Synthetic `.pl` domains or handles might exist for real] → `example`-style names (`*.example.pl` where a Polish domain is the point), checked against `registry/seed.csv`; no person names, phone numbers only from `+48 000 …`.
 - [Stage-2 rules change after this lands] → the gold-set test asserts the run finishes and that FP/FN move between the default threshold and +0.2, not exact numbers, so rule changes do not break the build; the report diff is the review signal.
@@ -95,8 +99,4 @@ No schema change. Deploy = merge; the next `docker compose up` writes the first 
 
 ## Open Questions
 
-1. **Labels vs gold run in the API.** Today any analyst label replaces the gold run for that module (rest-api spec "Labels win over a stored run"), while `.docs/integration-plan.md` §5 says the curve uses both. Should a follow-up `api` change add the gold counts to the label counts (or offer a `source=gold|labels|both` query), so the demo does not collapse to a few labels after one click?
-2. **Pendrive samples.** Did UKNF hand out sample materials (Opis §7)? If yes, put them in `doc/` or tell us where: they go in as `origin: uknf-sample` with any personal data removed, and their labels decide more than our synthetic ones.
-3. **`uncertain` in the headline number.** Which reading should the README and slides quote per rule, `strict` or `review`? The plan here reports both; the stored module curve is unaffected.
-4. **Run on every `up`?** Fine to append a run per `docker compose up`, or do you prefer a `profiles: [eval]` service plus one command in the Quick Start?
-5. **Scope of hard cases.** About 20 per module, a third of them hard cases. Enough for the demo, or should M2 get more (it has the most rules)?
+Answered by Damian on 2026-11-21: (1) combine labels and gold, decision 12; (2) no UKNF samples in `doc/` yet, synthetic set now, `uknf-sample` items later without code changes; (3) report both readings, `strict` is the headline in the README and slides; (4) default stack, no profile, idempotent, decisions 7 and 11; (5) about 20 per module, a third hard cases, M2 somewhat more.
