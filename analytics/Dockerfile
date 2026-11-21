@@ -19,6 +19,8 @@ RUN pip install -r requirements.txt
 # knf.meta.json) resolves; seed.csv rides along as the fictional fixture. The rule catalogue ships in the package.
 COPY registry registry
 COPY src src
+# Gold set and its fictional registry for the one-shot analytics-eval service (src/../eval, like registry/).
+COPY eval eval
 
 ENV PYTHONPATH=/app/src \
     HEALTH_PORT=8001
