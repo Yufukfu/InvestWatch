@@ -2,7 +2,7 @@
 
 - Status: proposed
 - Date: 2026-11-21
-- Deciders: A, B, C (to be confirmed)
+- Deciders: C (proposal; A and B to review in PR #3)
 
 ## Context
 
@@ -20,8 +20,14 @@ Not measured yet: tokens per second of `gemma3:4b` / `gemma3:12b` on the team's 
 
 ## Decision
 
-_To be written by the team (A, B, C)._
+None of the three options as written: **analytics uses a cloud-hosted model, on the condition that it is easy to swap for another cloud or local model.** The model is reached only through the env configuration (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`), so switching provider or moving to a local Ollama container is a configuration change, not a code change.
+
+Why (C): a cloud model is acceptable only if it can be replaced by another cloud or local model easily.
 
 ## Consequences
 
-_To be written together with the decision._
+- No local hardware limits during development; the unmeasured tokens-per-second of local Gemma stops blocking work.
+- Conflicts with the UKNF task (section 5: on-premise, free models, no external paid APIs, whole stack started with one command) and with "no paid APIs" in [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md). This costs points in "compliance with the specification" (20%) unless the demo runs on a local model; the team has to decide that before the demo, and `analytics/CLAUDE.md` must be updated if this ADR is accepted.
+- The LLM client in analytics must not depend on one provider's API: either the chosen cloud endpoint is Ollama-compatible, or analytics gets a thin client layer covering both that provider and Ollama. Prompts are tested on at least two backends.
+- Runtime depends on an external service: the rules-only fallback ([analytics-plan.md](../analytics-plan.md) §7) has to work when the endpoint is unreachable or the API key is missing; `LLM_API_KEY` stays out of the repository.
+- The gold-set evaluation ([analytics-plan.md](../analytics-plan.md) §8) has to be re-run after any model swap.

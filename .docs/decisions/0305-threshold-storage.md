@@ -2,7 +2,7 @@
 
 - Status: proposed
 - Date: 2026-11-21
-- Deciders: A, B, C (to be confirmed)
+- Deciders: C (proposal; A and B to review in PR #3)
 
 ## Context
 
@@ -18,8 +18,15 @@ Two existing statements pull in different directions: §6 of the integration pla
 
 ## Decision
 
-_To be written by the team (A, B, C)._
+Option 1: **thresholds in a Redis key (`iw:settings:thresholds`) written by the API; analytics reads it and emits `finding.high_risk`.**
+
+Why (C):
+- It keeps the event flow of [integration-plan.md](../integration-plan.md) §6, where analytics publishes `finding.high_risk` on `iw:events`; nothing in the flow changes.
+- The API relay stays a plain pass-through from `iw:events` to Socket.IO with no threshold logic, which is less work before Integration #1.
 
 ## Consequences
 
-_To be written together with the decision._
+- No extra table and fast reads; consistent with §6 of [integration-plan.md](../integration-plan.md), which lists `finding.high_risk` among the events analytics publishes on `iw:events`.
+- Contradicts [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) ("the threshold is applied in `api`, never here"); that file must be changed if this ADR is accepted. `risk_level` is still derived by the API for REST responses ([0301](0301-contracts-v1.md)), so the threshold logic lives in two services and both must read the same key.
+- A threshold change from the calibration panel affects only findings analysed after analytics re-reads the key; findings already published are not re-evaluated for `finding.high_risk`.
+- Redis must be persistent (AOF or RDB in `docker compose`), otherwise thresholds are lost on restart; the API needs a default when the key is missing.

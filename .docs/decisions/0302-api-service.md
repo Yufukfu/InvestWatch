@@ -2,7 +2,7 @@
 
 - Status: proposed
 - Date: 2026-11-21
-- Deciders: A, B, C (to be confirmed)
+- Deciders: C (proposal; A and B to review in PR #3)
 
 ## Context
 
@@ -18,8 +18,15 @@ Constraints from the UKNF task (`doc/Opis Wyzwania HackNation UKNF 19.11.pdf`): 
 
 ## Decision
 
-_To be written by the team (A, B, C)._
+Option 1: **a separate `api/` service in Python (FastAPI + python-socketio), owned by C.**
+
+Why (C):
+- The UKNF task explicitly asks for frontend, backend and AI engine as separate services, and architecture is 20% of the score; a dedicated `api/` service meets that most directly.
+- Slow LLM calls in analytics cannot stall REST/WebSocket responses, because the API runs in its own process and container.
 
 ## Consequences
 
-_To be written together with the decision._
+- Matches the integration plan and the task's "separate services" requirement; analytics stays an AI engine only.
+- The Pydantic models of the contracts can be shared with analytics or generated once from the schemas.
+- Needs B's OK for the new top-level `api/` directory, a `CLAUDE.md` inside `api/`, and `api` added to `SERVICE_DIRS` in `.claude/skills/iw-docs-update/scripts/docs-check.mjs`; [STATUS.md](../STATUS.md) blocker about the missing `api/` closes.
+- One more container in `docker compose`; `web/` stays on mocks until the API serves the first endpoints, so it remains on the critical path for Integration #1.

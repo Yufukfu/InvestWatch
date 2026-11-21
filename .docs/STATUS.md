@@ -19,7 +19,7 @@ Last updated: 2026-11-21 (Sat) by A. Update this file when a milestone moves or 
 |---|---|---|---|
 | scraper | A | SDLC setup PR in progress; first change `scraper-v1` next | none yet |
 | dashboard | B | n/a | none yet |
-| analytics, api, contracts | C | plans written; contracts draft v1 in `contracts/`; ADR drafts 0301-0305 proposed, waiting for team decisions | none yet |
+| analytics, api, contracts | C | plans written; contracts draft v1 in `contracts/`; ADRs 0301-0305 proposed with C's decisions (0301 minimal core, 0302 Python `api/`, 0303 Alembic in `api/`, 0304 swappable cloud LLM, 0305 Redis thresholds), waiting for A and B to review | none yet |
 
 ## Blockers and open decisions
 
