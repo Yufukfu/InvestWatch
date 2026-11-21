@@ -14,7 +14,7 @@ The seed command SHALL read the entries of every `*.toml` file in the seed direc
 
 #### Scenario: Validity rules
 - **WHEN** an entry is checked
-- **THEN** it is valid only if `name` is non-empty, `platform` is one of the contract's platform values (`web` when omitted; every entry of `sources.toml` is `web`), `source_kind` is `firm_own`, `third_party` or `unknown`, `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host and without credentials or spaces, `schedule_cron` is a valid cron expression of exactly five fields or omitted, and no other entry has the same URL
+- **THEN** it is valid only if `name` is non-empty, `platform` is one of the contract's platform values (`web` when omitted; every entry of `sources.toml` is `web`), `source_kind` is `firm_own`, `third_party` or `unknown`, `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host, without credentials, spaces or control characters, and with no port or port 443, `schedule_cron` is a valid cron expression of exactly five fields or omitted, and no other entry has the same URL
 
 #### Scenario: Invalid entry aborts the whole run
 - **WHEN** one entry has `target_modules = []` and the others are valid
