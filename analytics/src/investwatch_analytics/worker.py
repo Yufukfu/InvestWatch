@@ -29,7 +29,7 @@ from . import logging_setup
 from .config import ConfigError, Settings, WorkerSettings, uses_seed_registry
 from .events import Publisher, RedisPublisher
 from .health import start_health_server
-from .pipeline import analyze
+from .pipeline import analyze, default_signal_catalogues
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
 from .storage import InvalidDocument, NotFound, StoreMisconfigured, StoreUnavailable
@@ -292,6 +292,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
                         "meaningful until REGISTRY_CSV names a real KNF registry",
                         extra={"reason": "registry_seed", "registry_csv": str(settings.registry_csv)})
         catalogue = Catalogue.load()
+        default_signal_catalogues()  # M1/M3 catalogues (analytics-m1-m3): a bad YAML stops startup, not a document
         store = PostgresStore(worker_settings.database_url, max_document_bytes=worker_settings.max_document_bytes)
     except (ConfigError, StoreMisconfigured) as exc:
         log.error("worker not started", extra={"reason": "config_error", "error": str(exc)})
