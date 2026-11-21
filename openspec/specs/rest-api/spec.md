@@ -199,12 +199,12 @@ The API SHALL compute `risk_level` for every finding it returns, and for the `ri
 #### Scenario: URL kept as sent
 - **WHEN** a client posts `url: "https://Alfa.example"` (no trailing slash, mixed case)
 - **THEN** the stored and returned `url` is exactly `https://Alfa.example`
-- **AND** `url` SHALL be stored exactly as sent
+- **AND** wherever a `url` is sent (POST or PATCH), it SHALL be stored exactly as sent
 
 #### Scenario: URL a parser could read differently
 - **WHEN** a client posts a `url` with a leading space, a trailing newline, a tab, a NUL, a DEL or a backslash (for example `https://good.example\@evil.example`)
 - **THEN** the response is 422 and no row is created
-- **AND** `url` SHALL be an http(s) URL without credentials, whitespace, control characters or backslashes
+- **AND** wherever a `url` is sent (POST or PATCH), it SHALL be an http(s) URL without credentials, whitespace, control characters or backslashes
 
 #### Scenario: NUL in a text field
 - **WHEN** a client posts or patches a `name` or `schedule_cron` containing a NUL character

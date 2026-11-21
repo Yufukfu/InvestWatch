@@ -70,7 +70,7 @@ R2 SHALL pass when the text contains an advertising label from its dictionary (f
 #### Scenario: Not only an ad
 - **WHEN** the text is `To nie tylko reklama – to Twoja szansa.`
 - **THEN** R2 is `pass`
-- **AND** `nie tylko`, `jedynie`, `only`, `just` between the negation and the label SHALL cancel the negation
+- **AND** `nie tylko`, `jedynie`, `only`, `just` between the negation and the label cancel the negation
 
 ### Requirement: R3 risk information next to return claims
 R3 SHALL be `not_applicable` when the text makes no return claim (percent figures, or return vocabulary such as `zysk`, `zarob…`, `stopa zwrotu`). It SHALL pass when every return-claim sentence has a risk warning within the configured sentence window (default ±2). Otherwise it SHALL fail, quoting the first uncovered claim. A warning marked as a footnote (leading `*` or `¹`) SHALL NOT count as next to the claim. A loss denial (`bez ryzyka`, `nie stracisz`) SHALL NOT count as a warning.
@@ -99,7 +99,7 @@ R3 SHALL be `not_applicable` when the text makes no return claim (percent figure
 #### Scenario: Affirmed exclusion of loss
 - **WHEN** `Zarabiaj 12% rocznie.` is followed by `Nasz fundusz nie tylko wyklucza straty, ale daje spokój.`
 - **THEN** R3 is `fail`
-- **AND** an affirmed exclusion (`wykluczamy straty`, `nie tylko wyklucza straty`, `gwarantujemy brak straty`) SHALL be treated as a denial
+- **AND** an affirmed exclusion (`wykluczamy straty`, `nie tylko wyklucza straty`, `gwarantujemy brak straty`) is a denial
 
 #### Scenario: Plural and nie ma denials
 - **WHEN** `Zarabiaj 12% rocznie.` is followed by `Zero ryzyk.` or `Nie ma ryzyka utraty kapitału.`

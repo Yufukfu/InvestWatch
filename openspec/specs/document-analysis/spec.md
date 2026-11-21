@@ -118,7 +118,7 @@ The M2 finding SHALL list only the results of implemented rules. It SHALL carry 
 - **WHEN** R3 is `not_applicable`
 - **THEN** the summary does not list R3 among the checked rules and says it does not apply
 - **AND** the summary SHALL name as checked only the rules that applied, and name `not_applicable` rules separately
-- **AND** the score is 0 when no rule applies
+- **AND** when no rule applies (every rule is `not_applicable`), the score is 0
 
 ### Requirement: Command-line batch
 The CLI SHALL validate each document of a batch on its own. An invalid document SHALL be logged with its index and the error locations and types, without input values, and skipped. The CLI SHALL exit 2 without writing to stdout when the input has documents and none is valid. If analyzing a valid document raises, the CLI SHALL log the document id and the exception type (no input values), skip that document, still write the findings of the others, and exit 1.

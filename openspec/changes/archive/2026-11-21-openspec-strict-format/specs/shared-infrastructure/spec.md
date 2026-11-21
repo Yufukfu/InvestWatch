@@ -47,7 +47,7 @@ The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pul
 
 #### Scenario: Only the pull reaches the internet
 - **WHEN** the `llm` profile runs
-- **THEN** only the `ollama-pull` one-shot SHALL reach the internet
+- **THEN** of `ollama` and `ollama-pull`, only the `ollama-pull` one-shot SHALL reach the internet
 
 ### Requirement: Network isolation
 Only the gateway SHALL publish host ports in the default stack. `redis`, `minio`, `postgres` and `ollama` SHALL be on `data`, which stays `internal`. Outbound internet SHALL be available only to services on a non-internal network. Those are `egress`, which a module joins for internet access, and `edge`, which carries the gateway's published ports and so cannot be internal; a module joins `edge` only to be routed.
