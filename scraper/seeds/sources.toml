@@ -1,0 +1,103 @@
+# The vetted web sources the scraper starts with (OpenSpec change scraper-v2-sources, design.md decision 9).
+# Loaded by `python -m iw_scraper.seed`; a source whose URL is already in `sources` is left alone.
+# Every URL is the final one (no redirect) and was fetched with our engine: HTTP 200, robots allowed, static text.
+# `scraper/tests/test_seed_live.py` re-checks that on demand. schedule_cron is UTC; the XTB rows are staggered by
+# minute so one domain's concurrency cap and request interval are not hit at once.
+# No entry says that a named business breaks a rule: a row is a page that matches a signal, a negative control
+# (a page that should NOT raise a finding) or a list page.
+
+# --- M2: pages published by KNF-registered firms (rendered and checked by scraper-v3-render) ---
+
+[[source]]
+name = "XTB IKE"
+url = "https://www.xtb.com/pl/ike"
+source_kind = "firm_own"
+target_modules = ["M2"]
+schedule_cron = "0 6 * * *"
+
+[[source]]
+name = "XTB IKZE"
+url = "https://www.xtb.com/pl/ikze"
+source_kind = "firm_own"
+target_modules = ["M2"]
+schedule_cron = "10 6 * * *"
+
+[[source]]
+name = "XTB forex (CFD)"
+url = "https://www.xtb.com/pl/forex"
+source_kind = "firm_own"
+target_modules = ["M2"]
+schedule_cron = "20 6 * * *"
+
+# A frozen 2024 campaign page: it should not change during the demo window, hence weekly.
+[[source]]
+name = "mBank IKE promo 2024 (frozen campaign page)"
+url = "https://www.mbank.pl/lp2/2024/c1/indywidualny/inwestycje/gielda/promocja_ike_ikze_2024/"
+source_kind = "firm_own"
+target_modules = ["M2"]
+schedule_cron = "0 6 * * 1"
+
+[[source]]
+name = "mBank IKE eMakler"
+url = "https://www.mbank.pl/indywidualny/inwestycje-i-oszczednosci/emerytura/ike-emakler"
+source_kind = "firm_own"
+target_modules = ["M2"]
+schedule_cron = "5 6 * * *"
+
+# --- M1: pages that rank or review registered firms (affiliate, ranking and review sites) ---
+
+[[source]]
+name = "Moneteo broker ranking"
+url = "https://moneteo.com/rankingi/brokerzy-forex"
+source_kind = "third_party"
+target_modules = ["M1"]
+schedule_cron = "0 7 * * *"
+
+[[source]]
+name = "Moneteo XTB review"
+url = "https://moneteo.com/analizy/rachunek-forex-standard-xtb"
+source_kind = "third_party"
+target_modules = ["M1"]
+schedule_cron = "10 7 * * *"
+
+[[source]]
+name = "Comparic broker ranking"
+url = "https://comparic.pl/brokerzy-2/"
+source_kind = "third_party"
+target_modules = ["M1"]
+schedule_cron = "0 7 * * *"
+
+[[source]]
+name = "Take Profit broker guide"
+url = "https://takeprofitapp.com/pl/learn/najlepszy-broker-dla-poczatkujacych-pl-2026"
+source_kind = "third_party"
+target_modules = ["M1"]
+schedule_cron = "0 7 * * 1"
+
+# --- M3: entities whose registry status the scraper does not determine (source_kind unknown; analytics routes M3
+# by registry mismatch). Two negative controls and one list page; the M3 positives of the demo are the Telegram
+# channels seeded by scraper-v2-social. A named business is added here only by a human, never by an agent. ---
+
+# Negative control: a large advisory firm's family-office page, which should NOT raise an M3 finding.
+[[source]]
+name = "EY family office (negative control)"
+url = "https://www.ey.com/pl_pl/insights/law/ey-family-office"
+source_kind = "unknown"
+target_modules = ["M3"]
+schedule_cron = "0 8 * * 1"
+
+# Negative control, same reason.
+[[source]]
+name = "Grant Thornton family office (negative control)"
+url = "https://grantthornton.pl/usluga/kancelaria-prawna/family-office/"
+source_kind = "unknown"
+target_modules = ["M3"]
+schedule_cron = "0 8 * * 1"
+
+# A list page about Telegram signal groups: a loose match for M3 and a candidate source list for M1.
+[[source]]
+name = "icobench Telegram signal groups list (list page)"
+url = "https://icobench.com/pl/akademia/najlepsze-grupy-telegram-dla-sygnalow-forex/"
+source_kind = "unknown"
+target_modules = ["M1", "M3"]
+schedule_cron = "0 8 * * 1"
