@@ -61,3 +61,16 @@
 | `eurotrade` | score 0.74 | score 0.538 | Follows from the rows above |
 | `m2-bank-ok` | R3 `pass` | R3 `not_applicable` | Pre-existing: no return claim in the text |
 | `m2-bank-ok` | score 0.12 | score 0 | Nothing fails |
+
+## Review findings, group 4
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R26 | review group 4 | R17 deterministic false fails: `Rada Nadzorcza zatwierdziła…`, negated approval (`KNF nie zaaprobował…`), the lawful prospectus statement, `certyfikat ISO … i podlega nadzorowi KNF` | `fix-here`: supervisory board and `nadzorowany przez <non-supervisor>` are not mentions; approval excludes (negation, prospectus); `certyfikat` only of the supervisor; spec updated |
+| R27 | review group 4 | R18 missed `Bezpieczeństwo … gwarantuje nadzór KNF` | `fix-here`: `bezpieczeństw…` and `gwarant…`; a negated guarantee (`nie gwarantuje bezpieczeństwa`) is excluded |
+| R28 | review group 4 | `nadzorowany przez doświadczonych zarządzających … bezpieczny` was an R18 fail | `fix-here` (with R26) |
+| R29 | review group 4 | `licencję na oprogramowanie`, `rynek regulowany` were supervisor mentions (wasted LLM calls later) | `fix-here`: `licencja` only of a supervisor or for brokerage activity, `regulowany przez` |
+| R30 | review group 4 | An unhashable `llm.when` raised `TypeError` instead of a catalogue error | `fix-here` |
+| R31 | review group 4, plausible | `Fundusz nadzorowany przez KNF, środki chronione przez system rekompensat.` is an R18 fail; a factual compensation-scheme statement may be lawful | `new-item`: product question for Damian (calibration with the gold set) |
+| R32 | review group 4, can't verify | Group 8 must skip R17's deterministic fail under `when: always`, and decide whether an LLM `pass` without a quote replaces the rules-only evidence | `fix-here` in group 8 (R17 `ask_llm` override; merge keeps rules evidence when the verdict has none) |
+| R33 | review group 4, declined | English variants (`regulated and authorised by`, `licensed by`) | `new-item`: extend with the gold set |

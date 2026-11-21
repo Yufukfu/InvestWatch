@@ -622,3 +622,62 @@ def test_r4_displayed_ratio_never_contradicts_the_verdict(registry, catalogue):
     blocks = [block("Zysk 8% rocznie na naszym koncie maklerskim.", size=20), block("Ryzyko utraty.", size=14.99)]
     r = run("Zysk 8% rocznie na naszym koncie maklerskim. Ryzyko utraty.", registry, catalogue, blocks=blocks)["R4"]
     assert r.result == "fail" and "0,749" in r.explanation
+
+
+# ---- group 4 review fixes ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("text", [
+    "KNF nie zaaprobował tego produktu.",
+    "Komisja Nadzoru Finansowego nie zatwierdza materiałów reklamowych.",
+    "Zatwierdzenie prospektu przez KNF nie powinno być rozumiane jako poparcie dla oferowanych akcji.",
+    "Spółka posiada certyfikat ISO 27001 i podlega nadzorowi KNF.",
+])
+def test_r17_lawful_or_negated_wording_is_not_a_rules_fail(text, registry, catalogue):
+    assert run(text, registry, catalogue)["R17"].result == "pass"
+
+
+@pytest.mark.parametrize("text", [
+    "Rada Nadzorcza zatwierdziła wypłatę dywidendy.",
+    "Kup licencję na oprogramowanie.",
+    "Rynek regulowany GPW.",
+    "Twój portfel nadzorowany przez doświadczonych zarządzających jest bezpieczny.",
+])
+def test_non_supervisor_words_are_not_mentions(text, registry, catalogue):
+    res = run(text, registry, catalogue)
+    assert res["R17"].result == "not_applicable" and res["R18"].result == "not_applicable"
+
+
+@pytest.mark.parametrize("text", [
+    "Licencja KNF na prowadzenie działalności maklerskiej.",
+    "Posiadamy licencję maklerską.",
+    "Podmiot regulowany przez CySEC.",
+    "Fundusz nadzorowany przez Komisję Nadzoru Finansowego.",
+])
+def test_real_supervisor_mentions_still_count(text, registry, catalogue):
+    assert run(text, registry, catalogue)["R17"].result == "pass"
+
+
+@pytest.mark.parametrize("text", [
+    "Bezpieczeństwo Twoich środków gwarantuje nadzór KNF.",
+    "Nadzór KNF gwarantuje, że Twoje środki nie przepadną.",
+    "Bezpieczeństwo Twoich środków to nadzór KNF.",
+])
+def test_r18_more_safety_wordings(text, registry, catalogue):
+    assert run(text, registry, catalogue)["R18"].result == "fail"
+
+
+def test_r18_negated_guarantee_is_not_a_safety_argument(registry, catalogue):
+    text = "Nadzór KNF nie gwarantuje bezpieczeństwa inwestycji."
+    assert run(text, registry, catalogue)["R18"].result == "pass"
+
+
+@pytest.mark.parametrize("bad", ["[always]", "{a: 1}"])
+def test_llm_when_unhashable_fails_cleanly(tmp_path, bad):
+    from investwatch_analytics.rules.engine import CatalogueError
+
+    anchor = "  - id: R1\n    name: Identyfikacja firmy\n"
+    p = tmp_path / "rules.yaml"
+    p.write_text(_catalogue_text().replace(anchor, anchor + f"    llm: {{question: 'Czy?', when: {bad}}}\n"), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="R1 llm.when"):
+        Catalogue.load(p)

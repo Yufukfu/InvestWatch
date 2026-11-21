@@ -30,6 +30,7 @@ KNOWN_PARAMS = {
     "figure_patterns", "figure_exclude_patterns", "past_patterns", "future_patterns", "disclaimer_patterns",
     "hiding_regions", "figure_extra_exclude_patterns", "min_ratio",
     "supervisor_patterns", "approval_patterns", "safety_patterns",
+    "supervisor_exclude_patterns", "approval_exclude_patterns", "safety_exclude_patterns",
 }
 _RULES: dict[str, type["Rule"]] = {}
 
@@ -156,7 +157,7 @@ def _check_llm(path: Path, rule_id: str, block: Any) -> dict[str, str] | None:
     if not isinstance(question, str) or not question.strip():
         raise CatalogueError(f"{path}: {rule_id} llm.question must be a non-empty string")
     when = block.get("when", "uncertain")
-    if when not in LLM_WHEN:
+    if not isinstance(when, str) or when not in LLM_WHEN:
         raise CatalogueError(f"{path}: {rule_id} llm.when must be one of {sorted(LLM_WHEN)}, got {when!r}")
     return {"question": question.strip(), "when": when}
 

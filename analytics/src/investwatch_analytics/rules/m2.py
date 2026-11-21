@@ -377,11 +377,13 @@ class _SupervisorMention(Rule):
     """Detect a supervisor mention first, then classify how it is used (ZASÓB R17 / R18)."""
 
     @cached_property
-    def _supervisor(self) -> list[re.Pattern]:
-        return compile_patterns(self.spec.params.get("supervisor_patterns", []))
+    def _supervisor(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
+        p = self.spec.params
+        return compile_patterns(p.get("supervisor_patterns", [])), compile_patterns(p.get("supervisor_exclude_patterns", []))
 
     def mentions(self, ctx: Context) -> list[int]:
-        return [i for i, s in enumerate(ctx.pre.sentences) if any(p.search(s.text) for p in self._supervisor)]
+        inc, exc = self._supervisor
+        return [i for i, s in enumerate(ctx.pre.sentences) if R3RiskNextToReturns._hits(s.text, inc, exc)]
 
 
 @register
@@ -389,15 +391,16 @@ class R17SupervisoryApproval(_SupervisorMention):
     rule_id = "R17"
 
     @cached_property
-    def _approval(self) -> list[re.Pattern]:
-        return compile_patterns(self.spec.params.get("approval_patterns", []))
+    def _approval(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
+        p = self.spec.params
+        return compile_patterns(p.get("approval_patterns", [])), compile_patterns(p.get("approval_exclude_patterns", []))
 
     def evaluate(self, ctx: Context) -> RuleResult:
         sentences = ctx.pre.sentences
         idx = self.mentions(ctx)
         if not idx:
             return self.result("not_applicable", None, "Materiał nie odwołuje się do organu nadzoru.")
-        approving = next((i for i in idx if any(p.search(sentences[i].text) for p in self._approval)), None)
+        approving = next((i for i in idx if R3RiskNextToReturns._hits(sentences[i].text, *self._approval)), None)
         if approving is not None:
             return self.result(
                 "fail", sentences[approving].text,
@@ -414,11 +417,12 @@ class R18SupervisionAsSafety(_SupervisorMention):
     rule_id = "R18"
 
     @cached_property
-    def _safety(self) -> list[re.Pattern]:
-        return compile_patterns(self.spec.params.get("safety_patterns", []))
+    def _safety(self) -> tuple[list[re.Pattern], list[re.Pattern]]:
+        p = self.spec.params
+        return compile_patterns(p.get("safety_patterns", [])), compile_patterns(p.get("safety_exclude_patterns", []))
 
     def _safe(self, text: str) -> bool:
-        return any(p.search(text) for p in self._safety)
+        return R3RiskNextToReturns._hits(text, *self._safety)
 
     def evaluate(self, ctx: Context) -> RuleResult:
         sentences = ctx.pre.sentences

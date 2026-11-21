@@ -210,18 +210,28 @@ rules:
         - '\bU?KNF\b'
         - '\bnadz[oó]r\w*'
         - '\bESMA\b'
-        - '\bregulowan\w*'
-        - '\blicencj\w*'
+        - '\bregulowan\w*\s+(?:przez|i\s+nadzorowan)'
+        - '\blicencj\w*\s+(?:\w+\s+){0,2}(?:U?KNF|ESMA|Komisj\w*|maklersk\w*|na\s+prowadzenie)'
         - '\bsupervis\w*'
         - '\bregulated\s+by\b'
         - '\b(?:FCA|CySEC|BaFin)\b'
+      # Not the regulator: a company's supervisory board, or "nadzorowany przez" someone other than a supervisor.
+      supervisor_exclude_patterns: &supervisor_exclude_patterns
+        - '\brad\w*\s+nadzorcz\w*'
+        - '\bnadz[oó]r\w*\s+przez\s+(?!(?:U?KNF|ESMA|Komisj\w*|FCA|CySEC|BaFin)\b)\w+(?:\s+\w+){0,2}'
       approval_patterns:
         - '\bzatwierdz\w*'
         - '\bzaaprobowa\w*'
         - '\baprob\w*'
         - '\b(?:rekomendowan|polecan)\w*\s+przez\b'
-        - '\bcertyfik\w*'
+        - '\bcertyfik\w*\s+(?:\w+\s+){0,2}(?:U?KNF|ESMA|Komisj\w*)'
         - '\b(?:approved|endorsed|certified|recommended)\s+by\b'
+      # Negated approval and the lawful prospectus statement are not a rules fail (the LLM still judges them).
+      approval_exclude_patterns:
+        - '\bnie\s+(?:\w+\s+){0,2}(?:zatwierdz|zaaprob|aprob|rekomend|polec|certyfik|approv|endors)\w*'
+        - '\bzatwierdzeni\w*\s+prospekt\w*'
+        - '\bprospekt\w*\s+(?:\w+\s+){0,3}zatwierdz\w*'
+        - '\bnot\s+(?:been\s+)?(?:approved|endorsed)'
     llm:
       when: always
       question: >-
@@ -240,9 +250,11 @@ rules:
     implemented: true
     params:
       supervisor_patterns: *supervisor_patterns
+      supervisor_exclude_patterns: *supervisor_exclude_patterns
       safety_patterns:
         - '\bbezpieczn\w*'
-        - '\bgwarantowan\w*'
+        - '\bbezpiecze[nń]\w*'
+        - '\bgwarant\w*'
         - '\bpewn(?:a|e|y|ą|ość|ości)\b'
         - '\bchronion\w*'
         - '\bbez\s+ryzyka\b'
@@ -250,6 +262,10 @@ rules:
         - '\bsecure\w*'
         - '\bguaranteed\b'
         - '\bprotected\b'
+      # A negated guarantee is a disclaimer, not a safety argument ("nadzór KNF nie gwarantuje bezpieczeństwa").
+      safety_exclude_patterns:
+        - '\bnie\s+(?:\w+\s+){0,2}(?:gwarant|zapewni|chroni)\w*(?:\s+\w+){0,3}'
+        - '\b(?:does|do|is|are)\s+not\s+(?:\w+\s+)?(?:guarantee|protect|secure)\w*(?:\s+\w+){0,3}'
       window: 1
     llm:
       when: uncertain

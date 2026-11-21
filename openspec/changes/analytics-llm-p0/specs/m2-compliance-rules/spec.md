@@ -192,7 +192,15 @@ R14 SHALL be `not_applicable` when no sentence presents past performance: a retu
 - **THEN** R14 is `pass` with the footnote as evidence and R6 is `fail`
 
 ### Requirement: R17 implying supervisory approval
-Stating supervision alone SHALL NOT be a violation; R17 covers a mention used to suggest approval of the product or service (ZASÓB). R17 SHALL be `not_applicable` when the text does not mention a supervisor (`KNF`, `UKNF`, `Komisja Nadzoru Finansowego`, `ESMA`, `nadzór`/`nadzorowany`, `regulowany`, `licencja`, `supervised`, `regulated by`). It SHALL fail, quoting the sentence, when an approval word (`zatwierdzon…`, `zaaprobowan…`, `aprobat…`, `rekomendowan… przez`, `certyfikat…`, `approved by`, `endorsed by`) is in the same sentence as a mention. Otherwise its rules-only result SHALL be `pass`, quoting the first mention, and it SHALL be deferred to the LLM (`llm.when: always`), which judges whether the wording suggests that the supervisor approves the product.
+Stating supervision alone SHALL NOT be a violation; R17 covers a mention used to suggest approval of the product or service (ZASÓB). R17 SHALL be `not_applicable` when the text does not mention a supervisor (`KNF`, `UKNF`, `Komisja Nadzoru Finansowego`, `ESMA`, `nadzór`/`nadzorowany`, `regulowany przez`, a `licencja` of a supervisor or for brokerage activity, `supervised`, `regulated by`); a company's supervisory board (`rada nadzorcza`) and `nadzorowany przez` someone who is not a supervisor SHALL NOT count as a mention. It SHALL fail, quoting the sentence, when an approval word (`zatwierdzon…`, `zaaprobowan…`, `aprobat…`, `rekomendowan… przez`, a `certyfikat` of the supervisor, `approved by`, `endorsed by`) is in the same sentence as a mention. A negated approval (`KNF nie zatwierdza…`) and the lawful prospectus statement (`zatwierdzenie prospektu przez KNF…`) SHALL NOT be a rules-only fail. Otherwise its rules-only result SHALL be `pass`, quoting the first mention, and it SHALL be deferred to the LLM (`llm.when: always`), which judges whether the wording suggests that the supervisor approves the product.
+
+#### Scenario: Negated approval or prospectus statement
+- **WHEN** the text is `Komisja Nadzoru Finansowego nie zatwierdza materiałów reklamowych.` or `Zatwierdzenie prospektu przez KNF nie powinno być rozumiane jako poparcie…`
+- **THEN** R17 is `pass` rules-only
+
+#### Scenario: Supervisory board is not a supervisor
+- **WHEN** the text is `Rada Nadzorcza zatwierdziła wypłatę dywidendy.`
+- **THEN** R17 and R18 are `not_applicable`
 
 #### Scenario: Explicit approval
 - **WHEN** the text contains `Produkt zatwierdzony przez KNF.`
@@ -211,7 +219,7 @@ Stating supervision alone SHALL NOT be a violation; R17 covers a mention used to
 - **THEN** R17 is `not_applicable`
 
 ### Requirement: R18 supervision as a safety argument
-R18 SHALL be `not_applicable` without a supervisor mention (same dictionary as R17). It SHALL fail, quoting the sentence, when a safety word (`bezpieczn…`, `gwarantowan…`, `pewna`/`pewne`/`pewny`/`pewność`, `chronion…`, `bez ryzyka`, `safe`, `secure`, `guaranteed`, `protected`) is in the same sentence as a mention; this verdict SHALL NOT be deferred. When a safety word is only within one sentence of a mention, the rules-only result SHALL be `uncertain`, quoting the mention sentence, and it SHALL be deferred to the LLM. Otherwise R18 SHALL pass.
+R18 SHALL be `not_applicable` without a supervisor mention (same dictionary as R17). It SHALL fail, quoting the sentence, when a safety word (`bezpieczn…`, `bezpieczeństwo`, `gwarant…`, `pewna`/`pewne`/`pewny`/`pewność`, `chronion…`, `bez ryzyka`, `safe`, `secure`, `guaranteed`, `protected`; a negated guarantee such as `nie gwarantuje bezpieczeństwa` SHALL NOT count) is in the same sentence as a mention; this verdict SHALL NOT be deferred. When a safety word is only within one sentence of a mention, the rules-only result SHALL be `uncertain`, quoting the mention sentence, and it SHALL be deferred to the LLM. Otherwise R18 SHALL pass.
 
 #### Scenario: Same sentence
 - **WHEN** `m2-alfa-landing` is analyzed (`Działamy pod nadzorem KNF – Twoje środki są bezpieczne.`)
