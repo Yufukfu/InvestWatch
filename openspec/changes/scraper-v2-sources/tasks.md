@@ -22,7 +22,7 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 3. Closing
 
-- [ ] 3.1 Apply the `iw-docs-update` skill: `scraper/CLAUDE.md` and `scraper/README.md` (the seed step and `scraper/seeds/sources.toml`), `.docs/status/scraper.md` (your row; M3 positives come from `scraper-v2-social` and icobench, the KNF-warnings pick is an optional follow-up), `.docs/INDEX.md` if the router needs a "how do I add a source" line, `docs-check` clean, and the `iw-ai-log` row. No new dependency, so no `pip-audit` row; say so in the PR body
+- [x] 3.1 Apply the `iw-docs-update` skill: `scraper/CLAUDE.md` and `scraper/README.md` (the seed step and `scraper/seeds/sources.toml`), `.docs/status/scraper.md` (your row; M3 positives come from `scraper-v2-social` and icobench, the KNF-warnings pick is an optional follow-up), `.docs/INDEX.md` if the router needs a "how do I add a source" line, `docs-check` clean, and the `iw-ai-log` row. No new dependency, so no `pip-audit` row; say so in the PR body
 - [ ] 3.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up

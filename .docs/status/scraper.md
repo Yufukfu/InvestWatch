@@ -10,9 +10,12 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - `scraper-orchestration` (queue, run lock, concurrency cap, events, scan requests, scheduler, health, `run_source`, the `worker` and `scheduler` commands) is implemented and tested end to end on real Redis, PostgreSQL and MinIO; the opt-in live KNF smoke run passed once (2026-11-21). The PR is next.
 - ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
+- `scraper-v2-sources` (12 vetted M1/M2/M3 web sources in `scraper/seeds/sources.toml`, validated and idempotent seed loader, host-guard test, opt-in live check) is implemented and tested, stacked on `scraper-orchestration` (PR #38). The live check has not been run yet (needs a human go-ahead). M3 positives come from `scraper-v2-social` (Telegram channels) and the icobench list page; naming a business from the KNF warnings list is an optional, human-only follow-up.
+
 ## Active OpenSpec changes
 
-- `scraper-orchestration` (PR pending)
+- `scraper-orchestration` (PR #38)
+- `scraper-v2-sources` (stacked on PR #38)
 
 ## Blockers and open decisions
 
