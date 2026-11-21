@@ -38,7 +38,7 @@ def test_patch_status_is_persisted_and_bumps_updated_at(client):
     assert client.get(f"/api/findings/{f['id']}").json()["status"] == "confirmed"
 
 
-@pytest.mark.parametrize("body", [{"status": "approved"}, {}, {"unknown": 1}])
+@pytest.mark.parametrize("body", [{"status": "approved"}, {}, {"unknown": 1}, {"status": None}])
 def test_patch_rejects_invalid_body_and_keeps_the_finding(client, body):
     f = a_finding(client)
 

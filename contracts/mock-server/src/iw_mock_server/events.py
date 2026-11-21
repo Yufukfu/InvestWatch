@@ -43,6 +43,7 @@ class EventHub:
         self._templates = itertools.cycle(sorted(store.findings))
         self._replay_task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
+        self.clients: set[str] = set()  # connected sids on /events; replay runs only while non-empty
 
     def _spawn(self, coro) -> None:
         task = asyncio.get_running_loop().create_task(coro)
@@ -80,6 +81,8 @@ class EventHub:
         interval = self.settings.replay_interval_s
         while True:
             await asyncio.sleep(interval)
+            if not self.clients:
+                continue
             try:
                 self.replay_once()
             except Exception:  # keep the loop alive; a bad template must not stop alerts
@@ -95,11 +98,12 @@ class EventHub:
         self._spawn(self._scan(source_id))
 
     async def _scan(self, source_id: str) -> None:
+        generation = self.store.generation
         await self.emit("scan.started", {"source_id": source_id, "documents": None, "status": None})
         await asyncio.sleep(self.settings.scan_delay_s)
         documents = sum(1 for d in self.store.documents.values() if d.get("source_id") == source_id)
         source = self.store.sources.get(source_id)
-        if source is not None:
+        if source is not None and self.store.generation == generation:  # skip if reset meanwhile
             source.update(last_run_at=_now(), last_run_status="ok", documents_count=documents)
         await self.emit("scan.finished", {"source_id": source_id, "documents": documents, "status": "ok"})
 
@@ -110,8 +114,7 @@ def create_asgi_app(settings: Settings | None = None, store: Store | None = None
     store = store or Store(load_mock_data(settings.contracts_dir))
     api = create_app(settings, store)
 
-    origins = "*" if "*" in settings.cors_origins else list(settings.cors_origins)
-    sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=origins)
+    sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=list(settings.cors_origins))
     hub = EventHub(sio, store, settings)
     api.state.notify = hub.notify
     api.state.start_scan = hub.start_scan
@@ -119,11 +122,12 @@ def create_asgi_app(settings: Settings | None = None, store: Store | None = None
 
     @sio.on("connect", namespace=NAMESPACE)
     async def on_connect(sid, environ, auth=None):
+        hub.clients.add(sid)
         hub.ensure_replay()
 
     @sio.on("disconnect", namespace=NAMESPACE)
     async def on_disconnect(sid, reason=None):
-        pass
+        hub.clients.discard(sid)
 
     app = socketio.ASGIApp(sio, other_asgi_app=api, socketio_path="socket.io")
     app.hub = hub

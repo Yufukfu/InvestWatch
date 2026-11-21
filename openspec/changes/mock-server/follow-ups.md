@@ -24,4 +24,13 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 18 | review group 2 | CORS headers missing on unhandled 500s; `MOCK_PORT` upper bound; `nan`/`inf` intervals; partial first hour in day buckets | wont-fix (mock-only edge cases; no 500s expected, values come from the team's own `.env`) |
 | 20 | group 5 | `docker build` of `contracts/mock-server/Dockerfile` not run: Docker Desktop was not running on C's machine | new-item (build once Docker is up, before the PR is merged; `python -m iw_mock_server` is covered by the smoke tests) |
 | 21 | group 5 | `pip-audit -r requirements.txt -r requirements-dev.txt` (pip-audit 2.10.1, 2026-11-21) | docs (result: "No known vulnerabilities found"; for the PR body) |
+| 22 | review groups 3-4 | sync routes ran in the thread pool while replay wrote the store on the loop: `dictionary changed size during iteration`, 500s under load | fix-here (all routes `async def`; stress test `test_reads_stay_consistent_while_replay_writes`) |
+| 23 | review groups 3-4 | `reset()` published a half-built store; `mock_reset` ran in a thread | fix-here (dicts built first, then swapped; route async) |
+| 24 | review groups 3-4 | a scan in flight wrote into the store after a reset | fix-here (`Store.generation`; the scan skips its update when it changed) |
+| 25 | review groups 3-4 | replay kept running with no client connected | fix-here (replay pauses while `/events` has no clients, as the spec says) |
+| 26 | review groups 3-4 | scan test did not check that `scan.started` comes before `scan.finished` | fix-here (ordered event log in the test client) |
+| 27 | review groups 3-4 | `finding.created` and `finding.high_risk` are emitted from separate tasks; order likely but not guaranteed | docs (dashboard must not depend on their order; README) |
+| 28 | review groups 3-4 | exceptions in spawned emit tasks go to asyncio's default log; replay task not cancelled at shutdown; replayed findings not schema-validated in tests | wont-fix (mock-only; findings are deep copies of validated mocks) |
+| 29 | mutation check | the `"*"` → string conversion for Socket.IO origins was a no-op (a list with `"*"` works the same) | fix-here (conversion removed) |
+| 30 | mutation check | smoke test blocked on `stdout.read()` while the server was still running | fix-here (terminate first, then read) |
 | 19 | group 4 | uvicorn without `websockets` silently falls back to long-polling | fix-here (`websockets` pinned in `requirements.txt`) |

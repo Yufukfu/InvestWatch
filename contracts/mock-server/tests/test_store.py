@@ -29,7 +29,17 @@ def test_loads_all_mock_files_and_they_match_the_schemas(contracts_dir):
 def test_missing_mock_file_names_the_file(contracts_copy):
     (contracts_copy / "mocks" / "findings.json").unlink()
 
-    with pytest.raises(MockDataError, match="findings.json"):
+    with pytest.raises(MockDataError, match="missing mock file: findings.json"):
+        load_mock_data(contracts_copy)
+
+
+def test_finding_with_unknown_document_is_rejected(contracts_copy):
+    path = contracts_copy / "mocks" / "findings.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["items"][0]["document_id"] = "00000000-0000-4000-8000-000000000000"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(MockDataError, match="unknown document"):
         load_mock_data(contracts_copy)
 
 
@@ -96,7 +106,8 @@ def test_invalid_calibration_names_the_file(contracts_copy):
 
 @pytest.mark.parametrize(
     ("score", "threshold", "expected"),
-    [(0.9, 0.9, "high"), (0.95, 0.9, "high"), (0.7, 0.9, "medium"), (0.89, 0.9, "medium"), (0.69, 0.9, "low"), (0.0, 0.5, "low")],
+    [(0.9, 0.9, "high"), (0.95, 0.9, "high"), (0.7, 0.9, "medium"), (0.89, 0.9, "medium"), (0.69, 0.9, "low"),
+     (0.0, 0.5, "low"), (0.6, 0.8, "medium")],  # 0.8 - 0.2 == 0.6000000000000001 without rounding
 )
 def test_risk_level_follows_the_threshold(score, threshold, expected):
     assert risk_level(score, threshold) == expected
@@ -115,6 +126,15 @@ def test_store_does_not_share_state_with_loaded_data_and_resets(contracts_dir):
     store.reset()
     assert store.findings[first_id]["status"] == original_status
     assert store.thresholds["M2"] == 0.5
+
+
+def test_reset_bumps_the_generation(contracts_dir):
+    store = Store(load_mock_data(contracts_dir))
+    before = store.generation
+
+    store.reset()
+
+    assert store.generation == before + 1
 
 
 def test_store_findings_carry_no_stored_risk_level(contracts_dir):

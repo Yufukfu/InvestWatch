@@ -2,6 +2,10 @@
 
 Routes and bodies follow contracts/openapi.yaml; data comes from the in-memory Store.
 Routes under /__mock/ are development helpers and not part of the contract.
+
+Every route is `async def` on purpose: FastAPI runs plain `def` routes in a thread pool, and the store
+is also written by replay and scans on the event loop. Keeping all access on the single loop thread
+means no locks and no "dictionary changed size during iteration".
 """
 
 from __future__ import annotations
@@ -148,7 +152,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # --- findings -------------------------------------------------------------------------
 
     @api.get("/api/findings")
-    def list_findings(
+    async def list_findings(
         module: Module | None = None,
         status: str | None = None,
         platform: str | None = None,
@@ -203,7 +207,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                 "total": len(result), "page": page, "page_size": page_size}
 
     @api.get("/api/findings/{finding_id}")
-    def get_finding(finding_id: UUID):
+    async def get_finding(finding_id: UUID):
         finding = get_finding_or_404(finding_id)
         view = store.finding_view(finding)
         document = store.documents.get(finding["document_id"])
@@ -227,7 +231,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # --- stats ----------------------------------------------------------------------------
 
     @api.get("/api/stats/summary")
-    def stats_summary():
+    async def stats_summary():
         findings = list(store.findings.values())
 
         def count(key_fn, keys):
@@ -248,7 +252,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         }
 
     @api.get("/api/stats/trend")
-    def stats_trend(
+    async def stats_trend(
         module: Module | None = None,
         bucket: Literal["hour", "day"] = "hour",
         risk_level: RiskLevel | None = None,
@@ -281,35 +285,35 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # --- calibration and settings ---------------------------------------------------------
 
     @api.get("/api/calibration")
-    def calibration(module: Module):
+    async def calibration(module: Module):
         body = dict(store.calibration[module])
         body["current_threshold"] = store.thresholds[module]
         return body
 
     @api.get("/api/settings/thresholds")
-    def get_thresholds():
+    async def get_thresholds():
         return dict(store.thresholds)
 
     @api.put("/api/settings/thresholds")
-    def put_thresholds(thresholds: Thresholds):
+    async def put_thresholds(thresholds: Thresholds):
         store.thresholds.update(thresholds.model_dump())
         return dict(store.thresholds)
 
     # --- sources, scans, documents, health ------------------------------------------------
 
     @api.get("/api/sources")
-    def list_sources():
+    async def list_sources():
         return {"items": list(store.sources.values())}
 
     @api.post("/api/sources", status_code=201)
-    def create_source(body: SourceCreate):
+    async def create_source(body: SourceCreate):
         source = body.model_dump(mode="json")
         source.update(id=str(uuid.uuid4()), last_run_at=None, last_run_status=None, documents_count=0)
         store.sources[source["id"]] = source
         return source
 
     @api.patch("/api/sources/{source_id}")
-    def patch_source(source_id: UUID, patch: SourcePatch):
+    async def patch_source(source_id: UUID, patch: SourcePatch):
         source = store.sources.get(str(source_id))
         if source is None:
             raise HTTPException(404, f"source {source_id} not found")
@@ -329,20 +333,20 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return {"queued": True, "source_id": source_id}
 
     @api.get("/api/documents/{document_id}/screenshot/{viewport}")
-    def screenshot(document_id: UUID, viewport: Viewport):
+    async def screenshot(document_id: UUID, viewport: Viewport):
         document = store.documents.get(str(document_id))
         if not document or not (document.get("screenshots") or {}).get(viewport):
             raise HTTPException(404, f"no {viewport} screenshot for document {document_id}")
         return Response(placeholder_png(viewport), media_type="image/png")
 
     @api.get("/api/health")
-    def health():
+    async def health():
         return store.health
 
     # --- mock-only helpers (not part of the contract) -------------------------------------
 
     @api.post("/__mock/reset")
-    def mock_reset():
+    async def mock_reset():
         store.reset()
         return {"reset": True}
 
@@ -354,7 +358,6 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return replay_once()
 
     # Event hooks; replaced with Socket.IO emitters when the app is mounted (events.py).
-    # Handlers that call them are async, so the hooks run on the event loop.
     api.state.notify = lambda event_type, data: None
     api.state.start_scan = lambda source_id: None
     api.state.replay_once = None

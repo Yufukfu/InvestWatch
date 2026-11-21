@@ -142,14 +142,18 @@ class Store:
 
     def __init__(self, data: MockData):
         self._original = data
+        self.generation = 0
         self.reset()
 
     def reset(self) -> None:
+        """Restore the original data. Everything is built first and swapped in at the end, and
+        `generation` changes, so background work started before the reset can tell."""
         data = copy.deepcopy(self._original)
-        self.findings: dict[str, dict] = {}
+        findings = {}
         for f in data.findings:
             f.pop("risk_level", None)  # derived at read time from the current thresholds
-            self.findings[f["id"]] = f
+            findings[f["id"]] = f
+        self.findings: dict[str, dict] = findings
         self.documents: dict[str, dict] = {d["id"]: d for d in data.documents}
         self.sources: dict[str, dict] = {s["id"]: s for s in data.sources}
         self.thresholds: dict[str, float] = dict(data.thresholds)
@@ -158,6 +162,7 @@ class Store:
         self.health: dict = data.health
         self.events: list[dict] = data.events
         self.added_ids: set[str] = set()
+        self.generation += 1
 
     def add_finding(self, finding: dict) -> None:
         """Add a finding created at runtime (replay); it also counts in the trend."""

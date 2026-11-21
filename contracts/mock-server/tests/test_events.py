@@ -43,6 +43,7 @@ class LiveServer:
 class Recorder:
     def __init__(self, url: str):
         self.events: dict[str, list] = defaultdict(list)
+        self.order: list[str] = []  # event types in arrival order
         self.cond = threading.Condition()
         self.sio = socketio.Client()
         for event_type in EVENT_TYPES:
@@ -53,6 +54,7 @@ class Recorder:
         def handle(data):
             with self.cond:
                 self.events[event_type].append(data)
+                self.order.append(event_type)
                 self.cond.notify_all()
         return handle
 
@@ -90,20 +92,39 @@ def test_status_change_emits_finding_updated(live):
     assert_event_valid("finding.updated", events[0])
 
 
-def test_scan_emits_started_then_finished(live):
+NEW_SOURCE = {"name": "Skan testowy", "platform": "web", "url": "https://scan-test.example.com/",
+              "source_kind": "unknown", "target_modules": ["M3"], "active": True}
+
+
+def test_scan_emits_started_then_finished_and_updates_the_source(live):
     url, rec = live
-    source_id = httpx.get(f"{url}/api/sources").json()["items"][0]["id"]
+    source_id = httpx.post(f"{url}/api/sources", json=NEW_SOURCE).json()["id"]  # never scanned yet
 
     assert httpx.post(f"{url}/api/scans", json={"source_id": source_id}).status_code == 202
 
-    started = rec.wait_for("scan.started")
     finished = rec.wait_for("scan.finished")
+    started = rec.wait_for("scan.started")
+    assert rec.order.index("scan.started") < rec.order.index("scan.finished")
     assert started[0]["source_id"] == finished[0]["source_id"] == source_id
     assert finished[0]["status"] == "ok"
     assert_event_valid("scan.started", started[0])
     assert_event_valid("scan.finished", finished[0])
     source = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source_id)
-    assert source["last_run_status"] == "ok"
+    assert source["last_run_status"] == "ok" and source["last_run_at"] is not None
+
+
+def test_scan_in_flight_does_not_write_into_a_reset_store(live):
+    url, rec = live
+    sources = httpx.get(f"{url}/api/sources").json()["items"]
+    source = sources[0]
+
+    httpx.post(f"{url}/api/scans", json={"source_id": source["id"]})
+    rec.wait_for("scan.started")
+    httpx.post(f"{url}/__mock/reset")
+    rec.wait_for("scan.finished")
+
+    after = next(s for s in httpx.get(f"{url}/api/sources").json()["items"] if s["id"] == source["id"])
+    assert after == source
 
 
 def test_unknown_scan_emits_nothing(live):
@@ -158,6 +179,51 @@ def test_replay_emits_periodically_and_survives_a_disconnect(contracts_dir):
         first.close()
         assert len(second.wait_for("finding.created", count=3)) >= 3
         second.close()
+
+
+def test_replay_pauses_while_no_client_is_connected(contracts_dir):
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0.1, scan_delay_s=0, cors_origins=("*",))
+    with LiveServer(settings) as url:
+        rec = Recorder(url)
+        rec.wait_for("finding.created", count=2)
+        rec.close()
+        time.sleep(0.3)  # let an in-flight replay finish
+        total = httpx.get(f"{url}/api/findings").json()["total"]
+        time.sleep(1.0)  # ten intervals with nobody connected
+
+        assert httpx.get(f"{url}/api/findings").json()["total"] == total
+
+
+def test_reads_stay_consistent_while_replay_writes(contracts_dir):
+    """Reads must never see the store mid-update (was: 'dictionary changed size during iteration')."""
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0, scan_delay_s=0, cors_origins=("*",))
+    with LiveServer(settings) as url:
+        errors: list[int] = []
+        stop = threading.Event()
+
+        def writer():
+            with httpx.Client() as c:
+                while not stop.is_set():
+                    c.post(f"{url}/__mock/emit")
+
+        def reader(path: str):
+            with httpx.Client() as c:
+                while not stop.is_set():
+                    r = c.get(f"{url}{path}")
+                    if r.status_code != 200:
+                        errors.append(r.status_code)
+
+        threads = [threading.Thread(target=writer) for _ in range(3)]
+        threads += [threading.Thread(target=reader, args=(p,)) for p in
+                    ("/api/findings?q=x&page_size=200", "/api/stats/trend?risk_level=high", "/api/stats/summary")]
+        for t in threads:
+            t.start()
+        time.sleep(4)
+        stop.set()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert errors == []
 
 
 def test_socketio_cors_allows_only_configured_origins(contracts_dir):

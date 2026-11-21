@@ -38,7 +38,9 @@ def test_module_entry_point_serves_health():
                 break
             except httpx.TransportError:
                 if proc.poll() is not None or time.time() > deadline:
-                    raise AssertionError(f"server did not start: {proc.stdout.read() if proc.stdout else ''}")
+                    proc.terminate()  # read the output only after the process is gone, or read() blocks
+                    output, _ = proc.communicate(timeout=10)
+                    raise AssertionError(f"server did not answer on port {port}: {output}")
                 time.sleep(0.2)
         assert r.status_code == 200
         assert r.json()["status"] == "ok"
