@@ -11,7 +11,12 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
 from dbutil import document_row, finding_row, now, source_row
-from investwatch_api.db.sql import findings_upsert, latest_calibration_run, unpublished_documents
+from investwatch_api.db.sql import (
+    document_insert_ignore_duplicate,
+    findings_upsert,
+    latest_calibration_run,
+    unpublished_documents,
+)
 from investwatch_api.db.tables import calibration_points, documents, findings, job_errors, sources
 
 
@@ -26,8 +31,8 @@ def _add_doc(conn, **over) -> dict:
 
 
 def _insert_ignore(conn, row):
-    """What the scraper runs: INSERT ... ON CONFLICT DO NOTHING without a conflict target."""
-    return conn.execute(pg_insert(documents).values(row).on_conflict_do_nothing().returning(documents.c.id))
+    """What the scraper runs (api/README.md): ON CONFLICT on the dedup index only."""
+    return conn.execute(document_insert_ignore_duplicate(row))
 
 
 def _count(conn, table) -> int:
@@ -72,6 +77,22 @@ def test_documents_without_a_hash(app_engine):
         assert _count(conn, documents) == 2
 
 
+def test_reused_document_id_is_not_silently_dropped(app_engine):
+    with pytest.raises(IntegrityError, match="pk_documents"):
+        with app_engine.begin() as conn:
+            first = document_row(content_hash="d" * 64)
+            _insert_ignore(conn, first)
+            _insert_ignore(conn, document_row(id=first["id"], content_hash="e" * 64))
+
+
+def test_untargeted_do_nothing_also_works_with_the_index(app_engine):
+    """The short form from the first README draft still deduplicates (it also hides id collisions)."""
+    with app_engine.begin() as conn:
+        for _ in range(2):
+            conn.execute(pg_insert(documents).values(document_row(content_hash="f" * 64)).on_conflict_do_nothing())
+        assert _count(conn, documents) == 1
+
+
 def test_unknown_source(app_engine):
     with pytest.raises(IntegrityError, match="foreign key"):
         with app_engine.begin() as conn:
@@ -96,6 +117,13 @@ def test_sweep_returns_oldest_first_up_to_the_limit(app_engine):
         _add_doc(conn, created_at=t)
         early = _add_doc(conn, created_at=t - timedelta(minutes=5))
         assert [r.id for r in conn.execute(unpublished_documents(1))] == [early["id"]]
+
+
+def test_sweep_skips_rows_younger_than_the_grace(app_engine):
+    with app_engine.begin() as conn:
+        _add_doc(conn, created_at=now())
+        old = _add_doc(conn, created_at=now() - timedelta(minutes=5))
+        assert [r.id for r in conn.execute(unpublished_documents(10, older_than=timedelta(minutes=1)))] == [old["id"]]
 
 
 # --- One finding per document and module -----------------------------------------------------
@@ -244,6 +272,17 @@ def test_latest_calibration_run_per_module(app_engine):
         rows = conn.execute(latest_calibration_run("M2")).mappings().all()
         assert [r["threshold"] for r in rows] == [0.4, 0.7]
         assert {r["run_id"] for r in rows} == {new_run}
+
+
+def test_tied_runs_resolve_to_one_run(app_engine):
+    with app_engine.begin() as conn:
+        t = now()
+        a, b = sorted((uuid.uuid4(), uuid.uuid4()), key=str)
+        for run in (a, b):
+            for th in (0.3, 0.6):
+                _insert(conn, calibration_points, _point(run, th, t))
+        rows = conn.execute(latest_calibration_run("M2")).mappings().all()
+        assert {r["run_id"] for r in rows} == {b} and len(rows) == 2
 
 
 def test_duplicate_point_in_one_run(app_engine):

@@ -165,7 +165,8 @@ def upgrade() -> None:
         DECLARE r record;
         BEGIN
           FOR r IN SELECT DISTINCT grantee FROM information_schema.role_table_grants
-                   WHERE table_schema = 'public' AND table_name = 'alembic_version' AND grantee <> current_user
+                   WHERE table_schema = 'public' AND table_name = 'alembic_version'
+                     AND grantee NOT IN (current_user, 'PUBLIC')
           LOOP
             EXECUTE format('REVOKE ALL ON TABLE public.alembic_version FROM %I', r.grantee);
           END LOOP;

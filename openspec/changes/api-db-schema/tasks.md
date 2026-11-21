@@ -16,7 +16,7 @@ Lands before change `api-v1`: groups 1-3 unblock `scraper-v1` group 5 (Adam) and
 - [x] 2.3 Failing tests, then the dedup index and `stream_published_at` with its partial index: all "Documents are deduplicated per source" and "Published-to-stream marker" scenarios pass
 - [x] 2.4 Failing tests, then the `(document_id, module)` unique key and the documented upsert statement as a helper `findings_upsert()` in `src/investwatch_api/db/sql.py` (the API's tests and analytics can copy the SQL): "One finding per document and module" scenarios pass
 - [x] 2.5 Failing tests, then the enum, range and not-null constraints: "Unknown enum value is rejected", "Score out of range is rejected", "Required contract field missing", "Empty reason is rejected", the job-error and calibration scenarios pass
-- [x] 2.6 Mutation check; mutations: 16 tried, 16 caught
+- [x] 2.6 Mutation check; mutations: 16 tried, 16 caught; review fixes: mutations: 3 tried, 3 caught
 
 ## 3. Contract round-trip and the migrate service
 

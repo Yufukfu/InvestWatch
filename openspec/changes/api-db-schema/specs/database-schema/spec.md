@@ -55,10 +55,10 @@ Each table SHALL store the scalar fields of its contract as typed columns and SH
 - **THEN** the insert fails with a not-null violation
 
 ### Requirement: Documents are deduplicated per source
-`documents` SHALL have a unique index on `(source_id, content_hash)` that treats a null `source_id` as one value and ignores rows whose `content_hash` is null, so that `INSERT ... ON CONFLICT DO NOTHING` drops a repeated document.
+`documents` SHALL have a unique index on `(source_id, content_hash)` that treats a null `source_id` as one value and ignores rows whose `content_hash` is null, so that `INSERT ... ON CONFLICT (source_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING` drops a repeated document while any other conflict (for example a reused `id`) still fails.
 
 #### Scenario: Same text from the same source
-- **WHEN** two documents with the same `source_id` and the same `content_hash` are inserted with `ON CONFLICT DO NOTHING`
+- **WHEN** two documents with the same `source_id` and the same `content_hash` are inserted with that statement
 - **THEN** `documents` holds one row and the second insert returns no row
 
 #### Scenario: Same text from two sources
@@ -66,12 +66,16 @@ Each table SHALL store the scalar fields of its contract as typed columns and SH
 - **THEN** both rows are stored
 
 #### Scenario: Ad-hoc documents without a source
-- **WHEN** two documents with `source_id = null` and the same `content_hash` are inserted with `ON CONFLICT DO NOTHING`
+- **WHEN** two documents with `source_id = null` and the same `content_hash` are inserted with that statement
 - **THEN** `documents` holds one row
 
 #### Scenario: Documents without a hash
 - **WHEN** two documents with the same `source_id` and `content_hash = null` are inserted
 - **THEN** both rows are stored
+
+#### Scenario: Reused document id
+- **WHEN** a second document with a different `content_hash` reuses the `id` of an existing one
+- **THEN** the insert fails with a primary-key violation instead of being dropped as a duplicate
 
 #### Scenario: Unknown source
 - **WHEN** a document is inserted with a `source_id` that has no row in `sources`
