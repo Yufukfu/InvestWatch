@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import findings from '../../mocks/fixtures/findings.json';
+import findings from '../../test/fixtures/findings.json';
 import { server } from '../../test/setup';
 import { storeWrapper } from '../../test/store';
 import { FindingsPage } from './FindingsPage';
