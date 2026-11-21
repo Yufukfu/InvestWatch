@@ -11,6 +11,6 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   // Filter and selection state lives in the URL; never let one test's URL leak into the next.
-  window.history.replaceState(null, '', '/');
+  if (typeof window !== 'undefined') window.history.replaceState(null, '', '/');
 });
 afterAll(() => server.close());

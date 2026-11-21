@@ -8,15 +8,15 @@
 
 ## 2. Filter bar, sort and paging UI
 
-- [ ] 2.1 Failing component tests (props only): labelled controls, multi-select status, debounce of `q`, clear-filters, empty and error states, count from `total`.
-- [ ] 2.2 Implement `FindingsFilters`, paging and sort controls; wire in `FindingsPage`. Tests pass.
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`.
+- [x] 2.1 Failing component tests (props only): labelled controls, multi-select status, debounce of `q`, clear-filters, empty and error states, count from `total`.
+- [x] 2.2 Implement `FindingsFilters`, paging and sort controls; wire in `FindingsPage`. Tests pass.
+- [x] 2.3 Mutation check; mutations: 10 tried, 10 caught
 
 ## 3. Table presentation
 
-- [ ] 3.1 Failing tests: risk text for each level, score display, detection time, markup rendered as text, scroll container present.
+- [x] 3.1 Failing tests: risk text for each level, score display, detection time, markup rendered as text, scroll container present.
 - [ ] 3.2 Implement table upgrade and CSS tokens (AA contrast). Check 375/768/1280 px by hand against the running mock; note result in the commit body.
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`.
+- [x] 3.3 Mutation check; mutations: 9 tried, 9 caught (one survivor at the 4/5 plural boundary, case added)
 
 ## 4. Finding detail panel
 
