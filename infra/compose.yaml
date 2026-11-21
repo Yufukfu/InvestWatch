@@ -1,0 +1,67 @@
+# Shared infrastructure: database and HTTPS gateway. Each module ships its own compose.yaml;
+# the root compose.yaml includes them all. Modules only meet through network contracts
+# (REST/Socket.IO via the gateway, Postgres, later Redis), never through shared code.
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-investwatch}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-iw_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD in .env (scripts/init-env.sh)}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      IW_APP_USER: ${POSTGRES_APP_USER:-iw_app}
+      IW_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    # No host port: iw-data is internal, so the DB is unreachable from outside the stack.
+    # Local access: docker compose exec postgres psql -U iw_admin -d investwatch
+    networks: [data]
+    security_opt: [no-new-privileges:true]
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  gateway:
+    image: public.ecr.aws/docker/library/caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      IW_HOSTNAME: ${IW_HOSTNAME:-localhost}
+      IW_HTTPS_PORT: ${IW_HTTPS_PORT:-8443}
+      IW_HSTS: ${IW_HSTS:-max-age=300}
+      API_UPSTREAM: ${API_UPSTREAM:-api:8000}
+      WEB_UPSTREAM: ${WEB_UPSTREAM:-web:8080}
+    ports:
+      - "127.0.0.1:${IW_HTTPS_PORT:-8443}:8443"
+      - "127.0.0.1:${IW_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  edge:
+    name: iw-edge
+  # No route outside; only services that need the database join it (api, scraper, analytics).
+  data:
+    name: iw-data
+    internal: true

@@ -1,0 +1,43 @@
+# Single HTTPS entry point. Routes by path to independently deployed services.
+# Locally Caddy's internal CA issues the certificate (see infra/README.md to trust it).
+{
+	admin off
+	http_port 8080
+	https_port 8443
+	auto_https disable_redirects
+}
+
+http://:8080 {
+	redir https://{host}:{$IW_HTTPS_PORT}{uri} permanent
+}
+
+{$IW_HOSTNAME}:8443 {
+	tls internal
+
+	header {
+		# Short by default: HSTS is per host, not per port, so a long value on localhost would force https on
+		# every local dev server. Set IW_HSTS="max-age=31536000; includeSubDomains" on a real domain.
+		Strict-Transport-Security "{$IW_HSTS}"
+		-Server
+		-X-Powered-By
+	}
+
+	request_body {
+		max_size 1MB
+	}
+
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM}
+	}
+	handle /socket.io/* {
+		reverse_proxy {$API_UPSTREAM}
+	}
+	handle {
+		reverse_proxy {$WEB_UPSTREAM}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
