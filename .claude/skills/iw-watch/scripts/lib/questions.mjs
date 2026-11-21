@@ -1,8 +1,7 @@
 // Questions the agent leaves for the human, as `- <question> => <option> | <option>` lines in
-// .iw-watch/questions.md. Each option becomes a command to copy from Discord into a terminal; the
-// resulting `/iw <option>` comment is the next round's input (scan.mjs: type 'answer').
-// The options are agent-written text that the human pastes into a shell, so they are cut down to plain
-// characters and single-quoted: no quote, $, backtick, backslash or shell operator survives.
+// .iw-watch/questions.md. Each option becomes a `/iw <option>` comment to paste on the PR
+// (Discord shows them, one copy box each); that comment is the next round's input (scan.mjs: type 'answer').
+// The options are agent-written text, so they are cut down to plain characters.
 const PLAIN = /[^\p{L}\p{N} .,:_/#+-]/gu;
 const MAX_Q = 5;
 const MAX_OPT = 4;
@@ -20,9 +19,10 @@ export function parseQuestions(text) {
   return out;
 }
 
-export const answerCommands = (pr, options) => options.map((o) => `gh pr comment ${Number(pr)} --body '/iw ${o.replace(PLAIN, ' ')}'`);
+/** The comments to paste on the PR, one per option: never a shell command */
+export const answerComments = (options) => options.map((o) => `/iw ${o.replace(PLAIN, ' ')}`);
 
-/** The text block for a notice: each question with its copy-paste answers */
-export function questionsText(pr, questions) {
-  return questions.map((x) => `Q: ${x.q}\n${answerCommands(pr, x.options).map((c) => `  ${c}`).join('\n')}`).join('\n');
+/** The text block for a notice: each question with the /iw comments that answer it */
+export function questionsText(questions) {
+  return questions.map((x) => `Q: ${x.q}\n${answerComments(x.options).map((c) => `  ${c}`).join('\n')}`).join('\n');
 }

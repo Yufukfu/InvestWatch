@@ -3,7 +3,7 @@
 // is the next round's input.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseQuestions, answerCommands } from './lib/questions.mjs';
+import { parseQuestions, answerComments, questionsText } from './lib/questions.mjs';
 import { message } from './notify-discord.mjs';
 import { buildPrompt } from './lib/prompt.mjs';
 import { scan } from './lib/scan.mjs';
@@ -20,20 +20,23 @@ test('questions.md lines become questions with options', () => {
 test('options are made safe to paste into a shell: only plain characters, single-quoted', () => {
   const [q] = parseQuestions("- Q? => ok'; rm -rf ~ # | $(id) `x` \\n | zażółć gęślą jaźń");
   for (const o of q.options) assert.ok(!/['$`\;|&()]/.test(o), `parsed option is clean too (it also goes into the notice JSON): ${o}`);
-  const cmds = answerCommands(11, q.options);
-  for (const c of cmds) {
-    assert.match(c, /^gh pr comment 11 --body '\/iw [^'$`\\;|&()<>]*'$/, c);
-  }
-  assert.ok(cmds[2].includes('zażółć gęślą jaźń'), 'Polish letters survive');
+  const lines = answerComments(q.options);
+  for (const c of lines) assert.match(c, /^\/iw [^'$`\\;|&()<>]*$/, c);
+  assert.ok(!lines.some((c) => c.startsWith('gh ')), 'a comment to paste on the PR, never a shell command');
+  assert.ok(lines[2].includes('zażółć gęślą jaźń'), 'Polish letters survive');
   assert.equal(parseQuestions('- only a question, no options').length, 0);
   assert.equal(parseQuestions(Array.from({ length: 9 }, (_, i) => `- q${i}? => a | b`).join('\n')).length, 5, 'at most 5 questions');
 });
 
-test('the Discord message carries the questions and the commands to copy', () => {
-  const text = 'Q: Pager fix in this PR or later?\n  gh pr comment 39 --body \'/iw pager: w tym PR\'';
-  const m = message(['needs-human', '#39 findings', 'https://github.com/x/y/pull/39', text]);
+test('the Discord message links the agent\'s comment and gives the /iw comments to paste on the PR', () => {
+  const link = 'https://github.com/x/y/pull/39#issuecomment-7';
+  const text = questionsText([{ q: 'Pager fix in this PR or later?', options: ['pager: w tym PR', 'pager: pozniej'] }]);
+  const m = message(['needs-human', '#39 findings', link, text]);
+  assert.ok(m.content.includes(`<${link}>`), 'the link goes straight to the comment');
   assert.match(m.content, /Pager fix/);
-  assert.match(m.content, /```[\s\S]*gh pr comment 39 --body '\/iw pager: w tym PR'[\s\S]*```/);
+  assert.match(m.content, /reply on the PR/i);
+  assert.match(m.content, /```\n\/iw pager: w tym PR\n```/);
+  assert.ok(!m.content.includes('gh pr comment'));
   assert.ok(m.content.length <= 2000);
 });
 

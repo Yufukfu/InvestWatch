@@ -18,6 +18,7 @@ import { claudeArgs, runSession, pushDenied } from './lib/session.mjs';
 import { prepareClone, unpushed, removeClone, collectDrafts, findMainRoot, realGit, NeedsHuman } from './lib/worktree.mjs';
 import { makeNotifier } from './lib/notify.mjs';
 import { parseQuestions, questionsText } from './lib/questions.mjs';
+import { MARKER } from './lib/rounds.mjs';
 
 const USAGE = `usage: watch.mjs scan|run [--mine] [--review-requested] [--author <login>] [--domain <dir>|mine]
                  [--max-rounds N] [--json]                                  (scan)
@@ -187,7 +188,15 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   fs.writeFileSync(path.join(draftDir, 'summary.md'), `${res.summary}\n`, { mode: 0o600 });
   fs.writeFileSync(path.join(draftDir, 'session.json'), `${JSON.stringify({ item: it.id, kind: it.kind, ok: res.ok, code: res.code, timedOut: res.timedOut, cost: res.cost, turns: res.turns, subtype: res.subtype, denials: res.denials, summary: res.summary, clone: clone.dir }, null, 2)}\n`, { mode: 0o600 });
   const own = it.kind === 'address-review' || it.kind === 'ci-failed';
-  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost, ...(questions.length ? { questions, ask: questionsText(it.pr, questions) } : {}) };
+  // a link straight to the reply the agent posted, so the notice opens the conversation
+  let link;
+  if (!o.dryRun) {
+    try {
+      const mine = (deps.gh(['api', '--paginate', `repos/${ctx.repo}/issues/${it.pr}/comments?per_page=100`]) || []).filter((c) => c.user?.login?.toLowerCase() === ctx.me.toLowerCase() && String(c.body || '').includes(MARKER));
+      link = mine.at(-1)?.html_url;
+    } catch { /* the notice keeps the PR link */ }
+  }
+  const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost, ...(link ? { link } : {}), ...(questions.length ? { questions, ask: questionsText(questions) } : {}) };
   const n = res.denials.length;
   const denied = n ? `; ${n} command${n > 1 ? 's were' : ' was'} denied (see session.json)` : '';
   // every needs-human below keeps the clone and the item: remove the clone to let the watcher retry
@@ -200,7 +209,8 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
     const steps = [`cd ${clone.dir}`];
     if (own) steps.push(`git push origin ${it.headRef}`);
     steps.push(`gh pr comment ${it.pr} --body-file ${path.join(draftDir, 'reply.md')}`);
-    return { ...at, kind: 'draft-ready', detail: `dry run: nothing was pushed or posted${denied}. To publish: ${steps.join(' && ')}` };
+    // the publish commands stay in the JSON log (publish), never in the message text that goes to Discord
+    return { ...at, kind: 'draft-ready', publish: steps.join(' && '), detail: `dry run: nothing was pushed or posted${denied}. The draft reply is in ${path.join(draftDir, 'reply.md')}` };
   }
   if (own && pushDenied(res.denials)) return human(`the push was denied; the commits and the reply are kept (drafts ${draftDir})`);
   const left = own ? unpushed({ git: deps.git, dir: clone.dir, headRef: it.headRef }) : 0;

@@ -10,9 +10,15 @@ const LABEL = { done: '✅ done', 'draft-ready': '📝 draft ready', 'needs-huma
 const WEBHOOK = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/;
 
 export function message([kind, title, url, text]) {
-  const head = `**iw-watch** ${LABEL[kind] || kind}: ${title} ${url}`.slice(0, 600);
-  // what to do next, with the commands to copy, in a code block so Discord renders nothing in it
-  const body = text ? `\n\`\`\`\n${String(text).replace(/\`\`\`/g, "'''").slice(0, 1300)}\n\`\`\`` : "";
+  // <url> keeps Discord from embedding a preview; the link points at the agent's comment when there is one
+  const head = `**iw-watch** ${LABEL[kind] || kind}: ${title} <${url}>`.slice(0, 600);
+  const fence = (s) => s.replace(/\`/g, "'");
+  const lines = String(text || "").slice(0, 1300).split("\n");
+  const answers = lines.filter((l) => /^\s*\/iw /.test(l));
+  const notes = lines.filter((l) => !/^\s*\/iw /.test(l) && l.trim());
+  let body = notes.length ? `\n${fence(notes.join("\n"))}` : "";
+  // one copy box per answer: paste it as a comment on the PR
+  if (answers.length) body += `\nReply on the PR with one of these comments:\n${answers.map((a) => `\`\`\`\n${fence(a.trim())}\n\`\`\``).join("\n")}`;
   return { content: `${head}${body}`, allowed_mentions: { parse: [] } };
 }
 

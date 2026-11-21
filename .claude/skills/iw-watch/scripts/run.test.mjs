@@ -164,8 +164,9 @@ test('run --dry-run: no push or GitHub write is allowed, the result is a draft w
   const [n] = s.notices();
   assert.equal(n.kind, 'draft-ready');
   assert.ok(fs.existsSync(path.join(n.path, 'reply.md')));
-  assert.match(n.detail, /git push origin web\/fe/);
-  assert.match(n.detail, /gh pr comment 11 --body-file/);
+  assert.match(n.publish, /git push origin web\/fe/);
+  assert.match(n.publish, /gh pr comment 11 --body-file/);
+  assert.ok(!/gh |git /.test(n.detail), 'no shell command in the text a notifier shows');
   assert.ok(fs.existsSync(s.clone(11)), 'the local commits stay in the clone');
 });
 
@@ -339,9 +340,23 @@ test('run: the agent\'s questions reach the notifier as copy-paste /iw commands'
   await main(['run', '--mine', '--dry-run'], s.deps);
   const text = s.notified[0].args[3];
   assert.match(text, /Q: Pager now or later\?/);
-  assert.ok(text.includes("gh pr comment 11 --body '/iw pager: teraz'"));
-  assert.ok(!/rm -rf ~'|;/.test(text.split('\n').filter((l) => l.includes('gh pr comment')).join('\n')), 'nothing to paste that runs more than the comment');
+  assert.ok(text.includes('/iw pager: teraz'));
+  assert.ok(!text.includes('gh pr comment'), 'a comment to leave on the PR, not a shell command');
+  assert.ok(!/rm -rf ~'|;/.test(text.split('\n').filter((l) => l.includes('/iw')).join('\n')));
   assert.equal(s.notices()[0].questions.length, 1);
+});
+
+test('run: the notice links the agent\'s own reply comment when it posted one', async () => {
+  const s = setup({ env: { IWATCH_NOTIFY_CMD: 'n' } });
+  const posted = { id: 77, user: { login: ME, type: 'User' }, author_association: 'OWNER', body: `Fixed.\n${MARKER}`, created_at: '2026-11-21T23:59:00Z', html_url: 'https://github.com/Yufukfu/InvestWatch/pull/11#issuecomment-77' };
+  const base = s.deps.gh;
+  let after = false;
+  s.deps.gh = (args) => (after && args.join(' ').includes('issues/11/comments') ? [posted] : base(args));
+  const spawn = s.deps.spawnClaude;
+  s.deps.spawnClaude = (...a) => { const r = spawn(...a); after = true; return r; };
+  await main(['run', '--mine'], s.deps);
+  assert.equal(s.notices()[0].link, posted.html_url);
+  assert.equal(s.notified[0].args[2], posted.html_url, 'the notifier gets the comment link');
 });
 
 test('run: --limit caps the sessions per run', async () => {
