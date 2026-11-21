@@ -26,4 +26,5 @@ A blocker goes in the file of the domain it blocks. Naming another owner in your
 ## Team-wide blockers and open decisions
 
 - Repository layout is Kacper's (`scraper/`, `analytics/`, `web/`, `contracts/`, `api/`, `infra/`, `.docs/`, `doc/` for UKNF materials); confirm with him before adding directories.
+- Demo path: until the api (`api-v1`, PR #21) or a mock service is in the root compose, `docker compose up` shows the dashboard's error states only; the dashboard is developed against `contracts/mock-server` run as a separate container ([ADR 0206](decisions/0206-dashboard-data-from-backend.md), decision in PR #25). Accepted for now; before the demo and the Sunday 10:30 hand-in `docker compose up` must run the whole system. Owner Kacper, with Damian for the backend.
 - `.docs/security-audit.md` collects every `pip-audit` / `npm audit` run ([integration-plan.md](integration-plan.md) §7); add a row per audit before merge.

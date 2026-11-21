@@ -12,5 +12,11 @@ export const handlers = (base: string) => [
   http.get(`${base}/health`, () => HttpResponse.json(health)),
   http.get(`${base}/findings`, () => HttpResponse.json(findings)),
   http.get(`${base}/stats/summary`, () => HttpResponse.json(summary)),
-  http.get(`${base}/stats/trend`, () => HttpResponse.json(trend)),
+  // Hour data only: a test that asks for bucket=day must register its own day points with server.use,
+  // so a forgotten override fails loudly instead of drawing hour-shaped data under "Dzień".
+  http.get(`${base}/stats/trend`, ({ request }) =>
+    new URL(request.url).searchParams.get('bucket') === 'day'
+      ? HttpResponse.json({ error: 'no default day data in the test network' }, { status: 500 })
+      : HttpResponse.json(trend),
+  ),
 ];

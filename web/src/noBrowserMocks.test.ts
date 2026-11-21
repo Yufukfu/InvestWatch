@@ -6,26 +6,53 @@ import { describe, expect, it } from 'vitest';
 // The running app always talks to the backend (the api, or contracts/mock-server); MSW is a Vitest-only fake.
 const webRoot = resolve(import.meta.dirname, '..');
 const srcRoot = join(webRoot, 'src');
+const testSupport = join(srcRoot, 'test');
 
-function appSources(dir: string): string[] {
+function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const path = join(dir, e.name);
-    if (e.isDirectory()) return path === join(srcRoot, 'test') ? [] : appSources(path);
-    return /\.[jt]sx?$/.test(e.name) && !/\.test\.[jt]sx?$/.test(e.name) ? [path] : [];
+    return e.isDirectory() ? walk(path) : [path];
   });
 }
 
+const isTestFile = (f: string) => /\.test\.[jt]sx?$/.test(f);
+const isCode = (f: string) => /\.[cm]?[jt]sx?$/.test(f);
+
+// Everything the browser or the build can load: app sources, type declarations, public assets, config and the HTML entry.
+const shipped = [
+  ...walk(srcRoot).filter((f) => !f.startsWith(testSupport + '/') && !isTestFile(f)),
+  ...walk(join(webRoot, 'public')),
+  ...readdirSync(webRoot)
+    .filter((n) => /\.(html|[cm]?[jt]s)$/.test(n) || n.startsWith('.env'))
+    .map((n) => join(webRoot, n)),
+];
+const read = (f: string) => readFileSync(f, 'utf8');
+const rel = (fs: string[]) => fs.map((f) => relative(webRoot, f));
+
 describe('no in-browser fake backend', () => {
-  it('app code (outside src/test and tests) never imports msw or registers a service worker', () => {
-    const offenders = appSources(srcRoot)
-      .filter((f) => /['"]msw(\/|['"])|serviceWorker/.test(readFileSync(f, 'utf8')))
-      .map((f) => relative(webRoot, f));
-    expect(offenders).toEqual([]);
+  it('shipped code never imports msw or registers a service worker', () => {
+    const offenders = shipped.filter((f) => /['"]msw(\/|['"])|serviceWorker/.test(read(f)));
+    expect(rel(offenders)).toEqual([]);
+  });
+
+  it('shipped code never imports the Vitest support folder (src/test)', () => {
+    const offenders = shipped.filter(
+      (f) => isCode(f) && /(from\s+|import\s*\(\s*|import\s+|require\s*\(\s*)['"][^'"]*\/test(\/[^'"]*)?['"]/.test(read(f)),
+    );
+    expect(rel(offenders)).toEqual([]);
+  });
+
+  it('no file in src, tests included, starts a browser MSW worker', () => {
+    const offenders = walk(srcRoot).filter(
+      (f) => f !== import.meta.filename && /msw\/browser|setupWorker/.test(read(f)),
+    );
+    expect(rel(offenders)).toEqual([]);
   });
 
   it('ships no mock service worker and no mock switch', () => {
     expect(existsSync(join(webRoot, 'public', 'mockServiceWorker.js'))).toBe(false);
     expect(existsSync(join(srcRoot, 'mocks'))).toBe(false);
-    expect(readFileSync(join(srcRoot, 'config.ts'), 'utf8')).not.toMatch(/useMocks|VITE_USE_MOCKS/);
+    const offenders = shipped.filter((f) => /useMocks|VITE_USE_MOCKS/.test(read(f)));
+    expect(rel(offenders)).toEqual([]);
   });
 });

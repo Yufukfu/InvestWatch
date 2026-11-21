@@ -17,4 +17,5 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 
 ## Blockers and open decisions
 
+- Compose has no REST backend yet: the dashboard runs against `contracts/mock-server` started by hand (see `web/README.md`). Team-wide blocker in `.docs/STATUS.md`; to be solved before the demo.
 - Root `README.md` exists; its Quick Start is pending the deployment ADR. Per-service READMEs are stubs.
