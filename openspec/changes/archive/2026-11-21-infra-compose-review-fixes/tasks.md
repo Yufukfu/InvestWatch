@@ -23,4 +23,4 @@
 ## 4. Closing
 
 - [x] 4.1 Apply the iw-docs-update skill (docs above, Damian's `.docs/STATUS.md` row, ADRs) and add the iw-ai-log row; `docker compose up` on an isolated project with `api-migrate` exiting 0, output kept for the PR body
-- [ ] 4.2 Run the iw-pr-review skill and fix real findings
+- [x] 4.2 Run the iw-pr-review skill and fix real findings (reviewer pass: a new STATUS conflict with `main` after PR #14, fixed by merging `origin/main`; the GNU-only CRLF fixture, fixed; STATUS said archived before the archive, true after this change's archive commit)
