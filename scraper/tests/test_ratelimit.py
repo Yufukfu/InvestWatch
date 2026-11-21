@@ -155,6 +155,18 @@ async def test_any_connection_level_failure_falls_back_to_the_local_limiter(erro
     assert 0 < await limiter.wait_turn("example.org") <= 0.1
 
 
+class Hung:
+    async def eval(self, *args):
+        await asyncio.sleep(3600)
+
+
+async def test_a_redis_that_never_answers_is_treated_as_down(monkeypatch):
+    monkeypatch.setattr("iw_scraper.ratelimit.REDIS_TIMEOUT_SECONDS", 0.2)
+    limiter = DomainLimiter(Hung(), 0.1)
+
+    assert await asyncio.wait_for(limiter.wait_turn("example.org"), 2) == 0
+
+
 async def test_the_fallback_warns_once_per_outage_and_again_after_a_recovery(caplog):
     down = RedisConnectionError("down")
     limiter = DomainLimiter(Flaky(down, down, down, 0, down), 0.01)

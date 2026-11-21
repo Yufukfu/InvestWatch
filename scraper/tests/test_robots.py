@@ -45,6 +45,23 @@ async def test_a_rule_for_our_agent_applies_and_a_rule_for_another_agent_does_no
     assert (await verdict(stub)).allowed is True
 
 
+@pytest.mark.parametrize(
+    "rules, path, allowed",
+    [
+        ("Disallow: /*?session=", "/x?session=1", False),
+        ("Disallow: /*?session=", "/x?page=2", True),
+        ("Disallow: /private$", "/private", False),
+        ("Disallow: /private$", "/private/x", True),
+        ("Disallow: /docs/\nAllow: /docs/public/", "/docs/public/a", True),
+        ("Disallow: /docs/\nAllow: /docs/public/", "/docs/secret", False),
+    ],
+)
+async def test_rfc_9309_wildcards_end_anchors_and_longest_match_decide(stub, rules, path, allowed):
+    robots(stub, f"User-agent: *\n{rules}\n")
+
+    assert (await verdict(stub, path)).allowed is allowed
+
+
 @pytest.mark.parametrize("status", [401, 403, 404, 410, 400])
 async def test_an_unavailable_robots_txt_means_no_restrictions(stub, status):
     robots(stub, "User-agent: *\nDisallow: /\n", status=status)  # a body on an error page must be ignored

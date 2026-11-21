@@ -18,6 +18,7 @@ from redis.exceptions import RedisError
 _log = logging.getLogger(__name__)
 
 _WWW = "www."
+REDIS_TIMEOUT_SECONDS = 2.0  # a Redis that does not answer is treated as down
 
 # KEYS[1] slot key; ARGV[1] interval in ms. Returns the ms this caller must wait before starting.
 _RESERVE_SLOT = """
@@ -78,7 +79,10 @@ class DomainLimiter:
         """Wait for this domain's next start slot, shared across workers; return the seconds waited."""
         key = domain_key(domain)
         try:
-            wait_ms = await self._client.eval(_RESERVE_SLOT, 1, self._prefix + key, int(self._interval * 1000))
+            wait_ms = await asyncio.wait_for(
+                self._client.eval(_RESERVE_SLOT, 1, self._prefix + key, int(self._interval * 1000)),
+                REDIS_TIMEOUT_SECONDS,
+            )
         except (RedisError, OSError) as exc:  # a timeout is an OSError
             if not self._degraded:
                 self._degraded = True

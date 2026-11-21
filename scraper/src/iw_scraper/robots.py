@@ -9,7 +9,8 @@ The request goes through the run's own `ProxyRun` and target guard like any othe
 import logging
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
-from urllib.robotparser import RobotFileParser
+
+from protego import Protego
 
 from iw_scraper.fetch import (
     _REDIRECT_STATUSES,
@@ -39,9 +40,8 @@ class RobotsVerdict:
 
 def _verdict(status: int, body: bytes, url: str) -> RobotsVerdict:
     if 200 <= status < 300:
-        rules = RobotFileParser()
-        rules.parse(body.decode("utf-8", errors="replace").splitlines())
-        if rules.can_fetch(ROBOTS_AGENT, url):
+        rules = Protego.parse(body.decode("utf-8", errors="replace"))  # RFC 9309: `*`, `$`, longest match
+        if rules.can_fetch(url, ROBOTS_AGENT):
             return RobotsVerdict(True, "allowed by robots.txt")
         return RobotsVerdict(False, "disallowed by robots.txt")
     if 400 <= status < 500 and status != 429:
