@@ -19,5 +19,6 @@
 ## 3. Closing
 
 - [x] 3.1 Apply the `iw-docs-update` skill: `scraper/README.md` (one short section: command, flags, what it cannot measure), `scraper/CLAUDE.md` module list, `.docs/status/scraper.md`; add the `iw-ai-log` row; `docs-check` prints `docs-check: ok`
-- [ ] 3.2 Run the command once against the running stack after a real scan and put the output in the PR body (not in the repo)
-- [ ] 3.3 Run the `iw-pr-review` skill and fix real findings
+- [x] 3.2 Run the command once against the running stack after a real scan and put the output in the PR body (not in the repo)
+  - Done on an isolated stack (infra postgres, redis, minio and the real `api-migrate`, scraper runtime image as the app role): `seed`, one manual scan of the KNF source (stored 1 document with raw HTML), then the report: exit 0, empty stderr. The first scan had no DNS (the `data` network is internal) and left one `blocked` error; the second reached KNF. The output is in the PR body.
+- [x] 3.3 Run the `iw-pr-review` skill and fix real findings
