@@ -5,18 +5,20 @@
 	http_port 8080
 	https_port 8443
 	auto_https disable_redirects
+	# Clients connecting by IP send no SNI: serve the 127.0.0.1 certificate to them.
+	default_sni 127.0.0.1
 }
 
 http://:8080 {
 	redir https://{host}:{$IW_HTTPS_PORT}{uri} permanent
 }
 
-{$IW_HOSTNAME}:8443 {
+{$IW_HOSTNAME}:8443, 127.0.0.1:8443 {
 	tls internal
 
 	header {
-		# Short by default: HSTS is per host, not per port, so a long value on localhost would force https on
-		# every local dev server. Set IW_HSTS="max-age=31536000; includeSubDomains" on a real domain.
+		# Off by default (max-age=0 also clears an old entry): HSTS ignores ports, so on localhost it would
+		# force https on every local dev server. On a real domain: IW_HSTS="max-age=31536000; includeSubDomains".
 		Strict-Transport-Security "{$IW_HSTS}"
 		-Server
 		-X-Powered-By
@@ -26,10 +28,9 @@ http://:8080 {
 		max_size 1MB
 	}
 
-	handle /api/* {
-		reverse_proxy {$API_UPSTREAM}
-	}
-	handle /socket.io/* {
+	# Bare /api and /socket.io must reach the api too, not fall through to the SPA.
+	@api path /api /api/* /socket.io /socket.io/*
+	handle @api {
 		reverse_proxy {$API_UPSTREAM}
 	}
 	handle {

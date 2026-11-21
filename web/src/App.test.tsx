@@ -41,6 +41,13 @@ describe('App (against contract mocks)', () => {
     expect(document.querySelector('img')).toBeNull();
   });
 
+  it('tells "system down" apart from "API unreachable"', async () => {
+    server.use(http.get('http://localhost/api/health', () => HttpResponse.json({ status: 'down', services: {} })));
+    renderApp();
+    expect(await screen.findByText('System nie działa')).toBeInTheDocument();
+    expect(screen.queryByText('Brak połączenia z API')).toBeNull();
+  });
+
   it('shows an API-down state instead of crashing when the API is unreachable', async () => {
     server.use(
       http.get('http://localhost/api/health', () => HttpResponse.error()),

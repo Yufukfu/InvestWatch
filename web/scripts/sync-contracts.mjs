@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { generateEndpoints } from '@rtk-query/codegen-openapi';
 
-const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// IW_WEB_DIR / IW_CONTRACTS_DIR override target and source, so tests run against temp copies.
+const webDir = process.env.IW_WEB_DIR ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(webDir);
-// IW_CONTRACTS_DIR overrides the source (used by tests).
 const contractsDir = process.env.IW_CONTRACTS_DIR ?? path.resolve(webDir, '..', 'contracts');
 const check = process.argv.includes('--check');
 const rel = (file) => path.relative(webDir, file);

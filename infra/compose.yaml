@@ -36,7 +36,7 @@ services:
     environment:
       IW_HOSTNAME: ${IW_HOSTNAME:-localhost}
       IW_HTTPS_PORT: ${IW_HTTPS_PORT:-8443}
-      IW_HSTS: ${IW_HSTS:-max-age=300}
+      IW_HSTS: ${IW_HSTS:-max-age=0}
       API_UPSTREAM: ${API_UPSTREAM:-api:8000}
       WEB_UPSTREAM: ${WEB_UPSTREAM:-web:8080}
     ports:

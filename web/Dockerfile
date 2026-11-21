@@ -8,7 +8,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 # Contract snapshot (src/api/openapi.json, generated.ts) is committed, so the image builds without ../contracts.
-RUN npm run typecheck && npm run lint && npx vitest run src && npm run build \
+# `build` runs tsc -b itself, so no separate typecheck step.
+RUN npm run lint && npx vitest run src && npm run build \
     && rm -f dist/mockServiceWorker.js
 
 FROM public.ecr.aws/nginx/nginx-unprivileged:1.29-alpine AS runtime
