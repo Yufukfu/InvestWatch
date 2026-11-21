@@ -1,8 +1,8 @@
 # NNNN. Title
 
-- Status: proposed | accepted | superseded by NNNN
+- Status: accepted | superseded by NNNN
 - Date: YYYY-MM-DD
-- Deciders: names
+- Deciders: agent-written; accepted by <human> via PR #<n>
 
 ## Context
 

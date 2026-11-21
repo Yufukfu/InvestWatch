@@ -10,6 +10,7 @@ Task-group reviews already ran (`iw-commit-cycle`). This is the last pass over t
 1. **Pin the range**: `BASE=$(git merge-base HEAD origin/main)`, `HEAD` sha, worktree path.
 2. **Deterministic checks, all green, run after the last code edit:**
    - the module's tests, lint and type check;
+   - every task group has its `mutations: N tried, N caught` line (`iw-commit-cycle` step 3); a group with surviving mutants or no line is not done;
    - `openspec validate --all --strict`;
    - `node .claude/skills/iw-docs-update/scripts/docs-check.mjs`, and `iw-docs-update` has been applied;
    - `node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs"` if hooks or the checker changed;
