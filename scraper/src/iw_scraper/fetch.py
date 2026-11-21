@@ -58,13 +58,19 @@ class FetchFailure(Exception):
     """The fetch produced nothing usable; `reason` is a `Reason` from the closed set."""
 
     def __init__(
-        self, reason: Reason, detail: str, proxy_id: str | None = None, retry_after: str | None = None
+        self,
+        reason: Reason,
+        detail: str,
+        proxy_id: str | None = None,
+        retry_after: str | None = None,
+        http_status: int | None = None,
     ) -> None:
         super().__init__(detail)
         self.reason = reason
         self.detail = detail
         self.proxy_id = proxy_id  # the proxy involved, for `scrape_meta.proxy`; never its URL
-        self.retry_after = retry_after  # the raw `Retry-After` header of the answer, for `DomainGate`
+        self.retry_after = retry_after  # the raw `Retry-After` header of the answer
+        self.http_status = http_status  # of the answer that caused this, when there was one (the queue retries 5xx)
 
 
 class ProxyAuthFailure(FetchFailure):
@@ -223,6 +229,9 @@ async def _request_through_proxies(
             raise
 
 
+open_session = _new_session  # the run's session: shared by `check_robots` and `fetch`, closed by its owner
+
+
 async def close_session(session: Session) -> None:
     try:
         await session.close()
@@ -259,9 +268,9 @@ async def fetch(
                 continue
             retry_after = headers.get("retry-after")
             if status in BLOCK_STATUSES:
-                raise FetchFailure(Reason.BLOCKED, f"HTTP {status}", proxy_id, retry_after)
+                raise FetchFailure(Reason.BLOCKED, f"HTTP {status}", proxy_id, retry_after, status)
             if not 200 <= status < 300:
-                raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}", proxy_id, retry_after)
+                raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}", proxy_id, retry_after, status)
             if not body:
                 raise FetchFailure(Reason.BLOCKED, "empty response body", proxy_id)
             if marker := block_marker(body):

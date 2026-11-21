@@ -27,10 +27,11 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | 1 | Size, worktree, branch | `iw-implement` | branch prefix = module |
 | 2 | Explore (only if scope is foggy) | `/openspec-explore` | none |
 | 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
-| 4 | Implement, per task group | `/openspec-apply-change` + `iw-commit-cycle` | failing test first, mutation check per task group; `iw-reviewer` per task group or before a push |
+| 4 | Implement, per task group | `/openspec-apply-change` + `iw-commit-cycle` | failing test first, mutation check per task group; `iw-reviewer` on each logic group's own range |
 | 5 | Closing tasks (generated into every `tasks.md`) | `iw-docs-update`, `iw-ai-log`, `iw-pr-review` | docs-check clean, review findings verified |
 | 6 | Archive, as the last commit of the branch | `/openspec-archive-change` | specs updated |
-| 7 | Push and PR | human | fresh go-ahead every time (also `permissions.ask`) |
+| 7 | Push the branch and open the PR | agent | PR-ready criteria in `.claude/CODE_REVIEW.md`; `origin` and the current branch only, never `main`, never `--force` (hook); the PR body lists every `IW_*` escape used and says that it loosens no permission beyond ADR 0207 |
+| 7b | Approve and merge | human | review, approval and merge are always the human's (`gh pr merge`, `gh pr ready` and `gh pr review` stay in `permissions.ask`; the hook denies `gh api` merge and approve calls) |
 | 8 | CI (advisory for now) | `.github/workflows/ci.yml`, manual dispatch | not a merge gate during the hackathon; becomes a required check in the full SDLC |
 | 9 | After merge | remove the worktree | nothing else: docs, log and archive were in the PR |
 

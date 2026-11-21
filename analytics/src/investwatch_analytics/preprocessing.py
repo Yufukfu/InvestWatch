@@ -14,8 +14,11 @@ from dataclasses import dataclass, field
 _WS = re.compile(r"\s+")
 
 # A boundary: sentence-final punctuation, then whitespace, then something that starts a sentence.
+# Linear on hostile input (scraped text is untrusted): the whitespace run is possessive (`\s++`, never given back)
+# and the lookahead allows at most 3 spaces after a footnote marker ("* Ryzyko", "(*) Ryzyko"). The previous
+# `\s+(?=...\s*X)` re-scanned the run on every backtrack: ". " + 40 000 spaces took ~15 s (PR #26 review).
 _BOUNDARY = re.compile(
-    r"(?:(?<=[.!?…])|(?<=[.!?…][”\"»)]))\s+(?=(?:\(\*\)|[\"'„«(\[*¹²³])?\s*[A-ZĄĆĘŁŃÓŚŹŻ0-9#])|\n\s*\n"
+    r"(?:(?<=[.!?…])|(?<=[.!?…][”\"»)]))\s++(?=(?:\(\*\)|[\"'„«(\[*¹²³])?\s{0,3}[A-ZĄĆĘŁŃÓŚŹŻ0-9#])|\n\s*\n"
 )
 # Tokens that end with a period but never end a sentence: legal forms, titles and `<year> r.`
 # (usually followed by a capitalized name, so the boundary regex alone would split there).
@@ -27,7 +30,11 @@ _ABBREV = re.compile(
 # they end a sentence ("Zaufaj im."), and before a lowercase word there is no boundary anyway.
 _ABBREV_BEFORE_DIGIT = re.compile(r"\b(?:ok|tel|Tel|tys|mln|godz|ust|art|pkt)\.$")
 # A digit next, possibly after the opening bracket or quote the boundary allows ("tel. (22) …").
-_DIGIT_NEXT = re.compile(r"[(\[\"'„«*]?\s*\d")
+_DIGIT_NEXT = re.compile(r"[(\[\"'„«*]?\s{0,3}\d")
+# The abbreviation checks look only at this many characters before a boundary (the longest token is a few
+# characters). Searching the whole sentence prefix was quadratic: a skipped boundary keeps `start`, so a chain like
+# "S.A. Ab S.A. Ab ..." re-scanned an ever longer prefix (40 000 characters took ~10 s).
+_ABBREV_WINDOW = 16
 
 _PL_CHARS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
 _PL_WORDS = {
@@ -71,9 +78,12 @@ def split_sentences(text: str) -> list[Sentence]:
     start = 0
     for m in _BOUNDARY.finditer(text):
         paragraph_break = "\n\n" in re.sub(r"[^\n]", "", m.group(0))
-        before = text[start:m.start()]
+        tail = max(start, m.start() - _ABBREV_WINDOW)  # `\b` still sees the character before `tail`
         digit_next = _DIGIT_NEXT.match(text, m.end()) is not None
-        if not paragraph_break and (_ABBREV.search(before) or (digit_next and _ABBREV_BEFORE_DIGIT.search(before))):
+        if not paragraph_break and (
+            _ABBREV.search(text, tail, m.start())
+            or (digit_next and _ABBREV_BEFORE_DIGIT.search(text, tail, m.start()))
+        ):
             continue
         _append(sentences, text, start, m.start())
         start = m.end()

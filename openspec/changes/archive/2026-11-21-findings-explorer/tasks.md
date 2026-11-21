@@ -1,0 +1,39 @@
+# Tasks
+
+## 1. URL filter state and findings data hook
+
+- [x] 1.1 Failing tests: `parseFindingParams` drops invalid values and defaults; serialise round-trips; a change of filter resets `page` to 1; hook sends the matching generated-query params. Run `npm test` and see them fail first.
+- [x] 1.2 Implement `model.ts` types, URL-state hook and `useFindings` with params and `total`. `npm test`, `npm run lint`, `npm run typecheck` pass.
+- [x] 1.3 Mutation check (iw-commit-cycle step 3); mutations: 11 tried, 11 caught
+
+## 2. Filter bar, sort and paging UI
+
+- [x] 2.1 Failing component tests (props only): labelled controls, multi-select status, debounce of `q`, clear-filters, empty and error states, count from `total`.
+- [x] 2.2 Implement `FindingsFilters`, paging and sort controls; wire in `FindingsPage`. Tests pass.
+- [x] 2.3 Mutation check; mutations: 10 tried, 10 caught
+
+## 3. Table presentation
+
+- [x] 3.1 Failing tests: risk text for each level, score display, detection time, markup rendered as text, scroll container present.
+- [x] 3.2 Implement table upgrade and CSS tokens (AA contrast). Check 375/768/1280 px by hand against the running mock; note result in the commit body.
+- [x] 3.3 Mutation check; mutations: 9 tried, 9 caught (one survivor at the 4/5 plural boundary, case added)
+
+## 4. Finding detail panel
+
+- [x] 4.1 Failing tests with `contracts/mocks/finding-detail.json`: `fail`/`uncertain` rules visible with legal basis and explanation, `pass` group collapsed with count, rule id shown verbatim, 404 state, deep link, `Escape` closes and focus returns.
+- [x] 4.2 Implement detail data hook, panel components and screenshot preview with failure message. Tests pass.
+- [x] 4.3 Mutation check; mutations: 15 tried, 15 caught (two equivalent mutants found, redundant guards removed; 500-is-not-404 case added)
+
+## 5. Status change
+
+- [x] 5.1 Failing tests: PATCH body, status shown from response, pending disables, 422/500 shows error and keeps old status, list refreshes; tag invalidation via `enhanceEndpoints`.
+- [x] 5.2 Implement status select, note and save. Tests pass.
+- [x] 5.3 Mutation check; mutations: 11 tried, 11 caught (two survivors closed with no-change submit and no-early-confirmation cases)
+
+## 6. Closing
+
+- [x] 6.1 Run against the contract mock server (`docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts`, run on :8000, `npm run dev`): filters, detail, status change work and the browser console is clean.
+- [x] 6.2 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `docs-check` clean) and add the `iw-ai-log` row.
+- [x] 6.3 Run the `iw-pr-review` skill and fix real findings (7 of 8 fixed; review fixes mutations: 12 tried, 12 caught; rest in follow-ups.md).
+
+Note (PR #39 review, Adam): the `mutations:` lines above count only the mutants chosen by the author. An independent run over the new code (174 mutants) left 70 alive, 66 of them real gaps. They are closed in `findings-explorer-review-fixes`.

@@ -1,0 +1,68 @@
+# analytics/ deployment unit (owner Damian): the iw:documents stream worker and the one-shot gold-set evaluation. Included from the root compose.yaml
+# next to infra/compose.yaml, which owns postgres, redis and the data network (none is declared here),
+# and api/compose.yaml, whose one-shot api-migrate creates the tables this worker reads and writes.
+# Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml up analytics
+services:
+  analytics:
+    build: .
+    image: investwatch/analytics:${IW_VERSION:-dev}
+    restart: unless-stopped
+    environment:
+      # App role: CRUD only, no DDL (infra/postgres/init/01-app-role.sh).
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      HEALTH_PORT: "8001"
+      # LLM slots (ADR 0304), from the root .env; empty = rules-only (model.llm = null). The client is wired by the
+      # later change analytics-llm-p0. Local fallback: LLM_BASE_URL=http://ollama:11434/v1 with --profile llm.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
+      # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).
+      # Format and refresh: analytics/registry/README.md.
+      REGISTRY_CSV: ${REGISTRY_CSV:-}
+      # Optional tuning, defaults in analytics/.env.example: WORKER_CONSUMER (hostname), STREAM_BLOCK_MS,
+      # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES, MAX_DOCUMENT_BYTES.
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # data only: Postgres and Redis, internal, no route out. The worker makes no outbound call yet; analytics-llm-p0
+    # adds egress together with the hosted LLM client (ADR 0304).
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  # One-shot gold-set evaluation (change analytics-eval-calibration, ADR 0312): fills calibration_points so the
+  # calibration panel has a curve after a plain `docker compose up`. Rules-only and deterministic; it writes a module's
+  # run only when the gold set, the pipeline version or the results changed, so restarts add nothing.
+  # Manual re-run: docker compose run --rm analytics-eval  (or: python analytics/eval/run.py --db).
+  analytics-eval:
+    build: .
+    image: investwatch/analytics:${IW_VERSION:-dev}
+    command: ["python", "-m", "investwatch_analytics.evaluation", "--db"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+    # data only: Postgres. No Redis, no egress (no LLM in the default run).
+    networks: [data]
+    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 256M }

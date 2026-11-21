@@ -5,3 +5,4 @@ include:
   - infra/compose.yaml
   - web/compose.yaml
   - api/compose.yaml
+  - analytics/compose.yaml

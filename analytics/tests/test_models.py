@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from conftest import NOW, make_doc
-from investwatch_analytics.models import Finding, FirmRef, ModelInfo, RuleResult, ScrapedDocument
+from investwatch_analytics.models import AdvertiserRef, Finding, FirmRef, ModelInfo, RuleResult, ScrapedDocument
 
 
 def sample_finding() -> Finding:
@@ -19,6 +19,8 @@ def sample_finding() -> Finding:
         title="Tytuł",
         summary="Podsumowanie.",
         firm=FirmRef(name="Alfa", registry_id=None, registry_type="brokerage_house", authorized=True, match_confidence=0.95),
+        advertiser=AdvertiserRef(name="Jan Kowalski", handle="@inwestor_jan", profile_url="https://x.com/inwestor_jan",
+                                 website=None, in_registry=False, on_warning_list=None),
         rules=[RuleResult(rule_id="R2", name="Oznaczenie reklamy", result="fail", severity="medium", method="rule")],
         content_excerpt="x",
         url="https://example.com/oferta",
@@ -38,9 +40,39 @@ def test_finding_matches_contract(finding_validator):
 
 def test_rules_only_finding_with_nulls_matches_contract(finding_validator):
     data = sample_finding().model_dump()
-    data.update(firm=None, summary=None, content_excerpt=None, model=None)
+    data.update(firm=None, advertiser=None, summary=None, content_excerpt=None, model=None)
     payload = Finding(**data).to_contract()
     assert [e.message for e in finding_validator.iter_errors(payload)] == []
+
+
+def test_advertiser_round_trips_in_contract_shape():
+    payload = sample_finding().to_contract()
+    assert payload["advertiser"] == {
+        "name": "Jan Kowalski", "handle": "@inwestor_jan", "profile_url": "https://x.com/inwestor_jan",
+        "website": None, "in_registry": False, "on_warning_list": None,
+    }
+
+
+def test_advertiser_defaults_to_none():
+    data = sample_finding().model_dump()
+    del data["advertiser"]
+    assert Finding(**data).advertiser is None
+
+
+def test_advertiser_in_registry_has_no_default():
+    with pytest.raises(ValidationError):  # the schema types it boolean, never null
+        AdvertiserRef(name="X")
+
+
+@pytest.mark.parametrize("field", ["profile_url", "website"])
+def test_advertiser_urls_must_be_absolute_http(field):
+    with pytest.raises(ValidationError):
+        AdvertiserRef(in_registry=False, **{field: "/profil"})
+
+
+def test_advertiser_rejects_unknown_field():
+    with pytest.raises(ValidationError):
+        AdvertiserRef(in_registry=False, followers=10)
 
 
 def test_firm_authorized_has_no_default():
