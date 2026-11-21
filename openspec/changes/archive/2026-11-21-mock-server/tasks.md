@@ -47,3 +47,12 @@
 - [x] 7.2 Settings: `LOG_LEVEL` validated, port <= 65535, finite numbers; mutations: 5 tried, 5 caught
 - [x] 7.3 Scan `running` status, trend `date_from` hour, empty findings refused; mutations: 4 tried, 4 caught
 - [x] 7.4 Review of 7.1-7.3: stored url must be a valid `uri`, five log levels only; mutations: 3 tried, 3 caught (scan `generation` taken in `start_scan`: mutations: n/a, the race window is not reachable in a test)
+
+## 8. PR #8 reviews by Adam and Kacper (follow-ups rows 46-55)
+
+- [x] 8.1 Socket.IO accepts same-origin behind the gateway; mutations: 7 tried, 7 caught
+- [x] 8.2 `/__mock/*` needs `X-Mock-Admin`, default bind `127.0.0.1`; mutations: 5 tried, 5 caught
+- [x] 8.3 Blank `status` 422, sort ties by `id`, strict threshold numbers; mutations: 6 tried, 6 caught
+- [x] 8.4 `MOCK_MAX_ADDED` cap and text length limits; mutations: 10 tried, 10 caught
+- [x] 8.5 CI job for contracts and the mock server, pinned base image; mutations: n/a, config only (workflow, Dockerfile)
+- [x] 8.6 README for `web/` (Vite proxy), new variables and behaviour; mutations: n/a, docs only
