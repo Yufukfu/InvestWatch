@@ -56,8 +56,11 @@ def _firm_by_handle(handle: str | None, registry: Registry) -> Firm | None:
     key = handle_key(handle)
     if key is None:
         return None
+    # Every name form, bank brokerage-unit lines and their cores included, but only one the firm owns: `@xtb` is
+    # the Polish XTB S.A., never the Cypriot XTB Ltd that shares the form (change analytics-knf-registry).
     for firm in registry.firms:
-        if key in {firm_key(n) for n in (firm.name, firm.core, *firm.aliases)}:
+        forms = (firm.name, firm.core, *firm.name_lines, *firm.cores, *firm.aliases)
+        if any(firm_key(n) == key and registry.owns(firm, n) for n in forms):
             return firm
     return None
 

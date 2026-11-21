@@ -4,7 +4,7 @@ Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M
 
 - **Owner:** Damian
 - **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`): S1.5 is always `uncertain`, and S3.3/S3.4 are `uncertain` when the rules find a candidate phrase, `pass` otherwise, until it lands.
-- **Registry:** [`registry/seed.csv`](registry/seed.csv) holds four fictional firms until the real KNF loader lands, so M1/M2 only recognise those firms and every other entity is "not found in the loaded registry"; M3 findings say so, with "(dane demonstracyjne)" while the seed is loaded ([`registry/README.md`](registry/README.md)). Until a real KNF registry CSV is loaded and `REGISTRY_CSV` is set, a real firm is unmatched, so R1 fails and the score can cross the M2 threshold: R1 results and `finding.high_risk` alerts for real firms are not meaningful. The worker logs a `registry_seed` WARNING at startup in that case. A real KNF loader is a follow-up.
+- **Registry:** the default registry is `registry/knf.csv`, the real KNF register of investment firms (749 firms, snapshot of 2026-11-21; change `analytics-knf-registry`). At start-up the worker logs `registry_loaded` with the snapshot date. R1 passes only on a firm's official name; a former or trade name alone makes it `uncertain`. `registry/seed.csv` (4 fictional firms) is the test fixture: it logs a `registry_seed` WARNING if used, and M3 findings then add "(dane demonstracyjne)" (`Registry.demo`: no firm has a `source_url`). Files, source and refresh: [`registry/README.md`](registry/README.md).
 - **Privacy:** rule `evidence` and `advertiser` copy scraped author names, handles, profile and referral links verbatim (cut to 200-300 characters) into `findings`, and the `iw:events` messages carry the title, which names the advertiser, so treat them as personal data taken from public posts.
 
 ## Modules and routing
@@ -40,9 +40,11 @@ Python 3.12+.
 ```bash
 cd analytics
 python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt -e .   # Linux/macOS: .venv/bin/python
-.venv/Scripts/python -m investwatch_analytics.cli ../contracts/mocks/documents.json > findings.json
+REGISTRY_CSV=registry/seed.csv .venv/Scripts/python -m investwatch_analytics.cli ../contracts/mocks/documents.json > findings.json
 .venv/Scripts/python ../contracts/validate.py finding findings.json
 ```
+
+The mocks name the fictional seed firms, so this run sets `REGISTRY_CSV` to the seed; with the default (the real KNF register) their firms are unmatched and R1 fails.
 
 The CLI reads one `ScrapedDocument` or a list of them and writes `Finding`s as a JSON list to stdout. JSON logs go to stderr. An invalid document, or one whose analysis fails, is logged and skipped. Exit codes: 0 ok; 1 at least one document failed analysis (the others' findings are still written); 2 bad input, bad configuration, or no valid document (nothing on stdout).
 
@@ -66,7 +68,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REGISTRY_CSV` | `registry/seed.csv` (3 fictional firms, see the registry caveat above; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | KNF firm registry, format in [`registry/README.md`](registry/README.md) |
+| `REGISTRY_CSV` | `registry/knf.csv` (the real KNF register snapshot; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | firm registry, files and refresh in [`registry/README.md`](registry/README.md) |
 | `LOG_LEVEL` | `INFO` | log level |
 | `DATABASE_URL` | worker: required | Postgres, app role (`postgresql://iw_app:...@postgres:5432/investwatch`) |
 | `REDIS_URL` | worker: required | Redis (`redis://:<password>@redis:6379/0`) |

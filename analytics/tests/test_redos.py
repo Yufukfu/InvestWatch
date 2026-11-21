@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from conftest import NOW, make_doc
-from investwatch_analytics.config import Settings
+from investwatch_analytics.config import SEED_REGISTRY, Settings
 from investwatch_analytics.models import ScrapedDocument
 from investwatch_analytics.pipeline import analyze
 from investwatch_analytics.preprocessing import split_sentences
@@ -58,7 +58,7 @@ def test_split_is_fast_on_hostile_input(text):
     ids=["digit-run", "dotted-digits", "fee-then-digits", "repeated-fee-stem", "claim-warning-pairs"],
 )
 def test_r3_patterns_are_fast_on_hostile_input(text):
-    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    registry = Registry.from_csv(SEED_REGISTRY)
     doc = ScrapedDocument.model_validate(make_doc(text="Reklama. " + text, url=FIRM_PAGE))
     assert elapsed(lambda: analyze(doc, registry=registry, catalogue=Catalogue.load(), now=NOW)) < 3.0
 
@@ -78,7 +78,7 @@ def test_abbreviation_window_keeps_legal_forms_and_years():
 
 
 def test_percent_claim_still_found():
-    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    registry = Registry.from_csv(SEED_REGISTRY)
     doc = ScrapedDocument.model_validate(make_doc(text="Reklama. Zarabiaj 12,5 % rocznie z nami.", url=FIRM_PAGE))
     [f] = analyze(doc, registry=registry, catalogue=Catalogue.load(), now=NOW)
     [r3] = [r for r in f.rules if r.rule_id == "R3"]
@@ -99,7 +99,7 @@ def test_r3_claim_patterns_alone_are_linear_on_a_digit_run():
 def test_r3_coverage_unchanged_by_bisect():
     """Covered and uncovered claims around the +-2 sentence window, as before the bisect rewrite
     (old and new coverage logic agreed on 200 000 random claim/warning layouts)."""
-    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    registry = Registry.from_csv(SEED_REGISTRY)
 
     def r3(text):
         [f] = analyze(ScrapedDocument.model_validate(make_doc(text=text, url=FIRM_PAGE)), registry=registry,
@@ -235,7 +235,7 @@ def test_megabyte_of_hostile_text_costs_no_more_than_the_scan_cap(unit):
     (without the cap it grows about 5x)."""
     from investwatch_analytics.pipeline import SCAN_MAX
 
-    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    registry = Registry.from_csv(SEED_REGISTRY)
 
     def run(size: int) -> float:
         doc = ScrapedDocument.model_validate(make_doc(source_kind="third_party", platform="web",
@@ -257,7 +257,7 @@ def test_expanding_ligatures_are_bounded_in_registry_lookups():
     """'ﬁ' folds to two characters under NFKC; R1's name lookup and the registry match read at most the 200 000-character
     prefix, so 2 MB of them costs about what the prefix costs (review-2 security pass). Preprocessing's own NFKC of the
     whole text is a separate follow-up."""
-    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+    registry = Registry.from_csv(SEED_REGISTRY)
     firm = next(f for f in registry.firms if f.name.startswith("Alfa"))
 
     def run(size: int) -> float:
