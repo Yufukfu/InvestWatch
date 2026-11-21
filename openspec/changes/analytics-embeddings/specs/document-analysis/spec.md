@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Investment topic gate
-After preprocessing and before any module runs, analytics SHALL decide whether a document is investment-related (`.docs/analytics-plan.md` §2 step 2). Its core signal is dictionary hits: the terms of `gate_terms.yaml` (stems or phrases on word boundaries) matched against the normalized text, lowercased and with diacritics stripped. A registry firm match SHALL count as a hit. The gate SHALL drop a document only when it has no hit and the similarity rescue does not apply.
+After preprocessing and before any module runs, analytics SHALL decide whether a document is investment-related (`.docs/analytics-plan.md` §2 step 2). Its core signal is dictionary hits: the terms of `gate_terms.yaml` (stems or phrases on word boundaries) matched against the normalized text, lowercased and with diacritics stripped. A registry firm match SHALL count as a hit. The gate SHALL drop a document only when it has no hit.
 
 #### Scenario: Investment post passes on the dictionary
 - **WHEN** a `third_party` post says `Zainwestuj w CFD na forex, zyski 20% miesięcznie`
@@ -43,7 +43,7 @@ Documents with `source_kind` `firm_own` SHALL bypass the gate, because M2 covers
 - **THEN** the gate drops nothing
 
 ### Requirement: Dropped documents are logged
-A document dropped by the gate SHALL produce no finding. It SHALL log `document skipped` with reason `off_topic` and the figures `dict_hits`, `similarity` (null without the rescue) and `embedder` (the model, or null), without document text. Its `documents` row SHALL stay untouched, so it can be re-analyzed.
+A document dropped by the gate SHALL produce no finding. It SHALL log `document skipped` with reason `off_topic` and the figures `dict_hits`, `similarity` (always null until a similarity rescue exists) and `embedder` (the model, or null), without document text. Its `documents` row SHALL stay untouched, so it can be re-analyzed.
 
 #### Scenario: Off-topic post dropped with a reason
 - **WHEN** a `third_party` post about a recipe has no dictionary hit
@@ -63,25 +63,6 @@ The gate SHALL increment `passed`, `dropped` or `bypassed` in the Redis hash `iw
 #### Scenario: Counter on a Redis outage
 - **WHEN** the Redis client raises on `HINCRBY iw:stats:gate`
 - **THEN** the gate decision and the analysis are unchanged
-
-### Requirement: Similarity rescue in the topic gate (stretch)
-When a document vector is available, a document with no dictionary hit SHALL still pass if its highest cosine similarity to the positive class centroids (normalized means of the seed phrases in `gate_terms.yaml`) is at or above `GATE_SIM_THRESHOLD`. The similarity SHALL never drop a document the dictionary kept. Centroids SHALL be rebuilt on the first successful call after an outage. Stretch item: if cut, this requirement is removed before archive.
-
-#### Scenario: Embedding rescues a post without vocabulary
-- **WHEN** a post has no dictionary hit and the stub embedder gives similarity 0.60 to the investment-offer centroid
-- **THEN** the gate passes it
-
-#### Scenario: Low similarity still dropped
-- **WHEN** a recipe post has no dictionary hit and similarity 0.20
-- **THEN** it is dropped, and the log has `similarity` 0.2 and `embedder` `bge-m3`
-
-#### Scenario: Centroids after an outage
-- **WHEN** the embedder was down at start-up and comes back
-- **THEN** the centroids are built on the first successful call, and later documents get a similarity
-
-#### Scenario: Centroid class without seeds
-- **WHEN** `gate_terms.yaml` has a centroid class with an empty seed list
-- **THEN** loading fails at start-up with an error naming the class
 
 ### Requirement: Near-duplicate detection
 Analytics SHALL detect near-duplicates with MinHash (`NEARDUP_NUM_PERM` permutations, deterministic in every process) over word 5-shingles of the normalized, lowercased text, cut to `NEARDUP_MAX_CHARS`, and an LSH index of `NEARDUP_BANDS` bands in Redis. A band candidate SHALL count only if its estimated Jaccard similarity is at least `NEARDUP_THRESHOLD`. A document SHALL never match its own id. Texts with fewer than 5 words SHALL skip detection.

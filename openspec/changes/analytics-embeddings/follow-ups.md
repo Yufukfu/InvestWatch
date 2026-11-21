@@ -1,5 +1,15 @@
 # Follow-ups
 
+## Differences from the mock findings (task 10.0)
+
+`contracts/mocks/` stay untouched (Damian's rule); checked on 2026-11-22 with `python -m investwatch_analytics.cli ../contracts/mocks/documents.json --no-llm`, with and without `GATE_ENABLED=false`, on both `registry/seed.csv` and the default KNF registry.
+
+| # | Mock | Mock value | From this change | Disposition |
+|---|---|---|---|---|
+| M1 | all findings | `model.embedder: bge-m3` | `null` unless `EMBED_BASE_URL` is set and the vector was used | `keep-mock` (the mock is illustrative) |
+| M2 | all documents | – | the gate drops none of the mock documents: findings identical with and without the gate; all valid against `finding.schema.json` | – |
+| M3 | `8721cb75` (edu, M1) | an M1 finding | none, with or without the gate | not from this change (routing/rules on main); left as is |
+
 ## Review findings
 
 | # | Source | Item | Disposition |
@@ -48,3 +58,4 @@
 | R42 | review group 9 | compose passed `EMBED_MODEL=""` when unset, so setting only `EMBED_BASE_URL` made the worker exit 2 in a restart loop | `fix-here`: `${EMBED_MODEL:-bge-m3}` plus a test that every compose key's empty value means its default |
 | R43 | review group 9, can't verify | a slow (not down) Redis can add about 3-4 s of side-client calls per document, outside the claim-idle check | `wont-fix` for now: 48 s worst case against 60 s at the defaults; revisit with a per-message deadline |
 | R44 | review group 9 | the gate counter increments before `save_findings`, so a redelivery after a store failure counts twice | `wont-fix`: statistics only |
+| R45 | closing | group 5 (similarity rescue with class centroids, stretch) cut for time: the gate is dictionary-only; `GATE_SIM_THRESHOLD` and the centroid seeds are kept, unused | `new-item`: build it in a later change, moving the embedding before the gate, and calibrate the threshold on the gold set |

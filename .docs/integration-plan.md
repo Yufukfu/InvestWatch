@@ -204,7 +204,7 @@ Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/soc
 | Event | Payload | When |
 |---|---|---|
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
-| `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
+| `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert. At most one per near-duplicate group and module: a near-identical copy still gets `finding.created` but no second alert (ADR 0314) |
 | `finding.updated` | `{ id, status }` | published by the API on `iw:events` after `PATCH /findings/{id}` commits (status or note change; sync between tabs) |
 | `scan.started` / `scan.finished` | `{ source_id, documents, status }`: `documents` = new documents of that job (integer or null), `status` = `ok\|partial\|failed` or null ([`events.schema.json`](../contracts/schemas/events.schema.json)) | scan progress bar |
 
