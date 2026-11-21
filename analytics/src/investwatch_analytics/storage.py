@@ -8,7 +8,6 @@ Spec: openspec/specs/finding-storage/spec.md.
 
 from __future__ import annotations
 
-import copy
 import threading
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -84,75 +83,6 @@ def document_from_row(columns: Mapping[str, Any], payload: Mapping[str, Any] | N
 
 def _too_large(size: int, limit: int) -> InvalidDocument:
     return InvalidDocument("text", f"document too large: {size} bytes > MAX_DOCUMENT_BYTES {limit}")
-
-
-class InMemoryStore:
-    """Test store with the same observable behaviour as the Postgres store."""
-
-    def __init__(self, *, max_document_bytes: int = DEFAULT_MAX_DOCUMENT_BYTES) -> None:
-        self._max_document_bytes = max_document_bytes
-        self._lock = threading.Lock()
-        self._documents: dict[str, tuple[dict, dict | None]] = {}
-        self._findings: dict[tuple[str, str], Finding] = {}
-        #: Set to True to simulate an outage: every operation raises `StoreUnavailable`.
-        self.unavailable = False
-        #: Test seam called between staging and commit, so a test can interleave two saves.
-        self.before_commit: Callable[[], None] | None = None
-
-    # -- test helpers (the scraper and the API write these in production) --------------------------
-
-    def put_document_row(self, columns: Mapping[str, Any], payload: Mapping[str, Any] | None = None) -> None:
-        self._documents[str(columns["id"])] = (dict(columns), dict(payload) if payload is not None else None)
-
-    def set_review(self, document_id: str, module: str, *, status: str, note: str | None) -> None:
-        key = (document_id, module)
-        self._findings[key] = self._findings[key].model_copy(update={"status": status, "note": note})
-
-    # -- Store -------------------------------------------------------------------------------------
-
-    def _check(self) -> None:
-        if self.unavailable:
-            raise StoreUnavailable("in-memory store marked unavailable")
-
-    def load_document(self, document_id: str) -> ScrapedDocument:
-        self._check()
-        row = self._documents.get(document_id)
-        if row is None:
-            raise NotFound(document_id)
-        columns, payload = row
-        import json as _json
-
-        size = len(str(columns.get("text") or "").encode("utf-8")) + len(_json.dumps(payload or {}).encode("utf-8"))
-        if size > self._max_document_bytes:
-            raise _too_large(size, self._max_document_bytes)
-        return document_from_row(columns, payload)
-
-    def save_findings(self, document: ScrapedDocument, findings: Sequence[Finding]) -> list[SavedFinding]:
-        with self._lock:
-            self._check()
-            staged = copy.copy(self._findings)  # one "transaction": swap in only when every write succeeded
-            saved: list[SavedFinding] = []
-            for f in findings:
-                if f.document_id not in self._documents:
-                    raise StoreError("ForeignKeyViolation (sqlstate 23503)")  # same text as the Postgres store
-                key = (f.document_id, f.module)
-                existing = staged.get(key)
-                if existing is None:
-                    row = f.model_copy(update={"status": "new", "note": None})
-                    outcome = "created"
-                else:
-                    row = existing.model_copy(update={name: getattr(f, name) for name in ANALYSIS_FIELDS})
-                    outcome = "updated"
-                staged[key] = row
-                saved.append(SavedFinding(row, outcome))
-            if self.before_commit is not None:
-                self.before_commit()
-            self._findings = staged
-            return saved
-
-    def findings_for_document(self, document_id: str) -> list[Finding]:
-        self._check()
-        return [f for (doc_id, _), f in sorted(self._findings.items()) if doc_id == document_id]
 
 
 # ---- Postgres -----------------------------------------------------------------------------------

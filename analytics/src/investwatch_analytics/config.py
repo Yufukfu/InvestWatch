@@ -18,11 +18,18 @@ class Settings:
     log_level: str
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
+        env = os.environ if env is None else env
         return cls(
-            registry_csv=Path(os.environ.get("REGISTRY_CSV") or _DEFAULT_REGISTRY),
-            log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+            registry_csv=Path(env.get("REGISTRY_CSV") or _DEFAULT_REGISTRY),
+            log_level=(env.get("LOG_LEVEL") or "INFO").upper(),
         )
+
+
+def uses_seed_registry(settings: Settings) -> bool:
+    """True when the registry is the bundled fictional `registry/seed.csv` (3 `*.example.com` firms): R1 results
+    and high-risk alerts for real firms are then not meaningful until `REGISTRY_CSV` names a real KNF registry."""
+    return settings.registry_csv.resolve() == _DEFAULT_REGISTRY.resolve()
 
 
 

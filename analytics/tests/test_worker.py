@@ -14,11 +14,11 @@ import pytest
 import redis
 
 from conftest import NOW, make_doc
-from investwatch_analytics.events import NoopPublisher
 from investwatch_analytics.registry import Registry
 from investwatch_analytics.config import Settings
 from investwatch_analytics.rules.engine import Catalogue
-from investwatch_analytics.storage import InMemoryStore, StoreError, StoreMisconfigured, StoreUnavailable
+from investwatch_analytics.storage import StoreError, StoreMisconfigured, StoreUnavailable
+from investwatch_analytics.testing import InMemoryStore, NoopPublisher
 from investwatch_analytics.worker import (
     GROUP,
     STREAM,

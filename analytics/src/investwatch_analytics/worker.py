@@ -26,8 +26,8 @@ from typing import Any
 import redis
 
 from . import logging_setup
-from .config import ConfigError, Settings, WorkerSettings
-from .events import NoopPublisher, RedisPublisher
+from .config import ConfigError, Settings, WorkerSettings, uses_seed_registry
+from .events import Publisher, RedisPublisher
 from .health import start_health_server
 from .pipeline import analyze
 from .registry import Registry, RegistryError
@@ -64,7 +64,7 @@ class Worker:
         self,
         client: Any,
         store: Any,
-        publisher: RedisPublisher | NoopPublisher,
+        publisher: Publisher,
         *,
         registry: Registry,
         catalogue: Catalogue,
@@ -285,8 +285,12 @@ def main(env: Mapping[str, str] | None = None) -> int:
 
     try:
         worker_settings = WorkerSettings.from_env(env)
-        settings = Settings.from_env() if env is os.environ else _settings_from(env)
+        settings = Settings.from_env(env)
         registry = Registry.from_csv(settings.registry_csv)
+        if uses_seed_registry(settings):
+            log.warning("bundled fictional registry in use: R1 and high-risk alerts for real firms are not "
+                        "meaningful until REGISTRY_CSV names a real KNF registry",
+                        extra={"reason": "registry_seed", "registry_csv": str(settings.registry_csv)})
         catalogue = Catalogue.load()
         store = PostgresStore(worker_settings.database_url, max_document_bytes=worker_settings.max_document_bytes)
     except (ConfigError, StoreMisconfigured) as exc:
@@ -335,16 +339,6 @@ def main(env: Mapping[str, str] | None = None) -> int:
         client.close()
     log.info("worker stopped", extra={"reason": "signal"})
     return 0
-
-
-def _settings_from(env: Mapping[str, str]) -> Settings:
-    """`Settings.from_env` reads os.environ; tests pass an explicit mapping."""
-    from pathlib import Path
-
-    from .config import _DEFAULT_REGISTRY
-
-    return Settings(registry_csv=Path(env.get("REGISTRY_CSV") or _DEFAULT_REGISTRY),
-                    log_level=(env.get("LOG_LEVEL") or "INFO").upper())
 
 
 if __name__ == "__main__":

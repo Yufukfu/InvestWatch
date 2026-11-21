@@ -15,12 +15,12 @@ from investwatch_analytics.events import (
     DEFAULT_THRESHOLDS,
     EVENTS_CHANNEL,
     THRESHOLDS_KEY,
-    NoopPublisher,
     RedisPublisher,
     read_thresholds,
 )
 from investwatch_analytics.models import Finding
 from investwatch_analytics.storage import SavedFinding
+from investwatch_analytics.testing import NoopPublisher
 
 EMITTED = datetime(2026, 11, 21, 16, 30, tzinfo=timezone.utc)
 

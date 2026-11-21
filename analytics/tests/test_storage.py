@@ -20,7 +20,6 @@ import pytest
 from conftest import NOW, make_doc
 from investwatch_analytics.models import AdvertiserRef, Finding, ScrapedDocument
 from investwatch_analytics.storage import (
-    InMemoryStore,
     InvalidDocument,
     NotFound,
     PostgresStore,
@@ -28,6 +27,7 @@ from investwatch_analytics.storage import (
     StoreMisconfigured,
     StoreUnavailable,
 )
+from investwatch_analytics.testing import InMemoryStore
 
 DOC_ID = "22222222-2222-4222-8222-222222222222"
 DOC2_ID = "33333333-3333-4333-8333-333333333333"

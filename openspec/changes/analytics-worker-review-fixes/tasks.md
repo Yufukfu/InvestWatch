@@ -2,9 +2,9 @@
 
 ## 1. Registry warning, honest clean title, test helpers out, main settings
 
-- [ ] 1.1 Failing tests: `registry_seed` warning with the default registry and none with `REGISTRY_CSV` set (`config.uses_seed_registry`); clean M2 title names the checked rule ids; importing `investwatch_analytics.worker` loads no `investwatch_analytics.testing`; `Settings.from_env(mapping)` reads the mapping
-- [ ] 1.2 `config.Settings.from_env(env=None)`, `uses_seed_registry`; worker logs the warning and uses `Settings.from_env(env)` (no `_settings_from`, no `_DEFAULT_REGISTRY` import); `InMemoryStore` and `NoopPublisher` to `investwatch_analytics/testing.py`; M2 clean title; tests green
-- [ ] 1.3 Mutation check; `mutations: N tried, N caught`
+- [x] 1.1 Failing tests: `registry_seed` warning with the default registry and none with `REGISTRY_CSV` set (`config.uses_seed_registry`); clean M2 title names the checked rule ids; importing `investwatch_analytics.worker` loads no `investwatch_analytics.testing`; `Settings.from_env(mapping)` reads the mapping
+- [x] 1.2 `config.Settings.from_env(env=None)`, `uses_seed_registry`; worker logs the warning and uses `Settings.from_env(env)` (no `_settings_from`, no `_DEFAULT_REGISTRY` import); `InMemoryStore` and `NoopPublisher` to `investwatch_analytics/testing.py`; M2 clean title; tests green
+- [x] 1.3 Mutation check; `mutations: 7 tried, 7 caught`
 
 ## 2. Postgres and Redis tests run in CI
 
