@@ -15,7 +15,7 @@ import redis
 
 from conftest import NOW, make_doc, redis_test_url
 from investwatch_analytics.registry import Registry
-from investwatch_analytics.config import Settings
+from investwatch_analytics.config import SEED_REGISTRY, Settings
 from investwatch_analytics.rules.engine import Catalogue
 from investwatch_analytics.storage import StoreError, StoreMisconfigured, StoreUnavailable
 from investwatch_analytics.testing import InMemoryStore, NoopPublisher
@@ -37,7 +37,7 @@ MISSING_ID = "99999999-9999-4999-8999-999999999999"
 
 @pytest.fixture(scope="module")
 def registry():
-    return Registry.from_csv(Settings.from_env().registry_csv)
+    return Registry.from_csv(SEED_REGISTRY)
 
 
 @pytest.fixture(scope="module")

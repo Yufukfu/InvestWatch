@@ -107,3 +107,14 @@ The scraper SHALL publish `{"document_id": "<uuid>", "schema": "v1"}` to the Red
 - **THEN** a later sweep may publish it again, which is acceptable because consumers deduplicate by `document_id`
 
 The schedule of the sweep is in `scan-orchestration`.
+
+### Requirement: Author never comes from the parsed page
+The scraper SHALL NOT copy `author` from a parsed page into a document, because page markup (`<meta>`, `rel=author`, embedded JSON) is controlled by the post's writer and analytics routes on `author.handle` and `author.profile_url`.
+
+#### Scenario: Page supplies an author
+- **WHEN** a parsed page carries an `author` with a firm's `profile_url`
+- **THEN** the stored document has no `author`
+
+#### Scenario: Collector passes account data
+- **WHEN** a collector passes `author` explicitly
+- **THEN** the stored document has exactly that `author`
