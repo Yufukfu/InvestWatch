@@ -49,6 +49,14 @@ def test_build_drops_a_page_supplied_html_object_key(source):
     assert "html_object_key" not in doc
 
 
+def test_build_drops_a_page_supplied_author(source):
+    # page markup (meta, rel=author, embedded JSON) is writer-controlled and analytics routes on author (issue 36)
+    author = {"name": "Alfa", "handle": "@alfa", "profile_url": "https://alfa.example.com/"}
+    doc = build(source, {**PAGE, "author": author})
+    assert "author" not in doc
+    assert check_document(doc) is None
+
+
 def test_build_does_not_mutate_the_page(source):
     page = dict(PAGE)
     build(source, page)
@@ -132,6 +140,6 @@ def test_a_scraper_value_the_page_supplied_is_kept(source):
     ],
 )
 def test_a_non_web_url_scheme_is_schema_invalid(source, field, value):
-    error = check_document(build(source, PAGE | {field: value}))
+    error = check_document(build(source) | {field: value})  # set after the build: a page cannot supply `author`
     assert error is not None and error.reason is Reason.SCHEMA_INVALID
     assert "http or https" in error.detail

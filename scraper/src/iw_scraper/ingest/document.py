@@ -8,6 +8,9 @@ from iw_scraper.types import Source
 # the parsed page carries the raw HTML for the object store; it is not part of the ScrapedDocument. The object
 # key is set by the pipeline after a real upload, never taken from a page.
 _PAGE_ONLY_KEYS = frozenset({"html", "html_object_key"})
+# `author` is dropped too: page markup (meta, rel=author, embedded JSON) is writer-controlled, and analytics routes a
+# post to M2 on `author.handle` / `author.profile_url` (issue 36). A platform collector that has account data adds its own path.
+_UNTRUSTED_PAGE_KEYS = frozenset({"author"})
 
 
 def normalise_text(text: str) -> str:
@@ -41,7 +44,7 @@ def build_document(page: dict, source: Source, *, fetched_at: datetime, duration
 
     `proxy` is an identifier, never credentials (contract `scrape_meta.proxy`).
     """
-    doc = {key: value for key, value in page.items() if key not in _PAGE_ONLY_KEYS}
+    doc = {key: value for key, value in page.items() if key not in _PAGE_ONLY_KEYS | _UNTRUSTED_PAGE_KEYS}
     doc.pop("content_hash", None)  # always derived from the text here, never trusted from the page
     doc.update(
         id=str(uuid.uuid4()),

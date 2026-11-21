@@ -2,8 +2,8 @@
 
 ## 1. Drop the page-supplied author
 
-- [ ] 1.1 Failing test, then `build_document` dropping `author` from the page; the page-supplies-an-author scenario passes and the page dict is still not mutated
-- [ ] 1.2 Mutation check; `mutations: n/a, pending`
+- [x] 1.1 Failing test, then `build_document` dropping `author` from the page; the page-supplies-an-author scenario passes and the page dict is still not mutated
+- [x] 1.2 Mutation check; `mutations: 2 tried, 2 caught` (empty untrusted set, filter not applied)
 
 ## 2. Closing
 
