@@ -5,5 +5,4 @@ include:
   - infra/compose.yaml
   - web/compose.yaml
   - api/compose.yaml
-  # analytics needs redis from infra (PR #18, chore/infra-compose-v2): merge after it.
   - analytics/compose.yaml
