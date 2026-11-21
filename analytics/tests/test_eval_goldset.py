@@ -19,7 +19,6 @@ RUNTIME_REGISTRY = Path(__file__).resolve().parents[1] / "registry"
 README = EVAL_DIR / "README.md"
 ZASOB_RULES = KNOWN_IDS["M2"]  # R1-R18 with R12a and R12b, as listed in the ZASÓB table
 MIN_DOCS = {"M1": 15, "M2": 20, "M3": 15}
-DEFAULT = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
 
 
 @pytest.fixture(scope="module")
@@ -129,8 +128,9 @@ def test_thresholds_move_fp_and_fn(report, module):
     if entry is None or entry["status"] != "evaluated":
         pytest.skip(f"{module} is not in this build or not labeled yet")
     at = {p["threshold"]: p for p in entry["points"]}
-    here = at[DEFAULT[module]]
-    around = [at[t] for t in (round(DEFAULT[module] - 0.2, 2), round(DEFAULT[module] + 0.2, 2)) if t in at]
+    rec = entry["recommended_threshold"]
+    here = at[rec]
+    around = [at[t] for t in (round(rec - 0.2, 2), round(rec + 0.2, 2)) if t in at]
     assert any((p["fp"], p["fn"]) != (here["fp"], here["fn"]) for p in around)
 
 

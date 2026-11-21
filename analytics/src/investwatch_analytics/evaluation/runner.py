@@ -26,17 +26,17 @@ from ..registry import Registry
 from ..rules.engine import Catalogue
 from .gold import GoldItem, rule_status
 from .known_ids import MODULES, Catalogues
-from .metrics import curve, rule_metrics
+from .metrics import curve, recommended_threshold, rule_metrics
 
 log = logging.getLogger(__name__)
 
 EVAL_DIR = Path(__file__).resolve().parents[3] / "eval"  # analytics/eval, /app/eval in the image
 DEFAULT_GOLD = EVAL_DIR / "gold.jsonl"
 DEFAULT_REGISTRY = EVAL_DIR / "registry.csv"
+#: The one source of the default thresholds (ADR 0316); api DEFAULTS and events.DEFAULT_THRESHOLDS are copies.
+THRESHOLDS_FILE = EVAL_DIR / "thresholds.json"
 #: Namespace of the deterministic run id (design decision 7); never change it, or every stored run is "new".
 RUN_NAMESPACE = uuid.UUID("6f1d3c2a-9b8e-4d7f-a6c5-0e1f2a3b4c5d")
-#: Module thresholds the API writes when none are set (ADR 0305); used for the report's headline point.
-DEFAULT_THRESHOLDS = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
 
 
 class Build:
@@ -137,10 +137,11 @@ def evaluate(
         pairs = [(found[i.id][module].score if module in found[i.id] else 0.0, i.expect[module].positive)
                  for i in labeled]
         points = curve(pairs)
-        default = DEFAULT_THRESHOLDS[module]
+        rec = recommended_threshold(points)
         mid = run_id or (llm_run_id if judge is not None else _run_id(gold_sha256, pipeline_version, module, points))
         report_modules[module] = {"status": "evaluated", "run_id": mid, **entry, "points": points,
-                                  "at_default_threshold": next(p for p in points if p["threshold"] == default),
+                                  "recommended_threshold": rec,
+                                  "at_recommended_threshold": next((p for p in points if p["threshold"] == rec), None),
                                   "rules": _rules(module, labeled, found, build.catalogues)}
 
     llm = None
@@ -177,6 +178,23 @@ def _rules(module: str, labeled: list[GoldItem], found: dict[str, dict[str, Find
             for gold, _ in obs:
                 labels[gold] += 1
             out[rule_id] = {"status": status, "labels": labels}
+    return out
+
+
+def write_thresholds(path: Path, report: dict) -> dict[str, float]:
+    """Write each evaluated module's recommended threshold; a module without one keeps its value in the file."""
+    try:
+        current = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        current = {}
+    for module, entry in report["modules"].items():
+        if entry["status"] == "evaluated" and entry.get("recommended_threshold") is not None:
+            current[module] = entry["recommended_threshold"]
+    missing = [m for m in MODULES if m not in current]
+    if missing:
+        raise ValueError(f"no threshold for {', '.join(missing)}: evaluate those modules or keep a previous file")
+    out = {m: current[m] for m in MODULES}
+    Path(path).write_text(json.dumps(out) + "\n", encoding="utf-8", newline="\n")
     return out
 
 

@@ -87,6 +87,7 @@ def set_thresholds(r, **values) -> None:
 
 
 def test_created_event_shape(r, sub):
+    set_thresholds(r, M2=0.5)  # shape only: keep 0.3 below the threshold whatever the defaults are
     RedisPublisher(r, clock=clock).publish_findings([created()])
     [event] = sub()
     assert event == {
@@ -224,7 +225,7 @@ def test_valid_key_logs_nothing(r, caplog):
 def test_partial_key_keeps_valid_values(r, caplog):
     r.set(THRESHOLDS_KEY, '{"M2": 0.9}')
     with caplog.at_level(logging.WARNING):
-        assert read_thresholds(r) == {"M1": 0.6, "M2": 0.9, "M3": 0.7}
+        assert read_thresholds(r) == {**DEFAULT_THRESHOLDS, "M2": 0.9}
     assert [rec.reason for rec in caplog.records] == ["thresholds_invalid"]
 
 
@@ -238,8 +239,9 @@ def test_names_match_the_contract():
     assert (EVENTS_CHANNEL, THRESHOLDS_KEY) == ("iw:events", "iw:settings:thresholds")
 
 
-def test_defaults_match_adr_0305():
-    assert DEFAULT_THRESHOLDS == {"M1": 0.6, "M2": 0.5, "M3": 0.7}
+def test_defaults_match_adr_0316():
+    # literal on purpose; tests/test_eval_thresholds.py checks it against analytics/eval/thresholds.json
+    assert DEFAULT_THRESHOLDS == {"M1": 0.65, "M2": 0.25, "M3": 0.25}
 
 
 # ---- failures -----------------------------------------------------------------------------------

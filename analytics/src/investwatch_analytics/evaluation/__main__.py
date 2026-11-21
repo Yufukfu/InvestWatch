@@ -28,7 +28,15 @@ from ..storage import StoreError, StoreMisconfigured
 from . import store
 from .gold import GoldError, load_gold
 from .known_ids import MODULES
-from .runner import DEFAULT_GOLD, DEFAULT_REGISTRY, evaluate, load_build, report_json
+from .runner import (
+    DEFAULT_GOLD,
+    DEFAULT_REGISTRY,
+    THRESHOLDS_FILE,
+    evaluate,
+    load_build,
+    report_json,
+    write_thresholds,
+)
 
 log = logging.getLogger("investwatch_analytics.evaluation")
 
@@ -50,6 +58,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", action="store_true", help="store the run in calibration_points (DATABASE_URL)")
     parser.add_argument("--llm", action="store_true", help="use the LLM judge from LLM_BASE_URL/LLM_MODEL/LLM_API_KEY")
     parser.add_argument("--module", action="append", choices=MODULES, help="evaluate only this module (repeatable)")
+    parser.add_argument("--write-thresholds", nargs="?", type=Path, const=THRESHOLDS_FILE, default=None,
+                        metavar="PATH", help="write the recommended thresholds (default eval/thresholds.json, ADR 0316)")
     return parser
 
 
@@ -113,10 +123,15 @@ def main(argv: list[str] | None = None) -> int:
         except StoreError as exc:
             log.error("calibration run not stored", extra={"error": str(exc)})
             code = 3
+    if args.write_thresholds is not None:
+        if args.llm:
+            return _fail("invalid configuration", error="--write-thresholds needs a rules-only run (ADR 0316)")
+        written = write_thresholds(args.write_thresholds, report)
+        log.info("default thresholds written", extra={"thresholds": written, "file": str(args.write_thresholds)})
     for module, entry in report["modules"].items():
         log.info("module evaluated", extra={"eval_module": module, "status": entry["status"],
                                             "labeled_samples": entry["labeled_samples"],
-                                            "at_default_threshold": entry.get("at_default_threshold"),
+                                            "recommended_threshold": entry.get("recommended_threshold"),
                                             "stored": (report["store"] or {}).get(module)})
     sys.stdout.write(report_json(report))
     if code:

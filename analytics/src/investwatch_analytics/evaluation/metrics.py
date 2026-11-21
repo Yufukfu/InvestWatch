@@ -50,6 +50,17 @@ def curve(pairs: Iterable[tuple[float, bool]]) -> list[dict]:
     return [point(t, *confusion(pairs, t)) for t in GRID]
 
 
+def recommended_threshold(points: list[dict]) -> float | None:
+    """Grid threshold with the best F1, the higher threshold on a tie (precision wins); None when every F1 is 0.
+
+    ADR 0316: these become the default thresholds the API writes when `iw:settings:thresholds` is missing.
+    """
+    best = max(points, key=lambda p: (p["f1"], p["threshold"]), default=None)
+    if best is None or best["f1"] <= 0:
+        return None
+    return best["threshold"]
+
+
 def _counts(observations: list[tuple[bool, bool]]) -> dict:
     tp = sum(1 for pos, flag in observations if pos and flag)
     fp = sum(1 for pos, flag in observations if not pos and flag)
