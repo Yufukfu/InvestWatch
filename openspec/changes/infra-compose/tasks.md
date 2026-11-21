@@ -16,9 +16,9 @@ Before group 1: Damian approves ADR 0306 and the open questions in `design.md` a
 
 ## 3. Redis
 
-- [ ] 3.1 Failing tests: authenticated `PING` returns `PONG` and an unauthenticated one returns `NOAUTH`; `CONFIG GET` shows `appendonly yes` and `maxmemory-policy noeviction`; `iw:settings:thresholds` survives `docker compose restart redis`
-- [ ] 3.2 Add `redis` (redis 8-alpine from the ECR mirror, pinned digest) to `infra/compose.yaml` per design decision 2: `iw-data` only, volume `redisdata`, healthcheck, limits, hardening; the three Redis scenarios pass
-- [ ] 3.3 Mutation check (drop `--appendonly yes`, then drop `--requirepass`; each must be caught); record `mutations: N tried, N caught`
+- [x] 3.1 Failing tests: missing `REDIS_PASSWORD` is named; authenticated `PING` returns `PONG` and an unauthenticated one returns `NOAUTH`; `CONFIG GET` shows `appendonly yes` and `maxmemory-policy noeviction`; `iw:settings:thresholds` survives `docker compose restart redis`
+- [x] 3.2 Add `redis` (redis 8-alpine from the ECR mirror, pinned digest) to `infra/compose.yaml` per design decision 2: `iw-data` only, volume `redisdata`, healthcheck, limits, hardening; the three Redis scenarios pass
+- [x] 3.3 Mutation check (drop `--appendonly yes`, then drop `--requirepass`; each must be caught); mutations: 6 tried, 6 caught (no `--requirepass`, `--appendonly no`, `allkeys-lru`, default for `REDIS_PASSWORD`, redis also on `edge`, plus the group 2 review fix: no CRLF strip in `init-env`)
 
 ## 4. Object storage
 

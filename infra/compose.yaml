@@ -30,6 +30,37 @@ services:
       resources:
         limits: { cpus: "1.0", memory: 512M }
 
+  # Stream iw:documents, pub/sub iw:events, key iw:settings:thresholds (ADR 0305: must persist, hence AOF).
+  # noeviction: a full instance rejects writes instead of silently dropping stream entries.
+  # Redis 8 under its AGPLv3 option, image pinned by digest (ADR 0306).
+  redis:
+    image: public.ecr.aws/docker/library/redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
+    restart: unless-stopped
+    user: redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server --appendonly yes --appendfsync everysec
+        --maxmemory 200mb --maxmemory-policy noeviction
+        --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - redisdata:/data
+    networks: [data]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+
   gateway:
     image: public.ecr.aws/docker/library/caddy:2-alpine
     restart: unless-stopped
@@ -55,6 +86,7 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
   caddy_data:
   caddy_config:
 
