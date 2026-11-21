@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { formatScore } from '../../../format/score';
 import type { AlertItem } from '../model';
 
@@ -21,6 +21,16 @@ type Reason = 'pointer' | 'focus';
 export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, onRelease }: Props) {
   const region = useRef<HTMLElement>(null);
   const reasons = useRef(new Map<string, Set<Reason>>());
+
+  // The toasts move when the detail dialog opens or closes. An unmounted toast gets no pointer-leave or
+  // blur, so the holds it still has are released here, or they would never end.
+  useEffect(() => {
+    const held = reasons.current;
+    return () => {
+      for (const id of held.keys()) onRelease(id);
+      held.clear();
+    };
+  }, [onRelease]);
 
   const setReason = (id: string, reason: Reason, on: boolean) => {
     const set = reasons.current.get(id) ?? new Set<Reason>();

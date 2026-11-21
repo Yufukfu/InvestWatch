@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatScore } from '../../../format/score';
+import { useAlertSlot } from '../../../alertSlot';
 import type { FindingDetail, RuleView, Severity } from '../model';
 import {
   formatUtc,
@@ -237,6 +238,13 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
 export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClose, statusEditor }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  // The alert toasts move into the dialog while it is open, so they stay reachable and announced.
+  const { setNode } = useAlertSlot();
+  const [alertSlot, setAlertSlot] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    setNode(alertSlot);
+    return () => setNode(null);
+  }, [alertSlot, setNode]);
 
   // Modal: everything outside the panel is inert and the page does not scroll while it is open.
   // Focus moves into the panel on open and back to where it was on close. One effect, so the cleanup
@@ -316,6 +324,7 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
           Zamknij
         </button>
       </div>
+      <div ref={setAlertSlot} className="detail-alerts" />
       {content}
     </aside>
   );

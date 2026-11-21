@@ -59,6 +59,15 @@ describe('AlertToasts', () => {
     expect(h.onRelease).toHaveBeenCalledTimes(1);
   });
 
+  it('releases the holds it still has when it unmounts, so a moved toast is not held forever', () => {
+    const h = handlers();
+    const { unmount } = render(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
+    fireEvent.mouseEnter(screen.getByRole('group'));
+    expect(h.onRelease).not.toHaveBeenCalled();
+    unmount();
+    expect(h.onRelease).toHaveBeenCalledWith('x');
+  });
+
   it('shows label, title, module and score, in the given order, with a decimal comma', () => {
     render(<AlertToasts alerts={[alert(), alert({ id: 'b', title: 'Drugi', module: undefined, score: undefined })]} announcement="" {...handlers()} />);
     const toasts = screen.getAllByRole('group');

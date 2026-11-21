@@ -30,3 +30,8 @@
 - [x] 5.1 `web/README.md` and `.docs/status/dashboard.md` describe the compose stack as it is (review, should fix).
 - [x] 5.2 ADR 0208: bundle size and transitive dependencies (review, should fix).
 - [x] 5.3 Archived `realtime-alerts/tasks.md`: the mutation counts 16, 8 and 14 are replaced with what was verified (review item 5).
+
+## 6. Toasts and the detail dialog (round 2)
+
+- [x] 6.1 While the detail dialog is open, the toasts render inside it (in its flow, not floating over Save), so they are reachable by keyboard and inside the Tab trap; a new high-risk alert is still announced there (review item 2; answered by @kacpermalczyk: "inside the dialog", "yes, announce it").
+- [x] 6.2 A toast that unmounts while held (it moves between the header and the dialog) releases its holds (review item 4, follow-up to 6.1).
