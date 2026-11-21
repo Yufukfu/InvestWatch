@@ -51,7 +51,8 @@ class EmbedClient:
         self._s = settings
         self._url = settings.base_url.rstrip("/") + "/embeddings"
         self._host = urlsplit(settings.base_url).hostname or ""
-        headers = {"Content-Type": "application/json"}
+        # identity: no gzip, so the size cap counts what is actually held in memory.
+        headers = {"Content-Type": "application/json", "Accept-Encoding": "identity"}
         if settings.api_key:
             headers["Authorization"] = f"Bearer {settings.api_key}"
         # trust_env=False: no proxy, netrc or CA bundle from the environment.
@@ -70,12 +71,13 @@ class EmbedClient:
             raise ValueError("empty text is never sent to the embedder")
         read = self._s.timeout_s
         timeout = httpx.Timeout(read, connect=min(CONNECT_TIMEOUT_S, read))
-        body = {"model": self._s.model, "input": [text[: self._s.max_chars]]}
+        # ASCII-escaped JSON: scraped text with a lone surrogate cannot break the UTF-8 encoding.
+        body = json.dumps({"model": self._s.model, "input": [text[: self._s.max_chars]]}).encode("ascii")
         started = time.perf_counter()
         deadline = time.monotonic() + read  # also bounds a server that trickles the body
         status = None
         try:
-            with self._http.stream("POST", self._url, json=body, timeout=timeout) as response:
+            with self._http.stream("POST", self._url, content=body, timeout=timeout) as response:
                 status = response.status_code
                 if status >= 300:
                     self._log("embed call failed", started, status=status, reason="embed_unavailable")
@@ -108,7 +110,7 @@ class EmbedClient:
         try:
             envelope = json.loads(raw)
             values = envelope["data"][0]["embedding"]
-        except (ValueError, KeyError, IndexError, TypeError):
+        except (ValueError, KeyError, IndexError, TypeError, RecursionError):
             raise EmbedMalformed("not an embeddings response with one vector") from None
         return validate_vector(values, self._s.dim)
 
@@ -126,7 +128,10 @@ def validate_vector(values: Any, dim: int) -> np.ndarray:
         raise EmbedMalformed(f"embedding has {len(values)} values, expected {dim}")
     if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
         raise EmbedMalformed("embedding has a non-numeric value")
-    vector = np.asarray(values, dtype=np.float64)
+    try:
+        vector = np.asarray(values, dtype=np.float64)
+    except (OverflowError, ValueError, TypeError):  # e.g. an integer beyond float range
+        raise EmbedMalformed("embedding has a value outside the float range") from None
     with np.errstate(over="ignore", invalid="ignore"):
         norm = float(np.linalg.norm(vector))
     # A NaN or infinite value, or an overflow of huge values, makes the norm non-finite.

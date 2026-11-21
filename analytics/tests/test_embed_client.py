@@ -56,6 +56,20 @@ def test_key_sent_as_bearer(stub_llm):
     assert headers["authorization"] == "Bearer sk-emb-123"
 
 
+def test_lone_surrogate_in_scraped_text(stub_llm):
+    stub_llm.default = Reply(body=body(vec()))
+    text = "Zysk " + chr(0xD800) + " 20%"
+    client(stub_llm.base_url).embed(text)
+    assert stub_llm.requests[0]["body"]["input"] == [text]
+
+
+def test_no_compression_requested(stub_llm):
+    stub_llm.default = Reply(body=body(vec()))
+    client(stub_llm.base_url).embed("x")
+    headers = {k.lower(): v for k, v in stub_llm.requests[0]["headers"].items()}
+    assert headers["accept-encoding"] == "identity"
+
+
 def test_long_text_is_cut(stub_llm):
     stub_llm.default = Reply(body=body(vec()))
     text = "a" * 19_999 + "b"
@@ -101,9 +115,11 @@ def test_wrong_vector_size(stub_llm, caplog):
     json.dumps({"data": [{"embedding": "nope"}]}).encode(),
     json.dumps({"data": [{"embedding": 5}]}).encode(),
     json.dumps({"data": [{"embedding": [1e308] * 8}]}).encode(),
+    json.dumps({"data": [{"embedding": [10**400] * 8}]}).encode(),
+    b"[" * 200_000,
     json.dumps([1, 2, 3]).encode(),
     b"<html>not json</html>",
-], ids=["nan", "string", "bool", "inf", "zeros", "error", "empty-data", "not-list", "number", "overflow", "array", "html"])
+], ids=["nan", "string", "bool", "inf", "zeros", "error", "empty-data", "not-list", "number", "overflow", "huge-int", "deep-nesting", "array", "html"])
 def test_malformed_answers(stub_llm, payload):
     stub_llm.default = Reply(body=payload)
     with pytest.raises(EmbedMalformed):
@@ -142,9 +158,10 @@ def test_http_errors_are_unavailable(stub_llm, status):
 
 def test_slow_embedder_times_out(stub_llm):
     stub_llm.default = Reply(body=body(vec()), sleep_s=3)
+    c = client(stub_llm.base_url, EMBED_TIMEOUT_S="0.5")  # built first: SSL context setup is not the call
     started = time.monotonic()
     with pytest.raises(EmbedUnavailable) as exc:
-        client(stub_llm.base_url, EMBED_TIMEOUT_S="0.5").embed("x")
+        c.embed("x")
     assert time.monotonic() - started < 1.5
     assert exc.value.reason == "embed_timeout"
 
@@ -201,9 +218,10 @@ def test_trickled_body_hits_the_total_deadline():
 
     srv = _Raw(trickle)
     try:
+        c = client(srv.base_url, EMBED_TIMEOUT_S="1")
         started = time.monotonic()
         with pytest.raises(EmbedUnavailable) as exc:
-            client(srv.base_url, EMBED_TIMEOUT_S="1").embed("x")
+            c.embed("x")
         assert exc.value.reason == "embed_timeout" and time.monotonic() - started < 3
     finally:
         srv.stop()

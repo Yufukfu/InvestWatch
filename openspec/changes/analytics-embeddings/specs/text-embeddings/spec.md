@@ -124,8 +124,8 @@ A Redis error on a cache read SHALL be treated as a miss, and on a write as a sk
 - **THEN** it is treated as a miss, a request is sent, and the entry is overwritten
 
 ### Requirement: Tests never call a real model
-Embeddings tests SHALL use a stub OpenAI-compatible server on `127.0.0.1` with a scripted queue of answers (a valid vector, a wrong size, `NaN`, a zero vector, non-JSON, HTTP 404, 429, 500 and 401, a sleep past the timeout, a closed connection), or a fake embedder. A test guard SHALL fail any test that builds an embedder whose base URL is not loopback.
+Embeddings tests SHALL use a stub OpenAI-compatible server on `127.0.0.1` with a scripted queue of answers (a valid vector, a wrong size, `NaN`, a zero vector, non-JSON, HTTP 404, 429, 500 and 401, a sleep past the timeout, a closed connection), or a fake embedder. A test guard SHALL fail any test whose embedder sends a request to a host that is not a loopback test stub.
 
 #### Scenario: Guard
-- **WHEN** a test builds an embedder with `EMBED_BASE_URL=http://ollama:11434/v1`
+- **WHEN** a test embeds through an embedder with `EMBED_BASE_URL=http://ollama:11434/v1`
 - **THEN** the test fails with a message naming the guard
