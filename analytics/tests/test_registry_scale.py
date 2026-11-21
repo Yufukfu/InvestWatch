@@ -235,3 +235,50 @@ def _real_registry() -> Registry:
     if not _REAL:
         _REAL.append(Registry.from_csv(KNF_REGISTRY))
     return _REAL[0]
+
+
+# ---- whole-branch review: fuzzy on varied vocabulary -------------------------------------------------
+
+
+def _varied_text(size: int, seed: int = 3) -> str:
+    rng = random.Random(seed)
+    letters = "abcdefghijklmnoprstuwyzłóśćęą"
+    vocab = ["".join(rng.choice(letters) for _ in range(rng.randint(3, 10))) for _ in range(5000)]
+    weights = [1 / (i + 1) for i in range(5000)]  # Zipf-like, as in a long article or a forum page
+    return " ".join(rng.choices(vocab, weights=weights, k=size // 6))[:size]
+
+
+def test_real_registry_on_200kb_of_varied_words_within_budget():
+    from investwatch_analytics.registry import fold
+
+    registry, text = _real_registry(), _varied_text(200_000)
+    timings = []
+    for _ in range(3):
+        fold.cache_clear()
+        started = time.perf_counter()
+        registry.match(text, URL)
+        timings.append(time.perf_counter() - started)
+    assert min(timings) < 1.5, timings  # was 3-5 s before the length window and FUZZY_SCAN_MAX
+
+
+def test_fuzzy_reads_only_the_fuzzy_prefix_while_exact_names_read_the_scan_prefix():
+    from investwatch_analytics.registry import FUZZY_SCAN_MAX
+
+    reg = _reg(("Wise Assets Europe AS", "foreign_no_branch"))
+    filler = "slowo " * (FUZZY_SCAN_MAX // 6 + 10)
+    assert reg.match(filler + "Wise Asets Europe", URL) is None  # a typo far into the page: no fuzzy match
+    m = reg.match(filler + "Wise Assets Europe", URL)
+    assert m is not None and m.method == "name"  # the exact name is still found there
+    assert reg.match("Wise Asets Europe " + filler, URL).method == "fuzzy"
+
+
+@pytest.mark.parametrize("length,lo,hi", [(10, 8, 12), (20, 16, 25), (4, 4, 5)])
+def test_length_window_is_exact_for_the_ratio(length, lo, hi):
+    from rapidfuzz import fuzz
+
+    from investwatch_analytics.registry import FUZZY_MIN_RATIO, _length_window
+
+    assert _length_window(length) == (lo, hi)
+    target = "a" * length
+    assert fuzz.ratio(target, "a" * lo) >= FUZZY_MIN_RATIO and fuzz.ratio(target, "a" * hi) >= FUZZY_MIN_RATIO
+    assert fuzz.ratio(target, "a" * (lo - 1)) < FUZZY_MIN_RATIO and fuzz.ratio(target, "a" * (hi + 1)) < FUZZY_MIN_RATIO

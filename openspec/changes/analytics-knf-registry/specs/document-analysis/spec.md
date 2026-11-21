@@ -79,6 +79,7 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, by default
 #### Scenario: Multi-word core still fuzzy-matches
 - **WHEN** the registry holds `Wise Assets Europe AS` and the text says `Wise Asets Europe`
 - **THEN** that firm is matched by fuzzy match
+- **AND** the fuzzy match SHALL read only the first 20,000 characters of the folded text, while exact names are found in the whole scan prefix
 
 #### Scenario: Firm without domains
 - **WHEN** a firm has an empty `website_domains` and the page host is any host

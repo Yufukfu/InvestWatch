@@ -19,6 +19,7 @@ form shared by several firms belongs only to the single firm of the highest type
 from __future__ import annotations
 
 import csv
+import math
 import re
 import unicodedata
 from collections import defaultdict
@@ -45,6 +46,9 @@ LINK_CONFIDENCE = 0.9  # a link to a firm domain in third-party content (change 
 FUZZY_FACTOR = 0.85
 FUZZY_MIN_RATIO = 88
 SHORT_WORD_LETTERS = 8
+#: Fuzzy name matching reads this prefix of the folded text (whole-branch review: a 200 KB page of varied words
+#: took seconds against the real registry).
+FUZZY_SCAN_MAX = 20_000
 ACRONYM_LETTERS = 3
 
 # Legal forms seen on the KNF lists (evidence.md, Names). Unambiguous ones are removed anywhere; short ones
@@ -360,17 +364,31 @@ class Registry:
     def _fuzzy_ratios(self, folded: str) -> dict[str, float]:
         """Best fuzzy ratio (>= FUZZY_MIN_RATIO) of each fuzzy-eligible firm's core against the text's n-grams."""
         # Word runs between punctuation, so a fuzzy n-gram never spans "alfa: inwestycje".
-        segments = [ws for seg in _PUNCT.split(folded) if (ws := [w.lower() for w in _WORD.findall(seg)])]
+        # Only the first FUZZY_SCAN_MAX characters: fuzzy is the weakest signal (ratio x 0.85), and its cost grows
+        # with the number of distinct words; exact names are still found in the whole SCAN_MAX prefix.
+        segments = [ws for seg in _PUNCT.split(folded[:FUZZY_SCAN_MAX])
+                    if (ws := [w.lower() for w in _WORD.findall(seg)])]
         ratios: dict[str, float] = {}
         for n, targets in self._fuzzy.items():
-            grams = list({" ".join(ws[i:i + n]) for ws in segments for i in range(len(ws) - n + 1)})
-            if not grams:
+            by_length: dict[int, list[str]] = defaultdict(list)
+            for gram in {" ".join(ws[i:i + n]) for ws in segments for i in range(len(ws) - n + 1)}:
+                by_length[len(gram)].append(gram)
+            if not by_length:
                 continue
             for firm, target in targets:
-                best = process.extractOne(target, grams, scorer=fuzz.ratio, score_cutoff=FUZZY_MIN_RATIO)
+                # ratio = 2·matches / (len_a + len_b) can reach FUZZY_MIN_RATIO only for lengths within this window.
+                lo, hi = _length_window(len(target))
+                grams = [g for length in range(lo, hi + 1) for g in by_length.get(length, ())]
+                best = grams and process.extractOne(target, grams, scorer=fuzz.ratio, score_cutoff=FUZZY_MIN_RATIO)
                 if best:
                     ratios[firm.id] = best[1]
         return ratios
+
+
+def _length_window(length: int) -> tuple[int, int]:
+    """Lengths a string can have and still reach FUZZY_MIN_RATIO against one of `length` characters."""
+    factor = 200 / FUZZY_MIN_RATIO - 1  # from 2·min(a, b) / (a + b) >= ratio / 100
+    return math.ceil(length / factor - 1e-9), math.floor(length * factor + 1e-9)
 
 
 def is_social(host: str) -> bool:

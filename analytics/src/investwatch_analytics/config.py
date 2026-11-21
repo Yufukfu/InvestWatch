@@ -33,7 +33,7 @@ class Settings:
 
 
 def uses_seed_registry(settings: Settings) -> bool:
-    """True when the registry is the bundled fictional `registry/seed.csv` (3 `*.example.com` firms): R1 results
+    """True when the registry is the bundled fictional `registry/seed.csv` (4 fictional `*.example.com` firms): R1 results
     and high-risk alerts for real firms are then not meaningful."""
     return settings.registry_csv.resolve() == SEED_REGISTRY.resolve()
 

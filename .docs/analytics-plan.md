@@ -46,7 +46,7 @@ Done in change `analytics-knf-registry` ([ADR 0311](decisions/0311-knf-registry-
 
 - One-off loader `python -m investwatch_analytics.knf` reads the four lists (server-rendered HTML, no download or API) and writes the committed CSV `analytics/registry/knf.csv` plus `knf.meta.json`. That replaces the planned `load_knf.py` and table `registry_firms`: no consumer reads such a table, and the build never fetches KNF.
 - Ids are uuid5 of the normalized name, kept across reloads and KNF renames. Aliases come from stripped legal forms ("Dom Maklerski", "S.A.", "DM", foreign forms), bank brokerage units, abbreviations, former names and trade names. Domains come from KNF's notes on foreign firms and a curated file for Polish firms (`verified_by_human`).
-- Fallback: a failed refresh keeps the committed CSV. `analytics/registry/seed.csv` (3 fictional firms) is the test fixture, not a fallback.
+- Fallback: a failed refresh keeps the committed CSV. `analytics/registry/seed.csv` (4 fictional firms) is the test fixture, not a fallback.
 - R1 passes only on the official name; an alias alone is `uncertain`.
 - M3 bonus, not done: the KNF public warnings list (`registry_warnings`, S3.7) is one page of free text; its own change (`openspec/changes/analytics-knf-registry/evidence.md`).
 
@@ -158,7 +158,7 @@ P2 rules (R9, R11, R13, OCR, clustering) only if all P0/P1 work is done before 0
 |---|---|
 | LLM too slow on our hardware | smaller model; LLM only for R3/R17/R18 and S1.5/S3.4; the rest rule-based |
 | The scraper does not deliver `blocks` | visual rules `not_applicable`; analytics renders the page itself with Playwright from `html_object_key` (P1) |
-| KNF pages cannot be parsed | `seed.csv` with manually listed firms |
+| KNF pages cannot be parsed | the loader fails closed and the committed `registry/knf.csv` snapshot stays (change `analytics-knf-registry`) |
 | No social media data for M1/M3 | samples from the USB stick + public websites of finfluencers/blogs; the scraper pushes them through the same stream |
 | Hallucinated quotes | substring check → `uncertain`; shown in the dashboard as "needs review" |
 | Hosted provider unreachable, or the jury questions the mentor exception | rules-only fallback; switch `LLM_*` to the local `ollama` profile (`gemma3:4b`) and show it in the demo; re-run the gold set on that model |
