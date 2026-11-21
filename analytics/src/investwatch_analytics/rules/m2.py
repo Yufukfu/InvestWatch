@@ -150,6 +150,8 @@ class R14PastPerformanceDisclaimer(Rule):
         return {
             "figure": compile_patterns(p.get("figure_patterns", [])),
             "figure_x": compile_patterns(p.get("figure_exclude_patterns", []) + p.get("figure_extra_exclude_patterns", [])),
+            "amount": compile_patterns(p.get("amount_patterns", [])),
+            "amount_return": compile_patterns(p.get("amount_return_patterns", [])),
             "past": compile_patterns(p.get("past_patterns", [])),
             "future": compile_patterns(p.get("future_patterns", [])),
             "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
@@ -158,7 +160,10 @@ class R14PastPerformanceDisclaimer(Rule):
 
     def _is_past_performance(self, sentence: str, fetch_year: int) -> bool:
         p = self._p
-        if not R3RiskNextToReturns._hits(sentence, p["figure"], p["figure_x"]):
+        percent = R3RiskNextToReturns._hits(sentence, p["figure"], p["figure_x"])
+        # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
+        amount = any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
+        if not (percent or amount):
             return False
         if any(m.search(sentence) for m in p["past"]):
             return True
@@ -191,6 +196,7 @@ _SEVERITY_ORDER = {"fail": 3, "uncertain": 2, "pass": 1}
 NO_BLOCKS = "Brak danych o renderowaniu strony – reguła wizualna nie dotyczy."
 NO_RISK_INFO = "Brak informacji o ryzyku w materiale – reguła nie dotyczy (brak ostrzeżenia ocenia R3)."
 NO_RISK_BLOCK = "Brak informacji o ryzyku w danych renderowania – reguła nie dotyczy."
+NO_RENDER_METADATA = "Brak metadanych renderowania (region, widoczność bez przewijania) – reguła nie dotyczy."
 
 
 def locate(text: str, needle: str) -> str | None:
@@ -262,18 +268,26 @@ class R6HiddenRisk(_RiskWarnings):
         return b.region in regions or self.is_footnote(b.text)
 
     def _state(self, b: Block) -> str:
-        if not self._placement_hidden(b) or b.in_viewport_on_load is True:
+        if b.in_viewport_on_load is True:
+            return "pass"
+        if b.region is None and not self.is_footnote(b.text):
+            return "unknown"  # no rendering metadata: never a pass on missing data
+        if not self._placement_hidden(b):
             return "pass"
         return "fail" if b.in_viewport_on_load is False else "uncertain"
 
-    def _viewport(self, blocks: list[Block]) -> tuple[str, Block]:
-        """pass if any risk block is exposed; else uncertain if any position is unknown; else fail."""
+    def _viewport(self, blocks: list[Block]) -> tuple[str, Block] | None:
+        """pass if any risk block is exposed; uncertain if a position is unknown or metadata is partly missing;
+        fail if every block is hidden; None (no verdict) when no block has rendering metadata."""
         states = [(self._state(b), b) for b in blocks]
-        for wanted in ("pass", "uncertain", "fail"):
-            hit = next((b for st, b in states if st == wanted), None)
-            if hit is not None:
-                return wanted, hit
-        raise AssertionError("unreachable: blocks is non-empty")
+        found = {st: next(b for s, b in states if s == st) for st in dict.fromkeys(st for st, _ in states)}
+        if "pass" in found:
+            return "pass", found["pass"]
+        if "uncertain" in found:
+            return "uncertain", found["uncertain"]
+        if "fail" in found:
+            return ("uncertain", found["unknown"]) if "unknown" in found else ("fail", found["fail"])
+        return None
 
     def evaluate(self, ctx: Context) -> RuleResult:
         if not ctx.doc.blocks:
@@ -285,6 +299,9 @@ class R6HiddenRisk(_RiskWarnings):
                 verdicts.append(self._viewport(risk))
         if not verdicts:
             return self.no_risk_result(ctx)
+        verdicts = [v for v in verdicts if v is not None]
+        if not verdicts:
+            return self.result("not_applicable", None, NO_RENDER_METADATA)
         result, b = max(verdicts, key=lambda v: _SEVERITY_ORDER[v[0]])  # first (desktop-first) wins ties
         why = {
             "fail": f"Ostrzeżenie o ryzyku tylko w stopce, sekcji prawnej lub przypisie i niewidoczne bez przewijania ({b.viewport}).",

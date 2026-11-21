@@ -156,6 +156,17 @@ rules:
       # with no future marker in the sentence).
       figure_patterns:
         - '\d+(?:[.,]\d+)?\s?%'
+      # Past results in any unit (coordinator answer, follow-up R9): an amount next to return vocabulary.
+      amount_patterns:
+        - '\b\d+(?:[.,]\d+)?\s?(?:zł|PLN|EUR|USD|€|\$)'
+      amount_return_patterns:
+        - '\bzysk\w*'
+        - '\bzarobi\w*'
+        - '\bwypracowa\w*'
+        - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
+        - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+        - '\bdoch(?:ód|od(?!z))\w*'
+        - '\b(?:profit|return|gain)\w*'
       figure_exclude_patterns: *return_figure_exclude
       # R14 only: percentages that are not returns (share of clients or accounts, bonuses).
       figure_extra_exclude_patterns:
@@ -265,6 +276,8 @@ rules:
       # A negated guarantee is a disclaimer, not a safety argument ("nadzór KNF nie gwarantuje bezpieczeństwa").
       safety_exclude_patterns:
         - '\bnie\s+(?:\w+\s+){0,2}(?:gwarant|zapewni|chroni)\w*(?:\s+\w+){0,3}'
+        # The mandatory investor-compensation-scheme fact is not a safety argument (coordinator answer, R31).
+        - '\bchronion\w*\s+(?:\w+\s+){0,2}(?:system\w*\s+rekompensat\w*|rekompensat\w*)'
         - '\b(?:does|do|is|are)\s+not\s+(?:\w+\s+)?(?:guarantee|protect|secure)\w*(?:\s+\w+){0,3}'
       window: 1
     llm:

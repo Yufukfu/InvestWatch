@@ -115,7 +115,7 @@ R4 SHALL be `not_applicable` when the document has no `blocks`; it SHALL never b
 - **THEN** R4 is `fail` and `evidence_locator.viewport` is `mobile`
 
 ### Requirement: R6 hidden risk information
-R6 SHALL be `not_applicable` without `blocks`, and `not_applicable` with the explanation `brak informacji o ryzyku` without a risk block; it SHALL never be `pass` without `blocks`. R6 SHALL be evaluated on `desktop`, `mobile` and, when present, `tablet`. In a viewport a risk block is hidden by placement when its `region` is in `hiding_regions` (default `footer`, `legal`) or its text starts with a footnote marker, and `in_viewport_on_load` is `false`; with that placement and `in_viewport_on_load` missing it is possibly hidden. Per viewport R6 SHALL fail when every risk block is hidden, be `uncertain` when every risk block is hidden or possibly hidden and at least one is possibly hidden, and pass otherwise. The worst viewport SHALL decide. `visible` and `requires_interaction` SHALL NOT affect R6 (they belong to R5 and R7).
+R6 SHALL be `not_applicable` without `blocks`, and `not_applicable` with the explanation `brak informacji o ryzyku` without a risk block; it SHALL never be `pass` without `blocks`. R6 SHALL be evaluated on `desktop`, `mobile` and, when present, `tablet`. In a viewport a risk block is hidden by placement when its `region` is in `hiding_regions` (default `footer`, `legal`) or its text starts with a footnote marker, and `in_viewport_on_load` is `false`; with that placement and `in_viewport_on_load` missing it is possibly hidden. Per viewport R6 SHALL fail when every risk block is hidden, be `uncertain` when every risk block is hidden or possibly hidden and at least one is possibly hidden, and pass otherwise. The worst viewport SHALL decide. `visible` and `requires_interaction` SHALL NOT affect R6 (they belong to R5 and R7). R6 SHALL never pass on missing data: a risk block in view on load is exposed, but a block with no `region` that is not footnote-marked has no rendering metadata; when no risk block has metadata R6 SHALL be `not_applicable` with the explanation `brak metadanych renderowania`, and when hidden blocks sit next to blocks without metadata it SHALL be `uncertain`.
 
 #### Scenario: Footer only, below the fold
 - **WHEN** `m2-alfa-landing` is analyzed (risk block in `footer`, `in_viewport_on_load: false`, on desktop and mobile)
@@ -136,6 +136,10 @@ R6 SHALL be `not_applicable` without `blocks`, and `not_applicable` with the exp
 #### Scenario: No blocks
 - **WHEN** the document has no `blocks`
 - **THEN** R6 is `not_applicable`
+
+#### Scenario: Blocks without rendering metadata
+- **WHEN** the risk block has `region: null` and `in_viewport_on_load: null` (the scraper does not render pages yet)
+- **THEN** R6 is `not_applicable` with the explanation `brak metadanych renderowania`, never `pass`
 
 #### Scenario: No risk block
 - **WHEN** blocks exist and none is a risk warning
@@ -169,7 +173,7 @@ R10 checks that risk information is not given in a language other than the main 
 - **THEN** R10 is `uncertain`
 
 ### Requirement: R14 past-performance disclaimer
-R14 SHALL be `not_applicable` when no sentence presents past performance: a return figure together with a past marker (a past-tense return verb such as `zarobili`, `wypracował`, `osiągnął`, `przyniósł`; `historyczn…`; `w ostatnich N latach/miesiącach`; or a year not later than the document's `fetched_at` year without a future marker such as `spodziewa`, `prognoz`, `będzie`, `expected`, `will`). ZASÓB requires a clear disclaimer to be present, with no proximity requirement. R14 SHALL pass when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material, including only as a footnote, quoting the first non-footnote occurrence if there is one, else the footnote. A footnote-only placement SHALL be left to R6 (ZASÓB: "ryzyko ukryte w przypisach"), so one violation is counted once. It SHALL fail, quoting the first past-performance sentence, when there is no disclaimer. Distance between the claim and the disclaimer SHALL NOT affect R14.
+R14 SHALL be `not_applicable` when no sentence presents past performance: a return figure (a percentage, or an amount such as `5 000 zł` or `1200 PLN` next to return vocabulary such as `zysk`, `zarobili`, `przyniósł`; past results in any unit) together with a past marker (a past-tense return verb such as `zarobili`, `wypracował`, `osiągnął`, `przyniósł`; `historyczn…`; `w ostatnich N latach/miesiącach`; or a year not later than the document's `fetched_at` year without a future marker such as `spodziewa`, `prognoz`, `będzie`, `expected`, `will`). ZASÓB requires a clear disclaimer to be present, with no proximity requirement. R14 SHALL pass when a past-performance disclaimer (`wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…`, `past performance is not a reliable indicator…`) appears anywhere in the material, including only as a footnote, quoting the first non-footnote occurrence if there is one, else the footnote. A footnote-only placement SHALL be left to R6 (ZASÓB: "ryzyko ukryte w przypisach"), so one violation is counted once. It SHALL fail, quoting the first past-performance sentence, when there is no disclaimer. Distance between the claim and the disclaimer SHALL NOT affect R14.
 
 #### Scenario: Past returns without warning
 - **WHEN** the `eurotrade` mock is analyzed (`Nasi klienci zarobili średnio 34% w 2025 roku.`)
@@ -178,6 +182,14 @@ R14 SHALL be `not_applicable` when no sentence presents past performance: a retu
 #### Scenario: Disclaimer next to past returns
 - **WHEN** `Fundusz wypracował 12% w 2024 roku.` is followed by `Wyniki historyczne nie są gwarancją przyszłych wyników.`
 - **THEN** R14 is `pass` with the warning as evidence
+
+#### Scenario: Past returns as an amount
+- **WHEN** the text is `Nasi klienci zarobili 5 000 zł.` or `Zysk 1200 PLN w 2025 roku.` with no disclaimer
+- **THEN** R14 is `fail`
+
+#### Scenario: Amount without a past return
+- **WHEN** the text is `Bonus 500 zł na start w 2025 roku.`
+- **THEN** R14 is `not_applicable`
 
 #### Scenario: Forecast is not past performance
 - **WHEN** the only figure is in `W 2026 roku spodziewamy się 10% zysku.` and `fetched_at` is in 2026
@@ -219,7 +231,7 @@ Stating supervision alone SHALL NOT be a violation; R17 covers a mention used to
 - **THEN** R17 is `not_applicable`
 
 ### Requirement: R18 supervision as a safety argument
-R18 SHALL be `not_applicable` without a supervisor mention (same dictionary as R17). It SHALL fail, quoting the sentence, when a safety word (`bezpieczn…`, `bezpieczeństwo`, `gwarant…`, `pewna`/`pewne`/`pewny`/`pewność`, `chronion…`, `bez ryzyka`, `safe`, `secure`, `guaranteed`, `protected`; a negated guarantee such as `nie gwarantuje bezpieczeństwa` SHALL NOT count) is in the same sentence as a mention; this verdict SHALL NOT be deferred. When a safety word is only within one sentence of a mention, the rules-only result SHALL be `uncertain`, quoting the mention sentence, and it SHALL be deferred to the LLM. Otherwise R18 SHALL pass.
+R18 SHALL be `not_applicable` without a supervisor mention (same dictionary as R17). It SHALL fail, quoting the sentence, when a safety word (`bezpieczn…`, `bezpieczeństwo`, `gwarant…`, `pewna`/`pewne`/`pewny`/`pewność`, `chronion…`, `bez ryzyka`, `safe`, `secure`, `guaranteed`, `protected`; a negated guarantee such as `nie gwarantuje bezpieczeństwa` and the mandatory investor-compensation-scheme fact `środki chronione przez system rekompensat` SHALL NOT count) is in the same sentence as a mention; this verdict SHALL NOT be deferred. When a safety word is only within one sentence of a mention, the rules-only result SHALL be `uncertain`, quoting the mention sentence, and it SHALL be deferred to the LLM. Otherwise R18 SHALL pass.
 
 #### Scenario: Same sentence
 - **WHEN** `m2-alfa-landing` is analyzed (`Działamy pod nadzorem KNF – Twoje środki są bezpieczne.`)
@@ -236,6 +248,10 @@ R18 SHALL be `not_applicable` without a supervisor mention (same dictionary as R
 #### Scenario: ZASÓB example
 - **WHEN** the text contains `Inwestycja w pełni bezpieczna – spełniamy rygorystyczne wymogi nadzorcze KNF.`
 - **THEN** R18 is `fail` with that sentence as evidence
+
+#### Scenario: Compensation-scheme fact
+- **WHEN** the text is `Fundusz nadzorowany przez KNF, środki chronione przez system rekompensat.`
+- **THEN** R18 is `pass`
 
 #### Scenario: Neutral legal footer
 - **WHEN** the only mention is `Dom Maklerski podlega nadzorowi Komisji Nadzoru Finansowego.` with no safety word nearby

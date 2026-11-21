@@ -74,3 +74,11 @@
 | R31 | review group 4, plausible | `Fundusz nadzorowany przez KNF, środki chronione przez system rekompensat.` is an R18 fail; a factual compensation-scheme statement may be lawful | `new-item`: product question for Damian (calibration with the gold set) |
 | R32 | review group 4, can't verify | Group 8 must skip R17's deterministic fail under `when: always`, and decide whether an LLM `pass` without a quote replaces the rules-only evidence | `fix-here` in group 8 (R17 `ask_llm` override; merge keeps rules evidence when the verdict has none) |
 | R33 | review group 4, declined | English variants (`regulated and authorised by`, `licensed by`) | `new-item`: extend with the gold set |
+
+## Coordinator answers applied (fix commit after group 4)
+
+| # | Answer | Change |
+|---|---|---|
+| R31 → resolved | The investor-compensation-scheme fact next to KNF is lawful mandatory information, not R18. R18 is supervision "używane do sugerowania bezpieczeństwa inwestycji" | `fix-here`: `chronione przez system rekompensat` is excluded from R18's safety words. A safety claim in the same sentence still fails; borderline cases go to the LLM (`llm:` block) |
+| R9 → resolved | Past results in any unit are past performance | `fix-here`: R14 counts an amount (`5 000 zł`, `1200 PLN`) next to return vocabulary as a return figure. A bare amount (bonus, fee, subscription) does not count |
+| R18 → resolved | The scraper on `main` does not produce `blocks` yet (no Playwright rendering) | Verified: R4 and R6 are `not_applicable` without blocks on every mock. `fix-here`: R6 never passes on missing metadata. A block with `region: null` (and no footnote marker, not in view on load) is unknown. All unknown gives `not_applicable` "brak metadanych renderowania"; unknown next to hidden gives `uncertain`. R4 reads only fields the contract requires (`text`, `font_size_px`, `visible`, `viewport`), so it cannot see a null |

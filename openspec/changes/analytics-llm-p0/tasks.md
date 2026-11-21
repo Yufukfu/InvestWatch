@@ -24,7 +24,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 
 - [x] 4.1 Failing tests for the rules-only R17/R18 scenarios (explicit approval `fail`, bare mention `pass`, no mention `not_applicable`; same sentence `fail`, neighbouring sentence `uncertain`, neutral legal footer `pass`), plus the catalogue scenario that only R3, R17, R18 carry `llm:` (loader accepts the block; parsing only, no engine change yet)
 - [x] 4.2 R17, R18 classes; `supervisor_patterns`, `approval_patterns`, `safety_patterns` (shared supervisor dictionary via anchor); `llm:` blocks with Polish questions on R3, R17, R18; `implemented: true`; catalogue comments on R5, R7, R9 (`not_applicable` with `brak informacji o ryzyku` when there is no risk information) and on R11, R15 (ZASÓB "Flaguje w raporcie": report the detection even when compliant) for the change that builds them; tests green
-- [x] 4.3 Mutation check; `mutations: 16 tried, 16 caught` (one survivor on the first run closed: a string `llm:` block is rejected as not a mapping); review fixes (follow-ups R26-R30): `mutations: 12 tried, 12 caught`
+- [x] 4.3 Mutation check; `mutations: 16 tried, 16 caught` (one survivor on the first run closed: a string `llm:` block is rejected as not a mapping); review fixes (follow-ups R26-R30): `mutations: 12 tried, 12 caught`; coordinator answers (R9, R18, R31): `mutations: 10 tried, 10 caught`
 
 ## 5. LLM config and OpenAI-compatible client (~1.5 h, needs `analytics-worker`)
 

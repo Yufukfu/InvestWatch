@@ -31,6 +31,7 @@ KNOWN_PARAMS = {
     "hiding_regions", "figure_extra_exclude_patterns", "min_ratio",
     "supervisor_patterns", "approval_patterns", "safety_patterns",
     "supervisor_exclude_patterns", "approval_exclude_patterns", "safety_exclude_patterns",
+    "amount_patterns", "amount_return_patterns",
 }
 _RULES: dict[str, type["Rule"]] = {}
 

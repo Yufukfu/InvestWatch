@@ -681,3 +681,71 @@ def test_llm_when_unhashable_fails_cleanly(tmp_path, bad):
     p.write_text(_catalogue_text().replace(anchor, anchor + f"    llm: {{question: 'Czy?', when: {bad}}}\n"), encoding="utf-8")
     with pytest.raises(CatalogueError, match="R1 llm.when"):
         Catalogue.load(p)
+
+
+# ---- coordinator answers (follow-ups R9, R18, R31) ----------------------------------------------
+
+
+def test_r18_compensation_scheme_fact_passes(registry, catalogue):
+    text = "Fundusz nadzorowany przez KNF, środki chronione przez system rekompensat."
+    assert run(text, registry, catalogue)["R18"].result == "pass"
+
+
+def test_r18_compensation_plus_safety_claim_still_fails(registry, catalogue):
+    text = "Nadzór KNF i system rekompensat sprawiają, że inwestycja jest w pełni bezpieczna."
+    assert run(text, registry, catalogue)["R18"].result == "fail"
+
+
+@pytest.mark.parametrize("text", [
+    "Nasi klienci zarobili 5 000 zł.",
+    "Zysk 1200 PLN w 2025 roku.",
+    "Portfel przyniósł 3 500 zł w ostatnich 12 miesiącach.",
+])
+def test_r14_absolute_amount_past_performance(text, registry, catalogue):
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "fail"
+
+
+@pytest.mark.parametrize("text", [
+    "Bonus 500 zł na start w 2025 roku.",
+    "Abonament 990 zł miesięcznie od 2025 roku.",
+    "Zarabiaj nawet 5 000 zł miesięcznie!",
+])
+def test_r14_amounts_without_past_return_are_not_past_performance(text, registry, catalogue):
+    assert run(text, registry, catalogue, fetched_at="2026-11-21T12:00:00Z")["R14"].result == "not_applicable"
+
+
+def test_r6_missing_region_is_never_pass(registry, catalogue):
+    blocks = [block("Zysk 8% rocznie.", region=None, in_view=None), block("Ryzyko utraty kapitału.", region=None, in_view=None)]
+    r = run("Zysk 8% rocznie. Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R6"]
+    assert r.result == "not_applicable" and "brak metadanych renderowania" in r.explanation.lower()
+
+
+def test_r6_missing_region_but_in_view_passes(registry, catalogue):
+    blocks = [block("Ryzyko utraty kapitału.", region=None, in_view=True)]
+    assert run("Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R6"].result == "pass"
+
+
+def test_r6_missing_region_with_partial_evidence_is_uncertain(registry, catalogue):
+    blocks = [block("Ryzyko utraty kapitału.", region="footer", in_view=False),
+              block("Ryzyko utraty kapitału.", region=None, in_view=False)]
+    assert run("Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R6"].result == "uncertain"
+
+
+def test_r6_footnote_with_missing_region_is_judged_by_marker(registry, catalogue):
+    blocks = [block("*Ryzyko utraty kapitału.", region=None, in_view=False)]
+    assert run("*Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R6"].result == "fail"
+
+
+def test_r6_missing_metadata_in_one_viewport_does_not_hide_the_other(registry, catalogue):
+    blocks = [block("Ryzyko utraty kapitału.", region="footer", in_view=False),
+              block("Ryzyko utraty kapitału.", viewport="mobile", region=None, in_view=None)]
+    assert run("Ryzyko utraty kapitału.", registry, catalogue, blocks=blocks)["R6"].result == "fail"
+
+
+def test_visual_rules_without_blocks_on_every_mock(mock_documents, registry, catalogue):
+    for raw in mock_documents:
+        raw = {**raw, "blocks": []}
+        doc = ScrapedDocument.model_validate(raw)
+        ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=registry.match(doc.text, doc.url), registry=registry)
+        res = {r.rule_id: r.result for r in run_rules(catalogue, ctx)}
+        assert res["R4"] == "not_applicable" and res["R6"] == "not_applicable"
