@@ -54,3 +54,30 @@ def test_json_formatter_emits_one_json_object():
     assert entry["level"] == "WARNING"
     assert entry["msg"] == "hello world"
     assert entry["ts"].endswith("Z")
+
+
+def _formatted(msg: str, exc: BaseException | None = None) -> dict:
+    exc_info = (type(exc), exc, None) if exc else None
+    record = logging.LogRecord("iw", logging.ERROR, __file__, 1, msg, (), exc_info)
+    return json.loads(JsonFormatter().format(record))
+
+
+def test_url_credentials_are_redacted_in_message_and_exception():
+    entry = _formatted("connect postgresql://iw_admin:s3cret@postgres:5432/db failed",
+                       RuntimeError("redis://:hunter2@redis:6379/0 refused"))
+    line = json.dumps(entry)
+    assert "s3cret" not in line and "hunter2" not in line
+    assert "postgresql://***@postgres:5432/db" in entry["msg"]
+
+
+def test_sql_parameters_are_redacted():
+    entry = _formatted("x", RuntimeError("(psycopg.errors.CheckViolation) boom\n[SQL: INSERT ...]\n"
+                                         "[parameters: {'note': 'private analyst note'}]\n(Background on this error)"))
+    assert "private analyst note" not in entry["exc"]
+    assert "[parameters: redacted]" in entry["exc"]
+
+
+def test_unserialisable_extra_does_not_drop_the_line():
+    record = logging.LogRecord("iw", logging.INFO, __file__, 1, "ok", (), None)
+    record.status = object()
+    assert json.loads(JsonFormatter().format(record))["msg"] == "ok"

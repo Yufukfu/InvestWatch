@@ -1,8 +1,8 @@
 """Fixtures for tests that need a real Postgres (design decision 10: SQLite is not a substitute).
 
 Set TEST_DATABASE_ADMIN_URL to a superuser or CREATEDB+CREATEROLE connection on any database of a
-Postgres 17 server, for example the one from api/README.md. Each test session creates its own
-databases and drops them afterwards; without the variable the database tests are skipped.
+Postgres 17 server on localhost, for example the one from api/README.md. Each test session creates its
+own databases and app role and drops them afterwards; without the variable the database tests are skipped.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import json
 import os
 import secrets
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import psycopg
@@ -22,7 +22,7 @@ from sqlalchemy.engine import make_url
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS_DIR = REPO_ROOT / "contracts"
-APP_ROLE = "iw_test_app"
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 def _plain(url: str) -> str:
@@ -35,10 +35,10 @@ def _sqlalchemy(url: str) -> str:
 
 
 @dataclass(frozen=True)
-class TestDatabase:
+class TempDatabase:
     name: str
-    admin_url: str  # SQLAlchemy URL, admin role, this database
-    app_url: str  # SQLAlchemy URL, least-privilege app role, this database
+    admin_url: str = field(repr=False)  # SQLAlchemy URL, admin role, this database
+    app_url: str = field(repr=False)  # SQLAlchemy URL, least-privilege app role, this database
 
 
 class DatabaseFactory:
@@ -46,25 +46,28 @@ class DatabaseFactory:
 
     def __init__(self, server_admin_url: str):
         self._server = make_url(_sqlalchemy(server_admin_url))
+        if self._server.host not in _LOCAL_HOSTS and os.environ.get("TEST_DATABASE_ALLOW_REMOTE") != "1":
+            raise pytest.UsageError("TEST_DATABASE_ADMIN_URL must point at localhost "
+                                    "(set TEST_DATABASE_ALLOW_REMOTE=1 to override)")
+        # One role per test session: concurrent sessions never share or overwrite each other's password.
+        self.app_role = f"iw_test_app_{secrets.token_hex(4)}"
         self._app_password = secrets.token_hex(16)
         self._created: list[str] = []
         with self._connect() as conn:
-            exists = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (APP_ROLE,)).fetchone()
-            verb = "ALTER" if exists else "CREATE"
-            conn.execute(sql.SQL(verb + " ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE").format(
-                sql.Identifier(APP_ROLE), sql.Literal(self._app_password)))
+            conn.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE").format(
+                sql.Identifier(self.app_role), sql.Literal(self._app_password)))
 
     def _connect(self, database: str | None = None) -> psycopg.Connection:
         url = self._server.set(database=database or self._server.database or "postgres")
         return psycopg.connect(_plain(url.render_as_string(hide_password=False)), autocommit=True)
 
-    def create(self) -> TestDatabase:
+    def create(self) -> TempDatabase:
         name = f"iw_test_{secrets.token_hex(4)}"
         with self._connect() as conn:
             conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
         self._created.append(name)
         with self._connect(name) as conn:
-            role, db = sql.Identifier(APP_ROLE), sql.Identifier(name)
+            role, db = sql.Identifier(self.app_role), sql.Identifier(name)
             for stmt in (
                 "REVOKE ALL ON DATABASE {db} FROM PUBLIC",
                 "GRANT CONNECT, TEMPORARY ON DATABASE {db} TO {role}",
@@ -77,13 +80,14 @@ class DatabaseFactory:
             ):
                 conn.execute(sql.SQL(stmt).format(db=db, role=role))
         admin = self._server.set(database=name).render_as_string(hide_password=False)
-        app = self._server.set(database=name, username=APP_ROLE, password=self._app_password)
-        return TestDatabase(name, _sqlalchemy(admin), _sqlalchemy(app.render_as_string(hide_password=False)))
+        app = self._server.set(database=name, username=self.app_role, password=self._app_password)
+        return TempDatabase(name, _sqlalchemy(admin), _sqlalchemy(app.render_as_string(hide_password=False)))
 
     def drop_all(self) -> None:
         with self._connect() as conn:
             for name in self._created:
                 conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name)))
+            conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(self.app_role)))
 
 
 @pytest.fixture(scope="session")
@@ -97,7 +101,7 @@ def db_factory() -> Iterator[DatabaseFactory]:
 
 
 @pytest.fixture
-def empty_db(db_factory: DatabaseFactory) -> TestDatabase:
+def empty_db(db_factory: DatabaseFactory) -> TempDatabase:
     """A fresh database with no tables, for migration tests."""
     return db_factory.create()
 
@@ -113,7 +117,7 @@ def assert_contract_valid(name: str, instance) -> None:
 
 
 @pytest.fixture(scope="session")
-def migrated_db(db_factory: DatabaseFactory) -> TestDatabase:
+def migrated_db(db_factory: DatabaseFactory) -> TempDatabase:
     """One migrated database per test session; app_engine empties it after every test."""
     from dbutil import upgrade
 
@@ -124,7 +128,7 @@ def migrated_db(db_factory: DatabaseFactory) -> TestDatabase:
 
 
 @pytest.fixture
-def app_engine(migrated_db: TestDatabase):
+def app_engine(migrated_db: TempDatabase):
     """SQLAlchemy engine as the least-privilege app role, on empty tables."""
     from sqlalchemy import create_engine, text
 

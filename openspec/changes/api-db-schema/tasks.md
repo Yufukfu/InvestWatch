@@ -6,8 +6,8 @@ Lands before change `api-v1`: groups 1-3 unblock `scraper-v1` group 5 (Adam) and
 
 - [x] 1.1 `api/CLAUDE.md` and `api/README.md` exist (written with this proposal); `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` passes
 - [x] 1.2 Failing test first (`api/tests/test_settings.py`: missing `DATABASE_ADMIN_URL` raises an error naming the variable), then `api/pyproject.toml`, pinned `requirements.txt` / `requirements-dev.txt` (sqlalchemy, alembic, psycopg[binary], pytest), `src/investwatch_api/settings.py` and a JSON log formatter; `pytest api` is green
-- [x] 1.3 Test fixture that connects with `TEST_DATABASE_ADMIN_URL` / `TEST_DATABASE_APP_URL`, creates a throwaway database per test session, runs the same role grants as `infra/postgres/init/01-app-role.sh`, and skips (not fails) when the variables are unset; documented in `api/README.md`
-- [x] 1.4 Mutation check (iw-commit-cycle step 3); mutations: 9 tried, 8 caught, 1 equivalent (removing `GRANT USAGE ON SCHEMA public` from the fixture survives because Postgres 17 grants USAGE on `public` to PUBLIC; same redundancy in `infra/postgres/init/01-app-role.sh`)
+- [x] 1.3 Test fixture that connects with `TEST_DATABASE_ADMIN_URL` (localhost only unless `TEST_DATABASE_ALLOW_REMOTE=1`), creates throwaway databases and a per-session app role with the same grants as `infra/postgres/init/01-app-role.sh`, drops both afterwards, and skips (not fails) when the variable is unset; documented in `api/README.md`
+- [x] 1.4 Mutation check (iw-commit-cycle step 3); mutations: 9 tried, 8 caught, 1 equivalent (removing `GRANT USAGE ON SCHEMA public` from the fixture survives because Postgres 17 grants USAGE on `public` to PUBLIC; same redundancy in `infra/postgres/init/01-app-role.sh`); review fixes: mutations: 6 tried, 6 caught
 
 ## 2. Initial revision: tables, constraints, dedup and upsert keys
 
