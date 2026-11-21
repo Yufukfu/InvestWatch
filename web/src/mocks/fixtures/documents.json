@@ -1,0 +1,401 @@
+[
+  {
+    "id": "a3c88321-15bf-56e4-8d59-05a9033308c6",
+    "source_id": "e05d8699-90e0-5042-a040-ab67dae7299a",
+    "platform": "web",
+    "source_kind": "firm_own",
+    "url": "https://alfa-inwestycje.example.com/konto-premium",
+    "canonical_url": "https://alfa-inwestycje.example.com/konto-premium",
+    "fetched_at": "2026-11-21T15:00:00Z",
+    "published_at": "2026-11-21T12:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": "Konto Premium – zarabiaj do 18% rocznie",
+    "text": "Konto Premium Alfa Inwestycje. Zarabiaj nawet do 18% rocznie na portfelu ETF! Dołącz do 50 000 zadowolonych inwestorów. Działamy pod nadzorem KNF – Twoje środki są bezpieczne. Otwórz konto w 5 minut. *Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+    "content_hash": "5fe280ed0c47eeaa68f0b28db6ce78de46ff55a58288334c8c14c74b4111d291",
+    "author": null,
+    "links": [],
+    "media": [],
+    "html_object_key": "html/a3c88321-15bf-56e4-8d59-05a9033308c6.html",
+    "screenshots": {
+      "desktop": "shot/a3c88321-15bf-56e4-8d59-05a9033308c6/desktop.png",
+      "tablet": "shot/a3c88321-15bf-56e4-8d59-05a9033308c6/tablet.png",
+      "mobile": "shot/a3c88321-15bf-56e4-8d59-05a9033308c6/mobile.png"
+    },
+    "blocks": [
+      {
+        "viewport": "desktop",
+        "text": "Zarabiaj nawet do 18% rocznie na portfelu ETF!",
+        "tag": "h1",
+        "font_size_px": 44,
+        "font_weight": 700,
+        "color": "#111111",
+        "background_color": "#ffffff",
+        "bbox": [
+          80,
+          120,
+          900,
+          60
+        ],
+        "visible": true,
+        "in_viewport_on_load": true,
+        "requires_interaction": false,
+        "region": "main",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "desktop",
+        "text": "Działamy pod nadzorem KNF – Twoje środki są bezpieczne.",
+        "tag": "p",
+        "font_size_px": 20,
+        "font_weight": 400,
+        "color": "#222222",
+        "background_color": "#ffffff",
+        "bbox": [
+          80,
+          200,
+          700,
+          28
+        ],
+        "visible": true,
+        "in_viewport_on_load": true,
+        "requires_interaction": false,
+        "region": "main",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "desktop",
+        "text": "*Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+        "tag": "small",
+        "font_size_px": 9,
+        "font_weight": 400,
+        "color": "#bbbbbb",
+        "background_color": "#ffffff",
+        "bbox": [
+          80,
+          2400,
+          600,
+          12
+        ],
+        "visible": true,
+        "in_viewport_on_load": false,
+        "requires_interaction": false,
+        "region": "footer",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "mobile",
+        "text": "*Inwestowanie wiąże się z ryzykiem utraty części lub całości kapitału.",
+        "tag": "small",
+        "font_size_px": 8,
+        "font_weight": 400,
+        "color": "#bbbbbb",
+        "background_color": "#ffffff",
+        "bbox": [
+          16,
+          3900,
+          340,
+          30
+        ],
+        "visible": true,
+        "in_viewport_on_load": false,
+        "requires_interaction": false,
+        "region": "footer",
+        "overflow_clipped": true
+      }
+    ],
+    "scrape_meta": {
+      "scraper": "playwright",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "c99e2a35-eee1-5ee9-b057-b0d707a52cfb",
+    "source_id": "2ee83c3b-bcff-5c88-abfc-57272ca93f09",
+    "platform": "web",
+    "source_kind": "firm_own",
+    "url": "https://eurotrade-markets.example.com/pl/promocje/bonus-cfd",
+    "canonical_url": "https://eurotrade-markets.example.com/pl/promocje/bonus-cfd",
+    "fetched_at": "2026-11-21T11:00:00Z",
+    "published_at": "2026-11-21T08:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": "Bonus 500 zł na start z CFD",
+    "text": "Handluj CFD na indeksy z bonusem 500 zł na start! Nasi klienci zarobili średnio 34% w 2025 roku. W przyszłym roku spodziewamy się jeszcze lepszych wyników. Risk warning: CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage.",
+    "content_hash": "b149f946b22c08ed90bd4603d8b8a931fbdf7b237a4867d3a83bc56caf48ad48",
+    "author": null,
+    "links": [],
+    "media": [],
+    "html_object_key": "html/c99e2a35-eee1-5ee9-b057-b0d707a52cfb.html",
+    "screenshots": {
+      "desktop": "shot/c99e2a35-eee1-5ee9-b057-b0d707a52cfb/desktop.png",
+      "tablet": "shot/c99e2a35-eee1-5ee9-b057-b0d707a52cfb/tablet.png",
+      "mobile": "shot/c99e2a35-eee1-5ee9-b057-b0d707a52cfb/mobile.png"
+    },
+    "blocks": [
+      {
+        "viewport": "desktop",
+        "text": "Nasi klienci zarobili średnio 34% w 2025 roku.",
+        "tag": "h2",
+        "font_size_px": 36,
+        "font_weight": 700,
+        "color": "#0a0a0a",
+        "background_color": "#ffe600",
+        "bbox": [
+          60,
+          300,
+          800,
+          48
+        ],
+        "visible": true,
+        "in_viewport_on_load": true,
+        "requires_interaction": false,
+        "region": "main",
+        "overflow_clipped": false
+      },
+      {
+        "viewport": "desktop",
+        "text": "Risk warning: CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage.",
+        "tag": "p",
+        "font_size_px": 14,
+        "font_weight": 400,
+        "color": "#333333",
+        "background_color": "#ffffff",
+        "bbox": [
+          60,
+          380,
+          900,
+          20
+        ],
+        "visible": false,
+        "in_viewport_on_load": false,
+        "requires_interaction": true,
+        "region": "main",
+        "overflow_clipped": false
+      }
+    ],
+    "scrape_meta": {
+      "scraper": "playwright",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "5030107e-63fe-567c-b076-ccfac4197430",
+    "source_id": null,
+    "platform": "web",
+    "source_kind": "firm_own",
+    "url": "https://bank-przykladowy.example.com/maklerskie/ike",
+    "canonical_url": "https://bank-przykladowy.example.com/maklerskie/ike",
+    "fetched_at": "2026-11-21T07:00:00Z",
+    "published_at": "2026-11-21T04:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": "IKE w Biurze Maklerskim",
+    "text": "Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału. Traktowanie podatkowe zależy od indywidualnej sytuacji klienta i może ulec zmianie.",
+    "content_hash": "945310aa25cfbe4ced1f671a8da2ee60abb1e698c095ff33f4f23773b8f1347f",
+    "author": null,
+    "links": [],
+    "media": [],
+    "html_object_key": "html/5030107e-63fe-567c-b076-ccfac4197430.html",
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "playwright",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "3c41441c-40ba-5864-b3e0-03f8bc9acebe",
+    "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+    "platform": "instagram",
+    "source_kind": "third_party",
+    "url": "https://www.instagram.com/p/MOCK0001/",
+    "canonical_url": "https://www.instagram.com/p/MOCK0001/",
+    "fetched_at": "2026-11-21T14:00:00Z",
+    "published_at": "2026-11-21T11:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": null,
+    "text": "Od pół roku gram na forexie w EuroTrade Markets i to najlepsza decyzja w moim życiu 🚀 Z moim linkiem dostaniesz bonus 500 zł na start – link w bio! #forex #inwestowanie #pasywnydochod",
+    "content_hash": "17a352cef451be8fe1c9957ffdad4368832d19cecdae3aa3c392b2996ad53847",
+    "author": {
+      "name": "Jan Inwestor",
+      "handle": "@inwestor_jan",
+      "profile_url": "https://www.instagram.com/inwestor_jan/",
+      "followers": 48200
+    },
+    "links": [
+      {
+        "href": "https://eurotrade-markets.example.com/pl/register?ref=JAN500",
+        "text": "link w bio",
+        "rel": null
+      }
+    ],
+    "media": [],
+    "html_object_key": null,
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "api",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "182e5a42-1041-5147-99dc-84d73ed34220",
+    "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+    "platform": "instagram",
+    "source_kind": "third_party",
+    "url": "https://www.instagram.com/p/MOCK0002/",
+    "canonical_url": "https://www.instagram.com/p/MOCK0002/",
+    "fetched_at": "2026-11-21T09:00:00Z",
+    "published_at": "2026-11-21T06:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": null,
+    "text": "#współpraca z Alfa Inwestycje DM. Pokazuję, jak założyłam rachunek maklerski i kupiłam pierwszy ETF. Pamiętajcie: inwestowanie wiąże się z ryzykiem, możecie stracić część pieniędzy.",
+    "content_hash": "8f2fb211b2618e44faa86b91dd902248abb1ab26269bb538a85088269c2ab896",
+    "author": {
+      "name": "Finanse z Kasią",
+      "handle": "@finanse_z_kasia",
+      "profile_url": "https://www.instagram.com/finanse_z_kasia/",
+      "followers": 125000
+    },
+    "links": [],
+    "media": [],
+    "html_object_key": null,
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "api",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "8721cb75-d75c-537f-8981-07a7e2dede3c",
+    "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+    "platform": "instagram",
+    "source_kind": "third_party",
+    "url": "https://www.instagram.com/p/MOCK0003/",
+    "canonical_url": "https://www.instagram.com/p/MOCK0003/",
+    "fetched_at": "2026-11-20T20:00:00Z",
+    "published_at": "2026-11-20T17:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": null,
+    "text": "Czym różni się ETF akumulujący od dystrybuującego? Krótki poradnik bez polecania konkretnych biur maklerskich.",
+    "content_hash": "5821972e7ff8cd7ec182c8aa6b34ee0181c53fe7e6f1c536f61acecf4457678b",
+    "author": {
+      "name": "Ekonomia na luzie",
+      "handle": "@ekonomia_na_luzie",
+      "profile_url": "https://www.instagram.com/ekonomia_na_luzie/",
+      "followers": 9100
+    },
+    "links": [],
+    "media": [],
+    "html_object_key": null,
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "api",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "007bbcee-0737-5c6d-b9b4-ce56fcbfa8e4",
+    "source_id": "0613f5c0-7837-58a1-a5ea-f8f2fffcb8f6",
+    "platform": "web",
+    "source_kind": "unknown",
+    "url": "https://zlotykapital-fo.example.com/oferta",
+    "canonical_url": "https://zlotykapital-fo.example.com/oferta",
+    "fetched_at": "2026-11-21T13:00:00Z",
+    "published_at": "2026-11-21T10:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": "ZłotyKapitał Family Office – indywidualna strategia",
+    "text": "ZłotyKapitał Family Office. Po bezpłatnej konsultacji 1:1 dopasujemy portfel do Twojej sytuacji. W tym kwartale rekomendujemy kupno obligacji skarbowych i akcji spółek z WIG20 oraz sprzedaż ETF na złoto. Abonament 990 zł miesięcznie.",
+    "content_hash": "732aa8daa131fbf0bcc8738bca6539101625406e8d17e904ec3b20537cf895f9",
+    "author": null,
+    "links": [],
+    "media": [],
+    "html_object_key": "html/007bbcee-0737-5c6d-b9b4-ce56fcbfa8e4.html",
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "playwright",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "cdbf5306-1bb9-5d3b-b8b8-bc64f2ed8e88",
+    "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+    "platform": "instagram",
+    "source_kind": "third_party",
+    "url": "https://www.instagram.com/p/MOCK0004/",
+    "canonical_url": "https://www.instagram.com/p/MOCK0004/",
+    "fetched_at": "2026-11-21T05:00:00Z",
+    "published_at": "2026-11-21T02:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": null,
+    "text": "Grupa VIP – sygnały premium na akcje i CFD. Codziennie mówię, co kupić, a co sprzedać. Ostatni miesiąc +27%! Dołącz za 199 zł/mies.",
+    "content_hash": "406cb0e537d519242cb5ec11ba75606278205bcfcbd58e8470eaeeca1edab485",
+    "author": {
+      "name": "Sygnały VIP",
+      "handle": "@sygnaly_vip",
+      "profile_url": "https://www.instagram.com/sygnaly_vip/",
+      "followers": 31000
+    },
+    "links": [],
+    "media": [],
+    "html_object_key": null,
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "api",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
+    "id": "72acbb3b-3546-5c9b-9b26-2b29f69ccce9",
+    "source_id": "0613f5c0-7837-58a1-a5ea-f8f2fffcb8f6",
+    "platform": "web",
+    "source_kind": "unknown",
+    "url": "https://blog-finansowy.example.com/czym-jest-family-office",
+    "canonical_url": "https://blog-finansowy.example.com/czym-jest-family-office",
+    "fetched_at": "2026-11-20T14:00:00Z",
+    "published_at": "2026-11-20T11:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": "Czym jest family office?",
+    "text": "Wyjaśniamy, czym jest family office i jak wybrać licencjonowanego doradcę. Nie udzielamy rekomendacji inwestycyjnych.",
+    "content_hash": "4231398a2153a7fb76e555a244359594a248f1b3d09396f7ad7aa49397fbe3d5",
+    "author": null,
+    "links": [],
+    "media": [],
+    "html_object_key": "html/72acbb3b-3546-5c9b-9b26-2b29f69ccce9.html",
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "playwright",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  }
+]

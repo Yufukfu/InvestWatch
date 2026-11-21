@@ -1,0 +1,54 @@
+import { configureStore } from '@reduxjs/toolkit';
+import { render, screen } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { Provider } from 'react-redux';
+import { describe, expect, it } from 'vitest';
+import { App } from './App';
+import { investWatchApi } from './api/generated';
+import findings from './mocks/fixtures/findings.json';
+import { server } from './test/setup';
+
+// A fresh store per test so RTK Query cache does not leak between scenarios.
+function renderApp() {
+  const store = configureStore({
+    reducer: { [investWatchApi.reducerPath]: investWatchApi.reducer },
+    middleware: (getDefault) => getDefault().concat(investWatchApi.middleware),
+  });
+  return render(
+    <Provider store={store}>
+      <App />
+    </Provider>,
+  );
+}
+
+describe('App (against contract mocks)', () => {
+  it('renders findings from the generated client as plain text', async () => {
+    renderApp();
+    expect(await screen.findByText(findings.items[0].title)).toBeInTheDocument();
+    expect(await screen.findByText('System działa')).toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(findings.items.length + 1);
+  });
+
+  it('renders markup in scraped text literally, never as HTML', async () => {
+    const payload = '<img src=x onerror=alert(1)>Zysk 20%';
+    server.use(
+      http.get('http://localhost/api/findings', () =>
+        HttpResponse.json({ ...findings, items: [{ ...findings.items[0], title: payload }] }),
+      ),
+    );
+    renderApp();
+    expect(await screen.findByText(payload)).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('shows an API-down state instead of crashing when the API is unreachable', async () => {
+    server.use(
+      http.get('http://localhost/api/health', () => HttpResponse.error()),
+      http.get('http://localhost/api/findings', () => HttpResponse.error()),
+      http.get('http://localhost/api/stats/summary', () => HttpResponse.error()),
+    );
+    renderApp();
+    expect(await screen.findByText('Brak połączenia z API')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
+  });
+});

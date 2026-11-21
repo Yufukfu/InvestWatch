@@ -1,0 +1,45 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint --deny-warnings",
+    "preview": "vite preview",
+    "contracts:sync": "node scripts/sync-contracts.mjs",
+    "contracts:check": "node scripts/sync-contracts.mjs --check",
+    "api:generate": "npm run contracts:sync && rtk-query-codegen-openapi openapi-config.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.15.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-redux": "^9.3.1",
+    "react-router": "^7.18.6",
+    "socket.io-client": "^4.8.4"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.0.0",
+    "@rtk-query/codegen-openapi": "^2.2.0",
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^29.1.1",
+    "msw": "^3.0.7",
+    "oxlint": "^1.90.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.1",
+    "yaml": "^2.9.1"
+  },
+  "engines": {
+    "node": ">=22.20"
+  }
+}

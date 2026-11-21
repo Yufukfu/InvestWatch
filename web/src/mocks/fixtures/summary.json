@@ -1,0 +1,25 @@
+{
+  "total": 9,
+  "by_module": {
+    "M1": 3,
+    "M2": 3,
+    "M3": 3
+  },
+  "by_status": {
+    "new": 3,
+    "in_review": 2,
+    "confirmed": 1,
+    "false_positive": 2,
+    "closed": 1
+  },
+  "by_platform": {
+    "instagram": 4,
+    "web": 5
+  },
+  "by_risk_level": {
+    "high": 6,
+    "medium": 0,
+    "low": 3
+  },
+  "last_scan_at": "2026-11-21T15:35:00Z"
+}
