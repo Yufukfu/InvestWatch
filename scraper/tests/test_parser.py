@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from jsonschema import FormatChecker
 
 from iw_scraper.parsing import ParsedPage, ParseFailure, ParserRegistry, parse_page
 from iw_scraper.types import Reason
@@ -193,3 +194,29 @@ def test_unparseable_canonical_falls_back_to_final_url():
     page = parse_page(body, HTML, "https://example.pl/a")
 
     assert page.canonical_url == "https://example.pl/a"
+
+
+def test_a_canonical_with_non_ascii_characters_and_a_space_is_a_valid_uri():
+    body = '<html><head><link rel="canonical" href="/ostrzeżenia lista"></head><body>x</body></html>'.encode()
+
+    page = parse_page(body, HTML, "https://www.knf.gov.pl/a")
+
+    assert page.canonical_url == "https://www.knf.gov.pl/ostrze%C5%BCenia%20lista"
+    FormatChecker().check(page.canonical_url, "uri")  # raises when the contract's `format: uri` would refuse it
+
+
+def test_links_are_percent_encoded_once_and_existing_escapes_stay():
+    body = '<a href="/a%20b/ż?q=1&r=%C5%BC#f">x</a><p>x</p>'.encode()
+
+    page = parse_page(body, HTML, "https://example.pl/")
+
+    assert page.links == ("https://example.pl/a%20b/%C5%BC?q=1&r=%C5%BC#f",)
+
+
+def test_a_parser_registered_for_the_bare_host_serves_the_www_host_and_back():
+    registry = ParserRegistry(default=_marker_parser("generic"))
+    registry.register("knf.gov.pl", _marker_parser("site"))
+
+    assert registry.parse(b"<p>x</p>", HTML, "https://www.knf.gov.pl/a").title == "site"
+    with pytest.raises(ValueError):
+        registry.register("www.knf.gov.pl", _marker_parser("again"))

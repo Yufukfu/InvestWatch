@@ -406,3 +406,14 @@ def test_an_empty_port_list_is_refused(monkeypatch):
 
     with pytest.raises(ValueError, match="ALLOWED_PORTS"):
         target_settings()
+
+
+@pytest.mark.parametrize("url", ["https://a..pl/", f"https://{'a' * 64}.pl/"])
+async def test_a_malformed_host_label_is_refused_not_raised(url):
+    guard = target_guard(UrlGuard(["example.pl"]), AddressGuard(), url)  # the source URL skips the host list
+
+    with pytest.raises(FetchFailure) as failure:
+        await guard(url)
+
+    assert failure.value.reason is Reason.BLOCKED_TARGET
+    assert "host name is not valid" in failure.value.detail

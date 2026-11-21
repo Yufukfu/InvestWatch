@@ -10,6 +10,7 @@ Facts about the client (`noble-tls` over the Go `tls-client`, ADR 0101) that sha
 
 import logging
 import os
+import re
 import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -19,12 +20,13 @@ from urllib.parse import SplitResult, unquote, urljoin, urlsplit
 from noble_tls import Client, Session
 
 from iw_scraper.config import DEFAULT_FETCH_MAX_BYTES, DEFAULT_FETCH_TIMEOUT_SECONDS
-from iw_scraper.parsing import HTML_TYPES, content_type_params
+from iw_scraper.parsing import HTML_TYPES, content_type_params, to_uri
 from iw_scraper.proxy import ProxyChoice, ProxyRun
 from iw_scraper.reporting import redact
 from iw_scraper.types import Deferral, Reason
 
 _log = logging.getLogger(__name__)
+_QUOTED_URL = re.compile(r'"[a-z][a-z0-9+.-]*://[^"]*"', re.IGNORECASE)
 DEFAULT_TIMEOUT_SECONDS = DEFAULT_FETCH_TIMEOUT_SECONDS
 DEFAULT_MAX_BYTES = DEFAULT_FETCH_MAX_BYTES
 MAX_REDIRECTS = 5
@@ -138,7 +140,7 @@ def _scrub_proxy(message: str, choice: ProxyChoice | None) -> str:
 
 
 def _transport_failure(exc: Exception, choice: ProxyChoice | None = None) -> FetchFailure:
-    message = redact(_scrub_proxy(str(exc), choice))
+    message = _QUOTED_URL.sub('"<url>"', redact(_scrub_proxy(str(exc), choice)))  # the client quotes the full URL
     lowered = message.lower()
     if "proxy responded with non 200 code: 407" in lowered:  # the client's wording for a refused CONNECT
         return ProxyAuthFailure(Reason.HTTP_ERROR, f"proxy authentication failed: {message}")
@@ -214,8 +216,6 @@ async def _request_once(
             raise _transport_failure(exc, choice) from None
         headers = _headers_of(response)
         status = response.status_code
-        if status == 407 and choice is not None:  # the proxy itself refused us, whatever the wording
-            raise ProxyAuthFailure(Reason.HTTP_ERROR, "proxy answered 407")
         is_redirect = status in _REDIRECT_STATUSES and "location" in headers
         body = b"" if is_redirect or not 200 <= status < 300 else _read_checked_body(path, headers, max_bytes, html_only)
         return status, headers, body
@@ -247,6 +247,13 @@ async def _request_through_proxies(
             raise
 
 
+async def close_session(session: Session) -> None:
+    try:
+        await session.close()
+    except Exception as exc:  # a failed close must not hide the real outcome
+        _log.warning("closing the session failed: %s", redact(str(exc)))
+
+
 async def fetch(
     url: str,
     identity: Identity,
@@ -255,9 +262,14 @@ async def fetch(
     guard: TargetGuard | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_bytes: int = DEFAULT_MAX_BYTES,
+    session: Session | None = None,
 ) -> FetchResult:
-    """Request `url` once, following up to `MAX_REDIRECTS` redirects hop by hop. Never retries."""
-    session = _new_session(identity)
+    """Request `url` once, following up to `MAX_REDIRECTS` redirects hop by hop. Never retries.
+
+    A `session` passed in is the run's: it is shared with `check_robots` and its owner closes it.
+    """
+    owned = session is None
+    session = session or _new_session(identity)
     try:
         current = url
         proxy_id = None
@@ -267,7 +279,7 @@ async def fetch(
             )
             proxy_id = choice.identifier if choice else None
             if status in _REDIRECT_STATUSES and "location" in headers:
-                current = urljoin(current, headers["location"])
+                current = to_uri(urljoin(current, headers["location"]))
                 continue
             retry_after = headers.get("retry-after")
             if status in _BLOCK_STATUSES:
@@ -289,7 +301,5 @@ async def fetch(
             )
         raise FetchFailure(Reason.HTTP_ERROR, f"more than {MAX_REDIRECTS} redirects", proxy_id)
     finally:
-        try:
-            await session.close()
-        except Exception as exc:  # a failed close must not hide the real outcome
-            _log.warning("closing the session failed: %s", redact(str(exc)))
+        if owned:
+            await close_session(session)

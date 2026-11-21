@@ -10,7 +10,7 @@ import hashlib
 import math
 import random
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from iw_scraper.types import Deferral
@@ -26,7 +26,7 @@ def proxy_identifier(url: str) -> str:
 
 @dataclass(frozen=True)
 class ProxyChoice:
-    url: str  # may hold credentials
+    url: str = field(repr=False)  # may hold credentials
     identifier: str
 
 

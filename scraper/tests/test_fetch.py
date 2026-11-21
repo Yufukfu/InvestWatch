@@ -654,3 +654,12 @@ def test_unusable_fetch_settings_are_refused_by_name(monkeypatch, name, value):
 
     with pytest.raises(ValueError, match=name):
         fetch_settings()
+
+
+async def test_a_redirect_location_with_a_space_is_percent_encoded(stub):
+    stub.route("/start", status=302, headers={"Location": "/menu page"})
+    stub.route("/menu%20page", body=PAGE.encode(), content_type="text/html; charset=utf-8")
+
+    result = await fetch(stub.url("/start"), IDENTITY, None)
+
+    assert result.url == stub.url("/menu%20page")

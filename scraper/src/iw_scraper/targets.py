@@ -124,6 +124,8 @@ class AddressGuard:
             raise _refuse(f"internal host name: {name}")
         try:
             answers = await asyncio.wait_for(self._resolver(name), RESOLVE_TIMEOUT_SECONDS)
+        except UnicodeError:  # an empty or over-long label; not an OSError, and not a lookup failure
+            raise _refuse("host name is not valid") from None
         except OSError as exc:
             raise FetchFailure(Reason.HTTP_ERROR, f"DNS lookup failed: {type(exc).__name__}") from None
         if not answers:

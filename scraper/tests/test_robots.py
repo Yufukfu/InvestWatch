@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from iw_scraper.fetch import MAX_REDIRECTS, FetchDeferred, FetchFailure
+from iw_scraper.fetch import MAX_REDIRECTS, FetchDeferred, FetchFailure, _new_session, close_session, fetch
 from iw_scraper.identities import TABLE
 from iw_scraper.proxy import ProxyRotator
 from iw_scraper.robots import ROBOTS_AGENT, check_robots
@@ -171,3 +171,26 @@ async def test_a_403_on_robots_txt_is_never_reported_as_a_block(stub):
     result = await verdict(stub)  # must return a verdict, not raise FetchFailure(BLOCKED)
 
     assert result.allowed is True
+
+
+async def test_a_cookie_set_by_robots_txt_reaches_the_page_request_of_the_same_session(stub):
+    robots(stub, "", headers={"Set-Cookie": "run=1"})
+    stub.route(
+        "/page",
+        body=b"<html><body><p>ok</p></body></html>",
+        content_type="text/html; charset=utf-8",
+        headers={"Set-Cookie": "page=1"},
+    )
+    session = _new_session(IDENTITY)
+    try:
+        await check_robots(stub.url("/page"), IDENTITY, None, session=session)
+        await fetch(stub.url("/page"), IDENTITY, None, session=session)
+        page_request = stub.requests[-1]
+        again = await check_robots(stub.url("/page"), IDENTITY, None, session=session)  # both left it open
+    finally:
+        await close_session(session)
+
+    assert page_request.path == "/page"
+    assert dict(page_request.headers).get("Cookie") == "run=1"
+    assert again.allowed
+    assert "page=1" in dict(stub.requests[-1].headers).get("Cookie", "")  # the page's cookie survived `fetch`

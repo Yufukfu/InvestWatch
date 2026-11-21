@@ -3,10 +3,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from email.message import Message
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 from lxml import etree, html
 
+from iw_scraper.ratelimit import host_key
 from iw_scraper.types import Reason
 
 HTML_TYPES = {"text/html", "application/xhtml+xml"}
@@ -67,10 +68,18 @@ def _title(root: html.HtmlElement) -> str | None:
     return None
 
 
+_URI_SAFE = "%/:=&?~#+!$,;'@()*[]"  # everything `quote` would otherwise escape that a URI may hold, `%` included
+
+
+def to_uri(url: str) -> str:
+    """`url` with raw non-ASCII characters and spaces percent-encoded; existing escapes stay as they are."""
+    return quote(url, safe=_URI_SAFE)
+
+
 def _web_url(base: str, href: str) -> str | None:
     """`href` resolved against `base` if it is an http(s) URL; None for anything else or a hostile value."""
     try:
-        resolved = urljoin(base, href)
+        resolved = to_uri(urljoin(base, href))
         return resolved if urlsplit(resolved).scheme in _WEB_SCHEMES else None
     except ValueError:  # e.g. `http://[` raises "Invalid IPv6 URL"; one bad value must not fail the page
         return None
@@ -126,7 +135,7 @@ PageParser = Callable[[bytes, str | None, str], ParsedPage]
 
 
 def _host(url: str) -> str:
-    return (urlsplit(url).hostname or "").lower()
+    return host_key((urlsplit(url).hostname or "").lower())
 
 
 class ParserRegistry:
@@ -137,7 +146,7 @@ class ParserRegistry:
         self._by_host: dict[str, PageParser] = {}
 
     def register(self, host: str, parser: PageParser) -> None:
-        key = host.lower()
+        key = host_key(host.lower())
         if key in self._by_host:
             raise ValueError(f"a parser is already registered for {key}")
         self._by_host[key] = parser

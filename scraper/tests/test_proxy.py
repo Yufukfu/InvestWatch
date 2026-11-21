@@ -321,15 +321,34 @@ def test_client_errors_without_a_proxy_are_left_readable():
     assert "connection refused" in detail
 
 
-async def test_a_407_answer_from_the_proxy_cools_it_and_another_serves(stub, stub2):
-    stub.route("/ok", status=407, body=b"proxy auth required")
+async def test_a_407_answer_from_the_target_is_an_http_error_and_cools_no_proxy(stub, stub2):
+    stub.route("/ok", status=407, body=b"the target wants credentials")
     stub2.route("/ok", body=PAGE)
     rot = rotator([stub.url("/"), stub2.url("/")], rng=First())
 
-    result = await fetch("http://example.test/ok", IDENTITY, rot.start_run())
+    with pytest.raises(FetchFailure) as failure:
+        await fetch("http://example.test/ok", IDENTITY, rot.start_run())
 
-    assert result.proxy_id == proxy_identifier(stub2.url("/"))
-    assert rot.start_run().pick().url == stub2.url("/")
+    assert failure.value.reason is Reason.HTTP_ERROR
+    assert [r.connect for r in stub.requests] == [True, False]  # one attempt, through one proxy
+    assert stub2.requests == []
+    assert {c.url for c in picks(rot.start_run(), 20)} == {stub.url("/"), stub2.url("/")}  # nothing is cooling
+
+
+def test_a_proxy_choice_never_prints_its_url():
+    choice = choice_of("http://user:p%2Fa%20ss@proxy.example:8080")
+
+    assert "user" not in repr(choice) and "proxy.example" not in repr(choice)
+    assert choice.identifier in repr(choice)
+
+
+def test_a_url_quoted_in_a_client_error_loses_its_path_and_query():
+    message = 'failed to do request: Get "http://127.0.0.1:1/secret/path?token=abc": dial tcp 127.0.0.1:1: refused'
+
+    detail = _transport_failure(TLSClientException(message), None).detail
+
+    assert "secret" not in detail and "token" not in detail
+    assert "refused" in detail
 
 
 async def test_a_407_without_a_proxy_is_just_an_http_error(stub):
