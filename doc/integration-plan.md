@@ -1,0 +1,228 @@
+# InvestWatch – Module Integration Plan
+
+Contract version: **v1** (frozen at 14:30 on Saturday; changes only after team agreement and with a version bump).
+
+## Team and responsibilities
+
+| Person | Module | Owns |
+|---|---|---|
+| **A** | Scraper | collectors (web + social media), job queue, scheduler, writes to `documents` + objects in MinIO |
+| **B** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel; **repository structure** |
+| **C** | Analytics + integration | database schema, contracts, REST API + WebSocket gateway, modules M1–M3, firm registry, docker-compose |
+
+Decisions from the team sync:
+
+- ✅ **C builds the REST API** (a thin layer over the same database). B works against mock data matching the contract in section 5 from the start; A focuses only on data collection.
+- ✅ **Social media:** we start with **one platform** and add more only if time allows.
+- ✅ **LLM:** Gemma accessed through an HTTP API (see the note in section 7).
+- ✅ **Repository structure** is defined by B; the layout below is only the list of services that must exist.
+- ✅ **Spec-driven workflow with OpenSpec** + an AI work log (`doc/ai-workflow.md`).
+- ⏳ Contracts (sections 3–6) – to be confirmed by A and B.
+- ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with A later.
+- ⏳ Milestone hours and the sleep rotation – to be agreed.
+
+## 1. Architecture
+
+```
+                ┌──────────────┐  XADD iw:documents   ┌──────────────────┐
+ scheduler ────▶│  scraper (A) │ ───────────────────▶ │  analytics (C)   │
+ (cron/beat)    │ Playwright,  │                      │ preprocessing,   │
+                │ httpx, UA/   │──┐                ┌──│ M1/M2/M3, LLM    │
+                │ proxy rotation  │                │  └────────┬─────────┘
+                └──────────────┘  │ INSERT         │ INSERT    │ PUBLISH iw:events
+                                  ▼                ▼           ▼
+                      ┌────────────────────┐   ┌──────────┐  ┌────────────────┐
+                      │ PostgreSQL         │   │ MinIO    │  │ api (C)        │
+                      │ sources, documents,│   │ html,    │  │ FastAPI REST + │
+                      │ findings, registry │   │ screens  │  │ Socket.IO      │
+                      └─────────▲──────────┘   └──────────┘  └───────┬────────┘
+                                └──────────────── SELECT ────────────┤
+                                                                      ▼
+                                                            ┌────────────────┐
+                                                            │ dashboard (B)  │
+                                                            └────────────────┘
+                     LLM endpoint (Gemma, Ollama-compatible API) ◀── analytics
+```
+
+Services in `docker-compose.yml` (single `docker compose up` command):
+`postgres`, `redis`, `minio`, `scraper`, `scheduler`, `analytics`, `api`, `dashboard` (+ `ollama` if we run the model in the stack).
+
+Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `doc` (UKNF materials, plans, AI work log), plus `docker-compose.yml` and `.env.example` at the root.
+
+## 2. Integration points
+
+| # | From → to | Mechanism | Payload |
+|---|---|---|---|
+| 1 | scraper → database | `INSERT` into `documents` | document per the `ScrapedDocument` schema (section 3) |
+| 2 | scraper → MinIO | bucket `iw-raw` | `html/{document_id}.html`, `shot/{document_id}/{viewport}.png`, `media/{document_id}/{n}.{ext}` |
+| 3 | scraper → analytics | Redis Stream `iw:documents` | `{"document_id": "<uuid>", "schema": "v1"}` – published **after** the DB commit |
+| 4 | analytics → database | `INSERT` into `findings` | result per the `Finding` schema (section 4) |
+| 5 | analytics → API | Redis Pub/Sub `iw:events` | events (section 6) |
+| 6 | API → dashboard | REST + Socket.IO | sections 5 and 6 |
+| 7 | analytics → LLM | HTTP `LLM_BASE_URL` | generation and embeddings |
+
+A Redis Stream with an `analytics` consumer group gives us: independence from the scraper's language, retries (`XPENDING`/`XCLAIM`) and the option to run several analytics workers. The scraper does not need to know anything about analytics.
+
+## 3. Contract: `ScrapedDocument` (scraper → analytics)
+
+Table `documents`; simple columns + `payload JSONB` for the rest.
+
+```jsonc
+{
+  "id": "uuid",
+  "source_id": "uuid",                  // row in the sources table
+  "platform": "web|facebook|instagram|tiktok|youtube|x|forum|other",
+  "source_kind": "firm_own|third_party|unknown", // published by the firm itself (M2) or by someone else (M1/M3)
+  "url": "https://...",
+  "canonical_url": "https://...",
+  "fetched_at": "2026-11-21T14:05:00Z",
+  "published_at": "2026-11-20T09:00:00Z | null",
+  "http_status": 200,
+  "lang": "pl | null",                  // optional – analytics detects it anyway
+  "title": "string | null",
+  "text": "clean text of the whole material",
+  "content_hash": "sha256 of normalized text", // deduplication
+  "author": {                           // for social media / blogs
+    "name": "string | null",
+    "handle": "@nick | null",
+    "profile_url": "https://... | null",
+    "followers": 12345
+  },
+  "links": [ { "href": "https://...", "text": "string", "rel": "nofollow sponsored | null" } ],
+  "media": [ { "type": "image|video", "object_key": "media/...", "alt": "string | null" } ],
+  "html_object_key": "html/{id}.html | null",
+  "screenshots": { "desktop": "shot/{id}/desktop.png", "tablet": "...", "mobile": "..." },
+
+  // Only for web pages rendered with Playwright – needed for the visual M2 rules (R4–R8, R13)
+  "blocks": [
+    {
+      "viewport": "desktop|tablet|mobile",
+      "text": "Invest with returns of up to 20% a year",
+      "tag": "h1|p|span|small|footer|...",
+      "font_size_px": 32,
+      "font_weight": 700,
+      "color": "#111111",
+      "background_color": "#ffffff",
+      "bbox": [x, y, w, h],
+      "visible": true,                  // display/visibility/opacity/size > 0
+      "in_viewport_on_load": true,      // visible without scrolling
+      "requires_interaction": false,    // hidden in <details>, accordion, tooltip, modal
+      "region": "main|header|footer|legal|aside|overlay",
+      "overflow_clipped": false         // text clipped (responsiveness)
+    }
+  ],
+  "scrape_meta": { "scraper": "playwright|httpx|api", "user_agent": "...", "proxy": "id | null", "duration_ms": 1830 }
+}
+```
+
+Minimum required for analytics to work: `id, platform, url, fetched_at, text, source_kind`.
+`blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
+
+Table `sources` (managed by the scraper, editable from the dashboard):
+`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at`.
+
+## 4. Contract: `Finding` (analytics → database → API)
+
+One document can produce 0–3 findings (one per module).
+
+```jsonc
+{
+  "id": "uuid",
+  "document_id": "uuid",
+  "module": "M1|M2|M3",
+  "score": 0.87,                        // raw score 0–1; the threshold is NOT stored – the API/dashboard applies it
+  "status": "new|in_review|confirmed|false_positive|closed",
+  "title": "XTB ad by finfluencer @inwestor_jan without an ad label",
+  "summary": "2–3 sentence rationale (in Polish – user-facing)",
+  "firm": {                             // investment firm the material concerns (M1, M2)
+    "name": "X-Trade Brokers DM S.A.",
+    "registry_id": "uuid | null",
+    "registry_type": "brokerage_house|brokerage_bank|foreign_branch|foreign_no_branch|null",
+    "authorized": true,
+    "match_confidence": 0.93
+  },
+  "advertiser": {                       // advertising / offering party (M1, M3)
+    "name": "Jan Kowalski",
+    "handle": "@inwestor_jan",
+    "profile_url": "https://...",
+    "in_registry": false
+  },
+  "rules": [                            // M2: the 18 UKNF rules; M1/M3: signals
+    {
+      "rule_id": "R3",
+      "name": "Risk information",
+      "result": "fail|pass|not_applicable|uncertain",
+      "severity": "high|medium|low",
+      "evidence": "exact quote from the document",
+      "evidence_locator": { "viewport": "desktop", "bbox": [0,0,0,0] },
+      "explanation": "A 20% return claim without a nearby risk warning.",
+      "legal_basis": "Art. 44(2)(b) Delegated Regulation (EU) 2017/565"
+    }
+  ],
+  "content_excerpt": "content snippet for the table",
+  "url": "https://...",                 // denormalized for the dashboard
+  "platform": "instagram",
+  "detected_at": "2026-11-21T14:06:10Z",
+  "updated_at": "2026-11-21T14:06:10Z",
+  "model": { "pipeline_version": "0.3.0", "llm": "gemma-3-4b", "embedder": "bge-m3" }
+}
+```
+
+The API derives `risk_level` from the threshold: `high` ≥ module threshold, `medium` ≥ threshold − 0.2, otherwise `low`.
+
+## 5. REST API (API → dashboard)
+
+Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/findings` | list; filters: `module, status, platform, source_id, risk_level, score_min, date_from, date_to, q` |
+| GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
+| PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
+| GET | `/stats/trend` | `?module&bucket=hour|day&date_from&date_to` → `[{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }]` |
+| GET | `/stats/summary` | counts per module / status / platform |
+| GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
+| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level` |
+| GET / POST / PATCH | `/sources` | list and edit sources |
+| POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`) |
+| GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
+| GET | `/health` | service status (for the demo) |
+
+Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed` / `false_positive`) and from the **gold set** (UKNF samples + our own labels, table `gold_labels`). This way the threshold slider shows precision and recall changing live.
+
+## 6. Real-time events
+
+Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`):
+
+| Event | Payload | When |
+|---|---|---|
+| `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
+| `finding.high_risk` | same | `score` ≥ current module threshold → toast/alert |
+| `finding.updated` | `{ id, status }` | status change (sync between tabs) |
+| `scan.started` / `scan.finished` | `{ source_id, documents }` | scan progress bar |
+
+## 7. Shared conventions
+
+- Time is always UTC ISO-8601; UUID v4 identifiers are generated by the record's producer.
+- Configuration only through environment variables (`.env`; only `.env.example` in the repo): `DATABASE_URL, REDIS_URL, MINIO_*, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, EMBED_MODEL, PROXY_LIST, USER_AGENTS_FILE`.
+- **LLM note:** the task requires an on-premise, open-source stack with no external paid APIs. Gemma is an open model, so we call it through an **Ollama-compatible HTTP API** whose base URL is configurable: locally (`ollama` service) for the final demo, or a team member's machine/GPU server during development. Avoid making a hosted cloud API the only option – the jury checks compliance with the specified technologies.
+- Database migrations in one place (Alembic in `api`) – A and C never create tables by hand.
+- Every service: `/health`, JSON logs to stdout, zero `console.log` in the production frontend build.
+- Dependencies: `npm audit` / `pip-audit` before every merge to `main`; results in `doc/security-audit.md`.
+- Branches: `scraper/*`, `dashboard/*`, `analytics/*`; merge to `main` only with a working `docker compose up`.
+- **Technical documentation, code, comments and commit messages are in English.** User-facing dashboard texts and finding summaries are in Polish.
+
+## 8. Integration milestones
+
+Submission deadline: **Sunday 22.11, 11:00**. Buffer: we submit at 10:30. Hours below are a proposal (⏳ to be agreed).
+
+| When | Milestone | Evidence |
+|---|---|---|
+| Sat 14:30 | **Contracts v1 frozen** | `contracts/*.schema.json`, mocks `findings.json`, `documents.json`; docker-compose with postgres/redis/minio starts |
+| Sat 17:00 | **Integration #1 – "thin thread"** | A pushes 1 real document → C creates a finding (even rule-based only) → B sees it in the table and gets a WS alert |
+| Sat 22:00 | **Integration #2 – all modules** | ≥ 1 source each for M1, M2, M3; filters, trend and status change work on real data |
+| Sun 03:00 | **Integration #3 – calibration** | the threshold slider changes FP/FN on the gold set; the scheduler scans periodically |
+| Sun 08:00 | **Feature freeze** | fixes only; dependency audit, README, clean console |
+| Sun 10:30 | **Submission** | repo, PDF, README, video (optional) |
+
+At every milestone: a 10-minute sync of all three – what works end-to-end, what blocks, whether we change the contract.
