@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Firm registry matching
-Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, which defaults to the real KNF register `registry/knf.csv`; the fictional `registry/seed.csv` is the test fixture. It SHALL match a document to at most one firm by name or alias in the text, by the page domain, or by a fuzzy name match. The match SHALL have a confidence in 0-1. When the page host is a registered firm's domain, that firm SHALL be matched even if the text names another firm. Among equally confident name matches, the firm whose name or alias appears first in the text SHALL win, then the one with the longest quote. The core name SHALL drop the Polish and EU legal forms found on the KNF lists (for example `S.A.`, `Sp. z o.o.`, `Dom Maklerski`, `GmbH`, `AG`, `B.V.`, `a.s.`, `Ltd`, `Limited`, `SAS`, `AS`). The fuzzy match SHALL tokenize the firm name the same way as the text, so punctuation inside a name (`Alfa-Beta`) does not lower the ratio. A name with no word tokens SHALL never fuzzy-match. A short word (a core or alias of one word token and fewer than 8 letters) SHALL match only when its first letter in the text is upper case, or lower case where the registry writes it so or where the text word has an inner capital (`eToro` for KNF's `Etoro`), and SHALL never fuzzy-match; an acronym of at most 3 letters written in capitals (`XTB`, `EVO`) SHALL match only in capitals. `find_name` for an already chosen firm SHALL search all of that firm's forms, including one another firm owns. A core shared by several firms SHALL be used as a bare pattern only by the single firm of the highest type precedence (`brokerage_house`, `brokerage_bank`, `foreign_branch`, `foreign_no_branch`). Matching a 20,000-character text against a registry of 1,000 firms SHALL take under 1 second. When the registry file cannot be read, the error SHALL tell the operator to set `REGISTRY_CSV`.
+Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, by default the real KNF register `registry/knf.csv`. It SHALL match a document to at most one firm by name or alias in the text, by the page domain, or by a fuzzy name match. The match SHALL have a confidence in 0-1. When the page host is a registered firm's domain, that firm SHALL be matched even if the text names another firm. When the registry file cannot be read, the error SHALL tell the operator to set `REGISTRY_CSV`.
 
 #### Scenario: Name without legal form
 - **WHEN** the text mentions `Alfa Inwestycje` and the registry holds `Alfa Inwestycje Dom Maklerski S.A.`
@@ -18,6 +18,7 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, which defa
 #### Scenario: Earliest name wins a tie
 - **WHEN** a page on no registered domain names two registry firms
 - **THEN** the firm named first in the text is matched, even if its full legal name appears only later
+- **AND** among equally confident name matches, the firm whose name or alias appears first in the text SHALL win, then the one with the longest quote
 
 #### Scenario: No match
 - **WHEN** no name, alias, domain or fuzzy candidate reaches the threshold
@@ -30,6 +31,11 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, which defa
 #### Scenario: Hyphenated firm name
 - **WHEN** the registry holds `Alfa-Beta Inwestycje S.A.` and the text says `Alfa-Beta Inwestycji`
 - **THEN** that firm is matched by fuzzy match
+- **AND** the fuzzy match SHALL tokenize the firm name the same way as the text, so punctuation inside a name (`Alfa-Beta`) does not lower the ratio
+
+#### Scenario: Firm name without word tokens
+- **WHEN** a registry firm's name has no word tokens
+- **THEN** that name SHALL never fuzzy-match
 
 #### Scenario: Registry path not set
 - **WHEN** `REGISTRY_CSV` points to a missing file
@@ -38,18 +44,21 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, which defa
 #### Scenario: Foreign legal form stripped
 - **WHEN** the registry holds `Admiral Markets AS` and the text mentions `Admiral Markets`
 - **THEN** that firm is matched by name with confidence at least 0.9
+- **AND** the core name SHALL drop the Polish and EU legal forms found on the KNF lists (`S.A.`, `Sp. z o.o.`, `Dom Maklerski`, `GmbH`, `AG`, `B.V.`, `a.s.`, `Ltd`, `Limited`, `SAS`, `AS`, `UAB`), short ones only at the end of the name
 
 #### Scenario: Short word in lower case never matches
 - **WHEN** the registry holds `EXT Ltd` and `Nova AG`, and the text says `next step` and `bossa nova`
 - **THEN** neither firm is matched
+- **AND** a short word (a core or alias of one word under 8 letters) SHALL never fuzzy-match
+
+#### Scenario: Short core matched by its full name
+- **WHEN** the registry holds `Nova AG` and the text says `Nova AG`
+- **THEN** that firm is matched by name
 
 #### Scenario: Short brand matched as a capitalized word
 - **WHEN** the registry holds `XTB S.A.` and the text says `Otwórz konto w XTB`
 - **THEN** that firm is matched by name with evidence `XTB`
-
-#### Scenario: Brand casing with an inner capital
-- **WHEN** the registry holds `Etoro (Europe) Ltd` with alias `Etoro` and the text says `Platforma eToro`
-- **THEN** that firm is matched with evidence `eToro`, while `platforma etoro` matches nothing
+- **AND** a short word SHALL match only capitalized, lower-first where the registry writes it so (`mBank`), or in brand casing with an inner capital (`eToro` for `Etoro`)
 
 #### Scenario: Acronym only in capitals
 - **WHEN** the registry holds `EVO Ltd` with alias `EVO` and the text says `Nowa wersja Evo`
@@ -58,10 +67,7 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`, which defa
 #### Scenario: Shared core goes to the Polish firm
 - **WHEN** the registry holds the brokerage house `XTB S.A.` and the foreign firm without a branch `XTB Ltd`, and the text says `XTB`
 - **THEN** `XTB S.A.` is matched
-
-#### Scenario: Short core matched by its full name
-- **WHEN** the registry holds `Nova AG` and the text says `Nova AG`
-- **THEN** that firm is matched by name
+- **AND** a form shared by firms of the same highest type SHALL match neither of them, while `find_name` for an already chosen firm searches all its forms
 
 #### Scenario: Multi-word core still fuzzy-matches
 - **WHEN** the registry holds `Wise Assets Europe AS` and the text says `Wise Asets Europe`
