@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Snapshots the shared contract (../contracts) into web/ so the web app builds and deploys on its own.
 //  - bundles contracts/openapi.yaml (+ external schema refs) into src/api/openapi.json
-//  - copies the REST mocks into src/mocks/fixtures/
+//  - copies the REST mocks (Vitest fixtures) into src/test/fixtures/
 // `--check` fails when the committed snapshot is out of date: a changed or extra file, or a
 // src/api/generated.ts that no longer matches what the codegen produces from the snapshot.
 import fs from 'node:fs';
@@ -25,7 +25,7 @@ const bundled = await SwaggerParser.bundle(path.join(contractsDir, 'openapi.yaml
 const openapiFile = path.join(webDir, 'src/api/openapi.json');
 outputs.set(openapiFile, `${JSON.stringify(bundled, null, 2)}\n`);
 
-const fixturesDir = path.join(webDir, 'src/mocks/fixtures');
+const fixturesDir = path.join(webDir, 'src/test/fixtures');
 for (const file of fs.readdirSync(path.join(contractsDir, 'mocks')).filter((f) => f.endsWith('.json'))) {
   outputs.set(path.join(fixturesDir, file), fs.readFileSync(path.join(contractsDir, 'mocks', file), 'utf8'));
 }

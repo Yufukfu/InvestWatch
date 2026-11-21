@@ -47,3 +47,26 @@ def contracts_dir() -> Path:
 
 def log_level() -> str:
     return os.environ.get("LOG_LEVEL", "").strip().upper() or "INFO"
+
+
+def redis_url() -> str:
+    raw = _required("REDIS_URL")
+    if not raw.startswith(("redis://", "rediss://")):
+        raise ConfigError("REDIS_URL must be a redis:// URL")
+    return raw
+
+
+def cors_origins() -> tuple[str, ...]:
+    """Origins allowed besides the same origin (the gateway case); empty by default."""
+    raw = os.environ.get("CORS_ORIGINS", "")
+    return tuple(o.strip() for o in raw.split(",") if o.strip())
+
+
+def minio_settings() -> dict:
+    return {
+        "endpoint": _required("MINIO_ENDPOINT"),
+        "access_key": _required("MINIO_ACCESS_KEY"),
+        "secret_key": _required("MINIO_SECRET_KEY"),
+        "bucket": os.environ.get("MINIO_BUCKET", "").strip() or "iw-raw",
+        "secure": os.environ.get("MINIO_SECURE", "").strip().lower() in ("1", "true", "yes"),
+    }
