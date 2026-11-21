@@ -3,7 +3,7 @@
 Both are "do not fetch this domain until T" facts held in Redis as an absolute time. `check` reports the later
 of the two as a `Deferral`, which a run returns instead of fetching (not a failure: the queue requeues it).
 Times are compared with the injected clock (UTC), so tests need no real waiting. The Redis TTLs only clean up.
-Redis errors and a Redis that does not answer within `REDIS_TIMEOUT_SECONDS` propagate: the queue needs Redis as
+Redis errors (`RedisError`) and a Redis that does not answer within `REDIS_TIMEOUT_SECONDS` (`TimeoutError`) propagate: the queue needs Redis as
 well, so a gate that quietly let requests through would only hide an outage (the rate limiter, which can degrade
 safely, has its own local fallback).
 """

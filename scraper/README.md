@@ -18,7 +18,7 @@ docker run --rm --network iw-scraper-test -e REDIS_URL=redis://iw-scraper-test-r
 
 ## Configuration
 
-Environment only; defaults in `scraper/.env.example`. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
+Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; the run that joins the pieces (`scraper-orchestration`) passes the values on, so until it exists the library takes them as parameters. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
 
 | Variable | Default | Meaning |
 |---|---|---|

@@ -42,7 +42,7 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 ## 6. Closing
 
 - [x] 6.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md` stack lines, your row in `.docs/STATUS.md` (split into three changes), ADRs), run docs-check, and add the `iw-ai-log` row
-- [ ] 6.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
+- [x] 6.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
 

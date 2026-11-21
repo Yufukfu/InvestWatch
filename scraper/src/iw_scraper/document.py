@@ -2,7 +2,8 @@
 
 `id` (UUID v4) and `content_hash` are added when the document is stored (`scraper-ingest`), which also validates the
 record against `contracts/schemas/scraped-document.schema.json` before the insert. `source_kind`, `platform` and
-`source_id` are copied from the source row and never inferred from the page. `scrape_meta.scraper` is `httpx`, the
+`source_id` are copied from the source row and never inferred from the page. `text` is never empty here: `parse_page` raises `empty_text` first, so a caller that goes through the parser cannot
+produce an empty document. `scrape_meta.scraper` is `httpx`, the
 nearest value of the v1 enum for an HTTP client (ADR 0101); `client` says which one it really is.
 """
 
