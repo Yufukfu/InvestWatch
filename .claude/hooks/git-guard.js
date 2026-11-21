@@ -12,13 +12,35 @@
  *
  *  - `git add` chained in front of `git commit` in one command (the staged diff is not visible yet).
  *
+ * A push is allowed only to `origin` and only for the current branch (ADR 0207). Push options are an
+ * allow-list (`-u`, `-v`, `-q`, `-n`, `--set-upstream`, `--no-verify`, `--atomic`, `--dry-run`, `--progress`,
+ * `-o <value>`): force (also in a cluster such as `-uf`), `--delete`, `:ref`, `--prune`, `--tags`, abbreviated
+ * long options (`--del`, `--rece`), another remote or URL, `--repo`/`--receive-pack`/`--exec`, glob and unreadable
+ * (quoted or expanded) refspecs, a destination other than the current branch, a push from a detached HEAD, with
+ * `-C`/`--git-dir`/`--work-tree`, or chained after `checkout`/`switch`, are all denied.
+ * None of the following takes an escape (IW_ALLOW_GIT=1 does nothing for them, even as a trailing comment):
+ *  - every push check above,
+ *  - rewiring a remote (`git remote add|set-url|rename|remove`, `git config remote.*|url.*|branch.*.remote|
+ *    core.sshCommand`, `git -c` / `--config-env` with the same keys), and any quoted or expanded git subcommand
+ *    or `-c` value (a remote could hide in it),
+ *  - `gh api` that writes (any method but GET, `-f`/`-F`/`--input` without `-X GET`, GraphQL) or merges or
+ *    approves, `gh pr review` with an approve flag in any spelling, and `gh pr create` for another repository
+ *    (`--repo`, `-R`, `--head owner:branch`, `GH_REPO=`).
+ * Commands are split on `; | && || ( ) \`` and newlines, `git` and `gh` are found by path, and a line
+ * continuation joins the command, so `(git push ...)` and `/usr/bin/git push ...` are seen.
+ *
  * Escapes: put IW_ALLOW_GIT=1 (destructive git), IW_SKIP_SPEC=1 (spec rule) or IW_CONTRACT_CHANGE=1
  * (contract freeze; only with the whole team's agreement and a version bump) in the command.
  * The escapes are plain text an agent can write itself: this guard catches mistakes, it is not a
  * security boundary. Their use should be reported to the human.
  * Limits: quoted strings and heredocs are stripped before matching; `git commit -a` is checked
- * against `git diff HEAD`; `git commit <paths>` stages those paths and is not seen. Pushes are
- * additionally gated by `permissions.ask` in .claude/settings.json.
+ * against `git diff HEAD`; `git commit <paths>` stages those paths and is not seen. The hook reads the
+ * command text only: `bash -c '...'`, `python -c`, a script file, environment variables such as
+ * GIT_SSH_COMMAND, or editing `.git/config` with a file tool all get past it. What actually limits a push
+ * is the narrowed rule `Bash(git push origin:*)` in .claude/settings.json (any other push matches no allow
+ * rule, so it falls to the default prompt; there is no `ask` rule for it on purpose, because an `ask` rule
+ * would override the allow rule) plus these checks; merges and `gh pr ready|review` stay gated by
+ * `permissions.ask`. settings-rules.test.js fails if an ask or deny rule ever covers an allow rule.
  */
 'use strict';
 
@@ -44,18 +66,153 @@ function stripQuoted(command) {
     .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
+// Command separators, subshell and substitution brackets, and backticks: each side is its own command.
+const SPLIT = /&&|\|\||[;|\n()`]/;
+// A token the guard cannot read after quotes were stripped: quoted, expanded or escaped.
+const UNREADABLE = /["'`$\\]/;
+const IS_GIT = /(?:^|\/)git$/;
+const IS_GH = /(?:^|\/)gh$/;
+
 function parseGit(segment) {
   const tokens = segment.split(/\s+/);
-  const at = tokens.indexOf('git');
+  const at = tokens.findIndex((t) => IS_GIT.test(t));
   if (at === -1) return null;
   let i = at + 1;
+  const config = [];
+  const global = [];
+  let unreadable = false;
   while (i < tokens.length && tokens[i].startsWith('-')) {
-    i += ['-c', '-C', '--git-dir', '--work-tree'].includes(tokens[i]) ? 2 : 1;
+    const t = tokens[i];
+    global.push(t);
+    if ((t === '-c' || t === '--config-env') && i + 1 < tokens.length) {
+      config.push(tokens[i + 1]);
+      if (UNREADABLE.test(tokens[i + 1])) unreadable = true;
+    } else if (t.startsWith('--config-env=')) {
+      config.push(t.slice('--config-env='.length));
+    }
+    i += ['-c', '-C', '--git-dir', '--work-tree', '--config-env'].includes(t) ? 2 : 1;
   }
-  return i < tokens.length ? { sub: tokens[i], args: tokens.slice(i + 1) } : null;
+  if (i >= tokens.length) return null;
+  if (UNREADABLE.test(tokens[i])) unreadable = true;
+  return { sub: tokens[i], args: tokens.slice(i + 1), config, global, unreadable };
 }
 
-const isForce = (a) => a === '-f' || a === '--force' || a.startsWith('--force-with-lease') || a === '--force-if-includes';
+// Settings that change where a push goes or how it connects. Never escapable (see redirectReason).
+const REDIRECT_KEY = /^(?:remote\.|url\.|core\.sshcommand|core\.gitproxy|branch\.[^\s=]*\.(?:push)?remote)/i;
+const REMOTE_WRITE = new Set(['add', 'set-url', 'rename', 'remove', 'rm', 'set-branches']);
+const CONFIG_READ = new Set(['--get', '--get-all', '--get-regexp', '--get-urlmatch', '--list', '-l']);
+// `gh api` payloads that merge or approve a pull request, in REST or GraphQL spelling.
+const GH_MERGE_OR_APPROVE = /\/merge\b|mergePullRequest|enablePullRequestAutoMerge|approvePullRequest|event(?:=|\s*:\s*|\s+)["']?APPROVE/i;
+
+/**
+ * Checks that decide whether work can leave the repository or reach `main` without a human.
+ * IW_ALLOW_GIT=1 does NOT lift them: an escape is plain text an agent can write itself, and a
+ * prompt-injected agent would write it. Ask the human to run the command instead.
+ */
+function redirectReason({ sub, args, config, global, unreadable }) {
+  if (config.some((c) => REDIRECT_KEY.test(c))) return 'inline git config that redirects a remote';
+  if (unreadable) return 'git subcommand or -c value the guard cannot read (quoted or expanded); a remote could be hidden in it';
+  const flags = args.filter((a) => a.startsWith('-'));
+  const positional = args.filter((a) => !a.startsWith('-'));
+  if (sub === 'remote' && REMOTE_WRITE.has(positional[0])) {
+    return `git remote ${positional[0]} (changes where pushes go)`;
+  }
+  if (sub === 'config' && !flags.some((f) => CONFIG_READ.has(f)) && positional[0] !== undefined
+    && (REDIRECT_KEY.test(positional[0]) || UNREADABLE.test(positional[0]))) {
+    return 'git config of a remote, a URL rewrite or an ssh command (changes where pushes go)';
+  }
+  if (sub === 'push') {
+    if (global.some((g) => ['-C', '--git-dir', '--work-tree'].includes(g) || /^--(?:git-dir|work-tree)=/.test(g))) {
+      return 'git push with -C, --git-dir or --work-tree (the current branch would be read from the wrong directory)';
+    }
+    const { flags: pushFlags, positional: pushPositional } = splitPushArgs(args);
+    if (pushFlags.some((f) => /^--(?:repo|receive-pack|exec)(?:=|$)/.test(f))) return 'push option that redirects the target';
+    if (pushPositional[0] !== undefined && pushPositional[0] !== 'origin') return 'push to a remote other than origin';
+  }
+  return null;
+}
+
+// `gh api` payloads that merge or approve a pull request, in REST or GraphQL spelling.
+function ghApiReason(rest, command) {
+  if (GH_MERGE_OR_APPROVE.test(command)) return 'gh api call that merges or approves a pull request (a human does that)';
+  const after = rest.slice(rest.indexOf('api') + 1);
+  let method = null;
+  let body = false;
+  for (let k = 0; k < after.length; k++) {
+    const a = after[k];
+    if (a === '-X' || a === '--method') method = after[++k] || '';
+    else if (/^-X./.test(a)) method = a.slice(2);
+    else if (a.startsWith('--method=')) method = a.slice('--method='.length);
+    else if (/^(?:-[fF].*|--(?:field|raw-field|input)(?:=.*)?)$/.test(a)) body = true;
+  }
+  const effective = String(method || (body ? 'POST' : 'GET')).toUpperCase();
+  if (effective !== 'GET' || after.includes('graphql')) {
+    return 'gh api call that writes or runs GraphQL (it can reach main without a PR); use gh pr or gh issue, or ask the human';
+  }
+  return null;
+}
+
+function ghReason(command, deps) {
+  for (const segment of stripQuoted(command).split(SPLIT)) {
+    const t = segment.trim().split(/\s+/);
+    const at = t.findIndex((x) => IS_GH.test(x));
+    if (at === -1) continue;
+    const env = t.slice(0, at);
+    const rest = t.slice(at + 1);
+    const first = rest.find((x) => x === 'api' || x === 'pr');
+    if (first === 'api') {
+      const why = ghApiReason(rest, command);
+      if (why) return why;
+    }
+    if (first !== 'pr') continue;
+    const sub2 = rest[rest.indexOf('pr') + 1];
+    if (sub2 === 'review' && rest.some((a) => /^--approve(?:=.*)?$/.test(a) || /^-[a-zA-Z]*a[a-zA-Z]*$/.test(a))) {
+      return 'approving a pull request (a human does that)';
+    }
+    if (sub2 === 'create') {
+      if (env.some((e) => e.startsWith('GH_REPO='))) return 'gh pr create with GH_REPO set (it can target another repository)';
+      const ours = deps.originRepo();
+      for (let k = 0; k < rest.length; k++) {
+        const a = rest[k];
+        let repo = null;
+        let head = null;
+        if (a === '--repo' || a === '-R') repo = rest[k + 1];
+        else if (a.startsWith('--repo=')) repo = a.slice('--repo='.length);
+        else if (/^-R./.test(a)) repo = a.slice(2);
+        else if (a === '--head' || a === '-H') head = rest[k + 1];
+        else if (a.startsWith('--head=')) head = a.slice('--head='.length);
+        else if (/^-H./.test(a)) head = a.slice(2);
+        if (repo !== null && (!ours || String(repo).toLowerCase() !== ours.toLowerCase())) {
+          return 'gh pr create for a repository other than this repository';
+        }
+        if (head !== null && String(head).includes(':')) {
+          return 'gh pr create from a branch of a repository other than this repository';
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// A short-flag cluster with f (`-f`, `-uf`, `-fu`) or any --force* option.
+const isForce = (a) => (/^-[a-zA-Z]*f/.test(a) && !a.startsWith('--')) || a.startsWith('--force');
+
+// Push flags the guard accepts. Everything else is denied, so an abbreviation of a dangerous long
+// option (`--del`, `--rece`, `--mir`) cannot slip past an exact-match list. `-o <value>` takes a value.
+const PUSH_FLAGS = new Set(['-u', '--set-upstream', '--no-verify', '-v', '--verbose', '-q', '--quiet', '--atomic', '--dry-run', '-n', '--progress']);
+const knownPushFlag = (f) => PUSH_FLAGS.has(f) || /^--push-option=/.test(f) || /^-[uvqn]+$/.test(f);
+
+function splitPushArgs(args) {
+  const flags = [];
+  const positional = [];
+  for (let k = 0; k < args.length; k++) {
+    const a = args[k];
+    if (a === '-o' || a === '--push-option') k++;
+    else if (a.startsWith('-')) flags.push(a);
+    else positional.push(a);
+  }
+  return { flags, positional };
+}
 
 // The branch a refspec writes to: `HEAD` means the current branch, `refs/heads/` is stripped,
 // `src:dst` uses dst.
@@ -65,19 +222,32 @@ function pushTarget(refspec, branch) {
   return dst === 'HEAD' ? branch : dst.replace(/^refs\/heads\//, '');
 }
 
+// A push may update the current branch and nothing else: the remote is checked in redirectReason,
+// the destination here. Quoted or expanded refspecs are denied because the guard cannot read them.
 function checkPush(args, branch) {
-  const flags = args.filter((a) => a.startsWith('-'));
-  const positional = args.filter((a) => !a.startsWith('-'));
+  const { flags, positional } = splitPushArgs(args);
   if (flags.some(isForce) || positional.some((a) => a.startsWith('+'))) return 'force push';
   if (flags.includes('--all') || flags.includes('--mirror')) return 'push of every branch (includes main)';
+  if (flags.includes('--delete') || flags.includes('-d')) return 'deleting a remote branch';
+  if (flags.includes('--prune')) return 'push --prune (deletes remote branches)';
+  const unknown = flags.find((f) => !knownPushFlag(f));
+  if (unknown) return `push option the guard does not recognise (${unknown}); abbreviations, --tags and unknown options are denied`;
   const refspecs = positional.slice(1);
-  if (refspecs.some((r) => PROTECTED.includes(pushTarget(r, branch)))) return 'push to main';
+  for (const raw of refspecs) {
+    const spec = raw.replace(/^\+/, '');
+    if (spec.startsWith(':')) return 'deleting a remote ref';
+    if (spec.includes('*')) return 'glob refspec (cannot tell which branches it updates)';
+    if (!branch || branch === 'HEAD') return 'push from a detached HEAD (check out your branch first)';
+    const dst = pushTarget(raw, branch);
+    if (PROTECTED.includes(dst)) return 'push to main';
+    if (!/^[\w./-]+$/.test(dst)) return 'refspec the guard cannot read (quoted or expanded); write the branch name plainly';
+    if (dst !== branch) return `push to a branch other than the current branch (${dst})`;
+  }
   if (refspecs.length === 0 && PROTECTED.includes(branch)) return `push while on ${branch}`;
   return null;
 }
 
 function destructiveReason({ sub, args }, branch, headIsPushed) {
-  if (sub === 'push') return checkPush(args, branch);
   if (sub === 'reset' && args.includes('--hard')) return 'git reset --hard';
   if (sub === 'clean' && args.some((a) => a === '--force' || /^-[a-zA-Z]*f/.test(a))) return 'git clean -f';
   if (sub === 'branch' && args.includes('-D') && args.some((a) => PROTECTED.includes(a))) return 'deleting main';
@@ -116,11 +286,26 @@ function commitReason(staged, activeChanges, skipSpec, contractsFrozen = false) 
 
 function evaluate(command, deps) {
   if (typeof command !== 'string' || !command) return null;
+  const NO_ESCAPE = 'No escape for this: ask the human to run it themselves.';
+  command = command.replace(/\\\r?\n/g, ' '); // a line continuation joins the command
+  const viaGh = ghReason(command, deps);
+  if (viaGh) return `Blocked: ${viaGh}. ${NO_ESCAPE}`;
   const gits = stripQuoted(command)
-    .split(/&&|\|\||[;|\n]/)
+    .split(SPLIT)
     .map((s) => parseGit(s.trim()))
     .filter(Boolean);
   if (gits.length === 0) return null;
+
+  // Where work can go and what a push may touch: no escape, whatever the command text says.
+  for (const [at, git] of gits.entries()) {
+    let why = redirectReason(git);
+    if (!why && git.sub === 'push') {
+      why = gits.slice(0, at).some((g) => g.sub === 'checkout' || g.sub === 'switch')
+        ? 'git push chained after checkout or switch (the current branch is read before the chain runs)'
+        : checkPush(git.args, deps.branch());
+    }
+    if (why) return `Blocked: ${why}. ${NO_ESCAPE}`;
+  }
 
   if (!/IW_ALLOW_GIT=1/.test(command)) {
     for (const git of gits) {
@@ -146,8 +331,16 @@ function git(cwd, args) {
 function defaultDeps(cwd) {
   return {
     now: () => new Date(),
-    branch: () => { try { return git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(); } catch { return null; } },
+    // symbolic-ref also works on a branch without commits, and fails (null) on a detached HEAD.
+    branch: () => { try { return git(cwd, ['symbolic-ref', '--short', '-q', 'HEAD']).trim() || null; } catch { return null; } },
     headIsPushed: () => { try { return git(cwd, ['branch', '-r', '--contains', 'HEAD']).trim() !== ''; } catch { return false; } },
+    // "owner/name" of origin, so `gh pr create --repo` can be limited to this repository.
+    originRepo: () => {
+      try {
+        const m = git(cwd, ['remote', 'get-url', 'origin']).trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?$/i);
+        return m ? m[1] : null;
+      } catch { return null; }
+    },
     staged: (all) => {
       try {
         const base = all ? 'HEAD' : '--cached';
