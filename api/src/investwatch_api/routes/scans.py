@@ -15,6 +15,7 @@ from ..models import ScanRequest
 
 router = APIRouter()
 STREAM = "iw:scan-requests"
+STREAM_MAXLEN = 10_000  # approximate cap: the API is unauthenticated behind the gateway
 
 
 @router.post("/scans", status_code=202)
@@ -27,7 +28,7 @@ async def request_scan(body: ScanRequest, request: Request):
     fields = {"source_id": str(body.source_id),
               "requested_at": format_time(datetime.now(timezone.utc).replace(microsecond=0))}
     try:
-        await svc.redis.xadd(STREAM, fields)
+        await svc.redis.xadd(STREAM, fields, maxlen=STREAM_MAXLEN, approximate=True)
     except (RedisError, OSError):
         raise ServiceUnavailable("redis") from None
     return {"queued": True, "source_id": str(body.source_id)}

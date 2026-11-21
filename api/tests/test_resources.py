@@ -177,7 +177,8 @@ def test_create_with_missing_field(client, migrated_db, missing):
 
 
 @pytest.mark.parametrize("over", [{"target_modules": ["M1", "M1"]}, {"url": "not a url"}, {"platform": "myspace"},
-                                  {"extra": 1}])
+                                  {"extra": 1}, {"url": "https://user:pw@alfa.example/"}, {"name": "x" * 201},
+                                  {"schedule_cron": "*" * 101}, {"url": "ftp://alfa.example/"}])
 def test_create_with_invalid_value(client, over):
     assert client.post("/api/sources", json={**NEW_SOURCE, **over}).status_code == 422
 

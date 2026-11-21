@@ -106,10 +106,22 @@ def publisher(redis_clean):
     client.close()
 
 
+def _wait_until_relaying(lst: Listener, publisher, timeout: float = 10.0) -> None:
+    """Publish a probe until it arrives, so the relay is subscribed; then forget the probe."""
+    probe = _brief(title="probe")
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and not lst.received:
+        publisher.publish("iw:events", _event("finding.created", probe))
+        lst.wait_for(1, timeout=0.2)
+    assert lst.received, "relay never subscribed"
+    time.sleep(0.2)
+    lst.received.clear()
+
+
 @pytest.fixture
-def listener(server):
+def listener(server, publisher):
     lst = Listener(server)
-    time.sleep(0.3)  # let the relay subscribe
+    _wait_until_relaying(lst, publisher)
     yield lst
     lst.close()
 
@@ -137,9 +149,10 @@ def test_scan_progress_keeps_order(listener, publisher):
 @pytest.mark.parametrize("bad", [
     "hello",
     json.dumps({"type": "finding.deleted", "emitted_at": "2026-11-21T16:00:00Z", "data": {}}),
-    json.dumps({"type": "finding.updated", "emitted_at": "2026-11-21T16:00:00Z", "data": {"id": str(uuid.uuid4())}}),
-    json.dumps({"document_id": str(uuid.uuid4()), "schema": "v1"}),
-])
+    json.dumps({"type": "finding.updated", "emitted_at": "2026-11-21T16:00:00Z",
+                "data": {"id": "4bc9c345-ce23-4393-8d33-3476159ecb2f"}}),
+    json.dumps({"document_id": "e1bbcaef-98b9-4100-9db3-2532a6f205b4", "schema": "v1"}),
+], ids=["not-json", "unknown-type", "payload-mismatch", "stream-message"])
 def test_invalid_messages_are_dropped_and_relay_continues(listener, publisher, bad):
     publisher.publish("iw:events", bad)
     good = _brief()
@@ -153,7 +166,7 @@ def test_no_client_connected(server, publisher):
     publisher.publish("iw:events", _event("finding.created", _brief()))  # nobody listens: dropped
     lst = Listener(server)
     try:
-        time.sleep(0.3)
+        _wait_until_relaying(lst, publisher)
         later = _brief()
         publisher.publish("iw:events", _event("finding.created", later))
         assert lst.wait_for(1) == [("finding.created", later)]

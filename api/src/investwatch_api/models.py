@@ -41,6 +41,12 @@ class Thresholds(_Strict):
     M3: _Unit = Field(ge=0, le=1)
 
 
+def _no_userinfo(value):
+    if value is not None and (value.username or value.password):
+        raise ValueError("url must not contain credentials")
+    return value
+
+
 def _unique_modules(value):
     if value is not None and len(set(value)) != len(value):
         raise ValueError("target_modules must not repeat a module")  # contract: uniqueItems
@@ -48,27 +54,29 @@ def _unique_modules(value):
 
 
 class SourceCreate(_Strict):
-    name: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=200)
     platform: Platform
     url: HttpUrl
     source_kind: SourceKind
     target_modules: list[Module] = Field(min_length=1)
-    schedule_cron: str | None = None
+    schedule_cron: str | None = Field(default=None, max_length=100)
     active: bool = True
 
     _modules = field_validator("target_modules")(_unique_modules)
+    _url = field_validator("url")(_no_userinfo)
 
 
 class SourcePatch(_Strict):
-    name: str | None = Field(default=None, min_length=1)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
     platform: Platform | None = None
     url: HttpUrl | None = None
     source_kind: SourceKind | None = None
     target_modules: list[Module] | None = Field(default=None, min_length=1)
-    schedule_cron: str | None = None
+    schedule_cron: str | None = Field(default=None, max_length=100)
     active: bool | None = None
 
     _modules = field_validator("target_modules")(_unique_modules)
+    _url = field_validator("url")(_no_userinfo)
 
     @model_validator(mode="after")
     def _not_empty(self):

@@ -39,6 +39,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env (infra-compose)}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (infra-compose)}
       MINIO_BUCKET: ${MINIO_BUCKET:-iw-raw}
+      MINIO_SECURE: ${MINIO_SECURE:-false}  # plain HTTP on the internal network
       # Same origin through the gateway needs nothing here; a list REPLACES that default (README).
       CORS_ORIGINS: ${API_CORS_ORIGINS:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
