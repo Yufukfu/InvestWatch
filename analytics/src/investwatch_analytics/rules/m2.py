@@ -544,3 +544,62 @@ class R18SupervisionAsSafety(_SupervisorMention):
                 "Odwołanie do nadzoru sąsiaduje z zapewnieniem o bezpieczeństwie – do weryfikacji.",
             )
         return self.result("pass", sentences[idx[0]].text, "Nadzór nie jest użyty jako argument bezpieczeństwa.")
+
+
+# ---- tax information (R16, analytics-m2-p1-rules) ------------------------------------------------
+
+
+@register
+class R16TaxInformation(Rule):
+    """ZASÓB R16 (art. 44 ust. 7): tax treatment "zależy od indywidualnej sytuacji klienta" and "może ulec zmianie".
+
+    The change part counts only where it is about tax: in the sentence of the individual part, or in a sentence
+    with a tax word or `przepis…` ("Oferta może ulec zmianie" does not). Disclaimer sentences are not a tax
+    reference, so a lone disclaimer is not_applicable (design §7).
+    """
+
+    rule_id = "R16"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "tax": compile_patterns(p.get("tax_patterns", [])),
+            "tax_x": compile_patterns(p.get("tax_exclude_patterns", [])),
+            "individual": compile_patterns(p.get("tax_individual_patterns", [])),
+            "change": compile_patterns(p.get("tax_change_patterns", [])),
+            "context": compile_patterns(p.get("tax_context_patterns", [])),
+        }
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        texts = [s.text for s in ctx.pre.sentences]
+        individual = [i for i, t in enumerate(texts) if any(x.search(t) for x in p["individual"])]
+        change = [
+            i for i, t in enumerate(texts)
+            if any(c.search(t) for c in p["change"]) and (i in individual or any(c.search(t) for c in p["context"]))
+        ]
+        disclaimer = set(individual) | set(change)
+        refs = [
+            i for i, t in enumerate(texts)
+            if i not in disclaimer and R3RiskNextToReturns._hits(t, p["tax"], p["tax_x"])
+        ]
+        if not refs:
+            return self.result("not_applicable", None, "Materiał nie odwołuje się do traktowania podatkowego.")
+        if individual and change:
+            return self.result(
+                "pass", texts[individual[0]],
+                "Informacja podatkowa z zastrzeżeniem, że traktowanie podatkowe zależy od indywidualnej sytuacji "
+                "klienta i może ulec zmianie.",
+            )
+        missing = []
+        if not individual:
+            missing.append("zależy od indywidualnej sytuacji klienta")
+        if not change:
+            missing.append("może ulec zmianie")
+        quote = texts[(individual or change or refs)[0]]
+        return self.result(
+            "fail", quote,
+            f"Informacja o traktowaniu podatkowym bez pełnego zastrzeżenia – brak informacji, że traktowanie "
+            f"podatkowe {' i '.join(missing)}.",
+        )

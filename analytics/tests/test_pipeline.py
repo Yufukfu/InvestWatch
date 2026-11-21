@@ -267,7 +267,9 @@ def test_finding_url_is_document_url_not_canonical(registry, catalogue):
 def test_compliant_material(registry, catalogue):
     text = (
         "Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. "
-        "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału."
+        "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału. "
+        # IKE is a tax reference: without the disclaimer of the m2-bank-ok mock, R16 fails (analytics-m2-p1-rules).
+        "Traktowanie podatkowe zależy od indywidualnej sytuacji klienta i może ulec zmianie."
     )
     [f] = run(make_doc(text=text), registry, catalogue)
     assert all(r.result != "fail" for r in f.rules)

@@ -16,7 +16,7 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
 
 ## 2. R16 tax information (~45 min)
 
-- [ ] 2.1 Write the failing tests for the R16 scenarios:
+- [x] 2.1 Write the failing tests for the R16 scenarios:
   - `m2-bank-ok` gives `pass`, with the disclaimer as evidence;
   - `bez podatku Belki w IKZE` gives `fail`;
   - only the individual part gives `fail`, naming the missing change part;
@@ -25,8 +25,8 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - a lone disclaimer sentence gives `not_applicable`;
   - `eurotrade` gives `not_applicable`;
   - empty text gives `not_applicable`.
-- [ ] 2.2 Write the R16 class. Add `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns` and `tax_context_patterns` (new `KNOWN_PARAMS`), set the legal basis to art. 44 ust. 7, and set `implemented: true`. Tests green.
-- [ ] 2.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 2.2 Write the R16 class. Add `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns` and `tax_context_patterns` (new `KNOWN_PARAMS`), set the legal basis to art. 44 ust. 7, and set `implemented: true`. Tests green.
+- [x] 2.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (VAT strip and its long form, the disclaimer excluded from the trigger, the change part's tax context both ways, each half of the pass condition, each missing part named, both evidence choices, `IKE` as a tax word, the legal basis). Two stage-2 tests change with R16: `test_catalogue_is_complete` lists R16, and `test_compliant_material` gets the tax disclaimer of the `m2-bank-ok` mock (IKE without it is R16's violation).
 
 ## 3. R15 forecasts (~1 h)
 

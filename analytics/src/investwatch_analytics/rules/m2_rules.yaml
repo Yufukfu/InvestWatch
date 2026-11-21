@@ -219,7 +219,45 @@ rules:
       footnote_markers: *footnote_markers
   # R15 (P1): ZASÓB "Flaguje w raporcie" – report a detected forecast even when it is compliant.
   - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
-  - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
+  # ZASÓB R16 (art. 44 ust. 7): a reference to tax treatment needs both disclaimer parts, "zależności od
+  # indywidualnej sytuacji klienta i możliwości zmian". VAT is not tax treatment of the investment, and the
+  # disclaimer sentence itself is not a tax reference (a lone disclaimer is not_applicable). Rules-only.
+  - id: R16
+    name: Informacja podatkowa
+    severity: medium
+    legal_basis: art. 44 ust. 7 rozp. del. 2017/565
+    implemented: true
+    params:
+      tax_patterns:
+        - '\bpodat\w*'
+        - '\bopodatkowan\w*'
+        - '\bIKZE\b'
+        - '\bIKE\b'
+        - '\bBelk\w*'
+        - '\bPIT\b'
+        - '\bodliczen\w*\s+(?:\w+\s+){0,2}od\s+(?:dochodu|podstawy)'
+        - '\btax\w*'
+      # Stripped before matching: VAT and its long form are not tax treatment of the investment.
+      tax_exclude_patterns:
+        - '\b(?:podat\w*\s+)?VAT\b'
+        - '\bpodat\w*\s+od\s+towarów\s+i\s+usług\b'
+      tax_individual_patterns:
+        - '\b(?:zależ|uzależnion)\w*\s+(?:\w+\s+){0,2}od\s+(?:\w+\s+)?(?:indywidualn|osobist)\w*\s+sytuacj\w*'
+        - '\b(?:indywidualn|osobist)\w*\s+sytuacj\w*\s+(?:\w+\s+){0,2}(?:klient|inwestor|podatnik)\w*'
+        - '\bindividual\s+circumstances\b'
+      # Counts only in the sentence of the individual part, or in a sentence with `tax_context_patterns`.
+      tax_change_patterns:
+        - '\b(?:może|mogą)\s+(?:\w+\s+){0,2}(?:ulec\s+zmian\w*|się\s+zmieni\w*|zmieni(?:ć|ać)\s+się)'
+        - '\bpodleg\w*\s+(?:\w+\s+)?zmian\w*'
+        - '\bsubject\s+to\s+change\b'
+        - '\bmay\s+change\b'
+      tax_context_patterns:
+        - '\bpodat\w*'
+        - '\bopodatkowan\w*'
+        - '\bprzepis\w*'
+        - '\bIKZE\b'
+        - '\bIKE\b'
+        - '\btax\w*'
   # ZASÓB R17: a supervisor mention "używane do sugerowania zatwierdzenia lub aprobaty produktu/usługi".
   # Stating supervision alone is not a violation: detect the mention, then classify its use. An approval word
   # in the same sentence is a rules fail; otherwise pass rules-only, and the LLM judges the wording (always).
