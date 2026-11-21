@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { formatScore } from '../../../format/score';
 import type { FindingDetail, RuleView, Severity } from '../model';
 import {
   formatUtc,
@@ -102,7 +103,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
         </div>
         <div>
           <dt>Wynik</dt>
-          <dd>{d.score.toFixed(2)}</dd>
+          <dd>{formatScore(d.score)}</dd>
         </div>
         <div>
           <dt>Moduł</dt>

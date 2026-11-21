@@ -1,3 +1,4 @@
+import { formatScore } from '../../../format/score';
 import type { FindingRow, FindingSort } from '../model';
 import { findingsCount, formatUtc, MODULE_LABEL, platformLabel, STATUS_LABEL } from './labels';
 import { RiskBadge } from './RiskBadge';
@@ -96,7 +97,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                     <span className="score-bar" aria-hidden="true">
                       <span style={{ width: `${Math.round(Math.min(1, Math.max(0, f.score)) * 100)}%` }} />
                     </span>
-                    <span>{f.score.toFixed(2)}</span>
+                    <span>{formatScore(f.score)}</span>
                   </span>
                 </td>
                 <td>
