@@ -38,7 +38,7 @@ function SortHeader({ label, field, sort, onSort }: { label: string; field: Sort
 // Scraped content is untrusted: every value is rendered as React text, never as HTML.
 export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect, onReset, onFirstPage, isLoading, isFetching, isError }: Props) {
   if (isError) return <p className="state" role="alert">Nie udało się pobrać zgłoszeń.</p>;
-  if (isLoading || (isFetching && !rows) || !rows) return <p className="state" role="status">Ładowanie…</p>;
+  if (isLoading || !rows) return <p className="state" role="status">Ładowanie…</p>;
   // Rows can be empty with total > 0 on a page past the end (old link, or the last row changed status).
   if (rows.length === 0 && (total ?? 0) > 0)
     return (

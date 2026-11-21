@@ -154,4 +154,41 @@ describe('FindingsTable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Wróć do pierwszej strony' }));
     expect(onFirstPage).toHaveBeenCalledTimes(1);
   });
+
+  it('shows platform, module and score in their cells', () => {
+    render(<FindingsTable {...props} rows={[row({ platform: 'tiktok', module: 'M3', score: 0.456 })]} />);
+    const cells = screen.getAllByRole('cell').map((c) => c.textContent);
+    expect(cells).toContain('TikTok');
+    expect(cells).toContain('M3');
+    expect(cells).toContain('0.46');
+  });
+
+  it('shows the raw status for a value outside the contract', () => {
+    render(<FindingsTable {...props} rows={[row({ status: 'archived' as FindingStatus })]} />);
+    expect(screen.getByRole('cell', { name: 'archived' })).toBeInTheDocument();
+  });
+
+  it('shows the error alert instead of stale rows when a refetch failed', () => {
+    render(<FindingsTable {...props} rows={[row()]} isError />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('keeps the table, not the loading text, while rows refresh', () => {
+    render(<FindingsTable {...props} rows={[row()]} isFetching />);
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.queryByText('Ładowanie…')).toBeNull();
+  });
+
+  it.each([
+    [11, '11 zgłoszeń'],
+    [14, '14 zgłoszeń'],
+    [21, '21 zgłoszeń'],
+    [24, '24 zgłoszenia'],
+    [112, '112 zgłoszeń'],
+    [102, '102 zgłoszenia'],
+  ])('uses the Polish plural for %i', (n, text) => {
+    render(<FindingsTable {...props} rows={[row()]} total={n} />);
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
 });

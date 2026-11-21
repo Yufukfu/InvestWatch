@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import detail from '../../test/fixtures/finding-detail.json';
@@ -118,5 +118,78 @@ describe('FindingsPage', () => {
     expect(alert).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.');
     expect(within(dialog).getByText('transition not allowed')).toBeInTheDocument();
     expect(within(dialog).getByText('Nowe', { selector: 'dd' })).toBeInTheDocument();
+  });
+
+  function paged(seen: URLSearchParams[], hold?: { wait: boolean; release?: () => void }) {
+    server.use(
+      http.get('http://localhost/api/findings', async ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        seen.push(p);
+        if (hold?.wait && seen.length > 1) await new Promise<void>((r) => (hold.release = r));
+        return HttpResponse.json({ ...findings, total: 60, page: Number(p.get('page') ?? 1), page_size: Number(p.get('page_size') ?? 25) });
+      }),
+    );
+  }
+
+  it('the pager, page size and sort headers send their parameters', async () => {
+    const seen: URLSearchParams[] = [];
+    paged(seen);
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText('Strona 1 z 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Następna strona' }));
+    await waitFor(() => expect(seen.at(-1)?.get('page')).toBe('2'));
+    fireEvent.change(screen.getByLabelText('Na stronie'), { target: { value: '50' } });
+    await waitFor(() => expect(seen.at(-1)?.get('page_size')).toBe('50'));
+    expect(seen.at(-1)?.get('page')).toBe('1');
+    fireEvent.click(screen.getByRole('button', { name: 'Wynik' }));
+    await waitFor(() => expect(seen.at(-1)?.get('sort')).toBe('-score'));
+    expect(window.location.search).toBe('?sort=-score&page_size=50');
+  });
+
+  it('platform, search and dates reach the request', async () => {
+    const seen: URLSearchParams[] = [];
+    paged(seen);
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText('Strona 1 z 3');
+    fireEvent.change(screen.getByLabelText('Platforma'), { target: { value: 'instagram' } });
+    await waitFor(() => expect(seen.at(-1)?.get('platform')).toBe('instagram'));
+    fireEvent.change(screen.getByLabelText('Od dnia'), { target: { value: '2026-11-20' } });
+    await waitFor(() => expect(seen.at(-1)?.get('date_from')).toBe('2026-11-20T00:00:00Z'));
+    fireEvent.change(screen.getByLabelText('Szukaj'), { target: { value: 'inwestor jan' } });
+    await waitFor(() => expect(seen.at(-1)?.get('q')).toBe('inwestor jan'), { timeout: 2000 });
+  });
+
+  it('the first-page action on an empty page past the end goes to page 1', async () => {
+    window.history.replaceState(null, '', '/?page=9');
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('http://localhost/api/findings', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        seen.push(p);
+        return HttpResponse.json({ items: p.get('page') === '9' ? [] : findings.items, total: 9, page: 1, page_size: 25 });
+      }),
+    );
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    fireEvent.click(await screen.findByRole('button', { name: 'Wróć do pierwszej strony' }));
+    await waitFor(() => expect(seen.at(-1)?.get('page')).toBe('1'));
+    expect(await screen.findByText(findings.items[0].title)).toBeInTheDocument();
+  });
+
+  it.each(['Następna strona', 'sort'])('keyboard focus stays on %s while the next result loads', async (target) => {
+    const seen: URLSearchParams[] = [];
+    const hold = { wait: true, release: undefined as undefined | (() => void) };
+    paged(seen, hold);
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText('Strona 1 z 3');
+    const control = target === 'sort' ? screen.getByRole('button', { name: 'Wynik' }) : screen.getByRole('button', { name: target });
+    control.focus();
+    fireEvent.click(control);
+    await waitFor(() => expect(seen).toHaveLength(2));
+    expect(control).toBeInTheDocument();
+    expect(control).toHaveFocus();
+    expect(screen.getByRole('table').parentElement).toHaveAttribute('aria-busy', 'true');
+    act(() => hold.release?.());
+    await waitFor(() => expect(screen.getByRole('table').parentElement).toHaveAttribute('aria-busy', 'false'));
+    expect(control).toHaveFocus();
   });
 });
