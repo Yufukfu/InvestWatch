@@ -9,6 +9,18 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stale-checkout-notice.js",
+            "timeout": 30,
+            "description": "Fetch origin/main and warn when this checkout is behind it (read-only, never merges or resets)"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
