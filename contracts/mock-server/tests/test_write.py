@@ -182,3 +182,18 @@ def test_integer_thresholds_are_numbers(client):
 
     assert r.status_code == 200
     assert r.json() == {"M1": 1.0, "M2": 0.0, "M3": 0.7}
+
+
+@pytest.mark.parametrize(("field", "limit"), [("name", 500), ("schedule_cron", 200)])
+def test_source_text_fields_have_a_length_limit(client, field, limit):
+    assert client.post("/api/sources", json={**NEW_SOURCE, field: "x" * limit}).status_code == 201
+    assert client.post("/api/sources", json={**NEW_SOURCE, field: "x" * (limit + 1)}).status_code == 422
+    source_id = client.get("/api/sources").json()["items"][0]["id"]
+    assert client.patch(f"/api/sources/{source_id}", json={field: "x" * (limit + 1)}).status_code == 422
+
+
+def test_note_has_a_length_limit(client):
+    f = a_finding(client)
+
+    assert client.patch(f"/api/findings/{f['id']}", json={"note": "x" * 10_000}).status_code == 200
+    assert client.patch(f"/api/findings/{f['id']}", json={"note": "x" * 10_001}).status_code == 422

@@ -39,6 +39,8 @@ SourceKind = Literal["firm_own", "third_party", "unknown"]
 Status = Literal["new", "in_review", "confirmed", "false_positive", "closed"]
 STATUSES: tuple[str, ...] = get_args(Status)
 ADMIN_HEADER = "X-Mock-Admin"
+# The contract sets no maxLength; these keep the in-memory store bounded and are far above real values
+NOTE_MAX, NAME_MAX, CRON_MAX = 10_000, 500, 200
 
 _HTTP_URL = TypeAdapter(HttpUrl)
 _URI_FORMAT = FormatChecker()
@@ -71,7 +73,7 @@ class _Strict(BaseModel):
 
 class FindingPatch(_Strict):
     status: Status | None = None
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=NOTE_MAX)
 
     @model_validator(mode="after")
     def _not_empty(self):
@@ -88,22 +90,22 @@ class Thresholds(_Strict):
 
 
 class SourceCreate(_Strict):
-    name: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=NAME_MAX)
     platform: Platform
     url: SourceUrl
     source_kind: SourceKind
     target_modules: TargetModules
-    schedule_cron: str | None = None
+    schedule_cron: str | None = Field(default=None, max_length=CRON_MAX)
     active: bool = True
 
 
 class SourcePatch(_Strict):
-    name: str | None = Field(default=None, min_length=1)
+    name: str | None = Field(default=None, min_length=1, max_length=NAME_MAX)
     platform: Platform | None = None
     url: SourceUrl | None = None
     source_kind: SourceKind | None = None
     target_modules: TargetModules | None = None
-    schedule_cron: str | None = None
+    schedule_cron: str | None = Field(default=None, max_length=CRON_MAX)
     active: bool | None = None
 
     @model_validator(mode="after")

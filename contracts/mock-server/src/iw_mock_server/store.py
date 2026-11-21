@@ -163,13 +163,20 @@ class Store:
         self.calibration: dict[str, dict] = data.calibration
         self.health: dict = data.health
         self.events: list[dict] = data.events
-        self.added_ids: set[str] = set()
+        self.added_ids: dict[str, None] = {}  # insertion-ordered, oldest first
         self.generation += 1
 
-    def add_finding(self, finding: dict) -> None:
-        """Add a finding created at runtime (replay); it also counts in the trend."""
+    def add_finding(self, finding: dict, limit: int | None = None) -> None:
+        """Add a finding created at runtime (replay); it also counts in the trend.
+
+        With `limit`, the oldest runtime findings are dropped so at most `limit` remain; mock
+        findings are never dropped."""
         self.findings[finding["id"]] = finding
-        self.added_ids.add(finding["id"])
+        self.added_ids[finding["id"]] = None
+        while limit is not None and len(self.added_ids) > limit:
+            oldest = next(iter(self.added_ids))
+            del self.added_ids[oldest]
+            self.findings.pop(oldest, None)
 
     def trend_points(self, risk_level_filter: str | None = None) -> list[dict]:
         """Hourly points: the mock trend plus findings added at runtime.

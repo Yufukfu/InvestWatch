@@ -152,3 +152,16 @@ def test_mock_without_findings_is_rejected(contracts_copy):
 
     with pytest.raises(MockDataError, match="findings.json: at least one finding"):
         load_mock_data(contracts_copy)
+
+
+def test_added_findings_are_capped_oldest_first(contracts_dir):
+    store = Store(load_mock_data(contracts_dir))
+    mock_ids = set(store.findings)
+    template = next(iter(store.findings.values()))
+
+    for n in range(5):
+        store.add_finding({**template, "id": f"added-{n}"}, limit=3)
+
+    assert set(store.findings) - mock_ids == {"added-2", "added-3", "added-4"}
+    assert list(store.added_ids) == ["added-2", "added-3", "added-4"]
+    assert mock_ids <= set(store.findings)  # mock findings are never dropped

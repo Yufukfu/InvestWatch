@@ -10,6 +10,7 @@ import httpx
 import pytest
 import socketio
 import uvicorn
+from fastapi.testclient import TestClient
 
 from conftest import assert_valid
 from iw_mock_server.events import create_asgi_app
@@ -271,3 +272,14 @@ def test_source_is_running_while_its_scan_is_in_flight(contracts_dir):
     assert running["last_run_status"] == "running"  # the contract enum has "running" for this window
     assert_valid("source", running)
     assert done["last_run_status"] == "ok"
+
+
+def test_replay_respects_max_added(contracts_dir):
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0, scan_delay_s=0, max_added=2)
+    app = create_asgi_app(settings)
+    with TestClient(app) as client:
+        before = client.get("/api/findings").json()["total"]
+        for _ in range(4):
+            assert client.post("/__mock/emit", headers=ADMIN).status_code == 200
+
+        assert client.get("/api/findings").json()["total"] == before + 2

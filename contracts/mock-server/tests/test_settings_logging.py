@@ -37,7 +37,7 @@ def test_env_overrides(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize(("var", "value"), [("MOCK_PORT", "abc"), ("MOCK_REPLAY_INTERVAL_S", "-1"),
                                             ("MOCK_SCAN_DELAY_S", "soon"), ("MOCK_PORT", "65536"),
-                                            ("MOCK_SCAN_DELAY_S", "inf"), ("MOCK_REPLAY_INTERVAL_S", "nan"), ("LOG_LEVEL", "notset"),
+                                            ("MOCK_SCAN_DELAY_S", "inf"), ("MOCK_REPLAY_INTERVAL_S", "nan"), ("LOG_LEVEL", "notset"), ("MOCK_MAX_ADDED", "0"),
                                             ("LOG_LEVEL", "verbose")])
 def test_bad_env_value_names_the_variable(monkeypatch, var, value):
     monkeypatch.setenv(var, value)
@@ -84,3 +84,9 @@ def test_default_host_is_loopback(monkeypatch):
     monkeypatch.delenv("MOCK_HOST", raising=False)
 
     assert Settings().host == "127.0.0.1"
+
+
+def test_max_added_default(monkeypatch):
+    monkeypatch.delenv("MOCK_MAX_ADDED", raising=False)
+
+    assert Settings().max_added == 500

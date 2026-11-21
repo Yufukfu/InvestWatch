@@ -49,5 +49,7 @@ class Settings:
     )
     replay_interval_s: float = field(default_factory=lambda: _number("MOCK_REPLAY_INTERVAL_S", "10"))
     scan_delay_s: float = field(default_factory=lambda: _number("MOCK_SCAN_DELAY_S", "2"))
+    # findings added by replay or /__mock/emit beyond this are dropped oldest first (long demos)
+    max_added: int = field(default_factory=lambda: _number("MOCK_MAX_ADDED", "500", int, 1))
     contracts_dir: Path = field(default_factory=lambda: Path(_env("CONTRACTS_DIR", str(_DEFAULT_CONTRACTS_DIR))))
     log_level: str = field(default_factory=lambda: _log_level("LOG_LEVEL", "INFO"))

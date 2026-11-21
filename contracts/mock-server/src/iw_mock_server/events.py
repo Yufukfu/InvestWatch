@@ -69,7 +69,7 @@ class EventHub:
         latest = max((f["detected_at"] for f in self.store.findings.values()), default=None)
         now = bumped_timestamp(latest)
         finding.update(id=str(uuid.uuid4()), status="new", note=None, detected_at=now, updated_at=now)
-        self.store.add_finding(finding)
+        self.store.add_finding(finding, limit=self.settings.max_added)
 
         brief = finding_brief(self.store, finding)
         self.notify("finding.created", brief)
