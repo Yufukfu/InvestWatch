@@ -46,6 +46,14 @@ def test_service_waits_for_the_migration_and_postgres():
     assert "redis" not in deps
 
 
+def test_worker_waits_for_the_evaluation_without_requiring_it():
+    # `up --wait` checks a service nobody depends on for "running or healthy": the one-shot fails it either way
+    # ("no healthcheck configured" while it runs, "exited (0)" once done). A completed_successfully dependant makes
+    # --wait check completion instead (like api-migrate); required: false still starts the worker if the run fails.
+    dep = COMPOSE["services"]["analytics"]["depends_on"]["analytics-eval"]
+    assert dep == {"condition": "service_completed_successfully", "required": False}
+
+
 def test_service_is_on_the_data_network_only():
     assert SERVICE["networks"] == ["data"]
 
