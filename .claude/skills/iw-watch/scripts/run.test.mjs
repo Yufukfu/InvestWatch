@@ -273,6 +273,32 @@ test('run: a clone left from an earlier run is not overwritten', async () => {
   assert.equal(s.calls.length, 1, 'the item was kept, so removing the directory lets it run');
 });
 
+test('run: the clone ignores the main clone\'s commit-graph (a stale one broke the first live run on PR #39)', async () => {
+  const s = setup();
+  const seen = [];
+  s.deps.git = (args, opts) => { seen.push(args); return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim(); };
+  await main(['run', '--mine'], s.deps);
+  const clone = seen.find((a) => a.includes('clone'));
+  assert.deepEqual(clone.slice(0, 3), ['-c', 'core.commitGraph=false', 'clone']);
+  assert.equal(s.notices()[0].kind, 'done');
+});
+
+test('run: a clone that fails half-way is removed, so the next run retries instead of seeing a leftover', async () => {
+  const s = setup();
+  let fail = true;
+  s.deps.git = (args, opts) => {
+    const out = execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
+    if (fail && args.includes('fetch') && args.some((a) => a.includes('refs/remotes/origin/main'))) throw Object.assign(new Error('boom'), { stderr: 'fatal: unable to parse commit' });
+    return out;
+  };
+  await main(['run', '--mine'], s.deps);
+  assert.match(s.notices()[0].detail, /could not prepare a clone: fatal: unable to parse commit/);
+  assert.ok(!fs.existsSync(s.clone(11)), 'the half-made clone is gone');
+  fail = false;
+  await main(['run', '--mine'], s.deps);
+  assert.equal(s.calls.length, 1, 'retried on the next run');
+});
+
 test('run: --limit caps the sessions per run', async () => {
   const s = setup();
   await main(['run', '--mine', '--review-requested', '--limit', '1'], s.deps);

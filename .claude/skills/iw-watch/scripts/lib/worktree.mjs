@@ -26,7 +26,19 @@ export function prepareClone({ git = realGit, fs = realFs, mainRoot, item }) {
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const url = git(['-C', mainRoot, 'remote', 'get-url', 'origin']);
   const own = item.kind === 'address-review' || item.kind === 'ci-failed';
-  git(['clone', '--quiet', '--reference', mainRoot, '--dissociate', '--no-tags', '--branch', own ? item.headRef : item.baseRef, '--', url, dir]);
+  // core.commitGraph=false: a stale commit-graph in the reference repo made checkout fail with
+  // "unable to parse commit" on the first live run (PR #39); the objects themselves were fine
+  try {
+    return populate({ git, fs, mainRoot, item, dir, url, own });
+  } catch (e) {
+    // the directory is ours (it did not exist above): a half-made clone must not block the next run
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw e;
+  }
+}
+
+function populate({ git, fs, mainRoot, item, dir, url, own }) {
+  git(['-c', 'core.commitGraph=false', 'clone', '--quiet', '--reference', mainRoot, '--dissociate', '--no-tags', '--branch', own ? item.headRef : item.baseRef, '--', url, dir]);
   let head;
   if (own) {
     git(['-C', dir, 'fetch', '--quiet', 'origin', `+refs/heads/${item.baseRef}:refs/remotes/origin/${item.baseRef}`]);
