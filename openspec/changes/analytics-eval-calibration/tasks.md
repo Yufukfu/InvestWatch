@@ -54,9 +54,9 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 
 ## 9. API: labels plus the gold run (≈ 1 h)
 
-- [ ] 9.1 Failing tests (`api/tests/test_resources.py` or a new `api/tests/test_calibration.py`) for the MODIFIED scenarios of `specs/rest-api/spec.md`: labels plus stored run summed at 0.5 (11/3/4/21, 0.786/0.733/0.759, `labeled_samples` 39); one label does not replace the gold curve; stored run alone returned as stored; labels alone unchanged; no labels and no run; a stored point off the grid is ignored when combining
-- [ ] 9.2 `api/src/investwatch_api/routes/calibration.py`: combine counts per threshold, recompute ratios with the existing `curve` conventions; response shape unchanged; `api` suite, lint and type check green
-- [ ] 9.3 Mutation check (sum vs replace, `labeled_samples` sum, off-grid filter, stored-only path); `mutations: N tried, N caught`
+- [x] 9.1 Failing tests (`api/tests/test_resources.py` or a new `api/tests/test_calibration.py`) for the MODIFIED scenarios of `specs/rest-api/spec.md`: labels plus stored run summed at 0.5 (11/3/4/21, 0.786/0.733/0.759, `labeled_samples` 39); one label does not replace the gold curve; stored run alone returned as stored; labels alone unchanged; no labels and no run; a stored point off the grid is ignored when combining
+- [x] 9.2 `api/src/investwatch_api/routes/calibration.py`: combine counts per threshold, recompute ratios with the existing `curve` conventions; response shape unchanged; `api` suite, lint and type check green
+- [x] 9.3 Mutation check (sum vs replace, `labeled_samples` sum, off-grid filter, stored-only path); `mutations: 5 tried, 4 caught`: the off-grid filter was equivalent (`curve` reads only grid thresholds) and was removed. `api` suite: 238 passed, 2 failed in `test_relay.py` (`test_redis_outage_and_recovery`, `test_redis_down_at_start_up`, TCP-proxy outage tests; relay code untouched by this change; they also fail when run alone on this Windows machine, not checked on CI)
 
 ## 10. Closing
 
