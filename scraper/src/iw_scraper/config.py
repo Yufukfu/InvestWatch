@@ -117,3 +117,17 @@ def fetch_settings() -> tuple[float, int]:
     if max_bytes < 1:
         raise ValueError("FETCH_MAX_BYTES must be a whole number of bytes, at least 1")
     return timeout, max_bytes
+
+
+DEFAULT_SOCIAL_MAX_POSTS = 40
+
+
+def social_max_posts() -> int:
+    """`SOCIAL_MAX_POSTS`: how many posts of a social channel one run reads at most (twenty a page)."""
+    try:
+        value = int(os.environ.get("SOCIAL_MAX_POSTS", DEFAULT_SOCIAL_MAX_POSTS))
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise ValueError("SOCIAL_MAX_POSTS must be a whole number of posts, at least 1")
+    return value

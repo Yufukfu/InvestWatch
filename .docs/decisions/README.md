@@ -8,7 +8,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 |---|---|---|
 | [0101](0101-scraper-fetch-client.md) | Scraper fetch client | accepted (agent-written; effective on merge) |
 | [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | accepted (agent-written; effective on merge) |
-| [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research; decided in `scraper-v2`) |
+| [0103](0103-first-social-platform.md) | First social platform | accepted (agent-written; effective on merge) |
 | [0104](0104-ingest-order-and-republish-sweep.md) | Ingest order, at-least-once delivery and the republish sweep | accepted (agent-written; effective on merge) |
 | [0105](0105-content-hash-normalisation.md) | One `content_hash` normalisation: NFC (the scraper's), written into integration-plan §3 | accepted (agent-written; effective on merge) |
 | [0106](0106-scraper-deployment-unit.md) | Scraper deployment unit: three services, networks, stop grace, merge order with the renderer | accepted (agent-written; effective on merge) |
