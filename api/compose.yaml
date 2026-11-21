@@ -1,5 +1,6 @@
 # api/ deployment unit (owner Damian). Included from the root compose.yaml next to infra/compose.yaml, which owns
-# the `postgres` service and the `data` and `edge` networks this file uses (so none of them is declared here).
+# the `postgres`, `redis` and `minio-init` services and the `data` and `edge` networks this file uses (so none of
+# them is declared here).
 # Without the root file, run it together with infra: docker compose -f infra/compose.yaml -f api/compose.yaml up
 # api-migrate applies the shared schema once and exits; scraper, analytics and api start only after it:
 #   depends_on:
@@ -34,10 +35,10 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
-      REDIS_URL: ${REDIS_URL:?set REDIS_URL in .env (infra-compose)}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env (infra-compose)}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (infra-compose)}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-iw-app}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (scripts/init-env.sh)}
       MINIO_BUCKET: ${MINIO_BUCKET:-iw-raw}
       MINIO_SECURE: ${MINIO_SECURE:-false}  # plain HTTP on the internal network
       # Same origin through the gateway needs nothing here; a list REPLACES that default (README).
@@ -46,6 +47,8 @@ services:
     depends_on:
       api-migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
     networks: [edge, data]
     read_only: true
     tmpfs: [/tmp]
