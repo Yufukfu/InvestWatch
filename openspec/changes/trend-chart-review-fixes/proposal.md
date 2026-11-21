@@ -2,7 +2,7 @@
 
 ## Why
 
-Review of PR #14 (hen68) found that the trend chart puts Recharts' keyboard layer inside a `role="img"` with only the three totals as text, that the "colour plus dash pattern", "no stale data after a switch" and "local hour ticks" claims are not pinned by tests, that the `Dzień` view is never drawn with day data (the mock always returns hourly points), and that `integration-plan.md` §5 documents `/stats/trend` as a bare array while OpenAPI returns `{bucket, points}`.
+Review of PR #14 (hen68) found that the trend chart puts Recharts' keyboard layer inside a `role="img"` with only the three totals as text, that the "colour plus dash pattern", "no stale data after a switch" and "local hour ticks" claims are not pinned by tests, that the `Dzień` view is never drawn with day data (the mock always returns hourly points), and that `.docs/integration-plan.md` §5 documents `/stats/trend` as a bare array while OpenAPI returns `{bucket, points}`.
 
 ## What Changes
 
@@ -13,7 +13,7 @@ Review of PR #14 (hen68) found that the trend chart puts Recharts' keyboard laye
 - Nits: `role="status"` on loading, a labelled `role="group"` around the bucket buttons, tooltip without animation, test names, the no-op `overflow-x` and the redundant smoke test removed.
 - `TrendBucket` and `TrendPoint` move to `features/trend/model.ts`, so the data hook no longer imports from a component (ADR 0204 rule).
 - `TrendPage` is lazy-loaded from `App.tsx`, so Recharts is a separate chunk.
-- Docs: `integration-plan.md` §5 matches OpenAPI; ADR 0203 gets a short note pointing at the measurement.
+- Docs: `.docs/integration-plan.md` §5 matches OpenAPI; ADR 0203 gets a short note pointing at the measurement.
 
 **Out of scope:** module display names (the dashboard shows the codes `M1`/`M2`/`M3` everywhere, e.g. the findings table), trend filters, contract mocks in `contracts/` (owner C). Owner B.
 

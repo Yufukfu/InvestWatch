@@ -35,3 +35,7 @@ Rationale: Recharts is declarative, so a chart is a pure function of its props. 
 - Adding Chart.js later is a new ADR that supersedes this one; no ADR is edited in place.
 - Responsive charts (`ResponsiveContainer`) size themselves by measuring the DOM with `ResizeObserver`, which jsdom does not provide. Tests therefore give charts a fixed `width`/`height` or stub `ResizeObserver`. Not verified yet: Recharts is not installed in this repo; confirm when the install PR runs the tests.
 - The library is added with `npm install recharts` in `web/`, then `npm audit` is run before merge, as every dependency requires ([CLAUDE.md](../../CLAUDE.md) hard rules).
+
+## Verification note (2026-11-21)
+
+Appended after the install, without changing the decision. The `trend-chart` change installed Recharts 3.11.0 and confirmed the `ResizeObserver` point: tests pass a fixed size or stub it (`web/src/features/trend/components/TrendChart.test.tsx`). Bundle measured with `vite build`: 98 kB to 206 kB gzip with the chart in the main bundle; with `TrendPage` lazy-loaded (`trend-chart-review-fixes`) the main bundle is about 101 kB gzip and the trend chunk about 107 kB gzip. Recharts 3 turns its keyboard `accessibilityLayer` on by default; the trend chart turns it off and offers a data table as the text alternative.

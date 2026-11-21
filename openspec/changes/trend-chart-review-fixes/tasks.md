@@ -14,5 +14,5 @@
 
 ## 3. Closing
 
-- [ ] 3.1 Apply `iw-docs-update`: `integration-plan.md` §5 matches OpenAPI, ADR 0203 note, `.docs/STATUS.md`, AI log row, `docs-check` clean.
+- [x] 3.1 Apply `iw-docs-update`: `.docs/integration-plan.md` §5 matches OpenAPI, ADR 0203 note, `.docs/STATUS.md`, AI log row, `docs-check` clean.
 - [ ] 3.2 Run `iw-reviewer` on the branch; fix real findings.
