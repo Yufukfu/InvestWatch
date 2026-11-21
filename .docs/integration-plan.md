@@ -16,7 +16,7 @@ Decisions from the team sync:
 - ✅ **Social media:** we start with **one platform** and add more only if time allows.
 - ✅ **LLM:** Gemma accessed through an HTTP API (see the note in section 7).
 - ✅ **Repository structure** is defined by B; the layout below is only the list of services that must exist.
-- ✅ **Spec-driven workflow with OpenSpec** + an AI work log (`doc/ai-workflow.md`).
+- ✅ **Spec-driven workflow with OpenSpec** + an AI work log (`.docs/ai-workflow.md`).
 - ⏳ Contracts (sections 3–6) – to be confirmed by A and B.
 - ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with A later.
 - ⏳ Milestone hours and the sleep rotation – to be agreed.
@@ -47,7 +47,7 @@ Decisions from the team sync:
 Services in `docker-compose.yml` (single `docker compose up` command):
 `postgres`, `redis`, `minio`, `scraper`, `scheduler`, `analytics`, `api`, `dashboard` (+ `ollama` if we run the model in the stack).
 
-Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `doc` (UKNF materials, plans, AI work log), plus `docker-compose.yml` and `.env.example` at the root.
+Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `docker-compose.yml` and `.env.example` at the root.
 
 ## 2. Integration points
 
@@ -208,7 +208,7 @@ Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`):
 - **LLM note:** the task requires an on-premise, open-source stack with no external paid APIs. Gemma is an open model, so we call it through an **Ollama-compatible HTTP API** whose base URL is configurable: locally (`ollama` service) for the final demo, or a team member's machine/GPU server during development. Avoid making a hosted cloud API the only option – the jury checks compliance with the specified technologies.
 - Database migrations in one place (Alembic in `api`) – A and C never create tables by hand.
 - Every service: `/health`, JSON logs to stdout, zero `console.log` in the production frontend build.
-- Dependencies: `npm audit` / `pip-audit` before every merge to `main`; results in `doc/security-audit.md`.
+- Dependencies: `npm audit` / `pip-audit` before every merge to `main`; results in `.docs/security-audit.md`.
 - Branches: `scraper/*`, `dashboard/*`, `analytics/*`; merge to `main` only with a working `docker compose up`.
 - **Technical documentation, code, comments and commit messages are in English.** User-facing dashboard texts and finding summaries are in Polish.
 
