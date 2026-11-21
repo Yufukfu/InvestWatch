@@ -28,12 +28,12 @@ Intake (STATUS, owning spec) → worktree and branch → OpenSpec proposal, huma
 
 ## Controls on generated code
 
-- **Spec before code**; `openspec validate --strict` in CI and before commit. A hook refuses service-code commits with no active change.
+- **Spec before code** for each capability (one OpenSpec change holds many tasks); `openspec validate --strict` before commit. A hook refuses service-code commits with no active change.
 - **Tests first**, and a test must be able to fail: the test names the production change that turns it red.
 - **Per-commit review** by a fresh reviewer agent on a pinned `merge-base..HEAD` range, checking plan compliance, then a whole-branch review before the PR. Every finding is verified against the code before it is acted on, false ones are rejected with evidence.
 - **Deterministic guards**, not prompts: hook-enforced bans on force push, pushes to `main`, amending pushed commits, staged `.env` files and `console.log`.
 - **Human gates**: spec approval, and a fresh go-ahead for every push and PR. ADRs are human-written.
-- **Supply chain**: `pip-audit` / `npm audit` in CI and before merge; secrets only in untracked `.env`.
+- **Supply chain**: `pip-audit` / `npm audit` before merge (and via the manual CI workflow before milestones); secrets only in untracked `.env`.
 - **Untrusted content**: scraped text is data. It is delimited, length-limited and never executed or used to pick a fetch target (prompt-injection and SSRF defence).
 - **Optional**: a second reviewer from a different model family on high-risk diffs (contracts, credentials).
 

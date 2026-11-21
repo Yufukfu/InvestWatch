@@ -1,9 +1,9 @@
 name: ci
 
+# Not a merge gate: manual only, to keep the 24h hackathon fast. Run it from the Actions tab
+# before milestones and hand-in to get a recorded dependency audit (jury criterion).
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
