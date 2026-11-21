@@ -15,9 +15,9 @@
 
 ## 3. Summary feature
 
-- [ ] 3.1 Write failing tests: `SummaryCards` renders three labelled counts from props with no `Provider` and renders nothing without data; `useSummary` returns `total`, `highRisk`, `newCount` from the contract mock.
-- [ ] 3.2 Create `features/summary/` (`data/useSummary.ts`, `components/SummaryCards.tsx`, `SummaryPage.tsx`), update `App.tsx`, remove the old file from `features/findings/`. Verify the new tests, `App.test.tsx`, lint and typecheck pass.
-- [ ] 3.3 Mutation check (swap `highRisk` and `newCount`, default missing counts to a wrong value) and verify the tests catch it. Record `mutations: N tried, N caught`.
+- [x] 3.1 Write failing tests: `SummaryCards` renders three labelled counts from props with no `Provider` and renders nothing without data; `useSummary` returns `total`, `highRisk`, `newCount` from the contract mock.
+- [x] 3.2 Create `features/summary/` (`data/useSummary.ts`, `components/SummaryCards.tsx`, `SummaryPage.tsx`), update `App.tsx`, remove the old file from `features/findings/`. Verify the new tests, `App.test.tsx`, lint and typecheck pass.
+- [x] 3.3 Mutation check (swap `highRisk` and `newCount`, default missing counts to a wrong value) and verify the tests catch it. Record `mutations: N tried, N caught`. mutations: 8 tried, 8 caught.
 
 ## 4. Findings feature
 

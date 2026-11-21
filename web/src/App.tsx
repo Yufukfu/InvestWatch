@@ -1,6 +1,6 @@
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsTable } from './features/findings/FindingsTable';
-import { SummaryCards } from './features/findings/SummaryCards';
+import { SummaryPage } from './features/summary/SummaryPage';
 
 export function App() {
   return (
@@ -10,7 +10,7 @@ export function App() {
         <HealthPage />
       </header>
       <main>
-        <SummaryCards />
+        <SummaryPage />
         <FindingsTable />
       </main>
     </div>
