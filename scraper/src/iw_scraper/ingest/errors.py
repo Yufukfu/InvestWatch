@@ -26,7 +26,16 @@ _BARE_USERINFO = re.compile(r"\b[^\s/:@]+:\S*@(?=[\w.-]+)")
 _BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
 _AUTH_HEADER = re.compile(r"(?i)\b(authorization|proxy-authorization|cookie|set-cookie)(\s*:\s*).*")
 _PAIR = re.compile(r"([\w-]+[\"']?)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)")
-_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase", "pass", "pw", "auth")
+_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase")
+# short names are matched as whole `-`/`_` separated words, or `bypass` and `AuthenticationError` would be masked
+_SECRET_NAME_WORDS = frozenset({"pass", "pw", "auth"})
+
+
+def _looks_secret(name: str) -> bool:
+    lowered = name.lower()
+    return any(part in lowered for part in _SECRET_NAME_PARTS) or not _SECRET_NAME_WORDS.isdisjoint(
+        re.split(r"[-_]", lowered)
+    )
 
 
 def _mask_secret_pairs(text: str) -> str:
@@ -40,7 +49,7 @@ def _mask_secret_pairs(text: str) -> str:
     while (match := _PAIR.search(text, pos)) is not None:
         out.append(text[pos : match.start()])
         name, separator = match.group(1), match.group(2)
-        if any(part in name.lower() for part in _SECRET_NAME_PARTS):
+        if _looks_secret(name):
             out.append(f"{name}{separator}***")
             pos = match.end()
         else:

@@ -137,6 +137,14 @@ def test_a_secret_nested_after_a_harmless_pair_is_still_redacted(detail, secret)
 
 @pytest.mark.parametrize(
     "detail",
+    ["AuthenticationError: Authentication required", "bypass=1 compass=2", "author=bob status=ok", "basic=1"],
+)
+def test_harmless_names_keep_their_values(detail):
+    assert redact(detail) == detail
+
+
+@pytest.mark.parametrize(
+    "detail",
     [
         "https://user:" + "p" * 2100 + "@host",  # no whitespace at all
         "ab\tuser:" + "p" * 1995 + "\t@host",  # tab, not a space
