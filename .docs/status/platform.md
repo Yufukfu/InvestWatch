@@ -11,7 +11,8 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 ### analytics
 - `analytics-skeleton` merged (PR #10): pure pipeline, registry, M2 rules R1-R3, CLI. No worker, storage or events yet.
 - Both of Kacper's reviews fixed in `analytics-skeleton-review-fixes` and `analytics-skeleton-review-2-fixes`.
-- Proposed on its own branch, awaiting approval: `analytics-worker` (needs `main` merged in now that PR #10 is in).
+- `analytics-worker` implemented, PR #26 (base `main`, after PR #18 brought Redis): stream worker on `iw:documents` (ack after commit, XAUTOCLAIM, poison messages acked with a reason, backoff on outages), Postgres store with the `(document_id, module)` upsert, `iw:events` publisher with live thresholds, `/health`, container and compose service. Verified end to end on a full stack. Rules-only; the LLM client comes with `analytics-llm-p0`.
+- Registry caveat: the default registry is the fictional `analytics/registry/seed.csv` (3 firms). Until a real KNF registry is loaded and `REGISTRY_CSV` is set, R1 results and high-risk alerts for real firms are not meaningful; the worker logs `registry_seed` at startup. A real KNF loader is open (follow-up of `analytics-worker-review-fixes`).
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
@@ -30,7 +31,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `api-v1` and `api-v1-review-fixes` archived in PR #21 (merges after PR #18)
 - `api-db-schema` and `api-db-schema-review-fixes` archived in PR #15
 - `infra-compose` and `infra-compose-review-fixes` archived in PR #18
-- proposed, awaiting approval: `analytics-worker`
+- `analytics-worker` archived; `analytics-worker-review-fixes` (Kacper's PR #26 review) in PR #26
 - `openspec-strict-format` archived in its own PR: 14 requirements across `database-schema`, `document-analysis`, `m2-compliance-rules`, `rest-api` and `shared-infrastructure` brought under OpenSpec 2.1.1's 500-character limit (text moved into scenarios, no behaviour change), so the CI job `Specs and hooks` passes. Its follow-ups name the fixes still due on `analytics-llm-p0` and `analytics-m1-m3`.
 
 ## Blockers and open decisions
