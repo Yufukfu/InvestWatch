@@ -4,9 +4,9 @@ Precondition: `analytics-skeleton` is merged and this branch is rebased on it. G
 
 ## 1. Config and store interface with the in-memory store
 
-- [ ] 1.1 Failing tests for the `finding-storage` scenarios on the in-memory store: load (payload merge, unknown id, invalid row naming the field), atomic save, first analysis, same document analysed again keeping `id`/`detected_at`/`status`/`note`, changed page as a new finding, different module, contract-valid read-back (skipped without `CONTRACTS_DIR`)
-- [ ] 1.2 `config.py` additions (`DATABASE_URL`, `REDIS_URL`, `WORKER_CONSUMER`, `STREAM_BLOCK_MS`, `CLAIM_MIN_IDLE_MS`, `MAX_DELIVERIES`, `HEALTH_PORT`), `storage.py` with the `Store` protocol, the error types `NotFound` / `InvalidDocument` / `StoreUnavailable`, `SaveResult` (`created` / `updated`) and `InMemoryStore`; tests green
-- [ ] 1.3 Mutation check; `mutations: N tried, N caught`
+- [x] 1.1 Failing tests for the `finding-storage` scenarios on the in-memory store: load (payload merge, unknown id, invalid row naming the field), atomic save, first analysis, same document analysed again keeping `id`/`detected_at`/`status`/`note`, changed page as a new finding, different module, contract-valid read-back (skipped without `CONTRACTS_DIR`)
+- [x] 1.2 `config.py` additions (`DATABASE_URL`, `REDIS_URL`, `WORKER_CONSUMER`, `STREAM_BLOCK_MS`, `CLAIM_MIN_IDLE_MS`, `MAX_DELIVERIES`, `HEALTH_PORT`), `storage.py` with the `Store` protocol, the error types `NotFound` / `InvalidDocument` / `StoreUnavailable`, `SaveResult` (`created` / `updated`) and `InMemoryStore`; tests green
+- [x] 1.3 Mutation check; `mutations: 16 tried, 16 caught` (the lock mutant first survived; the in-memory store got a `before_commit` test seam so the concurrent test really interleaves)
 
 ## 2. Postgres store
 

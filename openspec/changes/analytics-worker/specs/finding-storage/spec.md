@@ -6,7 +6,7 @@ Persist analytics results: read a scraped document by id and store its findings,
 ## ADDED Requirements
 
 ### Requirement: Store interface with two implementations
-Analytics SHALL access persistence only through a store interface with the operations `load_document(document_id)` and `save_findings(document, findings)`. A Postgres implementation and an in-memory implementation SHALL behave identically for every scenario in this spec; the worker tests run on the in-memory store.
+Analytics SHALL access persistence only through a store interface with the operations `load_document(document_id)`, `save_findings(document, findings)` and the read `findings_for_document(document_id)`. A Postgres implementation and an in-memory implementation SHALL behave identically for every scenario in this spec; the worker tests run on the in-memory store.
 
 #### Scenario: Same behaviour in both stores
 - **WHEN** the storage scenario suite runs against the in-memory store, and against Postgres with `TEST_DATABASE_URL` set
@@ -24,7 +24,7 @@ Analytics SHALL access persistence only through a store interface with the opera
 - **THEN** it returns not found (the worker maps it to `document_not_found`)
 
 #### Scenario: Invalid row
-- **WHEN** the row's `text` is empty after the scraper wrote it
+- **WHEN** the row's `text` is null (an empty string is valid input; the pipeline skips it as `empty_text`)
 - **THEN** a validation error naming `text` is raised (the worker maps it to `invalid_document`)
 
 ### Requirement: Atomic save
@@ -39,7 +39,7 @@ Analytics SHALL access persistence only through a store interface with the opera
 - **THEN** it validates against `contracts/schemas/finding.schema.json`
 
 ### Requirement: One finding per document and module
-A finding SHALL be identified by `(document_id, module)`, the unique key of `findings` in `api-db-schema`. When a finding with that key exists, `save_findings` SHALL update it in place, keeping `id`, `detected_at`, `status` and `note`, and replacing `score`, `title`, `summary`, `firm`, `advertiser`, `rules`, `content_excerpt`, `model` and `updated_at`. Otherwise it SHALL insert a new finding with `status: new`. Concurrent saves for the same key SHALL end with one row, enforced by `INSERT ... ON CONFLICT (document_id, module) DO UPDATE`, not by a prior lookup. A changed page is a new `documents` row and therefore gets a new finding.
+A finding SHALL be identified by `(document_id, module)`, the unique key of `findings` in `api-db-schema`. When a finding with that key exists, `save_findings` SHALL update it in place, keeping `id`, `detected_at`, `status` and `note`, and replacing `score`, `title`, `summary`, `firm`, `advertiser` (when the model carries it), `rules`, `content_excerpt`, `model` and `updated_at`. Otherwise it SHALL insert a new finding with `status: new`. Concurrent saves for the same key SHALL end with one row, enforced by `INSERT ... ON CONFLICT (document_id, module) DO UPDATE`, not by a prior lookup. A changed page is a new `documents` row and therefore gets a new finding.
 
 #### Scenario: First analysis
 - **WHEN** a document produces an M2 finding and no finding for `(document_id, M2)` exists

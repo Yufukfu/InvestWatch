@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import socket
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,4 +22,55 @@ class Settings:
         return cls(
             registry_csv=Path(os.environ.get("REGISTRY_CSV") or _DEFAULT_REGISTRY),
             log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        )
+
+
+
+class ConfigError(ValueError):
+    """A missing or malformed environment variable; the message names it."""
+
+
+def _required(env: Mapping[str, str], key: str) -> str:
+    value = (env.get(key) or "").strip()
+    if not value:
+        raise ConfigError(f"{key} is required for the worker")
+    return value
+
+
+def _positive_int(env: Mapping[str, str], key: str, default: int) -> int:
+    raw = env.get(key)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ConfigError(f"{key} must be an integer, got {raw!r}") from None
+    if value < 1:
+        raise ConfigError(f"{key} must be at least 1, got {value}")
+    return value
+
+
+@dataclass(frozen=True)
+class WorkerSettings:
+    """Settings the stream worker needs on top of `Settings`; the CLI does not need them."""
+
+    database_url: str
+    redis_url: str
+    consumer: str
+    stream_block_ms: int
+    claim_min_idle_ms: int
+    max_deliveries: int
+    health_port: int
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "WorkerSettings":
+        env = os.environ if env is None else env
+        return cls(
+            database_url=_required(env, "DATABASE_URL"),
+            redis_url=_required(env, "REDIS_URL"),
+            consumer=(env.get("WORKER_CONSUMER") or "").strip() or socket.gethostname(),
+            stream_block_ms=_positive_int(env, "STREAM_BLOCK_MS", 5000),
+            claim_min_idle_ms=_positive_int(env, "CLAIM_MIN_IDLE_MS", 60000),
+            max_deliveries=_positive_int(env, "MAX_DELIVERIES", 5),
+            health_port=_positive_int(env, "HEALTH_PORT", 8001),
         )
