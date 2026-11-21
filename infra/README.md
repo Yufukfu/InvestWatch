@@ -77,6 +77,8 @@ docker compose --profile llm up ollama-pull # pre-pull before a demo
 
 A plain `docker compose up` starts neither and downloads nothing.
 
+`ollama` runs with `OLLAMA_CONTEXT_LENGTH=8192` (override in `.env`). The OpenAI-compatible `/v1` endpoint cannot set the context length per request, and a stage-2 chunk (`analytics-llm-p0`, ADR 0304) is about 3k tokens plus the prompt. Ollama's own default context depends on the version and can be smaller, which truncates the input without an error to the client.
+
 ## Development helpers
 
 - **Host ports** (for a module or its tests running on the host): `docker compose -f compose.yaml -f infra/compose.dev-ports.yaml up -d` publishes Postgres, Redis and the object store on `127.0.0.1:15432`, `16379` and `19000` (`IW_DEV_*_PORT`). Loopback only. While the override is loaded these three services also have internet access. Local development only.
