@@ -330,7 +330,6 @@ def test_estimate_tracks_true_jaccard():
     b = shared | {f"b{i}" for i in range(200)}          # true Jaccard 600/1000 = 0.6
     estimate = float((signature(a, 128) == signature(b, 128)).mean())
     assert abs(estimate - 0.6) < 0.13
-    assert float((signature(a, 128) == signature(a, 128)).mean()) == 1.0
 
 
 def test_no_scipy_or_datasketch_at_runtime():
@@ -390,3 +389,13 @@ def test_best_similarity_wins_over_most_shared_buckets(r):
         r.set(f"iw:neardup:v1:doc:{doc}", doc)
     res = idx.observe(A, t, "a")
     assert res.group_id == D and abs(res.similarity - 116 / 128) < 1e-9
+
+
+#: datasketch 2.0.0 `MinHash(num_perm=128, seed=1, scheme="legacy")` over the same 3000 items (more than one
+#: chunk), first 8 values: recorded before datasketch was removed, so the "value for value" claim stays checked.
+DATASKETCH_LEGACY_3000 = [21344, 1582636, 2468978, 160459, 1160589, 731905, 2140914, 490508]
+
+
+def test_matches_datasketch_legacy_on_a_multi_chunk_set():
+    items = {f"zysk {i} procent" for i in range(3000)}
+    assert [int(x) for x in signature(items, 128)[:8]] == DATASKETCH_LEGACY_3000

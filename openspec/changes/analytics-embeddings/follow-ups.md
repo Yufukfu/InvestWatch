@@ -38,3 +38,7 @@
 | R32 | review group 8a | no-groups tests did not prove Redis is untouched | `fix-here` |
 | R33 | review group 8a, PLAUSIBLE | one scam template naming different impersonated firms forms one group, so only the first firm alerts | `docs`: design §5 names it; per-firm claims would need the firm in the key, a product call for Damian |
 | R34 | coordinator | scipy is heavy for the image: does datasketch need it at runtime? | `fix-here`: yes (package `__init__` imports `lsh.py` -> `scipy.integrate`), so datasketch is replaced by our own numpy MinHash; about -115 MB |
+| R35 | review MinHash refactor, PLAUSIBLE | signatures changed but the key prefix stayed `iw:neardup:v1`, so a Redis with keys from the datasketch build would miss matches | `wont-fix`: no Redis has run this branch outside fakeredis tests, so v1 is the first real layout. A later change of the hash must bump the prefix |
+| R36 | review MinHash refactor | the "datasketch legacy value for value" claim had no test after removal | `fix-here`: golden vector of datasketch 2.0.0 `scheme="legacy"` on a 3000-item, multi-chunk set |
+| R37 | review MinHash refactor | a tautological self-equality assert | `fix-here`: removed |
+| R38 | review MinHash refactor | `.docs/analytics-plan.md` §2 still names `datasketch` | `docs`: closing task 10.1 (iw-docs-update) |
