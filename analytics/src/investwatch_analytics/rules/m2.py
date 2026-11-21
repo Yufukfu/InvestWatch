@@ -607,3 +607,81 @@ class R16TaxInformation(Rule):
             f"Informacja o traktowaniu podatkowym bez pełnego zastrzeżenia – brak informacji, że traktowanie "
             f"podatkowe {' i '.join(missing)}.",
         )
+
+
+# ---- forecasts (R15, analytics-m2-p1-rules) -----------------------------------------------------
+
+
+@register
+class R15Forecasts(Rule):
+    """ZASÓB R15 (art. 44 ust. 6): a forecast needs a warning that it is not a reliable indicator of future results.
+
+    Every detected forecast is reported (ADR 0315): a compliant forecast is a pass quoting the forecast, with an
+    explanation that starts with `Wykryto prognozę`. Warning sentences never trigger the rule (design §6).
+    """
+
+    rule_id = "R15"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "performance": compile_patterns(p.get("performance_patterns", [])),
+            "strong": compile_patterns(p.get("forecast_patterns", [])),
+            "verb": compile_patterns(p.get("forecast_verb_patterns", [])),
+            "weak": compile_patterns(p.get("forecast_weak_patterns", [])),
+            "exclude": compile_patterns(p.get("forecast_exclude_patterns", []) + p.get("figure_exclude_patterns", [])),
+            "figure": compile_patterns(p.get("figure_patterns", []) + p.get("amount_patterns", [])),
+            "warning": compile_patterns(p.get("forecast_disclaimer_patterns", [])),
+        }
+
+    def _kind(self, sentence: str, fetch_year: int) -> str | None:
+        """`forecast`, `candidate` (weak marker, no figure) or None."""
+        p = self._p
+        for x in p["exclude"]:
+            sentence = x.sub(" ", sentence)
+        figure = any(f.search(sentence) for f in p["figure"])
+        results = figure or any(v.search(sentence) for v in p["performance"])
+        if not results:
+            return None
+        strong = (
+            any(s.search(sentence) for s in p["strong"])
+            or any(int(a or b) > fetch_year for a, b in _YEAR.findall(sentence))
+            or (figure and any(v.search(sentence) for v in p["verb"]))
+        )
+        weak = any(w.search(sentence) for w in p["weak"])
+        if strong or (weak and figure):
+            return "forecast"
+        return "candidate" if weak else None
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        fetch_year = ctx.doc.fetched_at.year
+        warnings, forecasts, candidates = [], [], []
+        for s in ctx.pre.sentences:
+            if any(w.search(s.text) for w in p["warning"]):
+                warnings.append(s.text)
+                continue
+            kind = self._kind(s.text, fetch_year)
+            if kind == "forecast":
+                forecasts.append(s.text)
+            elif kind == "candidate":
+                candidates.append(s.text)
+        if not forecasts and not candidates:
+            return self.result("not_applicable", None, "Materiał nie zawiera prognoz przyszłych wyników.")
+        if warnings:
+            quote = (forecasts or candidates)[0]
+            return self.result(
+                "pass", quote,
+                f"Wykryto prognozę przyszłych wyników; materiał zawiera ostrzeżenie: „{warnings[0]}”.",
+            )
+        if forecasts:
+            return self.result(
+                "fail", forecasts[0],
+                "Prognoza przyszłych wyników bez ostrzeżenia, że prognozy nie są wiarygodnym wskaźnikiem przyszłych wyników.",
+            )
+        return self.result(
+            "uncertain", candidates[0],
+            "Zdanie może zapowiadać przyszłe wyniki (bez liczby), a materiał nie zawiera ostrzeżenia dotyczącego "
+            "prognoz – do weryfikacji.",
+        )

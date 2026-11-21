@@ -217,8 +217,58 @@ rules:
         - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
-  # R15 (P1): ZASÓB "Flaguje w raporcie" – report a detected forecast even when it is compliant.
-  - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
+  # ZASÓB R15 (art. 44 ust. 6): "Flaguje w raporcie wykrycie prognozy przyszłych wyników" – every detected
+  # forecast is reported: a compliant one is a pass that quotes the forecast (ADR 0315). A forecast is result
+  # vocabulary plus a strong marker (or a year after the fetch year, or a future-tense return verb with a figure),
+  # or a weak marker with a figure; a weak marker with result vocabulary only is uncertain. The promotional
+  # imperative ("Zarabiaj nawet do 18% rocznie") is R3's return claim, never a forecast.
+  - id: R15
+    name: Prognozy przyszłych wyników
+    severity: medium
+    legal_basis: art. 44 ust. 6 rozp. del. 2017/565
+    implemented: true
+    params:
+      performance_patterns:
+        - '\bwynik\w*'
+        - '\bzysk\w*'
+        - '\bstop\w*\s+zwrotu'
+        - '\bzwrot\w*'
+        - '\brentown\w*'
+        - '\bdoch(?:ód|od(?!z))\w*'
+        - '\bwzro(?:st|sn|śn)\w*'
+        - '\bzar(?:ob|ab)\w*'
+        - '\b(?:returns?|performance|growth)\b'
+      forecast_patterns:
+        - '\bprognoz\w*'
+        - '\bspodziewa\w*'
+        - '\boczekuj(?:emy|e\s+się)\b'
+        - '\boczekiwan\w*'
+        - '\bprzewidu\w*'
+        - '\bszacuj\w*'
+        - '\bw\s+(?:przyszłym|kolejnym|następnym|nadchodzącym)\s+roku\b'
+        - '\bcel\w*\s+(?:\w+\s+)?zwrotu\b'
+        - '\b(?:expect\w*|forecast\w*|projected)\b'
+        - '\btarget\s+returns?\b'
+      # Strong only together with a figure ("W 2026 zarobisz 12%").
+      forecast_verb_patterns:
+        - '\b(?:zarobisz|zarobicie|zarobimy|zyskasz|zyskacie|zyskamy|przyniesie|przyniosą|wypracuje|wypracują|osiągnie|osiągną|wyniesie|wyniosą)\b'
+      forecast_weak_patterns:
+        - '\bbęd(?:zie\w*|ą)\b'
+        - '\bmoże\s+(?:przynieść|osiągnąć|wynieść)\b'
+        - '\bwill\b'
+      # Stripped before matching: imperatives (a return claim, R3) and fee or tax percentages.
+      forecast_exclude_patterns:
+        - '\b(?:zarabiaj|zyskaj|pomnażaj|pomnóż|earn)\w*'
+        - '\b(?:prowizj|opłat|marż|podat|koszt)\w*\b.{0,60}?\d+(?:[.,]\d+)?\s?%'
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      figure_exclude_patterns: *return_figure_exclude
+      # Not the R14 past-performance disclaimer: ZASÓB R15 names the forecast explicitly.
+      forecast_disclaimer_patterns: &forecast_disclaimers
+        - '\bprognoz\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*)\b.{0,40}?\b(?:wiarygodn|gwarancj|pewn)\w*'
+        - '\bprzyszł\w*\s+wynik\w*\b.{0,60}?\b(?:mogą\s+(?:się\s+)?różni\w*|nie\s+(?:są|jest)\s+gwarantowan\w*)'
+        - '\bnie\s+ma\s+gwarancji\b.{0,40}?\b(?:osiągnięcia|realizacji)\b.{0,40}?\b(?:prognoz|zakładan)\w*'
+        - '\b(?:forecasts?|projections?)\b.{0,40}?\b(?:are|is)\s+not\s+(?:a\s+)?(?:reliable|guarantee)'
   # ZASÓB R16 (art. 44 ust. 7): a reference to tax treatment needs both disclaimer parts, "zależności od
   # indywidualnej sytuacji klienta i możliwości zmian". VAT is not tax treatment of the investment, and the
   # disclaimer sentence itself is not a tax reference (a lone disclaimer is not_applicable). Rules-only.

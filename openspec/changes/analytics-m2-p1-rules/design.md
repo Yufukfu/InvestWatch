@@ -170,7 +170,7 @@ Kacper found a catastrophic-backtracking regex in preprocessing. Catalogue patte
   Names stay as they are, because they match `contracts/mocks/generate_mocks.py`.
 - **R9** gets the comment "LLM-first (no rules signal); `not_applicable` with `brak informacji o ryzyku` without risk information".
 - **R13** gets the comment "visual, needs `blocks` (#29)".
-- **New parameter keys** go into `KNOWN_PARAMS`. All of them end in `_patterns`, so the existing validation applies: `comparison_patterns`, `comparison_exclude_patterns`, `benchmark_patterns`, `superlative_patterns`, `forecast_exclude_patterns`, `forecast_verb_patterns`, `source_patterns`, `assumption_patterns`, `short_period_patterns`, `five_year_patterns`, `inception_patterns`, `fee_patterns`, `foreign_currency_patterns`, `currency_warning_patterns`, `forecast_patterns`, `forecast_weak_patterns`, `performance_patterns`, `forecast_disclaimer_patterns`, `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns`, `tax_context_patterns`.
+- **New parameter keys** go into `KNOWN_PARAMS`. All of them end in `_patterns`, so the existing validation applies: `comparison_patterns`, `comparison_exclude_patterns`, `benchmark_patterns`, `superlative_patterns`, `forecast_exclude_patterns`, `forecast_verb_patterns`, `source_patterns`, `assumption_patterns`, `short_period_patterns`, `five_year_patterns`, `inception_patterns`, `fee_patterns`, `foreign_currency_patterns`, `currency_warning_patterns`, `forecast_patterns`, `forecast_weak_patterns`, `performance_patterns`, `forecast_disclaimer_patterns`, `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns`, `tax_context_patterns`, `tax_subject_patterns`.
 
 ### 10. LLM blocks and the seam
 
@@ -217,6 +217,7 @@ The spec requirements stay under the OpenSpec 2.1.1 limit of 500 characters, so 
 - **R16 individual part (`tax_individual_patterns`):** `zależy/uzależnion… od indywidualnej/osobistej sytuacji`, `individual circumstances`.
 - **R16 change part (`tax_change_patterns`):** `może/mogą ulec zmianie / się zmienić`, `subject to change`, `may change`.
 - **R16 tax context (`tax_context_patterns`):** tax words and `przepis…`.
+- **R16 disclaimer subjects (`tax_subject_patterns`):** `traktowanie/korzyść/skutki/przepisy … podatkow…`, `tax treatment`. They are stripped from a disclaimer sentence together with the two parts; the sentence still counts as a tax reference if a tax word is left (`W IKE nie płacisz podatku Belki, choć przepisy mogą ulec zmianie`). The tax stem is `podat(ek|k|nik|nicz)…`, never `podatny` ("susceptible", common in risk warnings). Both came from the group 2 review.
 
 ## Risks / Trade-offs
 

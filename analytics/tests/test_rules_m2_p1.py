@@ -166,3 +166,113 @@ def test_r11_non_list_patterns_fail_at_load(tmp_path):
     with pytest.raises(CatalogueError, match=r"R11 comparison_patterns must be a list"):
         load_with(tmp_path, "R11", {"comparison_patterns": "niż"})
 
+
+# ---- R15 forecasts ------------------------------------------------------------------------------
+
+FORECAST_WARNING = "Prognozy nie są wiarygodnym wskaźnikiem przyszłych wyników."
+FETCHED_2026 = {"fetched_at": "2026-11-21T12:00:00Z"}
+
+
+def test_r15_catalogue_entry(catalogue):
+    spec = catalogue.get("R15")
+    assert spec.implemented
+    assert spec.legal_basis == "art. 44 ust. 6 rozp. del. 2017/565"
+
+
+def test_r15_eurotrade_forecast_without_warning_fails(mock_documents, registry, catalogue):
+    r = run_mock(mock_documents, EUROTRADE_ID, registry, catalogue)["R15"]
+    assert r.result == "fail"
+    assert r.evidence == "W przyszłym roku spodziewamy się jeszcze lepszych wyników."
+    assert r.method == "rule"
+
+
+def test_r15_forecast_with_warning_is_reported_as_pass(registry, catalogue):
+    forecast = "Prognozujemy stopę zwrotu 6% w 2027 roku."
+    r = run(f"{forecast} {FORECAST_WARNING}", registry, catalogue, **FETCHED_2026)["R15"]
+    assert r.result == "pass"
+    assert r.evidence == forecast
+    assert r.explanation.startswith("Wykryto prognozę")
+    assert FORECAST_WARNING in r.explanation
+
+
+def test_r15_weak_marker_with_figure_fails(registry, catalogue):
+    text = "Fundusz będzie zarabiał 12% rocznie."
+    r = run(text, registry, catalogue)["R15"]
+    assert r.result == "fail"
+    assert r.evidence == text
+
+
+def test_r15_weak_marker_without_figure_is_uncertain(registry, catalogue):
+    text = "Wyniki będą zależeć od sytuacji rynkowej."
+    r = run(text, registry, catalogue)["R15"]
+    assert r.result == "uncertain"
+    assert r.evidence == text
+
+
+def test_r15_weak_marker_without_figure_and_warning_passes(registry, catalogue):
+    r = run(f"Wyniki będą zależeć od sytuacji rynkowej. {FORECAST_WARNING}", registry, catalogue)["R15"]
+    assert r.result == "pass"
+
+
+def test_r15_past_performance_disclaimer_does_not_cover_a_forecast(registry, catalogue):
+    forecast = "Prognozujemy wzrost wyników o 6% w 2027 roku."
+    text = f"{forecast} Wyniki historyczne nie są gwarancją przyszłych wyników."
+    r = run(text, registry, catalogue, **FETCHED_2026)["R15"]
+    assert r.result == "fail"
+    assert r.evidence == forecast
+
+
+def test_r15_alfa_imperative_is_not_a_forecast(mock_documents, registry, catalogue):
+    results = run_mock(mock_documents, ALFA_ID, registry, catalogue)
+    assert results["R15"].result == "not_applicable"
+    assert results["R15"].evidence is None
+    assert results["R3"].result == "fail"  # the missing warning next to the return claim stays R3's
+
+
+@pytest.mark.parametrize(
+    "text",
+    [FORECAST_WARNING, "Zyskaj 10% i zarabiaj więcej!", "Pomnażaj kapitał – zarabiaj nawet 15% rocznie.",
+     "Opłata za zarządzanie będzie wynosić 2%.", "Konto będzie aktywne w 5 minut.", "", "Bez kropki"],
+    ids=["lone-warning", "imperatives", "imperative-figure", "fee-percent-with-bedzie", "bedzie-without-results",
+         "empty", "unsegmentable"],
+)
+def test_r15_not_applicable(text, registry, catalogue):
+    r = run(text, registry, catalogue)["R15"]
+    assert r.result == "not_applicable"
+    assert r.evidence is None
+
+
+def test_r15_year_after_fetch_year_is_a_strong_marker(registry, catalogue):
+    text = "W 2028 roku wyniki funduszu wzrosną."
+    assert run(text, registry, catalogue, **FETCHED_2026)["R15"].result == "fail"
+    # The same sentence about a past year is not a forecast.
+    assert run("W 2025 roku wyniki funduszu wzrosły.", registry, catalogue, **FETCHED_2026)["R15"].result == "not_applicable"
+
+
+def test_r15_future_tense_verb_with_figure_in_fetch_year_fails(registry, catalogue):
+    text = "W 2026 zarobisz nawet 12%."
+    r = run(text, registry, catalogue, **FETCHED_2026)["R15"]
+    assert r.result == "fail"
+    assert r.evidence == text
+
+
+def test_r15_future_tense_verb_without_figure_is_not_a_strong_marker(registry, catalogue):
+    # `zarobisz` is strong only with a figure; without one, and without another marker, nothing is detected.
+    assert run("Z nami zarobisz.", registry, catalogue)["R15"].result == "not_applicable"
+
+
+def test_r15_fetch_year_alone_is_not_a_strong_marker(registry, catalogue):
+    # Only a year after the fetch year is strong; in the fetch year a weak marker without a figure stays uncertain.
+    assert run("W 2026 roku wyniki będą lepsze.", registry, catalogue, **FETCHED_2026)["R15"].result == "uncertain"
+
+
+def test_r15_next_year_alone_is_a_strong_marker(registry, catalogue):
+    text = "W przyszłym roku wyniki funduszu wzrosną."
+    r = run(text, registry, catalogue)["R15"]
+    assert r.result == "fail"
+    assert r.evidence == text
+
+
+def test_r15_imperative_is_not_result_vocabulary(registry, catalogue):
+    # Without the imperative exclude, `zarabiaj` + `będzie` would be an uncertain forecast candidate.
+    assert run("Zarabiaj z nami – będzie łatwiej.", registry, catalogue)["R15"].result == "not_applicable"

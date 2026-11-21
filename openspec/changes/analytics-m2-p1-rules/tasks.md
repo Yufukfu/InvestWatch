@@ -12,7 +12,7 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
 
   In addition, the R14 tests run unchanged against a `_PastPerformance` base.
 - [x] 1.2 Add the nested-unbounded-repeat lint to `_check_params` in `rules/engine.py`. Move R14's detector into `_PastPerformance` in `rules/m2.py`, and anchor R14's detector lists in `m2_rules.yaml` (`&pp_figure`, `&pp_amount`, `&pp_amount_return`, `&pp_figure_exclude`, `&pp_past`, `&pp_future`). If an existing pattern is rejected, fix it and log it in `follow-ups.md`. Tests green.
-- [x] 1.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (lint: each guard, the nesting flag, lazy repeats, descent into branches; a quadratic module regex the lint cannot see is caught by the timing test; the moved detector: past and future markers, the year boundary, the amount conjunct). No shipped M1-M3 pattern was rejected. The timing test takes the best of 3 runs per search, so a loaded runner's pause is not a red.
+- [x] 1.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (lint: each guard, the nesting flag, lazy repeats, descent into branches; a quadratic module regex the lint cannot see is caught by the timing test; the moved detector: past and future markers, the year boundary, the amount conjunct). No shipped M1-M3 pattern was rejected. Review fix (opcode identity, a class range like `[+-9]` crashed the load): `mutations: 1 tried, 1 caught`. After the rebase onto llm-p0's faster R14 detector, its 5 detector mutations were re-run: `mutations: 5 tried, 5 caught`. The timing test takes the best of 3 runs per search, so a loaded runner's pause is not a red.
 
 ## 2. R16 tax information (~45 min)
 
@@ -26,11 +26,11 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - `eurotrade` gives `not_applicable`;
   - empty text gives `not_applicable`.
 - [x] 2.2 Write the R16 class. Add `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns` and `tax_context_patterns` (new `KNOWN_PARAMS`), set the legal basis to art. 44 ust. 7, and set `implemented: true`. Tests green.
-- [x] 2.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (VAT strip and its long form, the disclaimer excluded from the trigger, the change part's tax context both ways, each half of the pass condition, each missing part named, both evidence choices, `IKE` as a tax word, the legal basis). Two stage-2 tests change with R16: `test_catalogue_is_complete` lists R16, and `test_compliant_material` gets the tax disclaimer of the `m2-bank-ok` mock (IKE without it is R16's violation).
+- [x] 2.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (VAT strip and its long form, the disclaimer excluded from the trigger, the change part's tax context both ways, each half of the pass condition, each missing part named, both evidence choices, `IKE` as a tax word, the legal basis). Two stage-2 tests change with R16: `test_catalogue_is_complete` lists R16, and `test_compliant_material` gets the tax disclaimer of the `m2-bank-ok` mock (IKE without it is R16's violation). Review fix (`podatny` is not a tax word; a tax claim inside a partial disclaimer still triggers; a generic subject such as "traktowanie podatkowe" is stripped with the disclaimer, new key `tax_subject_patterns`): `mutations: 4 tried, 4 caught`.
 
 ## 3. R15 forecasts (~1 h)
 
-- [ ] 3.1 Write the failing tests for the R15 scenarios:
+- [x] 3.1 Write the failing tests for the R15 scenarios:
   - `eurotrade` gives `fail`, with the forecast as evidence;
   - a forecast with the warning gives `pass`, quoting the forecast, with the explanation starting `Wykryto prognozę`;
   - a weak marker with a figure gives `fail`;
@@ -42,8 +42,8 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - `W 2026 zarobisz nawet 12%.`, fetched in 2026, gives `fail` (a future-tense verb with a figure);
   - the imperatives `zarabiaj` and `zyskaj` are never forecast markers;
   - a fee percentage with `będzie` is not a forecast.
-- [ ] 3.2 Write the R15 class. Add `forecast_patterns`, `forecast_verb_patterns`, `forecast_exclude_patterns` (the imperatives), `forecast_weak_patterns`, `performance_patterns` and `forecast_disclaimer_patterns` (`&forecast_disclaimers`), reusing `*return_figure_exclude`, and set `implemented: true`. Tests green.
-- [ ] 3.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 3.2 Write the R15 class. Add `forecast_patterns`, `forecast_verb_patterns`, `forecast_exclude_patterns` (the imperatives), `forecast_weak_patterns`, `performance_patterns` and `forecast_disclaimer_patterns` (`&forecast_disclaimers`), reusing `*return_figure_exclude`, and set `implemented: true`. Tests green.
+- [x] 3.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 16 tried, 16 caught` (the excludes, the result-vocabulary gate, the future-year boundary and marker, the future-tense verb with and without a figure, both weak-marker branches, the candidate tier, warnings kept out of the trigger, the compliant pass quoting the forecast and starting `Wykryto prognozę`, the R14 disclaimer not counting, the imperative exclude, `w przyszłym roku`). Three survivors on the first run got their own tests (fetch-year boundary, `w przyszłym roku` alone, the imperative as vocabulary).
 
 ## 4. R12a period and scope (~1.25 h)
 
