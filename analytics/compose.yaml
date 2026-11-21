@@ -13,6 +13,11 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       HEALTH_PORT: "8001"
+      # LLM slots (ADR 0304), from the root .env; empty = rules-only (model.llm = null). The client is wired by the
+      # later change analytics-llm-p0. Local fallback: LLM_BASE_URL=http://ollama:11434/v1 with --profile llm.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       # Optional tuning, defaults in analytics/.env.example: WORKER_CONSUMER (hostname), STREAM_BLOCK_MS,
       # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES. REGISTRY_CSV defaults to the bundled fictional seed.
     depends_on:
