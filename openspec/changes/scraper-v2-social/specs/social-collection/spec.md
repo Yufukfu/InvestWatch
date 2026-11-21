@@ -58,7 +58,11 @@ A post that has no text (an image, video or sticker with no caption) SHALL NOT p
 - **THEN** the run ends without a document and without a job error
 
 ### Requirement: Author comes from the channel header
-Every document of a channel SHALL carry `author` with `name` the channel title, `handle` the channel username with a leading `@`, `profile_url` `https://t.me/<handle>` and `followers` the subscriber count as an integer, or null when the header shows none or an unreadable value. A count with a `K` or `M` suffix SHALL be read as thousands or millions (`36.1K` is 36100, `1.2M` is 1200000); a plain number is read as it is.
+Every document of a channel SHALL carry `author` with `name` the channel title, `handle` the channel username with a leading `@`, `profile_url` `https://t.me/<handle>` and `followers` the subscriber count as an integer, or null when the header shows none or an unreadable value. The collector SHALL pass it to ingest as the trusted `author` argument and SHALL NOT put it in the page dict, because ingest drops an `author` that comes from a page (`scraper-author-provenance`, issue 36). A count with a `K` or `M` suffix SHALL be read as thousands or millions (`36.1K` is 36100, `1.2M` is 1200000); a plain number is read as it is.
+
+#### Scenario: Author is a trusted argument
+- **WHEN** a post is ingested
+- **THEN** the channel header reaches ingest as its `author` argument and the page dict has no `author` key
 
 #### Scenario: Subscribers with a suffix
 - **WHEN** the header shows `36.1K subscribers`

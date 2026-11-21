@@ -54,6 +54,20 @@ def _utc(timestamp: str | None) -> str | None:
     return moment.astimezone(timezone.utc).isoformat() if moment.tzinfo is not None else None
 
 
+def build_author(channel: Channel) -> dict:
+    """The contract `author` of every post of the channel: the channel's own header, as the platform shows it.
+
+    It is passed to `Ingestor.ingest` as the trusted `author=` argument. The page dict never carries it: ingest
+    drops an `author` found on a page, because markup is written by the post's author (issue 36).
+    """
+    return {
+        "name": channel.title,
+        "handle": channel.handle,
+        "profile_url": channel.profile_url,
+        "followers": channel.followers,
+    }
+
+
 def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
     """The page dict `Ingestor.ingest` takes for one post: the contract fields the page decides, plus `html`.
 
@@ -68,12 +82,6 @@ def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
         "lang": None,
         "text": post.text,
         "published_at": _utc(post.published_at),
-        "author": {
-            "name": channel.title,
-            "handle": channel.handle,
-            "profile_url": channel.profile_url,
-            "followers": channel.followers,
-        },
         "links": [{"href": link.href, "text": link.text or None} for link in post.links],
         "scrape_meta": {"message_id": post.message_id, "views": post.views, "network": channel.network},
         "html": post.html,

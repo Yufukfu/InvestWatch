@@ -20,7 +20,7 @@ from iw_scraper.identities import draw_identity
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure, parse_page
 from iw_scraper.robots import check_robots
-from iw_scraper.social.model import build_page
+from iw_scraper.social.model import build_author, build_page
 from iw_scraper.social.registry import registry as social_registry
 from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.targets import AddressGuard, UrlGuard, target_guard
@@ -178,11 +178,11 @@ class Collector:
                 return self._partial(source.id, failure, stored)
             duration_ms = int((time.monotonic() - began) * 1000)
             fetched_at = self._clock()
-            inserted = 0
+            inserted, author = 0, build_author(channel)
             for post in channel.posts:
                 outcome = await self._ingestor.ingest(
                     build_page(channel, post, http_status=result.status), source,
-                    fetched_at=fetched_at, duration_ms=duration_ms, proxy=result.proxy_id,
+                    fetched_at=fetched_at, duration_ms=duration_ms, proxy=result.proxy_id, author=author,
                 )
                 if outcome.outcome == "failed":  # the ingestor has recorded it in `job_errors`
                     return AttemptResult(documents=stored + inserted, error=outcome.error, recorded=True)

@@ -87,7 +87,9 @@ async def test_a_telegram_source_yields_documents_with_objects_and_announcements
         assert len(rows) == TEXT_POSTS
         assert {(r["platform"], r["source_kind"]) for r in rows} == {("other", "third_party")}
         assert all(r["url"].startswith("https://t.me/") and len(r["content_hash"]) == 64 for r in rows)
-        assert json.loads(rows[0]["payload"])["scrape_meta"]["network"] == "telegram"
+        payload = json.loads(rows[0]["payload"])
+        assert payload["scrape_meta"]["network"] == "telegram"
+        assert payload["author"]["handle"] == "@kdpwiadomosci" and payload["author"]["followers"] == 45700
         assert all([await storage.exists(r["html_object_key"]) for r in rows])
         assert await rt.redis.xlen(DOCUMENTS_STREAM) == TEXT_POSTS
         assert (await finished(events, source_id))[0] == {"source_id": source_id, "documents": TEXT_POSTS, "status": "ok"}

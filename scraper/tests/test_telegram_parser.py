@@ -8,7 +8,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from iw_scraper.config import contracts_dir
 from iw_scraper.ingest.document import build_document
 from iw_scraper.parsing import ParseFailure
-from iw_scraper.social.model import Link, build_page
+from iw_scraper.social.model import Link, build_author, build_page
 from iw_scraper.social.telegram import parse
 from iw_scraper.types import Reason, Source
 
@@ -168,7 +168,9 @@ def stored_document(post_index: int = 0, fixture: str = "telegram_subetradingpl.
     """(the page dict the collector hands to ingest, the full document ingest builds from it)."""
     channel = parse(load(fixture), SUBE_URL)
     page = build_page(channel, channel.posts[post_index], http_status=200)
-    document = build_document(page, SOURCE, fetched_at=FETCHED, duration_ms=120, proxy=None)
+    document = build_document(
+        page, SOURCE, fetched_at=FETCHED, duration_ms=120, proxy=None, author=build_author(channel)
+    )
     return page, document
 
 
@@ -234,9 +236,7 @@ def test_stored_html_is_the_post_only():
 def test_channel_without_a_header_gives_null_author_fields():
     channel = parse(channel_page(posts=text_post(5, "Cześć")).replace(b"tgme_channel_info_header", b"x"), SUBE_URL)
 
-    page = build_page(channel, channel.posts[0], http_status=200)
-
-    assert page["author"] == {"name": None, "handle": None, "profile_url": None, "followers": 1500}
+    assert build_author(channel) == {"name": None, "handle": None, "profile_url": None, "followers": 1500}
 
 
 def test_post_with_only_whitespace_and_line_breaks_has_no_text():
@@ -373,3 +373,9 @@ def test_older_link_is_only_followed_on_a_channel_preview_path():
     channel = parse(channel_page(posts=text_post(5, "Cześć"), older="/other?before=5"), "https://t.me/other")
 
     assert channel.older_url is None
+
+
+def test_the_page_dict_never_carries_an_author():
+    channel = parse(load("telegram_subetradingpl.html"), SUBE_URL)
+
+    assert "author" not in build_page(channel, channel.posts[0], http_status=200)

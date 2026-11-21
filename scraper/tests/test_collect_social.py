@@ -39,6 +39,7 @@ class Harness:
     calls: list = field(default_factory=list)
     fetched: list = field(default_factory=list)  # (url, identity, proxy)
     ingested: list = field(default_factory=list)
+    authors: list = field(default_factory=list)
     identity: object = field(default_factory=object)
 
     def stages(self) -> Stages:
@@ -62,9 +63,10 @@ class Harness:
             fetch=fetch, draw_identity=lambda: self.identity,
         )
 
-    async def ingest(self, page_dict, source, *, fetched_at, duration_ms, proxy):
+    async def ingest(self, page_dict, source, *, fetched_at, duration_ms, proxy, author=None):
         self.calls.append("ingest")
         self.ingested.append((page_dict, source, proxy))
+        self.authors.append(author)
         url = page_dict["url"]
         if url == self.failing:
             return IngestResult("failed", error=JobError(Reason.STORAGE_ERROR, "upload failed", SRC))
@@ -137,6 +139,19 @@ async def test_valid_channel_url_requests_the_page_and_ingests_each_text_post():
     assert h.ingested[0][0]["url"] == "https://t.me/kdpwiadomosci/5179"
     assert h.ingested[0][0]["scrape_meta"]["network"] == "telegram"
     assert h.ingested[0][1].id == SRC and h.ingested[0][2] == "proxy-1"
+
+
+async def test_the_author_goes_to_ingest_as_the_trusted_argument_not_in_the_page():
+    h = Harness(KDP_PAGES)
+
+    await run(make(h, max_posts=20), h)
+
+    assert all("author" not in page_dict for page_dict, _, _ in h.ingested)
+    assert h.authors[0] == {
+        "name": "KDP - Marek Stiller 🎯", "handle": "@kdpwiadomosci", "profile_url": "https://t.me/kdpwiadomosci",
+        "followers": 45700,
+    }
+    assert all(a == h.authors[0] for a in h.authors)
 
 
 @pytest.mark.parametrize("url", ["https://t.me/SubeTradingPL", "https://t.me/s/ab", "https://t.me/s/a-b-c-d-e"])
