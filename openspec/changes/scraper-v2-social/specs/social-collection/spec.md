@@ -47,7 +47,7 @@ A post that has no text (an image, video or sticker with no caption) SHALL NOT p
 
 #### Scenario: Image-only post
 - **WHEN** a channel page contains a post with a photo and no text
-- **THEN** no document is emitted for it and the other posts of the page are collected
+- **THEN** no document is emitted for it, the other posts of the page are collected and the skipped count is logged
 
 #### Scenario: Page of image-only posts
 - **WHEN** every post on the page has no text
@@ -69,7 +69,7 @@ Every document of a channel SHALL carry `author` with `name` the channel title, 
 - **THEN** `author.followers` is null and the documents are still emitted
 
 ### Requirement: Paging is bounded and stateless
-The collector SHALL read the newest page first and follow the page's link to older posts (`?before=<id>`, 20 posts a page) until it has seen `SOCIAL_MAX_POSTS` posts (default 40) or the next page has no older link. It SHALL stop early when every post with text on a page was already stored. It SHALL keep no state between runs: a rerun starts from the newest page again.
+The collector SHALL read the newest page first and follow the page's link to older posts (`?before=<id>`, 20 posts a page) until it has seen `SOCIAL_MAX_POSTS` posts, with or without text (default 40) or the next page has no older link. It SHALL stop early when every post with text on a page was already stored. It SHALL keep no state between runs: a rerun starts from the newest page again.
 
 #### Scenario: Default cap
 - **WHEN** a channel has 500 posts and `SOCIAL_MAX_POSTS` is unset
@@ -88,7 +88,7 @@ The collector SHALL read the newest page first and follow the page's link to old
 - **THEN** it waits for the per-domain rate limit and passes the same guards as the first
 
 ### Requirement: Channel without a public preview
-A request for a channel that has no public preview (the host answers with a redirect to `https://t.me/<handle>`, off the `/s/` path) SHALL end the run with no document and one job error with reason `parse_error` naming "no public preview". The run SHALL NOT retry it.
+A request for a channel that has no public preview (the host answers with a redirect to `https://t.me/<handle>`, so the final URL is off the `/s/` path) SHALL end the run with no document and one job error with reason `parse_error` naming "no public preview". The run SHALL NOT retry it.
 
 #### Scenario: Preview disabled
 - **WHEN** `https://t.me/s/<handle>` redirects to `https://t.me/<handle>`
