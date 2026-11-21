@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Trend chart
-The dashboard SHALL show the number of findings per time bucket for each module (`M1`, `M2`, `M3`) from `GET /stats/trend` ([integration-plan.md](../../../../.docs/integration-plan.md) §5), drawn with Recharts, as a presentational component that takes its data as props and does not fetch.
+The dashboard SHALL show the number of findings per time bucket for each module (`M1`, `M2`, `M3`) from `GET /stats/trend` (integration plan §5), drawn with Recharts, as a presentational component that takes its data as props and does not fetch.
 
 #### Scenario: Chart from mocks
 - **WHEN** the app runs against the mock handlers

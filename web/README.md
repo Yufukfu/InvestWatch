@@ -4,7 +4,7 @@ Dashboard: findings with filters, trend charts, real-time alerts, threshold cali
 
 - **Owner:** B
 - **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), MSW for mocks, Vitest.
-- **Status:** foundation (app shell, generated client, mock mode, container). Features come next.
+- **Status:** foundation (app shell, generated client, mock mode, container) and the trend chart (Recharts, hourly or daily buckets). Other features come next.
 
 ## Run
 

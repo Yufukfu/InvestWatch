@@ -14,5 +14,5 @@
 
 ## 3. Closing
 
-- [ ] 3.1 Apply the iw-docs-update skill (`.docs/STATUS.md` row, `web/README.md`, docs-check) and add the iw-ai-log row
+- [x] 3.1 Apply the iw-docs-update skill (`.docs/STATUS.md` row, `web/README.md`, docs-check) and add the iw-ai-log row
 - [ ] 3.2 Run the iw-pr-review skill and fix real findings
