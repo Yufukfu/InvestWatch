@@ -29,6 +29,11 @@ class PhraseRule(Rule):
             return self.result(self.hit_result, m.group(0), self.hit_why)
         return self.result("pass", None, self.miss_why)
 
+    def candidates(self, ctx: Context) -> list[str]:
+        """Every sentence holding a phrase (the result quotes only the first)."""
+        patterns = compile_patterns(self.spec.params.get("phrase_patterns", []))
+        return [s.text for s in ctx.pre.sentences if any(p.search(s.text) for p in patterns)]
+
 
 class WindowRule(Rule):
     """Sentences with a buy/sell/hold form (negations removed first) and a noun within ±`window` sentences."""
@@ -97,14 +102,18 @@ class S33Personalisation(PhraseRule):
 class S34InstrumentRecommendation(WindowRule):
     rule_id = "S3.4"
 
+    def candidates(self, ctx: Context) -> list[str]:
+        """Every recommending sentence with an instrument nearby (the result quotes only the first)."""
+        return [ctx.pre.sentences[i].text for i in self._verb_sentences(ctx) if self._near(ctx, i, self._p["instrument"])]
+
     def evaluate(self, ctx: Context) -> RuleResult:
-        for i in self._verb_sentences(ctx):
-            if self._near(ctx, i, self._p["instrument"]):
-                return self.result(
-                    "uncertain", ctx.pre.sentences[i].text,
-                    "Możliwa rekomendacja nabycia, zbycia lub trzymania instrumentów finansowych (art. 76) – "
-                    "do potwierdzenia przez model językowy.",
-                )
+        found = self.candidates(ctx)
+        if found:
+            return self.result(
+                "uncertain", found[0],
+                "Możliwa rekomendacja nabycia, zbycia lub trzymania instrumentów finansowych (art. 76) – "
+                "do potwierdzenia przez model językowy.",
+            )
         return self.result("pass", None, "Brak rekomendacji konkretnych instrumentów finansowych (tryb regułowy).")
 
 

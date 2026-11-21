@@ -26,7 +26,7 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 
 - [x] 4.1 Failing tests (`tests/test_m3.py`) for every rules-only scenario in `specs/m3-unauthorized-advice-signals/spec.md`, on mocks `007bbcee…`, `cdbf5306…` and `72acbb3b…` plus the hand-made cases (plain crypto, crypto CFD, `kupiłam`, English `.com` page, S3.8 crypto signal group, gate cases: S3.3 alone capped, S3.4 alone ≥ 0.7 via a fixed result, both strongest), and the "M3 alongside M1" attribution cases (`@trader_ola`, the firm's own offer, the two M1 mocks)
 - [x] 4.2 `rules/m3.py` (S3.1-S3.6, S3.8; S3.7 catalogue-only), dictionaries in `m3_signals.yaml`, `modules/m3.py` (score with the S3.4 gate, sentence-level attribution, Polish texts, `firm: null`, `advertiser`); tests green
-- [x] 4.3 Mutation check; `mutations: 26 tried, 26 caught` (three first survivors, a verb sentence without crypto, a `.pl` host quote for S3.6 and the art. 2 summary note, got their own test cases; one no-op mutant discarded)
+- [x] 4.3 Mutation check; `mutations: 26 tried, 26 caught` (three first survivors, a verb sentence without crypto, a `.pl` host quote for S3.6 and the art. 2 summary note, got their own test cases; one no-op mutant discarded); review fix: `mutations: 13 tried, 13 caught`
 
 ## 5. Routing, pipeline and CLI (≈ 1 h)
 

@@ -283,7 +283,7 @@ def _attr(text: str, registry, cat) -> bool:
     d = page(text, source_kind="third_party", platform="instagram", url="https://www.instagram.com/p/A1/",
              author={"handle": "@trader_ola"})
     ctx = ctx_of(d, registry)
-    return m3.offer_is_publishers(ctx, run_rules(cat, ctx))
+    return m3.offer_is_publishers(ctx, run_rules(cat, ctx), cat)
 
 
 def test_finfluencer_own_buy_calls(registry, cat):
@@ -297,7 +297,7 @@ def test_firms_own_offer(registry, cat):
 def test_no_advisory_no_offer(mock, registry, cat):
     for doc_id in ("3c41441c-40ba-5864-b3e0-03f8bc9acebe", KASIA):
         ctx = ctx_of(mock(doc_id), registry)
-        assert not m3.offer_is_publishers(ctx, run_rules(cat, ctx))
+        assert not m3.offer_is_publishers(ctx, run_rules(cat, ctx), cat)
 
 
 def test_personalisation_in_own_sentence(registry, cat):
@@ -329,3 +329,50 @@ def test_s36_pl_host(registry, cat):
     d = page("Family office for wealthy families.", url="https://www.majatek-rodzinny.pl/oferta")
     r = signals(d, registry, cat)["S3.6"]
     assert (r.result, r.evidence) == ("fail", "majatek-rodzinny.pl")
+
+
+# ---- group 4 review: false candidates, verb forms, negation scope, attribution over all candidates ----
+
+
+@pytest.mark.parametrize("text", [
+    "Kup kurs teraz! Akcja promocyjna do piątku.",
+    "Kup dostęp do grupy. Opcja roczna taniej.",
+    "Inwestorzy kupują akcje banków.",
+    "Kup kurs i zdobądź certyfikat ukończenia.",
+])
+def test_s34_not_advice(registry, cat, text):
+    assert signals(page(text), registry, cat)["S3.4"].result == "pass"
+
+
+@pytest.mark.parametrize("text", [
+    "Sprzedajcie akcje banków przed wynikami.",
+    "Trzymajcie obligacje skarbowe do końca roku.",
+    "Warto kupić akcje PKO teraz.",
+    "Polecamy akcje PKO BP na ten kwartał.",
+    "Zainwestuj w obligacje skarbowe teraz.",
+    "Kupujcie opcje call na WIG20.",
+])
+def test_s34_recommending_forms(registry, cat, text):
+    assert signals(page(text), registry, cat)["S3.4"].result == "uncertain"
+
+
+def test_s34_negation_stops_at_comma(registry, cat):
+    r = signals(page("Nie rekomendujemy kupna akcji X, ale kupuj ETF na S&P."), registry, cat)["S3.4"]
+    assert r.result == "uncertain"
+
+
+def test_s33_bare_questionnaire_is_not_personalisation(registry, cat):
+    assert signals(page("Otwórz konto. Wypełnij ankietę i zacznij."), registry, cat)["S3.3"].result == "pass"
+
+
+def test_s33_investment_questionnaire(registry, cat):
+    assert signals(page("Wypełnij ankietę inwestycyjną, a dobierzemy portfel."), registry, cat)["S3.3"].result == "uncertain"
+
+
+def test_attribution_checks_every_candidate(registry, cat):
+    assert _attr("EuroTrade Markets rekomenduje kupno akcji PKO. Moja grupa VIP: co tydzień mówię, co kupić z akcji "
+                 "WIG20.", registry, cat)
+
+
+def test_broker_onboarding_is_not_the_publishers_offer(registry, cat):
+    assert not _attr("Otwórz konto w EuroTrade Markets. Wypełnij ankietę i zacznij.", registry, cat)

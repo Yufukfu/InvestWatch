@@ -41,7 +41,8 @@ rules:
         - '(?<!\w)dopasuj\w*\s+(?:\w+\s+){0,3}do\s+(?:Twojej|twojej|Pana|Pani|Państwa)\s+sytuacji(?!\w)'
         - '(?<!\w)konsultacj\w*\s+1\s?:\s?1(?!\w)'
         - '(?<!\w)profil\w*\s+inwestycyjn\w*'
-        - '(?<!\w)ankiet\w*'
+        # Not a bare "ankieta": a broker's MiFID onboarding questionnaire is the firm's, not advice.
+        - '(?<!\w)ankiet\w*\s+(?:inwestycyjn\w*|o\s+(?:Twoich|twoich|Twojej|twojej)\s+(?:celach|sytuacji|finansach))'
         - '(?<!\w)indywidualnie\s+dobier\w*'
         - '(?<!\w)szyt\w*\s+na\s+miarę(?!\w)'
     llm:
@@ -58,28 +59,35 @@ rules:
     implemented: true
     params:
       verb_patterns: &verbs
-        - '(?<!\w)kup(?!\w)'
-        - '(?<!\w)kupuj\w*'
+        # Recommending forms only (imperatives, "rekomendujemy", "warto kupić"); a descriptive present tense
+        # ("inwestorzy kupują") or a first-person past ("kupiłam") is not a recommendation.
+        - '(?<!\w)kup(?:cie)?(?!\w)'
+        - '(?<!\w)kupuj(?:cie)?(?!\w)'
         - '(?<!\w)kupn\w+'
-        - '(?<!\w)sprzedaj(?!\w)'
-        - '(?<!\w)sprzedawaj(?!\w)'
+        - '(?<!\w)sprzedaj(?:cie)?(?!\w)'
+        - '(?<!\w)sprzedawaj(?:cie)?(?!\w)'
         - '(?<!\w)sprzedaż\w*'
-        - '(?<!\w)trzymaj(?!\w)'
+        - '(?<!\w)trzymaj(?:cie)?(?!\w)'
+        - '(?<!\w)zainwestuj(?:cie)?\s+w(?!\w)'
         - '(?<!\w)rekomend(?:ujemy|uję|uje)(?!\w)'
         - '(?<!\w)polec(?:am|amy)\s+(?:kupić|kupno|sprzedać|sprzedaż)\w*'
+        - '(?<!\w)polec(?:am|amy)\s+(?=akcj|obligacj|ETF|CFD|kontrakt|certyfikat)'
+        - '(?<!\w)warto\s+(?:kupić|sprzedać|trzymać)(?!\w)'
         - '(?<!\w)co\s+(?:kupić|sprzedać)(?!\w)'
       instrument_patterns: &instruments
-        - '(?<!\w)akcj\w*'
+        - '(?<!\w)akcj\w*(?!\w)(?!\s+promocyj)'
         - '(?<!\w)obligacj\w*'
         - '(?<!\w)ETF\w*'
         - '(?<!\w)CFD(?!\w)'
-        - '(?<!\w)opcj\w*'
+        # Plural options only: "opcja roczna" (a plan) is not an instrument.
+        - '(?<!\w)opcj(?:e|i|ach|ami|om)(?!\w)(?!\s+(?:dostawy|płatności|abonamentu))'
         - '(?<!\w)kontrakt\w*\s+terminow\w*'
         - '(?<!\w)futures(?!\w)'
-        - '(?<!\w)certyfikat\w*'
+        - '(?<!\w)certyfikat\w*\s+(?:inwestycyjn|strukturyzowan|turbo)\w*'
         - '(?<!\w)jednost\w*\s+(?:uczestnictwa|funduszy?)\w*'
       negation_patterns: &negations
-        - '(?<!\w)nie\s+(?:udzielamy|udzielam|dajemy|polecamy|polecam|rekomendujemy|rekomenduję)\b[^.!?]*'
+        # Stops at a comma or semicolon, so "nie rekomendujemy X, ale kupuj ETF" keeps the second call.
+        - '(?<!\w)nie\s+(?:udzielamy|udzielam|dajemy|polecamy|polecam|rekomendujemy|rekomenduję)\b[^.!?,;]*'
       window: 1
     llm:
       when: always

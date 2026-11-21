@@ -30,7 +30,7 @@ S3.2 SHALL be `fail` when the text has a term from its PL/EN dictionary (`family
 - **THEN** S3.2 is `pass`
 
 ### Requirement: S3.3 personalization
-S3.3 SHALL find candidates from its dictionary (`dopasujemy … do Twojej sytuacji`, `konsultacja 1:1` in any inflection, `profil inwestycyjny`, `ankieta`, `indywidualnie dobierzemy`, `szyty na miarę`). It carries an `llm:` block and is sent to the LLM whenever it applies.
+S3.3 SHALL find candidates from its dictionary (`dopasujemy … do Twojej sytuacji`, `konsultacja 1:1` in any inflection, `profil inwestycyjny`, `ankieta inwestycyjna`, `indywidualnie dobierzemy`, `szyty na miarę`). It carries an `llm:` block and is sent to the LLM whenever it applies.
 
 #### Scenario: Personal consultation
 - **WHEN** the mock document `007bbcee…` is analyzed without a judge
@@ -41,7 +41,7 @@ S3.3 SHALL find candidates from its dictionary (`dopasujemy … do Twojej sytuac
 - **THEN** S3.3 is `pass`
 
 ### Requirement: S3.4 recommendation of specific instruments
-S3.4 SHALL find a candidate when a recommending buy, sell or hold form (`kup`, `kupuj`, `kupno`, `sprzedaj`, `sprzedaż`, `trzymaj`, `rekomendujemy`, `rekomenduję`, `polecam kupić`, `co kupić`, `co sprzedać`) occurs within one sentence of an instrument noun from Art. 2-3 of the Act on Trading in Financial Instruments (`akcje`, `obligacje`, `ETF`, `CFD`, `opcje`, `kontrakty terminowe`, `futures`, `certyfikaty`, `jednostki funduszy`), quoting the sentence with the expression. First-person past forms (`kupiłam`, `sprzedałem`) and negated expressions (`nie udzielamy rekomendacji`, `nie polecamy kupna`) SHALL NOT be candidates. Plain crypto-assets (`bitcoin`, `BTC`, `ethereum`, `ETH`, `kryptowaluty`) SHALL NOT count as instruments; crypto CFDs, futures and options SHALL count, because the derivative noun matches whatever the underlying (Art. 2 lit. h/i). It carries an `llm:` block and is sent to the LLM whenever it applies.
+S3.4 SHALL find a candidate when a recommending buy, sell or hold form (such as `kup`, `kupuj`, `kupno`, `sprzedaj`, `sprzedaż`, `trzymaj`, `rekomendujemy`, `rekomenduję`, `polecam kupić`, `co kupić`, `co sprzedać`) occurs within one sentence of an instrument noun from Art. 2-3 of the Act on Trading in Financial Instruments (`akcje`, `obligacje`, `ETF`, `CFD`, `opcje`, `kontrakty terminowe`, `futures`, `certyfikaty`, `jednostki funduszy`), quoting the sentence with the expression. First-person past forms (`kupiłam`, `sprzedałem`) and negated expressions (`nie udzielamy rekomendacji`, `nie polecamy kupna`) SHALL NOT be candidates. Plain crypto-assets (`bitcoin`, `BTC`, `ethereum`, `ETH`, `kryptowaluty`) SHALL NOT count as instruments; crypto CFDs, futures and options SHALL count, because the derivative noun matches whatever the underlying (Art. 2 lit. h/i). It carries an `llm:` block and is sent to the LLM whenever it applies.
 
 #### Scenario: Buy and sell recommendation
 - **WHEN** the mock document `007bbcee…` is analyzed without a judge
@@ -140,7 +140,7 @@ The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m
 - **THEN** the score is above 0.4 and below the score with a judge that confirms S3.4
 
 ### Requirement: M3 alongside M1
-When a document is routed to M1 and S3.3 or S3.4 is `fail` or `uncertain`, analytics SHALL also emit an M3 finding against the publisher if the sentence holding that evidence does not name the matched registry firm (its name, core name or alias), because the offer is then the publisher's own. When every such sentence names the firm, the offer is the firm's and analytics SHALL emit no M3 finding. The M3 finding SHALL have `firm: null` and the publisher as `advertiser`.
+When a document is routed to M1 and S3.3 or S3.4 is `fail` or `uncertain`, analytics SHALL also emit an M3 finding against the publisher if any sentence holding such a candidate does not name the matched registry firm (its name, core name or alias), because the offer is then the publisher's own. When every such sentence names the firm, the offer is the firm's and analytics SHALL emit no M3 finding. The M3 finding SHALL have `firm: null` and the publisher as `advertiser`.
 
 #### Scenario: Finfluencer's own buy calls
 - **WHEN** a Polish `third_party` post by `@trader_ola` says `Konto mam w EuroTrade Markets.` and `Moja grupa: co tydzień mówię, co kupić z akcji WIG20.`

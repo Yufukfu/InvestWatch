@@ -11,6 +11,7 @@ from datetime import datetime
 
 from ..config import PIPELINE_VERSION
 from ..models import AdvertiserRef, Finding, ModelInfo, RuleResult
+from ..rules import engine
 from ..rules.engine import Catalogue, Context, run_rules
 from ..rules.scoring import capped, sigmoid_score
 
@@ -32,14 +33,19 @@ def score(rules: list[RuleResult], catalogue: Catalogue) -> tuple[float, bool]:
     return (raw, False) if gate_open else (capped(raw, GATE_CAP), True)
 
 
-def offer_is_publishers(ctx: Context, rules: list[RuleResult]) -> bool:
-    """For an M1 document: is an S3.3/S3.4 offer the publisher's own (its sentence does not name the firm)?"""
+def offer_is_publishers(ctx: Context, rules: list[RuleResult], catalogue: Catalogue) -> bool:
+    """For an M1 document: is an S3.3/S3.4 offer the publisher's own?
+
+    The offer is the registered firm's only when every sentence holding it names the firm (design decision 9);
+    every rule candidate is checked, plus the result's own quote (an LLM verdict may quote another sentence).
+    """
     match = ctx.firm_match
     for r in rules:
-        if r.rule_id not in ("S3.3", "S3.4") or r.result not in PRESENT or not r.evidence:
+        if r.rule_id not in ("S3.3", "S3.4") or r.result not in PRESENT:
             continue
-        sentence = _sentence_of(ctx, r.evidence)
-        if match is None or ctx.registry.find_name(match.firm, sentence) is None:
+        rule = engine._RULES[r.rule_id](catalogue.get(r.rule_id))
+        sentences = rule.candidates(ctx) + ([_sentence_of(ctx, r.evidence)] if r.evidence else [])
+        if any(match is None or ctx.registry.find_name(match.firm, s) is None for s in sentences):
             return True
     return False
 
