@@ -14,7 +14,7 @@ Review of PR #12 (hen68) found that the layering check is not a CI check yet (CI
 - Tests: all five status labels and the fallback, page wiring of loading and error, summary through `App`, a settled-state wait instead of a sleep; `makeStore` is used by `App.test.tsx`.
 - The mutation tallies are listed per mutant in the archived `tasks.md` of this change instead of bare counts.
 
-**Out of scope:** new features, contracts, CI workflow changes, ADR 0204 text. Owner B.
+**Out of scope:** new features, contracts, CI workflow changes, ADR 0204 text. Owner Kacper.
 
 ## Capabilities
 

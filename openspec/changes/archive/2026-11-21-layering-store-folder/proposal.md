@@ -9,7 +9,7 @@ hen68's approving review of PR #12 found that `../../../store/index` is not bloc
 - Add `**/store/**` to the restricted patterns, with a layering test case.
 - State in `.claude/rules/web-dashboard.md` what the guard does not catch (alias or absolute paths, a sibling `./data` folder, a `model.ts` that re-exports from `data/`, dynamic `import()`).
 
-**Out of scope:** CI lint/typecheck steps (workflow, owner B), fake-timer polling test. No spec change: the requirement already says "the store".
+**Out of scope:** CI lint/typecheck steps (workflow, owner Kacper), fake-timer polling test. No spec change: the requirement already says "the store".
 
 ## Capabilities
 

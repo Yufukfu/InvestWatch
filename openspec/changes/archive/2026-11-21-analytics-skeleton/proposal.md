@@ -14,7 +14,7 @@ Integration #1 (Sat 17:00) needs analytics to turn a `ScrapedDocument` into sche
 - Add a router (`firm_own` → M2; `third_party` / `unknown` → skipped and logged for now), an M2 module that builds the Finding (Polish title and summary, raw `score`), and a pure `analyze(document) -> list[Finding]` pipeline.
 - Add a CLI: `python -m investwatch_analytics.cli <file.json>` analyzes a document, or a list of them, and prints findings as JSON with no infrastructure.
 - Out of scope, each in a later change: the Redis Stream worker, Postgres storage, `iw:events` publishing and `finding.high_risk` thresholds (plan §12.3 steps 7-8, next change `analytics-worker`); the Dockerfile (step 9); rules R4-R18; modules M1 and M3; the LLM layer (`model.llm` is always `null` here); the real KNF page loader; the gold set and `eval/run.py`.
-- Owner: module C (`analytics/`).
+- Owner: Damian's module (`analytics/`).
 - Contracts: reads `ScrapedDocument` v1 and produces `Finding` v1 (`.docs/integration-plan.md` §3, §4). Changes no contract, REST route or event. Output is checked with `contracts/validate.py`.
 
 ## Capabilities

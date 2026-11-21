@@ -12,7 +12,7 @@ The dashboard's three feature components (`FindingsTable`, `SummaryCards`, `Heal
 - Tests: `App.test.tsx` stays as the integration test with a real store; add props-only component tests and an MSW data-hook test per feature.
 - No change to what the user sees: same Polish texts, same loading, error and down states.
 
-**Out of scope:** new features (filters, trend chart, alerts, calibration panel, status change), the `recharts` install and the trend chart (separate change `trend-chart`), contracts, REST routes and events. This change touches no contract, route or event. Module B owns it.
+**Out of scope:** new features (filters, trend chart, alerts, calibration panel, status change), the `recharts` install and the trend chart (separate change `trend-chart`), contracts, REST routes and events. This change touches no contract, route or event. Kacper's module owns it.
 
 ## Capabilities
 
