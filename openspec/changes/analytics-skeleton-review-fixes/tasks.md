@@ -24,5 +24,5 @@
 
 ## 5. Closing
 
-- [ ] 5.1 Apply iw-docs-update (follow-ups, STATUS row) and add the iw-ai-log row
+- [x] 5.1 Apply iw-docs-update (follow-ups, STATUS row) and add the iw-ai-log row
 - [ ] 5.2 Run iw-pr-review checks and fix real findings

@@ -19,7 +19,7 @@ Last updated: 2026-11-21 (Sat) by Damian. Update this file when a milestone move
 |---|---|---|---|
 | scraper | A | SDLC merged; `scraper-v1` proposed (specs, design, tasks), not applied; ADRs 0101-0103 drafted, awaiting a human decision | `scraper-v1` (proposed) |
 | dashboard | B | foundation: app shell, RTK Query client generated from `contracts/openapi.yaml`, mock mode, hardened container, root compose with Postgres + HTTPS gateway (`infra/`) | none (`web-setup` archived) |
-| analytics, api, contracts | Damian | contracts v1 in `contracts/`, core frozen; ADRs 0301-0305 accepted (PR #3); analytics: `analytics-skeleton` applied on `analytics/analytics-skeleton` (pure pipeline, registry, M2 rules R1-R3, CLI; no worker, storage or events yet), PR pending; proposed on their own branches, awaiting approval: `infra-compose`, `api-db-schema` + `api-v1`, `analytics-worker`; `api/` not created on `main` | `analytics-skeleton` (applied) |
+| analytics, api, contracts | Damian | contracts v1 in `contracts/`, core frozen; ADRs 0301-0305 accepted (PR #3); analytics: `analytics-skeleton` applied on `analytics/analytics-skeleton` (pure pipeline, registry, M2 rules R1-R3, CLI; no worker, storage or events yet), PR #10 open, Kacper's review fixed in `analytics-skeleton-review-fixes`; proposed on their own branches, awaiting approval: `infra-compose`, `api-db-schema` + `api-v1`, `analytics-worker`; `api/` not created on `main` | `analytics-skeleton`, `analytics-skeleton-review-fixes` (applied) |
 
 ## Blockers and open decisions
 
