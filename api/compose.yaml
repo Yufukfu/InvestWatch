@@ -1,0 +1,31 @@
+# api/ deployment unit (owner C). Included from the root compose.yaml next to infra/compose.yaml.
+# api-migrate applies the shared schema once and exits; scraper, analytics and api start only after it:
+#   depends_on:
+#     api-migrate: { condition: service_completed_successfully }
+services:
+  api-migrate:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    image: investwatch/api:${IW_VERSION:-dev}
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      # Admin role: DDL. Only this one-shot job gets it; services connect as the app role.
+      DATABASE_ADMIN_URL: postgresql://${POSTGRES_ADMIN_USER:-iw_admin}:${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+
+networks:
+  data:
+    name: iw-data
+    internal: true
