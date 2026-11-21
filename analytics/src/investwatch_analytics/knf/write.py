@@ -124,27 +124,39 @@ def render_meta(fetched: dict[str, FetchedList], firms: list[Firm], summary: Sum
     }
 
 
-def _write_temp(target: Path, text: str) -> Path:
+def _write_temp(target: Path, text: str, temps: list[Path]) -> Path:
     fd, name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
+    temps.append(Path(name))  # registered before writing, so a failed write leaves nothing behind
     with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
         fh.write(text)
     return Path(name)
 
 
 def write_registry(csv_path: Path, csv_text: str, meta: dict) -> None:
-    """Write both files atomically. The CSV is loaded back first; on any failure the old files stay."""
+    """Write both files as a pair. The CSV is loaded back first. The meta file is replaced first and put back
+    if the CSV rename fails, so the old CSV never sits next to new counts. Failures raise `invalid_output`
+    (the output does not load) or `write_failed` (the file system); the old files stay."""
     temps: list[Path] = []
+    meta_file = meta_path(csv_path)
     try:
-        tmp_csv = _write_temp(csv_path, csv_text)
-        temps.append(tmp_csv)
+        tmp_csv = _write_temp(csv_path, csv_text, temps)
         try:
             Registry.from_csv(tmp_csv)
         except RegistryError as exc:
             raise KnfError("invalid_output", f"generated registry does not load: {exc}") from exc
-        tmp_meta = _write_temp(meta_path(csv_path), json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
-        temps.append(tmp_meta)
-        os.replace(tmp_csv, csv_path)
-        os.replace(tmp_meta, meta_path(csv_path))
+        tmp_meta = _write_temp(meta_file, json.dumps(meta, ensure_ascii=False, indent=2) + "\n", temps)
+        old_meta = meta_file.read_bytes() if meta_file.exists() else None
+        os.replace(tmp_meta, meta_file)
+        try:
+            os.replace(tmp_csv, csv_path)
+        except OSError:
+            if old_meta is None:
+                meta_file.unlink(missing_ok=True)
+            else:
+                meta_file.write_bytes(old_meta)
+            raise
+    except OSError as exc:
+        raise KnfError("write_failed", f"{csv_path}: {exc}") from exc
     finally:
         for t in temps:
             t.unlink(missing_ok=True)

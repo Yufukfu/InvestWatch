@@ -343,3 +343,20 @@ def test_shared_domain_stays_with_the_polish_firm():
 def test_polish_country_name_in_brackets_is_not_an_alias():
     (f,), _ = build(_fetched(no_branch=_list("no_branch", _record("Kappa Invest (Niemcy) GmbH"))))
     assert "Niemcy" not in f.aliases
+
+
+# ---- review fixes (group 5: the real snapshot) -----------------------------------------------------
+
+
+def test_trade_name_in_capitals_is_never_split():
+    assert trade_names("nazwa handlowa: LONDON AND CAPITAL WEALTH MANAGEMENT EUROPE") == [
+        "LONDON AND CAPITAL WEALTH MANAGEMENT EUROPE"]
+
+
+def test_cities_function_words_and_market_terms_are_no_aliases():
+    rec = _record("W1M Europe Ltd", Dodatkowe_informacje="nazwy handlowe: London, And, Shares, Dealing, OTF, Man, Plum")
+    (f,), report = build(_fetched(no_branch=_list("no_branch", rec)))
+    assert not {"London", "And", "Shares", "Dealing", "OTF", "Man"} & set(f.aliases)
+    assert "Plum" in f.aliases  # a real brand stays
+    reasons = {a: r for _, a, r in report.dropped_aliases}
+    assert reasons["London"] == "generic" and reasons["Man"] == "ambiguous"

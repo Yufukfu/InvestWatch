@@ -76,7 +76,7 @@ def _stopwords() -> frozenset[str]:
 STOPWORDS = _stopwords() | {w.casefold() for name in COUNTRIES for w in name.split()}
 #: Single words that name a well-known company outside the register (`PGE`: PGE Polska Grupa Energetyczna, not
 #: PGE Dom Maklerski). Dropped as a bare alias only; longer forms (`PGE Dom Maklerski`) stay.
-AMBIGUOUS_WORDS = frozenset({"pge"})
+AMBIGUOUS_WORDS = frozenset({"pge", "man"})
 
 
 @dataclass
@@ -152,7 +152,8 @@ def trade_names(notes: str) -> list[str]:
             part = part.strip(" ,;:")
             tokens = part.split()
             # "AccurateFX XGLOBAL AHMZTradeFX": three or more brand-like tokens are separate names.
-            if len(tokens) >= 3 and all(_brand_like(t) for t in tokens):
+            # A name in capitals only (`LONDON AND CAPITAL WEALTH MANAGEMENT EUROPE`) is one name, never split.
+            if len(tokens) >= 3 and not part.isupper() and all(_brand_like(t) for t in tokens):
                 names += tokens
             elif part:
                 names.append(part)

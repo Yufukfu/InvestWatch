@@ -148,21 +148,73 @@ def test_list_moved_exits_1(tmp_path, capsys):
     assert [l for l in _logs(capsys) if l["msg"] == "knf load failed"][0]["reason"] == "list_moved"
 
 
-def test_interrupted_write_keeps_the_old_file_loadable(tmp_path, monkeypatch):
-    _run(tmp_path)
-    before = (tmp_path / "knf.csv").read_bytes()
-
-    def boom(src, dst):
-        raise OSError("disk full")
-
-    monkeypatch.setattr(write_mod.os, "replace", boom)
+def _renamed_bank_fetcher() -> FakeFetcher:
     renamed = read("banks.html").replace("VeloBank S.A.", "NowyBank S.A.")  # new content, so a write shows
-    with pytest.raises(OSError):
-        _run(tmp_path, fetcher=FakeFetcher(overrides={SOURCES["banks"].url: renamed,
-                                                      SOURCES["banks"].page_url(2): renamed}))
-    assert (tmp_path / "knf.csv").read_bytes() == before
+    return FakeFetcher(overrides={SOURCES["banks"].url: renamed, SOURCES["banks"].page_url(2): renamed})
+
+
+def _snapshot_dir(tmp_path) -> dict[str, bytes]:
+    return {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
+@pytest.mark.parametrize("fail_call", [1, 2])  # 1: the meta rename, 2: the CSV rename after the meta one
+def test_interrupted_rename_keeps_the_old_pair(tmp_path, monkeypatch, capsys, fail_call):
+    _run(tmp_path)
+    before = _snapshot_dir(tmp_path)
+    real_replace, calls = write_mod.os.replace, []
+
+    def flaky(src, dst):
+        calls.append(dst)
+        if len(calls) == fail_call:
+            raise PermissionError("file is open in another program")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(write_mod.os, "replace", flaky)
+    capsys.readouterr()
+    code, _, _ = _run(tmp_path, fetcher=_renamed_bank_fetcher())
+    assert code == 1
+    assert [l for l in _logs(capsys) if l["msg"] == "knf load failed"][0]["reason"] == "write_failed"
+    assert _snapshot_dir(tmp_path) == before  # same CSV, same meta, no temp files
     Registry.from_csv(tmp_path / "knf.csv")
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["knf.csv", "knf.meta.json"]  # no temp files left
+
+
+def test_failed_write_of_a_temp_file_leaves_nothing(tmp_path, monkeypatch, capsys):
+    _run(tmp_path)
+    before = _snapshot_dir(tmp_path)
+    real_fdopen = write_mod.os.fdopen
+
+    class FullDisk:
+        def __init__(self, fd, *a, **k):
+            self._fh = real_fdopen(fd, *a, **k)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self._fh.close()
+            return False
+
+        def write(self, text):
+            raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(write_mod.os, "fdopen", FullDisk)
+    capsys.readouterr()
+    code, _, _ = _run(tmp_path, fetcher=_renamed_bank_fetcher())
+    assert code == 1 and _snapshot_dir(tmp_path) == before
+    assert [l for l in _logs(capsys) if l["msg"] == "knf load failed"][0]["reason"] == "write_failed"
+
+
+def test_first_write_failure_leaves_no_meta(tmp_path, monkeypatch):
+    real_replace = write_mod.os.replace
+
+    def csv_fails(src, dst):
+        if str(dst).endswith(".csv"):
+            raise PermissionError("locked")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(write_mod.os, "replace", csv_fails)
+    code, _, _ = _run(tmp_path)
+    assert code == 1 and list(tmp_path.iterdir()) == []
 
 
 def test_output_that_does_not_load_is_refused(tmp_path, monkeypatch, capsys):
