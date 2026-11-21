@@ -188,13 +188,13 @@ All dictionaries live in `m2_rules.yaml`. Risk-warning patterns are shared with 
 - **Prompt injection makes the model answer `pass` on a deferred check.** → The model never sees deterministic fails. Its quote must verify against the chunk. Answers for unrequested ids are dropped. The worst case is one borderline check flipping, which shows in the dashboard as `method: hybrid` with the model's quote. The `focus: security` review covers this.
 - **The LLM can move a borderline R3 from `fail` to `pass`**, but only in the near-window proximity case. It never reaches an absent warning (resolved question 1).
 - **R17 rules-only passes a bare supervisor mention**, so with the LLM down the `m2-alfa-landing` R17 shows `pass`. R18 still fails there (resolved question 2).
-- **Demo LLM default is pending Damian's decision.** The task text requires "wyłącznie darmowych modeli AI… całkowicie eliminując zewnętrzne, płatne API", names "vllm, lama.cpp lub ollama" and "Gemma4 lub… BERT", and asks for on-premise via one Docker Compose command. The jury's fit-to-specification criterion (20%) counts that. ADR 0304 currently makes a hosted model the default under a mentor exception. This change does not decide it and writes no ADR for it. It makes local Ollama with Gemma a fully supported and tested path that can be the demo default:
-  - the stub tests cover exactly the request shape Ollama `/v1` accepts;
+- **LLM default: hosted.** The default is a hosted OpenAI-compatible model ([ADR 0304](../../../.docs/decisions/0304-llm-serving.md), mentor exception), and local Ollama with Gemma (`gemma3:4b`) is the env-only swap target. Damian confirmed this on 2026-11-21 and kept ADR 0304. The task document asks for free, on-premise models only, and ADR 0304's mentor exception covers using a hosted model during the hackathon. The swap target must keep working:
+  - the stub-server tests cover exactly the request shape that Ollama `/v1` accepts;
   - `.env.example` documents the local values (`http://ollama:11434/v1`, `gemma3:4b`) next to the hosted ones;
   - `llm_mode` is logged;
-  - manual task 12.4 runs the mocks against the local profile.
+  - manual task 12.4 runs the mocks against both.
 
-  Making local the default is a change of `.env` values only.
+  Swapping is a change of `.env` values only.
 - **The visual rules depend on the `blocks` shape**, which stays provisional until it is settled with Adam (STATUS). → `not_applicable` without `blocks`, and every block field read except `text`, `font_size_px`, `visible` and `viewport` is optional.
 - **Spec merge order.** `analytics-m1-m3` will likely modify `document-analysis` (routing), while this change modifies its Preprocessing and M2 finding assembly requirements. They are different requirements, but whichever archives second re-reads the main spec first.
 - **Cost of a hosted model.** One call per module only when something is deferred, plus the cache. Most compliant pages make zero calls.
@@ -221,8 +221,8 @@ Answered by the coordinating session on Damian's instruction to follow the chall
 4. **R14.** A clear disclaimer anywhere in the material, with no proximity requirement. A footnote-only disclaimer is not a clear one, so R14 fails and R6 also covers the placement. Distance never fails R14 on its own.
 5. **R4/R6 viewports.** Desktop and mobile, plus tablet when present. The worst is reported.
 6. **No risk information.** R4, R6 and R10 (and later R5, R7, R9) are `not_applicable` with `brak informacji o ryzyku`, and R3 carries the violation. R11 and R15 "Flaguje w raporcie" is noted in the catalogue for later.
+7. **LLM default.** Hosted, per ADR 0304; local Ollama with Gemma is the swap target, kept working and covered by the stub-server tests. No new ADR.
 
 ## Open Questions
 
-- **The demo LLM default** (hosted under the ADR 0304 mentor exception, or local Ollama with Gemma per the task text) is Damian's decision. It is not part of this change.
 - **The R14 footnote-only reading** (question 4): `fail` is our reading of "is not only a footnote". If Damian prefers to leave it entirely to R6, it becomes a one-line change to `pass`.

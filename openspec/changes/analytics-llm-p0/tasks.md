@@ -74,7 +74,7 @@ Stage 2. Groups 1-4 are rules-only and can start on `main` before `analytics-wor
 - [ ] 12.1 Failing tests: the worker builds the judge from env with its Redis client and passes it to `analyze`; `llm_mode` logged (`hosted`, `local`, `disabled`); CLI uses the judge when `LLM_BASE_URL` is set (stub), `--no-llm` forces rules-only, CLI output on `contracts/mocks/documents.json` still passes `contracts/validate.py finding` in both modes
 - [ ] 12.2 `worker.py`, `cli.py`, `llm/__init__.build_judge`; `analytics/compose.yaml` passes `LLM_*` and joins `egress` (PR #18 key, no `name:`); `analytics/.env.example` documents every `LLM_*` variable (empty `LLM_BASE_URL` = rules-only; the local values for the `ollama` profile); tests green; `docker compose config` valid with and without `--profile llm`
 - [ ] 12.3 Mutation check; `mutations: N tried, N caught`
-- [ ] 12.4 Manual, outside pytest: run the CLI on all mock documents against the local `ollama` profile (`gemma3:4b`), the candidate demo default (pending Damian's decision on ADR 0304), and once against the hosted endpoint if one is configured; note whether each returns valid JSON and the latency per document; record the result in the AI log, never in a test
+- [ ] 12.4 Manual, outside pytest: run the CLI on all mock documents against the hosted default endpoint (ADR 0304) and against the local `ollama` swap target (`gemma3:4b`); note whether each returns valid JSON and the latency per document; record the result in the AI log, never in a test
 
 ## 13. Closing
 
