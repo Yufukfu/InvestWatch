@@ -1,0 +1,291 @@
+"""Load saved samples (HTML, text, markdown) into the system through the normal ingest, with no network access.
+
+    python -m iw_scraper.sample_import DIR [--kind KIND --modules M1,M3]
+
+Without a `samples.toml` in DIR, `--kind` and `--modules` are required: routing is never inferred. Reading and the
+manifest are in this half of the module; the run against PostgreSQL, Redis and MinIO is below it.
+"""
+
+import json
+import os
+import re
+import stat
+import tomllib
+from dataclasses import dataclass
+from datetime import datetime
+from functools import lru_cache
+from html import escape
+from pathlib import Path
+from urllib.parse import quote, urlsplit
+
+from jsonschema import Draft202012Validator, FormatChecker
+
+from iw_scraper.config import contracts_dir
+from iw_scraper.events import utc_iso
+from iw_scraper.ingest.document import parse_timestamp
+from iw_scraper.parsing import ParseFailure, parse_page
+from iw_scraper.types import Reason
+
+MANIFEST = "samples.toml"
+CLIENT = "sample-import"
+DEFAULT_PLATFORM = "web"
+SAMPLE_HOST = "https://sample.invalid"  # `.invalid` never resolves; the stored schema accepts only http(s) URLs
+MAX_MANIFEST_BYTES = 1_000_000
+_WEB_SCHEMES = frozenset({"http", "https"})
+_SET_KEYS = frozenset({"name", "url", "source_kind", "platform", "target_modules", "lang", "published_at", "author"})
+_FILE_KEYS = frozenset({"url", "source_kind", "platform", "target_modules", "title", "lang", "published_at", "author"})
+
+
+class ManifestError(ValueError):
+    """The manifest or the routing flags are unusable; the message names the key."""
+
+
+@dataclass(frozen=True)
+class Entry:
+    name: str
+    skipped: str | None  # None: will be read; else why it is not ("unsupported", "symlink")
+
+
+@dataclass(frozen=True)
+class FileSettings:
+    """Everything the manifest decides for one file."""
+
+    url: str
+    source_kind: str
+    platform: str
+    target_modules: tuple[str, ...]
+    title: str | None = None
+    lang: str | None = None
+    published_at: str | None = None
+    author: dict | None = None
+
+
+@dataclass(frozen=True)
+class SampleSet:
+    name: str
+    url: str  # of the set's source row
+    source_kind: str
+    platform: str
+    target_modules: tuple[str, ...]
+    slug: str
+    defaults: dict
+    files: dict
+
+    def settings_for(self, file_name: str) -> FileSettings:
+        values = {**self.defaults, **self.files.get(file_name, {})}
+        values.setdefault("url", f"{SAMPLE_HOST}/{self.slug}/{quote(file_name)}")
+        values["target_modules"] = tuple(values["target_modules"])
+        return FileSettings(**values)
+
+
+# --- reading ---------------------------------------------------------------------------------------------------
+
+
+def _read_file(directory: Path, name: str, max_bytes: int) -> bytes:
+    """The file's bytes. Opened without following a symlink and checked on the descriptor, so a file swapped
+    after the scan is still refused; details carry the file name only."""
+    try:
+        fd = os.open(directory / name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as exc:
+        raise ParseFailure(Reason.PARSE_ERROR, f"{name}: cannot be opened ({type(exc).__name__})") from None
+    with os.fdopen(fd, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise ParseFailure(Reason.PARSE_ERROR, f"{name}: not a regular file")
+        too_big = ParseFailure(Reason.PARSE_ERROR, f"{name}: larger than {max_bytes} bytes")
+        if info.st_size > max_bytes:
+            raise too_big
+        data = handle.read(max_bytes + 1)  # the file may have grown since fstat
+        if len(data) > max_bytes:
+            raise too_big
+    return data
+
+
+def _read_html(name: str, data: bytes, settings: FileSettings) -> dict:
+    parsed = parse_page(data, "text/html", settings.url)
+    return {
+        "title": parsed.title,
+        "canonical_url": parsed.canonical_url,
+        "text": parsed.text,
+        "links": [{"href": href} for href in parsed.links],
+        "html": data.decode("utf-8", errors="replace"),
+    }
+
+
+def _read_text(name: str, data: bytes, settings: FileSettings) -> dict:
+    if b"\x00" in data:
+        raise ParseFailure(Reason.PARSE_ERROR, f"{name}: contains NUL bytes, not text")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ParseFailure(Reason.PARSE_ERROR, f"{name}: not valid UTF-8") from None
+    # the ingest stores the HTML of every document and refuses a blank one
+    return {"title": None, "canonical_url": settings.url, "text": text, "links": [], "html": f"<pre>{escape(text)}</pre>"}
+
+
+READERS = {".html": _read_html, ".htm": _read_html, ".txt": _read_text, ".md": _read_text}
+
+
+def _extension(name: str) -> str:
+    return os.path.splitext(name)[1].lower()
+
+
+def scan(directory: Path) -> list[Entry]:
+    """The regular files directly inside `directory`, by name. No recursion, no symlink followed, never guessed.
+    `samples.toml` and dotfiles are not samples: they are neither read nor reported."""
+    entries = []
+    with os.scandir(directory) as found:
+        for entry in sorted(found, key=lambda e: e.name):
+            if entry.name == MANIFEST or entry.name.startswith("."):  # not samples: the manifest, Finder and editor files
+                continue
+            if entry.is_symlink():
+                entries.append(Entry(entry.name, "symlink"))
+            elif entry.is_file(follow_symlinks=False):
+                unsupported = _extension(entry.name) not in READERS
+                entries.append(Entry(entry.name, "unsupported" if unsupported else None))
+    return entries
+
+
+def read_sample(directory: Path, name: str, settings: FileSettings, max_bytes: int) -> tuple[dict, dict | None]:
+    """(page dict for `Ingestor.ingest`, author). The author is only what the manifest says, never the markup.
+
+    Raises `ParseFailure` (`parse_error`, or `empty_text` for HTML without text) naming the file.
+    """
+    data = _read_file(Path(directory), name, max_bytes)
+    try:
+        page = READERS[_extension(name)](name, data, settings)
+    except ParseFailure as failure:
+        raise ParseFailure(failure.reason, f"{name}: {failure.detail}") from None
+    page.update(url=settings.url, scrape_meta={"client": CLIENT, "sample_file": name})
+    page["title"] = settings.title or page["title"]
+    for key in ("lang", "published_at"):
+        if getattr(settings, key):
+            page[key] = getattr(settings, key)
+    return page, settings.author
+
+
+# --- manifest --------------------------------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=2)
+def _validator(schema_file: str) -> Draft202012Validator:
+    schema = json.loads((contracts_dir() / "schemas" / schema_file).read_text(encoding="utf-8"))
+    return Draft202012Validator(schema, format_checker=FormatChecker())
+
+
+def _timestamp(value: object) -> str:
+    moment = parse_timestamp(value) if isinstance(value, str) else value
+    if not isinstance(moment, datetime) or moment.tzinfo is None:
+        raise ValueError("needs a date, a time and an offset")
+    return utc_iso(moment)
+
+
+def _check_web_url(where: str, key: str, value: object) -> None:
+    try:
+        scheme = urlsplit(value).scheme.lower() if isinstance(value, str) else ""
+    except ValueError:
+        scheme = ""
+    if scheme not in _WEB_SCHEMES:
+        raise ManifestError(f"{where}{key}: must be an http or https URL")
+
+
+def _fail_first(validator: Draft202012Validator, fragment: dict, where: str) -> None:
+    """Raise for the first contract violation of `fragment`; a missing required field is not one, it is a fragment."""
+    for error in sorted(validator.iter_errors(fragment), key=lambda e: list(e.absolute_path)):
+        if error.validator != "required":
+            key = ".".join(str(part) for part in error.absolute_path)
+            raise ManifestError(f"{where}{key}: {error.validator} failed")
+
+
+def _validate_layer(values: dict, where: str) -> dict:
+    """`values` checked against the contract, one key at a time, and `published_at` in its stored form."""
+    values = dict(values)
+    if "name" in values and not (isinstance(values["name"], str) and values["name"].strip()):
+        raise ManifestError(f"{where}name: must be a non-empty string")
+    if "url" in values:
+        _check_web_url(where, "url", values["url"])
+    author = values.get("author")
+    if isinstance(author, dict) and author.get("profile_url") is not None:
+        _check_web_url(where, "author.profile_url", author["profile_url"])
+    if "published_at" in values:
+        try:
+            values["published_at"] = _timestamp(values["published_at"])
+        except ValueError:
+            raise ManifestError(f"{where}published_at: must be an RFC 3339 date-time with an offset") from None
+    if "target_modules" in values:
+        _fail_first(_validator("source.schema.json"), {"target_modules": values["target_modules"]}, where)
+    contract_keys = ("source_kind", "platform", "lang", "author", "title", "url")
+    _fail_first(_validator("scraped-document.schema.json"), {k: values[k] for k in contract_keys if k in values}, where)
+    return values
+
+
+def _only_keys(values: dict, allowed: frozenset, where: str) -> None:
+    for key in values:
+        if key not in allowed:
+            raise ManifestError(f"{where}{key}: not a key allowed here")
+
+
+def _read_manifest(directory: Path) -> dict | None:
+    if not os.path.lexists(directory / MANIFEST):
+        return None
+    try:
+        return tomllib.loads(_read_file(directory, MANIFEST, MAX_MANIFEST_BYTES).decode("utf-8"))
+    except ParseFailure as failure:
+        raise ManifestError(f"{MANIFEST}: {failure.detail}") from None
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise ManifestError(f"{MANIFEST}: not valid TOML ({exc})") from None
+
+
+def _file_layers(raw: object, directory: Path) -> dict:
+    if not isinstance(raw, dict) or not all(isinstance(value, dict) for value in raw.values()):
+        raise ManifestError("files: must be a table of tables, one per file name")
+    present = {entry.name for entry in scan(directory)}
+    layers = {}
+    for name, values in raw.items():
+        where = f"files.{name}."
+        _only_keys(values, _FILE_KEYS, where)
+        layers[name] = _validate_layer(values, where)
+        if name not in present:
+            raise ManifestError(f"files.{name}: no such file in the directory")
+    return layers
+
+
+def load_manifest(directory: Path, *, kind: str | None = None, modules: str | None = None) -> SampleSet:
+    """The set's settings from `samples.toml`, with `--kind` and `--modules` as the layer beneath it.
+
+    Every value is checked before anything is read or stored. Without a manifest both flags are required.
+    """
+    directory = Path(directory)
+    manifest = _read_manifest(directory)
+    layer: dict = {"platform": DEFAULT_PLATFORM}
+    if kind is not None:
+        layer["source_kind"] = kind
+    if modules is not None:
+        layer["target_modules"] = [item.strip() for item in modules.split(",")]
+    files: dict = {}
+    if manifest is None:
+        for flag, key in (("--kind", "source_kind"), ("--modules", "target_modules")):
+            if key not in layer:
+                raise ManifestError(f"{flag} is required when the directory has no {MANIFEST}")
+    else:
+        declared = {key: value for key, value in manifest.items() if key != "files"}
+        _only_keys(declared, _SET_KEYS, "")
+        layer.update(declared)
+        files = _file_layers(manifest.get("files", {}), directory)
+    for key in ("source_kind", "target_modules"):
+        if key not in layer:
+            raise ManifestError(f"{key}: set it in {MANIFEST} or with the matching flag")
+    layer = _validate_layer(layer, "")
+
+    folder = directory.resolve().name
+    slug = re.sub(r"[^a-z0-9-]+", "-", folder.lower()).strip("-") or "samples"
+    return SampleSet(
+        name=layer.pop("name", folder or slug),
+        url=layer.pop("url", f"{SAMPLE_HOST}/{slug}"),
+        source_kind=layer["source_kind"],
+        platform=layer["platform"],
+        target_modules=tuple(layer["target_modules"]),
+        slug=slug,
+        defaults=layer,
+        files=files,
+    )

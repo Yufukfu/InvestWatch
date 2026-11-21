@@ -20,6 +20,10 @@ The scraper SHALL provide a command that reads every supported file of a directo
 - **WHEN** the directory holds `skan.pdf`
 - **THEN** it is not ingested, the summary lists it as skipped, and the exit code is unaffected by it
 
+#### Scenario: Files that are not samples
+- **WHEN** the directory holds `samples.toml` and dotfiles such as `.DS_Store`
+- **THEN** none of them is read, ingested or reported as skipped
+
 #### Scenario: Rerun
 - **WHEN** the same directory is imported twice
 - **THEN** the second run inserts no row, publishes no event and reports every file as duplicate
@@ -35,12 +39,16 @@ The command SHALL read `samples.toml` when present, with set-level defaults and 
 - **WHEN** the manifest has `source_kind = "bank"`, an unparsable `published_at` or a `lang` that is not two lowercase letters
 - **THEN** nothing is ingested, no `sources` row is created, the error names the key and the command exits non-zero
 
+#### Scenario: Manifest entry for a missing file
+- **WHEN** the manifest has an entry for `xtb.htm` and the directory holds only `xtb.html`
+- **THEN** nothing is ingested, no `sources` row is created, the error names `xtb.htm` and the command exits non-zero
+
 #### Scenario: No manifest and no routing flags
 - **WHEN** the command runs on a directory without `samples.toml` and without `--kind` or `--modules`
 - **THEN** it refuses with a usage error and ingests nothing
 
 ### Requirement: Take the author only from the manifest
-The command SHALL set `author` on a document only from the manifest and SHALL NOT derive it from a file's content or markup.
+The command SHALL set `author` on a document only from the manifest, passed through the `author` argument of the ingest and never through the page dict, and SHALL NOT derive it from a file's content or markup. A manifest author is supplied by the operator, not verified by a platform.
 
 #### Scenario: Author in markup
 - **WHEN** an HTML sample carries `<meta name="author" content="Jan">` and the manifest gives no author
@@ -56,6 +64,10 @@ The command SHALL ensure one `sources` row for the set (matched by URL, never up
 #### Scenario: Source is never collected
 - **WHEN** the set has been imported
 - **THEN** its source row has `active = false` and `schedule_cron` NULL, and it is absent from the collectable sources
+
+#### Scenario: Set name to URL
+- **WHEN** the directory is named `Próbki UKNF 1` and the manifest gives no `url`
+- **THEN** the source URL is `https://sample.invalid/pr-bki-uknf-1`, a valid http(s) URL
 
 #### Scenario: Known set
 - **WHEN** a source with the set's URL already exists
