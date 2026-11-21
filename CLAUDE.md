@@ -1,6 +1,6 @@
 # InvestWatch
 
-Hackathon system (HackNation, UKNF challenge) that finds risky investment content online. Lightweight separate services, one `docker compose up`, open-source and on-premise only (no paid APIs at runtime). Hand-in: Sun 2026-11-22, 10:30.
+Hackathon system (HackNation, UKNF challenge) that finds risky investment content online. Lightweight separate services, one `docker compose up`, open-source and on-premise, with one mentor-approved exception: the LLM may be a hosted model if it swaps to a local open model (Gemma via Ollama) by env only ([ADR 0304](.docs/decisions/0304-llm-serving.md)). Hand-in: Sun 2026-11-22, 10:30.
 
 ## Docs first
 
@@ -42,7 +42,7 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 ## Hard rules
 
 - No push, PR or merge without a fresh explicit go-ahead from the human. No `--force`, no amending a pushed commit, nothing straight to `main`.
-- Contracts are frozen after Sat 14:30 (hook-enforced; escape `IW_CONTRACT_CHANGE=1`). Changing one needs the whole team and a version bump.
+- Contracts are frozen after Sat 14:30 (hook-enforced; escape `IW_CONTRACT_CHANGE=1`). Changing one needs the whole team and a version bump. Exception until Integration #1 (Sat 17:00): non-required fields are provisional and change without a bump, in a PR reviewed by their consumers ([ADR 0301](.docs/decisions/0301-contracts-v1.md)).
 - Secrets only in untracked `.env` (`.env.example` is tracked). Never print proxy credentials or keys.
 - No `console.log` in committed JS/TS (hook-enforced); Python uses the logger, not `print`; JSON logs to stdout.
 - Stage and commit in separate tool calls. Never use an `IW_*` escape flag without telling the human.

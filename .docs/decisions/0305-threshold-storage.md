@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
+- Deciders: agent-written from Damian's choices; accepted by: pending approval of PR #3
 
 ## Context
 
@@ -24,9 +24,13 @@ Why (Damian):
 - It keeps the event flow of [integration-plan.md](../integration-plan.md) §6, where analytics publishes `finding.high_risk` on `iw:events`; nothing in the flow changes.
 - The API relay stays a plain pass-through from `iw:events` to Socket.IO with no threshold logic, which is less work before Integration #1.
 
+Who applies the threshold, so it happens in exactly two well-defined places:
+- **API (Damian):** owns the key. `PUT /settings/thresholds` writes it, `GET` reads it, and when the key is missing the API writes the defaults. The API derives `risk_level` for REST responses from the current key.
+- **Analytics (Damian):** stores only the raw `score` on the finding. When it creates a finding it reads the key (no cache) and, if `score` is at or above the module threshold, publishes `finding.high_risk` next to `finding.created`. Analytics never computes `risk_level`.
+
 ## Consequences
 
-- No extra table and fast reads; consistent with §6 of [integration-plan.md](../integration-plan.md), which lists `finding.high_risk` among the events analytics publishes on `iw:events`.
-- Contradicts [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) ("the threshold is applied in `api`, never here"); that file must be changed right after this ADR takes effect (PR #3 merges). `risk_level` is still derived by the API for REST responses ([0301](0301-contracts-v1.md)), so the threshold logic lives in two services and both must read the same key.
-- A threshold change from the calibration panel affects only findings analysed after analytics re-reads the key; findings already published are not re-evaluated for `finding.high_risk`.
-- Redis must be persistent (AOF or RDB in `docker compose`), otherwise thresholds are lost on restart; the API needs a default when the key is missing.
+- No extra table and fast reads; `finding.high_risk` keeps its producer from integration-plan §6.
+- The threshold logic sits in two services that read the same key. After a slider move, REST `risk_level` follows the new threshold at once, while `finding.high_risk` alerts already sent are not re-evaluated: an alert reflects the threshold at the moment the finding was created.
+- Redis must be persistent (AOF in `docker compose`), otherwise thresholds fall back to the defaults on restart; set up by Damian together with `docker-compose.yml`.
+- Docs updated in this PR, all owned by Damian: [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) (threshold line), [integration-plan.md](../integration-plan.md) §4 (score comment) and §6 (`finding.high_risk` row), [analytics-plan.md](../analytics-plan.md) §1 (principle 4).

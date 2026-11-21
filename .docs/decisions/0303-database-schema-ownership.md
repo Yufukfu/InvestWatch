@@ -2,11 +2,11 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
+- Deciders: agent-written from Damian's choices; accepted by: pending approval of PR #3
 
 ## Context
 
-The scraper writes `sources` and `documents`, analytics writes `findings` (and later `registry_firms`, `gold_labels`, `calibration_points`), and the API reads all of them and writes statuses and settings ([integration-plan.md](../integration-plan.md) §2-§5, [analytics-plan.md](../analytics-plan.md) §3, §8). §7 of the integration plan says "Database migrations in one place (Alembic in `api`) – A and C never create tables by hand", but the `api/` service is itself undecided ([0302](0302-api-service.md)), and the scraper fetch client is still open (candidate ADR, owner Adam), so the scraper's language is not fixed either.
+The scraper writes `sources` and `documents`, analytics writes `findings` (and later `registry_firms`, `gold_labels`, `calibration_points`), and the API reads all of them and writes statuses and settings ([integration-plan.md](../integration-plan.md) §2-§5, [analytics-plan.md](../analytics-plan.md) §3, §8). §7 of the integration plan says "Database migrations in one place (Alembic in `api`) – Adam and Damian never create tables by hand", but the `api/` service is itself undecided ([0302](0302-api-service.md)), and the scraper fetch client is still open (candidate ADR, owner Adam), so the scraper's language is not fixed either.
 
 Whatever owns the schema must run before the scraper and analytics start under `docker compose up`.
 

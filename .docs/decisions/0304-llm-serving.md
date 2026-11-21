@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
+- Deciders: agent-written from Damian's choices; accepted by: pending approval of PR #3
 
 ## Context
 
@@ -20,14 +20,20 @@ Not measured yet: tokens per second of `gemma3:4b` / `gemma3:12b` on the team's 
 
 ## Decision
 
-None of the three options as written: **analytics uses a cloud-hosted model, on the condition that it is easy to swap for another cloud or local model.** The model is reached only through the env configuration (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`), so switching provider or moving to a local Ollama container is a configuration change, not a code change.
+None of the three options as written: **analytics uses a hosted model during the hackathon, through an OpenAI-compatible chat completions endpoint (for example OpenAI), and keeps a local open model as a drop-in fallback.**
 
-Why (Damian): a cloud model is acceptable only if it can be replaced by another cloud or local model easily.
+- Local fallback: an optional `ollama` service in `docker compose` (behind a compose profile, so a plain `docker compose up` does not download weights) serving `gemma3:4b`.
+- Swap: analytics speaks only the OpenAI-compatible API, which Ollama also serves under `/v1`. Moving between a hosted provider and local Gemma changes `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` only, with no code change and no provider-specific SDK.
+
+Evidence: the HackNation UKNF challenge mentors told the team on 2026-11-21 that a hosted provider such as OpenAI is fine for the hackathon scope, as long as the codebase makes it easy to swap to open-source models (Gemma or others) later (relayed by Adam in a PR #3 comment). Section 5 of the task PDF still says free models only and no external paid APIs, so this is a **mentor exception**, not something the PDF states.
+
+Why (Damian): a hosted model is acceptable only if it can be replaced by another hosted or a local model easily, which is also the mentors' condition.
 
 ## Consequences
 
-- No local hardware limits during development; the unmeasured tokens-per-second of local Gemma stops blocking work.
-- Conflicts with the UKNF task (section 5: on-premise, free models, no external paid APIs, whole stack started with one command) and with "no paid APIs" in [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md). This costs points in "compliance with the specification" (20%) unless the demo runs on a local model; the team has to decide that before the demo, and `analytics/CLAUDE.md` must be updated right after this ADR takes effect (PR #3 merges).
-- The LLM client in analytics must not depend on one provider's API: either the chosen cloud endpoint is Ollama-compatible, or analytics gets a thin client layer covering both that provider and Ollama. Prompts are tested on at least two backends.
-- Runtime depends on an external service: the rules-only fallback ([analytics-plan.md](../analytics-plan.md) §7) has to work when the endpoint is unreachable or the API key is missing; `LLM_API_KEY` stays out of the repository.
-- The gold-set evaluation ([analytics-plan.md](../analytics-plan.md) §8) has to be re-run after any model swap.
+- No local hardware limits during development; the unmeasured tokens per second of local Gemma matters only for the fallback.
+- The jury still reads the PDF requirement: the hand-in README and the demo must name the mentor exception and show the local fallback (`gemma3:4b` through the compose profile), otherwise "compliance with the specification" (20%) may lose points.
+- No provider-specific features: prompts use only what both a hosted OpenAI-compatible endpoint and Ollama `/v1` support (chat messages, `temperature`, JSON response format). Prompts are tested on both backends before the demo.
+- Runtime depends on an external service: the rules-only fallback ([analytics-plan.md](../analytics-plan.md) §7) covers an unreachable endpoint or a missing key; `LLM_API_KEY` lives only in `.env`.
+- The gold-set evaluation ([analytics-plan.md](../analytics-plan.md) §8) is re-run after any model swap.
+- Docs updated in this PR: root `CLAUDE.md` (on-premise line), [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) (LLM line), [integration-plan.md](../integration-plan.md) §1 and §7, [analytics-plan.md](../analytics-plan.md) §1, §7 and risks. The `ollama` compose profile is added by Damian together with `docker-compose.yml`.

@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
+- Deciders: agent-written from Damian's choices; accepted by: pending approval of PR #3
 
 ## Context
 
@@ -25,13 +25,19 @@ Evidence: `python contracts/validate.py` validates all mocks against the schemas
 
 ## Decision
 
-Option 3: **accept a minimal core now, extend later.** Frozen at Sat 14:30 are only the required fields: `ScrapedDocument` (`id, platform, source_kind, url, fetched_at, text`) and the required list of `Finding` in `contracts/schemas/finding.schema.json`. Every other field stays provisional until Integration #1.
+Option 3: **accept a minimal core now, extend later**, applied to every v1 contract file:
+
+- **Frozen core (since Sat 14:30):** the `required` lists of every schema: `ScrapedDocument` (`id, platform, source_kind, url, fetched_at, text`, and `viewport, text, font_size_px, visible` inside a block), `Finding` (its 11 required fields and `rule_id, name, result, severity` inside a rule result), `Source` (`id, name, platform, url, source_kind, target_modules, active`), and the required fields of the envelopes in `events.schema.json` (`document_message`, `scan_request`, `finding_brief`, `event`). In `openapi.yaml`: the 11 paths with their methods and the required fields of their responses, which is what Kacper builds the dashboard against.
+- **Provisional until Integration #1 (Sat 17:00):** every non-required property (for example `blocks`, `screenshots`) and every optional query parameter. After Integration #1 the whole of v1 is frozen and the general rule applies.
+
+How this fits the freeze hook: `git-guard` freezes the whole files under `contracts/schemas/`, `contracts/mocks/` and `contracts/openapi.yaml` and cannot tell fields apart, so the hook stays as it is. A change to a provisional field before Sat 17:00 is committed with the escape `IW_CONTRACT_CHANGE=1`, without a version bump, in a PR reviewed by the consumers of that field (Adam for documents and sources, Kacper for the REST API), with regenerated mocks and `python contracts/validate.py` passing. A change to the frozen core, or any change after Sat 17:00, still needs the whole team and a version bump. Root `CLAUDE.md` and `contracts/CLAUDE.md` state this exception.
 
 Why (Damian): the remaining fields, `blocks` and `screenshots` in particular, depend on decisions that are still open on Adam's side (Playwright boundary, fetch client), so freezing them now would freeze guesses.
 
 ## Consequences
 
-- Everyone can build against the required fields today; changing them after the freeze needs the whole team and a version bump (root `CLAUDE.md`).
-- Provisional fields are where mismatches between services are most likely: producers and consumers of any optional field must check it against `contracts/validate.py` and the mocks before Integration #1.
+- Everyone builds against the frozen core today; it changes only with the whole team and a version bump.
+- Provisional fields are where mismatches between services are most likely: any producer or consumer of an optional field checks it against `contracts/validate.py` and the mocks before Integration #1.
+- Each provisional change uses `IW_CONTRACT_CHANGE=1`, so per root `CLAUDE.md` the human is told every time the flag is used; review by the field's consumers replaces the version bump for this window only.
 - Rules R4-R8 and R13 keep returning `not_applicable` until `blocks`/`screenshots` are settled ([analytics-plan.md](../analytics-plan.md) §5).
-- Revisit at Integration #1 (Sat 17:00): promote the provisional fields that are actually produced to frozen, drop the rest, and record it in a superseding ADR.
+- At Integration #1 (Sat 17:00) the provisional window closes; fields nobody produces stay optional and are documented as unused rather than removed, so no version bump is needed.

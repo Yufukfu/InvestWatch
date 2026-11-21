@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-21
-- Deciders: agent-written from Damian's choices; accepted by Adam, Kacper and Damian via PR #3
+- Deciders: agent-written from Damian's choices; accepted by: pending approval of PR #3
 
 ## Context
 
