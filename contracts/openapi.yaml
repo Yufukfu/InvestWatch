@@ -3,7 +3,7 @@ info:
   title: InvestWatch API
   version: 1.0.0
   description: |
-    REST API between the `api` service (owner: Damian) and the dashboard (owner: Kacper).
+    REST API between the `api` service (owner: C) and the dashboard (owner: B).
     Real-time events are delivered over Socket.IO (namespace `/events`), see `schemas/events.schema.json`.
     Mock responses for every endpoint are in `mocks/`.
 servers:
