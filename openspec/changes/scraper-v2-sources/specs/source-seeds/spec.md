@@ -6,7 +6,7 @@ The vetted set of web sources the scraper starts with for modules M1, M2 and M3,
 ## ADDED Requirements
 
 ### Requirement: Seed file is validated before any write
-The seed command SHALL read the entries from the tracked seed file and validate all of them before inserting any. An entry is valid only when `platform` is `web`, `source_kind` is `firm_own`, `third_party` or `unknown` (the contract's closed set), `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host, `schedule_cron` is a valid five-field cron expression or null, and no other entry has the same URL. A single invalid entry SHALL abort the run with a message naming the entry, and no row SHALL be written.
+The seed command SHALL read the entries of every `*.toml` file in the seed directory and validate all of them together before inserting any. An entry is valid only when `name` is non-empty, `platform` is one of the contract's platform values (`web` when the entry omits it; the entries of `sources.toml` are all `web`), `source_kind` is `firm_own`, `third_party` or `unknown` (the contract's closed set), `target_modules` is a non-empty set drawn from `M1`, `M2`, `M3`, the URL is an `https` URL with a host, `schedule_cron` is a valid cron expression of exactly five fields or null, and no other entry has the same URL. A single invalid entry SHALL abort the run with a message naming the entry, and no row SHALL be written.
 
 #### Scenario: Valid file
 - **WHEN** every entry satisfies the rules
@@ -20,6 +20,14 @@ The seed command SHALL read the entries from the tracked seed file and validate 
 - **WHEN** two entries share a URL
 - **THEN** the command exits with an error naming both and no row is inserted
 
+#### Scenario: Several seed files
+- **WHEN** the seed directory holds `sources.toml` and a second valid file whose entries have `platform = other`
+- **THEN** both files' entries are validated, and inserted when valid, with no code change; the same URL in both files is a duplicate and aborts the run
+
+#### Scenario: Platform outside the contract set
+- **WHEN** an entry has `platform = "myspace"`
+- **THEN** the command exits with an error naming that entry and no row is inserted
+
 #### Scenario: Invalid cron
 - **WHEN** an entry has `schedule_cron = "every day"`
 - **THEN** the command exits with an error naming that entry
@@ -29,7 +37,7 @@ The seed command SHALL insert an entry only when no `sources` row has the same U
 
 #### Scenario: First run
 - **WHEN** the command runs against an empty `sources` table
-- **THEN** one row per entry exists with the entry's name, `platform = web`, URL, `source_kind`, `target_modules`, `schedule_cron` and `active = true`
+- **THEN** one row per entry exists with the entry's name, its `platform` (`web` for every `sources.toml` entry), URL, `source_kind`, `target_modules`, `schedule_cron` and `active = true`
 
 #### Scenario: Second run
 - **WHEN** the command runs again unchanged
@@ -86,7 +94,7 @@ Every seeded host SHALL be allowed because it is the host of a collectable sourc
 
 #### Scenario: Redirect to an unlisted host
 - **WHEN** a seeded page redirects to a host that no source row names
-- **THEN** the guard refuses the hop and the job records a job error instead of a document
+- **THEN** the guard refuses the hop (the job-error handling is `scraper-orchestration`'s)
 
 ### Requirement: Named M3 positives are added only by a human
 The seed file SHALL NOT name a business as an M3 positive case (an entity suspected of unauthorised investment advice) unless a human has chosen it, for example from the KNF public warnings list, and recorded the choice in the change. Without such a choice the seed file SHALL still pass validation and cover `M3` with its negative controls and list pages. M3 positives that are not named businesses, such as Telegram signal channels, belong to `scraper-v2-social`.
