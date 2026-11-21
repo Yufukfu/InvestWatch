@@ -54,7 +54,7 @@ class Listener:
 
     EVENTS = ("finding.created", "finding.high_risk", "finding.updated", "scan.started", "scan.finished")
 
-    def __init__(self, base: str, origin: str | None = None):
+    def __init__(self, base: str, origin: str | None = None, headers: dict | None = None):
         self.received: list[tuple[str, dict]] = []
         self._cond = threading.Condition()
         self.sio = socketio.Client(reconnection=False)
@@ -63,8 +63,8 @@ class Listener:
         if origin is None:  # websocket-client sends Origin = the server's own origin
             self.sio.connect(base, namespaces=["/events"], transports=["websocket"], wait_timeout=5)
         else:  # polling sends exactly the Origin header given here
-            self.sio.connect(base, namespaces=["/events"], transports=["polling"], headers={"Origin": origin},
-                             wait_timeout=5)
+            self.sio.connect(base, namespaces=["/events"], transports=["polling"],
+                             headers={"Origin": origin, **(headers or {})}, wait_timeout=5)
 
     def _handler(self, name):
         def handle(data):
@@ -187,6 +187,37 @@ def test_same_origin_connection(server):
 def test_foreign_origin_rejected(server):
     with pytest.raises(socketio.exceptions.ConnectionError):
         Listener(server, origin="http://evil.example")
+
+
+GATEWAY = {"Host": "localhost:8443", "X-Forwarded-Proto": "https"}  # what Caddy forwards to api:8000
+
+
+def test_gateway_https_origin_is_accepted(server):
+    lst = Listener(server, origin="https://localhost:8443", headers=GATEWAY)
+    assert lst.sio.connected
+    lst.close()
+
+
+def test_foreign_origin_behind_the_gateway_is_rejected(server):
+    with pytest.raises(socketio.exceptions.ConnectionError):
+        Listener(server, origin="https://evil.example", headers=GATEWAY)
+
+
+def test_emit_failure_does_not_resubscribe(listener, publisher, server):
+    import asyncio
+
+    from investwatch_api.events import NAMESPACE, Relay
+
+    class BrokenSio:
+        async def emit(self, *a, **kw):
+            raise RuntimeError("boom")
+
+    class Svc:
+        redis_connected = True
+
+    relay = Relay(BrokenSio(), None, None, Svc())
+    asyncio.run(relay._emit({"type": "finding.created", "data": {}}))  # logged, not raised
+    assert Svc.redis_connected is True and NAMESPACE == "/events"
 
 
 def test_explicit_same_origin_over_polling_is_accepted(server):

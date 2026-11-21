@@ -33,7 +33,8 @@ def event_validator(contracts_dir: Path) -> Draft202012Validator:
 
 
 def create_sio(cors_origins: tuple[str, ...]) -> socketio.AsyncServer:
-    # cors_allowed_origins=None means same origin only (the gateway case); X-Forwarded-Proto is honoured.
+    # None = same origin only (the gateway case; engineio also accepts X-Forwarded-Proto/-Host). An explicit
+    # CORS_ORIGINS list REPLACES that default, so it must also name the dashboard's own origin.
     sio = socketio.AsyncServer(async_mode="asgi", namespaces=[NAMESPACE],
                                cors_allowed_origins=list(cors_origins) if cors_origins else None)
 
@@ -75,8 +76,9 @@ class Relay:
     async def _run(self) -> None:
         backoff = BACKOFF_START_S
         while True:
-            pubsub = self._redis.pubsub()
+            pubsub = None
             try:
+                pubsub = self._redis.pubsub()
                 await pubsub.subscribe(CHANNEL)
                 self._services.redis_connected = True
                 backoff = BACKOFF_START_S
@@ -87,7 +89,7 @@ class Relay:
                         continue
                     event = self.parse(message["data"])
                     if event is not None:
-                        await self._sio.emit(event["type"], event["data"], namespace=NAMESPACE)
+                        await self._emit(event)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -96,5 +98,13 @@ class Relay:
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, BACKOFF_MAX_S)
             finally:
-                with contextlib.suppress(Exception):
-                    await pubsub.aclose()
+                if pubsub is not None:
+                    with contextlib.suppress(Exception):
+                        await pubsub.aclose()
+
+    async def _emit(self, event: dict) -> None:
+        """A Socket.IO failure drops this one event; it is not a Redis outage and must not resubscribe."""
+        try:
+            await self._sio.emit(event["type"], event["data"], namespace=NAMESPACE)
+        except Exception as exc:
+            log.error("emit failed", extra={"reason": type(exc).__name__, "event": event["type"]})

@@ -28,7 +28,7 @@ Starts after change `api-db-schema` groups 1-3 (package, tables, migrate service
 - [x] 4.1 Failing tests with `socketio.AsyncClient` against uvicorn on a free port: "Finding created", "High-risk alert passes through", "Scan progress", "Not JSON", "Unknown type", "Payload not matching its type", "Status change reaches another tab"
 - [x] 4.2 `socketio.AsyncServer` on `/events` wrapped around the FastAPI app, Pub/Sub subscriber with schema validation from `CONTRACTS_DIR`, `CORS_ORIGINS`; the 4.1 tests pass
 - [x] 4.3 Failing tests, then reconnect with capped backoff and the health flag (outages simulated by a TCP proxy in front of the test Redis that drops every connection and refuses new ones): "Redis restarts", "Redis down at start-up", "No client connected", "Foreign origin rejected" pass
-- [x] 4.4 Mutation check; mutations: 6 tried, 6 caught
+- [x] 4.4 Mutation check; mutations: 6 tried, 6 caught; review fixes: mutations: 1 tried, 1 caught
 
 ## 5. Stats, calibration, sources, scans, screenshots
 

@@ -11,3 +11,9 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 5 | review groups 1-3 | `publish_event` could hold a PATCH response for the Redis socket timeout (5 s) | fix-here (publish wrapped in a 1 s timeout; not covered by a test, a hanging Redis is hard to fake) |
 | 6 | review groups 1-3 | the detail `document` exposes `html_object_key` and screenshot keys (bucket layout) | wont-fix (fields of the `ScrapedDocument` contract; keys are only usable through the API, which reads keys from the row) |
 | 7 | review groups 1-3 | count and page are two queries, not one snapshot | wont-fix (hackathon volume; a moving `total` while findings arrive is acceptable) |
+| 8 | review group 4 | the https origin behind the gateway (X-Forwarded-Proto) was never tested | fix-here (tests with Caddy's forwarded headers: gateway origin accepted, foreign origin refused; engineio 4.15.1 source checked) |
+| 9 | review group 4 | an explicit `CORS_ORIGINS` list replaces the same-origin default (confirmed in engineio `_cors_allowed_origins`) | docs (code comment and README: the list must also name the dashboard's own origin) |
+| 10 | review group 4 | a failing Socket.IO emit was handled as a Redis outage (resubscribe, health flag down) | fix-here (`Relay._emit` logs and drops the one event; test) |
+| 11 | review group 4 | `redis.pubsub()` outside the `try` could end the relay task silently | fix-here (inside the `try`) |
+| 12 | review group 4 | cancelling `publish` on the 1 s timeout may leave a pooled connection with an unread reply | wont-fix (redis-py disconnects a connection on cancellation; the hang case is untested, row 5) |
+| 13 | review group 4 | no authentication or connection cap on `/events`; event titles and urls reach the browser | wont-fix (v1 decision: no auth behind the localhost gateway; the dashboard renders scraped text as text, `web/CLAUDE.md`) |
