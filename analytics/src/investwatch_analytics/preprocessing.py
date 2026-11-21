@@ -26,6 +26,8 @@ _ABBREV = re.compile(
 # follows ("ok. 15%", "tel. 22 …", "art. 44"). `im.`, `ww.`, `lit.` are not listed: before a capital
 # they end a sentence ("Zaufaj im."), and before a lowercase word there is no boundary anyway.
 _ABBREV_BEFORE_DIGIT = re.compile(r"\b(?:ok|tel|Tel|tys|mln|godz|ust|art|pkt)\.$")
+# A digit next, possibly after the opening bracket or quote the boundary allows ("tel. (22) …").
+_DIGIT_NEXT = re.compile(r"[(\[\"'„«*]?\s*\d")
 
 _PL_CHARS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
 _PL_WORDS = {
@@ -70,7 +72,7 @@ def split_sentences(text: str) -> list[Sentence]:
     for m in _BOUNDARY.finditer(text):
         paragraph_break = "\n\n" in re.sub(r"[^\n]", "", m.group(0))
         before = text[start:m.start()]
-        digit_next = text[m.end():m.end() + 1].isdigit()
+        digit_next = _DIGIT_NEXT.match(text, m.end()) is not None
         if not paragraph_break and (_ABBREV.search(before) or (digit_next and _ABBREV_BEFORE_DIGIT.search(before))):
             continue
         _append(sentences, text, start, m.start())

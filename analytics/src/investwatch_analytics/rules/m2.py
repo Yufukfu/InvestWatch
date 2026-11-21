@@ -42,13 +42,16 @@ class R2AdLabel(Rule):
         pattern = self.spec.params.get("negation_before")
         return re.compile(pattern, re.IGNORECASE) if pattern else None
 
-    def _negated(self, text: str, start: int) -> bool:
-        return bool(self._negation and self._negation.search(text[max(0, start - 40):start]))
+    def _negated(self, text: str, m: re.Match) -> bool:
+        if m.group(0).startswith("#") or self._negation is None:
+            return False
+        # pos/endpos, not a slice: `\b` still sees the character before the window.
+        return bool(self._negation.search(text, max(0, m.start() - 40), m.start()))
 
     def evaluate(self, ctx: Context) -> RuleResult:
         text = ctx.doc.text
         hits = sorted(
-            (m for p in self._labels for m in p.finditer(text) if not self._negated(text, m.start())),
+            (m for p in self._labels for m in p.finditer(text) if not self._negated(text, m)),
             key=lambda m: m.start(),
         )
         if not hits:

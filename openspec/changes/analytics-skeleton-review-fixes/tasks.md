@@ -22,7 +22,13 @@
 - [x] 4.2 Split `_ABBREV` into always / before-digit lists; `logging_setup` docstring and `analytics/CLAUDE.md` note on stderr
 - [x] 4.3 Mutation check — mutations: 10 tried, 10 caught
 
-## 5. Closing
+## 5. Reviewer fixes
 
-- [x] 5.1 Apply iw-docs-update (follow-ups, STATUS row) and add the iw-ai-log row
-- [ ] 5.2 Run iw-pr-review checks and fix real findings
+- [x] 5.1 Test: `nie tylko wyklucza straty` and `wykluczamy straty` are denials; negation stops at a line break and never applies to a hashtag; the look-back window does not cut inside a word; earliest mention in any form wins a tie; `tel. (22)` does not split
+- [x] 5.2 R3 override and exclude patterns, R2 `negation_before` same-line and `pos`/`endpos`, registry earliest-mention position, `_DIGIT_NEXT`
+- [x] 5.3 Mutation check — mutations: 11 tried, 11 caught
+
+## 6. Closing
+
+- [x] 6.1 Apply iw-docs-update (follow-ups, STATUS row) and add the iw-ai-log row
+- [x] 6.2 Run iw-pr-review checks and fix real findings (iw-reviewer: 6 findings, all verified and fixed in group 5; declined items in `follow-ups.md`)

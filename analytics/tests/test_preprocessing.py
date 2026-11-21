@@ -127,3 +127,8 @@ def test_preprocess_empty_text():
 )
 def test_abbreviations_that_are_also_words(text, expected):
     assert [s.text for s in split_sentences(text)] == expected
+
+
+@pytest.mark.parametrize("text", ["Zadzwoń: tel. (22) 123 45 67. Inwestuj.", "Zysk ok. „15%” rocznie. Inwestuj."])
+def test_abbreviation_before_bracketed_or_quoted_digit(text):
+    assert len(split_sentences(text)) == 2

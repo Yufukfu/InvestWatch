@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Preprocessing
-Analytics SHALL normalize text (Unicode NFKC, collapsed whitespace) and split it into sentences. It SHALL compute `content_hash` as sha256 of the normalized text and guess the language as `pl` or `en`. Evidence quotes SHALL still be exact substrings of the original `text`. Legal forms, titles and `<year> r.` SHALL NOT end a sentence; abbreviations that are also ordinary words (`ok.`, `tel.`, `art.` and similar) SHALL end one unless a digit follows.
+Analytics SHALL normalize text (Unicode NFKC, collapsed whitespace) and split it into sentences. It SHALL compute `content_hash` as sha256 of the normalized text and guess the language as `pl` or `en`. Evidence quotes SHALL still be exact substrings of the original `text`. Legal forms, titles and `<year> r.` SHALL NOT end a sentence; abbreviations that are also ordinary words (`ok.`, `tel.`, `art.` and similar) SHALL end one unless a digit follows, directly or after an opening bracket or quote.
 
 #### Scenario: Equivalent texts hash the same
 - **WHEN** two texts differ only in whitespace runs or Unicode composition
@@ -24,7 +24,7 @@ Analytics SHALL normalize text (Unicode NFKC, collapsed whitespace) and split it
 - **THEN** the pipeline returns no findings and logs the reason `empty_text`
 
 ### Requirement: Firm registry matching
-Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL match a document to at most one firm by name or alias in the text, by the page domain, or by a fuzzy name match. The match SHALL have a confidence in 0-1. When the page host is a registered firm's domain, that firm SHALL be matched even if the text names another firm. Among equally confident name matches, the earliest quote in the text SHALL win, then the longest.
+Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL match a document to at most one firm by name or alias in the text, by the page domain, or by a fuzzy name match. The match SHALL have a confidence in 0-1. When the page host is a registered firm's domain, that firm SHALL be matched even if the text names another firm. Among equally confident name matches, the firm whose name or alias appears first in the text SHALL win, then the one with the longest quote.
 
 #### Scenario: Name without legal form
 - **WHEN** the text mentions `Alfa Inwestycje` and the registry holds `Alfa Inwestycje Dom Maklerski S.A.`
@@ -40,7 +40,7 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL m
 
 #### Scenario: Earliest name wins a tie
 - **WHEN** a page on no registered domain names two registry firms
-- **THEN** the firm named first in the text is matched
+- **THEN** the firm named first in the text is matched, even if its full legal name appears only later
 
 #### Scenario: No match
 - **WHEN** no name, alias, domain or fuzzy candidate reaches the threshold

@@ -215,3 +215,9 @@ def test_empty_registry_rejected(tmp_path):
 def test_higher_fuzzy_confidence_beats_earlier_fuzzy(registry):
     m = registry.match("Alfa Inwestycji oraz EuroTrad Markets.", "https://x.example.org/")
     assert m.firm.id == EURO_ID and m.method == "fuzzy"
+
+
+def test_earliest_mention_counts_not_where_the_longest_form_is(registry):
+    text = "Alfa Inwestycje poleca. Bank Przykładowy S.A. też. Alfa Inwestycje Dom Maklerski S.A. zaprasza."
+    m = registry.match(text, "https://x.example.org/")
+    assert m.firm.id == ALFA_ID and m.evidence == "Alfa Inwestycje Dom Maklerski S.A."

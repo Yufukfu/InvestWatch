@@ -29,7 +29,8 @@ rules:
       # A label only counts in a prominent place: a hashtag anywhere, or within the first or last N sentences.
       prominent_sentences: 2
       # Text right before a label that negates it ("to nie jest reklama", "not an advertisement").
-      negation_before: '(?:\bnie|\bnot|\bno)\s+(?:\w+\s+){0,2}$'
+      # Same line only (headlines often lack punctuation); a hashtag label is never negated.
+      negation_before: '(?:\bnie|\bnot|\bno)[ \t]+(?:\w+[ \t]+){0,2}$'
 
   - id: R3
     name: Informacja o ryzyku
@@ -65,10 +66,14 @@ rules:
         - '\bno\s+\w+\s+is\s+risk[- ]free'
         - '\bnot\s+risk[- ]free'
         # Negated exclusion of loss: "nie jest wykluczona utrata", "nie można wykluczyć straty", "nie wykluczamy strat".
-        - '\bnie\s+(?:\w+\s+){0,2}wyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
+        # `nie` binds to the verb or its modal only, so "nie tylko wyklucza straty" stays a denial.
+        - '\bnie\s+(?:(?:jest|są|można|da\s+się)\s+)?wyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         # "nie gwarantujemy braku strat", "nie gwarantujemy uniknięcia straty".
-        - '\bnie\s+(?:\w+\s+)?gwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
+        - '\bnie\s+gwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
       risk_exclude_patterns:
+        # Affirmed exclusion of loss ("wykluczamy straty", "gwarantujemy brak straty") is a denial.
+        - '\bwyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
+        - '\bgwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
         - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:\w+\s+){0,2}ryzyk\w*(?:\s+(?:utrat|strat)\w*)?'
         - '\b(?:nie|bez|żadn\w*)\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\b(?:minimaln|nisk|znikom)\w*\s+ryzyk\w*'

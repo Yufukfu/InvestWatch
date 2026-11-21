@@ -363,3 +363,36 @@ def test_r2_prominent_label_beats_earlier_buried_one(registry, catalogue):
     text = "Jeden. Dwa. Reklama w środku. Cztery. Pięć. Materiał marketingowy."
     r = results(text, registry, catalogue)["R2"]
     assert r.result == "pass" and r.evidence == "Materiał marketingowy"
+
+
+@pytest.mark.parametrize(
+    "denial",
+    [
+        "Nasz fundusz nie tylko wyklucza straty, ale daje spokój.",
+        "Nie martw się, wykluczamy straty.",
+        "Nie martw się wykluczamy straty.",
+        "Nie tylko gwarantujemy brak straty, ale i spokój.",
+        "Gwarantujemy uniknięcie straty.",
+    ],
+)
+def test_r3_affirmed_exclusion_of_loss_is_not_a_warning(denial, registry, catalogue):
+    assert results(f"Zarabiaj 12% rocznie. {denial}", registry, catalogue)["R3"].result == "fail"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Nie czekaj\nReklama\nKonto. A. B. C.",
+        "Nie zwlekaj dłużej\n#reklama\nKonto. A. B. C.",
+        "Nie zwlekaj, #reklama nie kłamie. A. B. C. D.",
+        "Nie czekaj #ad. A. B. C. D.",
+    ],
+)
+def test_r2_negation_does_not_cross_lines_or_negate_hashtags(text, registry, catalogue):
+    assert results(text, registry, catalogue)["R2"].result == "pass"
+
+
+def test_r2_negation_window_does_not_cut_inside_a_word(registry, catalogue):
+    # The 40-char look-back starts right after "Inwestowa", so a sliced window would see "nie".
+    text = "Inwestowanie " + "a" * 20 + " " + "b" * 14 + " reklama. Zysk."
+    assert results(text, registry, catalogue)["R2"].result == "pass"

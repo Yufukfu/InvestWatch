@@ -133,7 +133,9 @@ class Registry:
         for firm in self.firms:
             on_domain = any(host == d or host.endswith("." + d) for d in firm.domains)
             if m := self._find(firm, text):
-                match, pos = FirmMatch(firm, NAME_CONFIDENCE, "name", m.group(0)), m.start()
+                # Rank by the firm's earliest mention in any form; quote its longest form.
+                pos = min(h.start() for p in self._patterns[firm.id] if (h := p.search(text)))
+                match = FirmMatch(firm, NAME_CONFIDENCE, "name", m.group(0))
             elif on_domain:
                 match, pos = FirmMatch(firm, DOMAIN_CONFIDENCE, "domain", None), len(text)
             elif (ratio := max((_best_fuzzy(firm.core, w) for w in segments), default=0.0)) >= FUZZY_MIN_RATIO:
