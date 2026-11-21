@@ -3,8 +3,8 @@ import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
-import findings from './mocks/fixtures/findings.json';
-import summary from './mocks/fixtures/summary.json';
+import findings from './test/fixtures/findings.json';
+import summary from './test/fixtures/summary.json';
 import { server } from './test/setup';
 import { makeStore } from './test/store';
 

@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import summary from '../../../mocks/fixtures/summary.json';
+import summary from '../../../test/fixtures/summary.json';
 import { server } from '../../../test/setup';
 import { useGetStatsSummaryQuery } from '../../../api/generated';
 import { storeWrapper } from '../../../test/store';

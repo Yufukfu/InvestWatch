@@ -3,19 +3,26 @@
 Dashboard: findings with filters, trend charts, real-time alerts, threshold calibration panel.
 
 - **Owner:** Kacper
-- **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), MSW for mocks, Vitest.
-- **Status:** foundation (app shell, generated client, mock mode, container) and the trend chart (Recharts, hourly or daily buckets). Other features come next.
+- **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), Vitest with MSW as the test-only network fake.
+- **Status:** foundation (app shell, generated client, container), data from the backend only and the trend chart (Recharts, hourly or daily buckets). Other features come next.
 
 ## Run
 
 ```bash
 cd web
 npm ci
-cp .env.example .env.local     # VITE_USE_MOCKS=true: works without the api
+cp .env.example .env.local
 npm run dev                    # http://localhost:5173
 ```
 
-With `VITE_USE_MOCKS=false` the dev server proxies `/api` and `/socket.io` to `API_PROXY_TARGET`.
+The app has no built-in mock data ([ADR 0206](../.docs/decisions/0206-dashboard-data-from-backend.md)): the dev server proxies `/api` and `/socket.io` to `API_PROXY_TARGET` (default `http://localhost:8000`), so run the backend there first: the contract mock server (`contracts/README.md`, "Mock server") until the api serves REST. Run it as a container:
+
+```bash
+docker build -f contracts/mock-server/Dockerfile -t iw-mock-server contracts
+docker run --rm -p 127.0.0.1:8000:8000 iw-mock-server
+```
+
+The mock endpoints stay until we have sensible data. A browser that ran the old mock mode on the same origin keeps its service worker until you unregister it (DevTools, Application, Service Workers). Compose does not start a REST backend yet, so `docker compose up` alone shows only the dashboard's error states.
 In docker the app is served by unprivileged nginx behind the gateway: `docker compose up --build` from the repo root, then https://localhost:8443.
 
 ## API client (contract-first)
@@ -27,7 +34,7 @@ npm run api:generate     # sync the contract snapshot + regenerate src/api/gener
 npm run contracts:check  # fails if the committed snapshot is behind contracts/
 ```
 
-The snapshot (`src/api/openapi.json`, `src/mocks/fixtures/`) and `src/api/generated.ts` are committed, so `web/` builds and deploys on its own, without the rest of the repo. Never edit them by hand.
+The snapshot (`src/api/openapi.json`, `src/test/fixtures/` for the Vitest MSW handlers) and `src/api/generated.ts` are committed, so `web/` builds and deploys on its own, without the rest of the repo. Never edit them by hand.
 
 ## Scripts
 
