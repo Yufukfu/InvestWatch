@@ -62,3 +62,34 @@ def make_doc(**overrides) -> dict:
     }
     doc.update(overrides)
     return doc
+
+
+# ---- LLM test doubles (analytics-llm-p0): tests never call a real LLM ----------------------------
+
+
+@pytest.fixture
+def stub_llm():
+    from llm_stub import StubLLM
+
+    stub = StubLLM()
+    try:
+        yield stub
+    finally:
+        stub.stop()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_llm(monkeypatch):
+    """Fail any test whose HTTP request leaves the loopback host (a real LLM endpoint by accident)."""
+    try:
+        import httpx
+    except ImportError:  # pragma: no cover - httpx is a runtime dependency
+        return
+    original = httpx.Client.send
+
+    def guarded(self, request, *args, **kwargs):
+        if request.url.host not in ("127.0.0.1", "localhost", "::1"):
+            raise AssertionError(f"test tried to reach a non-local host: {request.url.host}")
+        return original(self, request, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "send", guarded)

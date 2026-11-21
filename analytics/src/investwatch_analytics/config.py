@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
 import os
 import socket
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 PIPELINE_VERSION = "0.1.0"
 _DEFAULT_REGISTRY = Path(__file__).resolve().parents[2] / "registry" / "seed.csv"
@@ -83,3 +85,78 @@ class WorkerSettings:
             health_port=_positive_int(env, "HEALTH_PORT", 8001),
             max_document_bytes=_positive_int(env, "MAX_DOCUMENT_BYTES", 2_000_000),
         )
+
+
+# ---- LLM (analytics-llm-p0; ADR 0304, 0309, 0310) -------------------------------------------------
+
+
+def _positive_number(env: Mapping[str, str], key: str, default: float, *, integer: bool = False) -> float:
+    raw = env.get(key)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw) if integer else float(raw)
+    except ValueError:
+        kind = "an integer" if integer else "a number"
+        raise ConfigError(f"{key} must be {kind}, got {raw!r}") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ConfigError(f"{key} must be a positive finite number, got {raw!r}")
+    return value
+
+
+_LOCAL_HOSTS = {"ollama", "localhost", "127.0.0.1", "::1"}
+
+
+@dataclass(frozen=True)
+class LlmSettings:
+    """OpenAI-compatible chat completions endpoint, env only. Empty `LLM_BASE_URL` = disabled (rules-only)."""
+
+    base_url: str = ""
+    model: str = ""
+    api_key: str = field(default="", repr=False)  # never in a repr, log or error message
+    timeout_s: float = 20
+    doc_budget_s: float = 40
+    chunk_chars: int = 9000
+    max_chunks: int = 4
+    cache_ttl_s: int = 604800
+    breaker_failures: int = 3
+    breaker_cooldown_s: float = 60
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.base_url)
+
+    @property
+    def mode(self) -> str:
+        """`local` (Ollama / loopback), `hosted`, or `disabled`; logged at worker start."""
+        if not self.enabled:
+            return "disabled"
+        return "local" if (urlsplit(self.base_url).hostname or "") in _LOCAL_HOSTS else "hosted"
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None, *, claim_min_idle_ms: int | None = None) -> "LlmSettings":
+        env = os.environ if env is None else env
+        base_url = (env.get("LLM_BASE_URL") or "").strip()
+        if not base_url:
+            return cls()
+        model = (env.get("LLM_MODEL") or "").strip()
+        if not model:
+            raise ConfigError("LLM_MODEL is required when LLM_BASE_URL is set")
+        s = cls(
+            base_url=base_url,
+            model=model,
+            api_key=(env.get("LLM_API_KEY") or "").strip(),
+            timeout_s=_positive_number(env, "LLM_TIMEOUT_S", 20),
+            doc_budget_s=_positive_number(env, "LLM_DOC_BUDGET_S", 40),
+            chunk_chars=int(_positive_number(env, "LLM_CHUNK_CHARS", 9000, integer=True)),
+            max_chunks=int(_positive_number(env, "LLM_MAX_CHUNKS", 4, integer=True)),
+            cache_ttl_s=int(_positive_number(env, "LLM_CACHE_TTL_S", 604800, integer=True)),
+            breaker_failures=int(_positive_number(env, "LLM_BREAKER_FAILURES", 3, integer=True)),
+            breaker_cooldown_s=_positive_number(env, "LLM_BREAKER_COOLDOWN_S", 60),
+        )
+        if claim_min_idle_ms is not None and s.doc_budget_s * 1000 >= claim_min_idle_ms:
+            # Otherwise a second consumer XAUTOCLAIMs a message still being judged (ADR 0310).
+            raise ConfigError(
+                f"LLM_DOC_BUDGET_S ({s.doc_budget_s:g} s) must be below CLAIM_MIN_IDLE_MS ({claim_min_idle_ms} ms)"
+            )
+        return s
