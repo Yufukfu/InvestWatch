@@ -190,6 +190,13 @@ def _alias_rejection(alias: str) -> str | None:
 
 
 MANUAL_COLUMNS = ("name", "website_domains", "source_url", "verified_by_human")
+#: A registrable host: labels of 1-63 letters, digits or inner hyphens, and a letters-only TLD (so no IP).
+_HOST = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}")
+#: Suffixes shared by unrelated sites; a firm domain equal to one would claim every page under it.
+PUBLIC_SUFFIXES = frozenset({
+    "com.pl", "net.pl", "org.pl", "biz.pl", "info.pl", "edu.pl", "gov.pl", "waw.pl", "co.uk", "org.uk",
+    "com.cy", "co.com", "com.mt", "co.at", "com.de",
+})
 
 
 @dataclass(frozen=True)
@@ -215,6 +222,18 @@ def load_manual(path: Path) -> list[ManualRow]:
             raise KnfError("manual_row", f"{path}: missing column(s) {', '.join(missing)}")
         for line, row in enumerate(reader, start=2):
             rows.append(_manual_row(row, f"{path}:{line}"))
+    names: dict[str, str] = {}
+    owners: dict[str, ManualRow] = {}
+    for r in rows:
+        if (first := names.setdefault(normalize_name(r.name), r.where)) != r.where:
+            raise KnfError("manual_row", f"{r.where}: {r.name!r} repeats the row at {first}")
+        for d in r.domains:
+            # One curated domain, or one nested in another, for two firms would silently take one firm's pages.
+            for other_domain, other in owners.items():
+                if other is not r and (_on(d, [other_domain]) or _on(other_domain, [d])):
+                    raise KnfError("manual_row", f"{r.where}: {d} overlaps {other_domain} of {other.name!r} "
+                                                 f"at {other.where}")
+            owners[d] = r
     return rows
 
 
@@ -229,12 +248,14 @@ def _manual_row(row: dict, where: str) -> ManualRow:
     if not domains:
         fail("no domains")
     for d in domains:
-        if "." not in d or not re.fullmatch(r"[a-z0-9.-]+", d):
+        if not _HOST.fullmatch(d) or d in PUBLIC_SUFFIXES:
             fail(f"{d!r} is not a domain")
         if _on(d, SOCIAL_HOSTS):
             fail(f"{d} is a social platform host")
     source = (row.get("source_url") or "").strip()
     parts = urlsplit(source)
+    if "\\" in source or "@" in source:
+        fail(f"source_url {source!r} has a backslash or userinfo")
     if parts.scheme != "https":
         fail(f"source_url {source!r} must be an https URL")
     if not _on(_normalize_domain(source), domains):
@@ -295,12 +316,16 @@ def build(fetched: dict[str, FetchedList], *, previous: dict[str, str] | None = 
         for d in row.domains:
             if d not in firm.domains:
                 firm.domains.append(d)
-            report.curated.append((firm.name, d, row.verified_by_human))
 
     firms = list(by_name.values())
     _carry_ids(firms, previous, report)
     _filter_aliases(firms, report)
     _filter_domains(firms, supervisor_hosts, report)
+    # Counted after filtering: only curated domains that reach the CSV.
+    final = {normalize_name(f.name): f for f in firms}
+    for row in manual or []:
+        firm = final[normalize_name(row.name)]
+        report.curated += [(firm.name, d, row.verified_by_human) for d in row.domains if d in firm.domains]
     firms.sort(key=lambda f: (TYPE_ORDER[f.type], normalize_name(f.name), f.id))
     return firms, report
 

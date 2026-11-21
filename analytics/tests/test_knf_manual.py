@@ -90,3 +90,52 @@ def test_committed_manual_file_is_valid_and_names_registry_firms(snapshot):
     domestic = {f.name for f in firms if f.type in ("brokerage_house", "brokerage_bank")}
     assert {r.name for r in rows} <= domestic
     assert len(report.curated) == sum(len(r.domains) for r in rows)
+
+
+# ---- review fixes (group 4) -------------------------------------------------------------------------
+
+PEKAO_BANK = '"BANK PEKAO S.A. (BANK POLSKA KASA OPIEKI S.A.) – Biuro Maklerskie PEKAO"'
+
+
+def test_one_domain_for_two_firms_fails(tmp_path):
+    with pytest.raises(KnfError) as e:
+        load_manual(_write(tmp_path, "PEKAO INVESTMENT BANKING S.A.,pekao.com.pl,https://www.pekao.com.pl/,false",
+                           f"{PEKAO_BANK},pekao.com.pl,https://www.pekao.com.pl/,false"))
+    assert e.value.reason == "manual_row" and "pekao.com.pl overlaps" in e.value.message and "manual.csv:3" in e.value.message
+
+
+def test_nested_domain_for_another_firm_fails(tmp_path):
+    with pytest.raises(KnfError, match="ib.pekao.com.pl overlaps pekao.com.pl"):
+        load_manual(_write(tmp_path, f"{PEKAO_BANK},pekao.com.pl,https://www.pekao.com.pl/,false",
+                           "PEKAO INVESTMENT BANKING S.A.,ib.pekao.com.pl,https://ib.pekao.com.pl/,false"))
+
+
+def test_repeated_firm_row_fails(tmp_path):
+    with pytest.raises(KnfError, match="repeats the row at .*manual.csv:2"):
+        load_manual(_write(tmp_path, "XTB S.A.,xtb.com,https://www.xtb.com/pl,true",
+                           "xtb s.a.,xtb.pl,https://www.xtb.pl/,false"))
+
+
+def test_two_domains_of_one_firm_are_fine(tmp_path):
+    (row,) = load_manual(_write(tmp_path, "XTB S.A.,xtb.com|xtb.pl,https://www.xtb.com/pl,false"))
+    assert row.domains == ("xtb.com", "xtb.pl")
+
+
+def test_curated_count_only_holds_domains_that_reach_the_csv(tmp_path, snapshot):
+    # cysec.gov.cy is a supervisor site in the snapshots, so it is dropped from the firm and not counted.
+    rows = load_manual(_write(tmp_path, "XTB S.A.,xtb.com|cysec.gov.cy,https://www.xtb.com/pl,false"))
+    firms, report = build(snapshot, manual=rows)
+    assert _firm(firms, "XTB S.A.").domains == ["xtb.com"]
+    assert report.curated == [("XTB S.A.", "xtb.com", False)]
+
+
+@pytest.mark.parametrize("domain", ["com.pl", "192.168.0.1", "-x.pl", "x..pl", "a_b.pl", "xn--.pl"])
+def test_bad_hosts_rejected(tmp_path, domain):
+    with pytest.raises(KnfError, match="is not a domain"):
+        load_manual(_write(tmp_path, f"XTB S.A.,{domain},https://www.xtb.com/,false"))
+
+
+@pytest.mark.parametrize("url", [r"https://evil.pl\@xtb.com/", "https://user@xtb.com/"])
+def test_source_url_with_userinfo_or_backslash_rejected(tmp_path, url):
+    with pytest.raises(KnfError, match="backslash or userinfo"):
+        load_manual(_write(tmp_path, f"XTB S.A.,xtb.com,{url},false"))

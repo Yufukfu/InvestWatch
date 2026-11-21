@@ -27,7 +27,7 @@ Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip 
 
 - [x] 4.1 Failing tests: the manual CSV has the columns `name, website_domains, source_url, verified_by_human`; `verified_by_human` is `true` or `false`; `source_url` is an https URL on one of the row's domains; domains are valid hosts that are not social or supervisor hosts; the merge puts them on the firm, and the meta file counts curated (and unverified) domains apart from KNF ones; a row naming no registry firm fails
 - [x] 4.2 Merge in `knf/build.py`; draft the rows for the 38 domestic firms from official sites checked by hand (the site names the firm and its brokerage activity), all with `verified_by_human` `false`, leaving out a firm whose site cannot be verified; tests green. Done 2026-11-21: 31 rows, each homepage fetched once by hand (final host on the domain, the page names the firm). Left out (7): Aixon, Nehrebetius, PGE DM (certificate host mismatch), Everest, DDPP (no DNS), IFDS (`ifds.pl` is a parked domain), LFI (`lfi.pl` does not name the firm). `oanda.com` was left out for OANDA TMS Brokers because it is the global OANDA group site; `tms.pl` is used
-- [x] 4.3 Mutation check; `mutations: 13 tried, 13 caught` (first run 12/13: the missing-column test matched too loosely)
+- [x] 4.3 Mutation check; `mutations: 13 tried, 13 caught` (first run 12/13: the missing-column test matched too loosely); review fix: `mutations: 8 tried, 8 caught`
 
 ## 5. CLI, safe write and the committed registry (≈ 1.25 h)
 
