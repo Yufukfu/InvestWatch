@@ -150,7 +150,7 @@ The runner SHALL build each session's allow-list from its item: read tools, `gh 
 
 #### Scenario: Someone else's PR
 - **WHEN** a session reviews PR #28 by a teammate
-- **THEN** the allow-list has no `git commit`, no `git push` and no test command, and the PR head is checked out detached
+- **THEN** the allow-list has no `git commit`, no `git push` and no test command, the working tree is the base branch and the PR head is only the ref `refs/iw/pr-28`, so the PR's own `.claude/` settings and hooks never load
 
 #### Scenario: Unsafe branch name
 - **WHEN** the branch name is outside `[A-Za-z0-9._/-]` or unsafe for git

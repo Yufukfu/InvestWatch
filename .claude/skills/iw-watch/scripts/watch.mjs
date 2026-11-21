@@ -168,8 +168,9 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   try {
     clone = prepareClone({ git: deps.git, mainRoot, item: it });
   } catch (e) {
-    if (e instanceof NeedsHuman) return { ...base, kind: 'needs-human', detail: e.message };
-    return { ...base, kind: 'needs-human', detail: `could not prepare a clone: ${String(e.stderr || e.message).split('\n')[0]}` };
+    // kept, not acknowledged: once the human clears the cause the item runs again
+    if (e instanceof NeedsHuman) return { ...base, kind: 'needs-human', detail: e.message, keep: true };
+    return { ...base, kind: 'needs-human', detail: `could not prepare a clone: ${clean(String(e.stderr || e.message).split('\n')[0])}`, keep: true };
   }
   recordSession(state, it.pr);
   saveState(sdir, state); // a crash during the session still counts the round
@@ -181,7 +182,7 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   const own = it.kind === 'address-review' || it.kind === 'ci-failed';
   const at = { ...base, path: draftDir, clone: clone.dir, cost: res.cost };
   if (!res.ok) {
-    return { ...at, kind: 'needs-human', detail: `session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`}); the clone is kept at ${clone.dir}` };
+    return { ...at, kind: 'needs-human', keep: true, detail: `session failed (${res.timedOut ? 'timed out' : res.subtype || `exit ${res.code}`}); the clone is kept at ${clone.dir}; remove it to let the watcher retry` };
   }
   if (o.dryRun) {
     const steps = [`cd ${clone.dir}`];
@@ -213,8 +214,16 @@ function runCmd(deps, ctx, o) {
     saveState(sdir, state);
     for (const it of items.slice(0, o.limit)) {
       refreshLock(lock, { now: deps.now });
-      const notice = handle({ deps, ctx, o, state, sdir, mainRoot, it });
-      ack(state, it.id);
+      const { keep, ...notice } = handle({ deps, ctx, o, state, sdir, mainRoot, it });
+      const e = (state.prs[it.pr] ??= {});
+      if (keep) {
+        // not acknowledged, so it is retried; the human is told once per item, not on every poll
+        if (e.blockedItem === it.id) continue;
+        e.blockedItem = it.id;
+      } else {
+        delete e.blockedItem;
+        ack(state, it.id);
+      }
       saveState(sdir, state);
       notify(notice);
     }

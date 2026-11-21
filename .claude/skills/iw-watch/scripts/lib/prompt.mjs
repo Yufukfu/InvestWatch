@@ -24,9 +24,12 @@ function describe(e) {
   return `comment by @${e.author}`;
 }
 
+// File names come from the PR, so they are third-party text: printable ASCII only, and fenced by the caller
+const printable = (s) => String(s).replace(/[^\x20-\x7e]/g, '?');
+
 function ownership(owners, me) {
   if (!owners.length) return 'CODEOWNERS gives no owner for the changed files.';
-  return owners.map((o) => `- ${o.path}: ${o.owners.length ? o.owners.map((x) => `@${x}`).join(', ') : 'no owner'}${o.owners.some((x) => x.toLowerCase() === me.toLowerCase()) ? ' (you)' : ''}`).join('\n');
+  return owners.map((o) => `- ${printable(o.path)}: ${o.owners.length ? o.owners.map((x) => `@${x}`).join(', ') : 'no owner'}${o.owners.some((x) => x.toLowerCase() === me.toLowerCase()) ? ' (you)' : ''}`).join('\n');
 }
 
 function issueProcedure(dryRun, me) {
@@ -66,7 +69,7 @@ const KIND_TASK = {
       : `Then push with exactly \`git push origin ${item.headRef}\` and post one reply: \`gh pr comment ${item.pr} --body-file .iw-watch/reply.md\`.`,
   ],
   review: ({ item, me, dryRun }) => [
-    `@${item.author}'s PR #${item.pr} waits for your review. The PR head is checked out here; the diff is \`git diff origin/${item.baseRef}...HEAD\`.`,
+    `@${item.author}'s PR #${item.pr} waits for your review. The working tree is the base branch \`${item.baseRef}\`, not the PR: its code is never checked out or run here. The PR head is the ref \`refs/iw/pr-${item.pr}\`: read the diff with \`git diff origin/${item.baseRef}...refs/iw/pr-${item.pr}\` and a file with \`git show refs/iw/pr-${item.pr}:<path>\`.`,
     'Review it against .claude/CODE_REVIEW.md and the OpenSpec change it implements: correctness first, then tests that can fail, then docs. Check each claim against the code.',
     'Do not edit files, do not commit and do not push: this is someone else\'s branch.',
     `Write the review to \`.iw-watch/reply.md\`: findings as file:line, severity, evidence; then what you checked and found fine; end with "Approval is left to a human reviewer (@${me} or another teammate)."`,
@@ -97,8 +100,8 @@ export function buildPrompt({ item, me, owners = [], dryRun = false, nonce }) {
     '5. Post at most one PR comment in this session.',
     `6. ${issueProcedure(dryRun, me)}`,
     '',
-    '## Ownership (CODEOWNERS on the default branch)',
-    ownership(owners, me),
+    '## Ownership (CODEOWNERS on the default branch; the file names come from the PR)',
+    f('changed files and their owners', ownership(owners, me)),
     '',
     '## The PR',
     `#${item.pr} by @${item.author}, ${item.url}`,

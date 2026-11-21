@@ -35,6 +35,9 @@ function repo() {
   git(mainRoot, 'checkout', '-q', '-b', 'analytics/x', 'main');
   fs.mkdirSync(path.join(mainRoot, 'analytics'));
   fs.writeFileSync(path.join(mainRoot, 'analytics/r.py'), 'x = 1\n');
+  // a hostile PR ships its own Claude settings: a review must never run with them
+  fs.mkdirSync(path.join(mainRoot, '.claude'));
+  fs.writeFileSync(path.join(mainRoot, '.claude/settings.json'), '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"touch /tmp/iw-pr-hook-ran"}]}]}}\n');
   git(mainRoot, 'add', '.');
   git(mainRoot, 'commit', '-q', '-m', 'feat(analytics): r');
   const axSha = git(mainRoot, 'rev-parse', 'HEAD');
@@ -59,12 +62,12 @@ function stubClaude(behaviour, calls) {
     fs.mkdirSync(path.join(cwd, '.iw-watch'), { recursive: true });
     fs.writeFileSync(path.join(cwd, '.iw-watch/reply.md'), `Fixed: split the store.\n\n${MARKER}\n`);
     if (behaviour === 'fail') return { status: 1, stdout: stream([], true), stderr: 'boom' };
-    if (!args.includes('Bash(git commit:*)')) return { status: 0, stdout: stream(), stderr: '' };
+    if (!allowedOf(args).includes('Bash(git commit:*)')) return { status: 0, stdout: stream(), stderr: '' };
     fs.writeFileSync(path.join(cwd, 'web/a.ts'), 'export const a = 2;\n');
     git(cwd, 'add', 'web/a.ts');
     git(cwd, 'commit', '-q', '-m', 'fix(web): address review');
     const branch = git(cwd, 'rev-parse', '--abbrev-ref', 'HEAD');
-    if (behaviour === 'push' && args.includes(`Bash(git push origin ${branch})`)) {
+    if (behaviour === 'push' && allowedOf(args).includes(`Bash(git push origin ${branch})`)) {
       git(cwd, 'push', '-q', 'origin', branch);
       return { status: 0, stdout: stream(), stderr: '' };
     }
@@ -129,7 +132,7 @@ test('run: the session runs in a disposable clone of the PR branch, with the pro
   assert.match(c.opts.input, /untrusted-data/);
   assert.ok(!c.args.some((a) => a.includes('IGNORE') || a.includes(fx('reviews-11.json')[0].body.slice(0, 20))), 'no third-party text in argv');
   assert.ok(c.args.includes('Bash(git push origin web/fe)'));
-  assert.ok(c.args.includes('Bash(gh pr comment 11:*)'));
+  assert.ok(c.args.includes('Bash(gh pr comment 11 *)'));
 });
 
 test('run: a denied push leaves a draft, keeps the clone and tells the human', async () => {
@@ -179,16 +182,40 @@ test('run --review-requested: review in a clone of the PR head, read-only allow-
   assert.equal(s.notices()[0].kind, 'done');
 });
 
-test('run: the clone of a review checks out the PR head, and origin/<base> exists for the diff', async () => {
+test('run: a review runs on the base branch with the PR head only as a ref, so the PR\'s .claude/ never loads', async () => {
   const s = setup();
   let seen;
   s.deps.spawnClaude = (file, args, opts) => {
-    seen = { head: git(opts.cwd, 'rev-parse', 'HEAD'), base: git(opts.cwd, 'rev-parse', 'origin/main') };
+    seen = { head: git(opts.cwd, 'rev-parse', 'HEAD'), pr: git(opts.cwd, 'rev-parse', 'refs/iw/pr-28'), base: git(opts.cwd, 'rev-parse', 'origin/main'), prSettings: fs.existsSync(path.join(opts.cwd, '.claude/settings.json')) };
     return { status: 0, stdout: stream(), stderr: '' };
   };
   await main(['run', '--review-requested'], s.deps);
-  assert.equal(seen.head, s.axSha);
-  assert.equal(seen.base, git(s.origin, 'rev-parse', 'main'));
+  assert.equal(seen.head, git(s.origin, 'rev-parse', 'main'), 'the working tree is the base branch');
+  assert.equal(seen.pr, s.axSha, 'the PR head is a ref to diff against');
+  assert.equal(seen.base, seen.head);
+  assert.equal(seen.prSettings, false, 'the PR\'s .claude/settings.json is not in the working tree');
+});
+
+test('run: .iw-watch/ is excluded from git in the clone, and a branch that ships one is refused', async () => {
+  const s = setup();
+  let exclude;
+  s.deps.spawnClaude = (file, args, opts) => {
+    exclude = fs.readFileSync(path.join(opts.cwd, '.git/info/exclude'), 'utf8');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine'], s.deps);
+  assert.match(exclude, /^\.iw-watch\/$/m);
+  const t = setup();
+  git(t.mainRoot, 'checkout', '-q', 'web/fe');
+  fs.mkdirSync(path.join(t.mainRoot, '.iw-watch'));
+  fs.writeFileSync(path.join(t.mainRoot, '.iw-watch/reply.md'), 'planted');
+  git(t.mainRoot, 'add', '-f', '.iw-watch/reply.md');
+  git(t.mainRoot, 'commit', '-q', '-m', 'plant');
+  git(t.mainRoot, 'push', '-q', 'origin', 'web/fe');
+  t.deps.gh = fakeGh({ 'pr list mine': [{ ...t.pr11, headRefOid: git(t.mainRoot, 'rev-parse', 'HEAD') }], 'pr list open': [{ number: 11 }] }).gh;
+  await main(['run', '--mine'], t.deps);
+  assert.equal(t.calls.length, 0);
+  assert.match(t.notices()[0].detail, /\.iw-watch/);
 });
 
 test('run: at the round cap no session starts and the human is told once', async () => {
@@ -214,13 +241,20 @@ test('run: a hostile branch name is refused before any git or claude call', asyn
   assert.match(s.notices()[0].detail, /refused branch name.*only \[A-Za-z0-9\._\/-\] is handled/);
 });
 
-test('run: a failed session needs the human and keeps the clone', async () => {
+test('run: a failed session needs the human, keeps the clone, and is retried once the clone is removed', async () => {
   const s = setup({ behaviour: 'fail' });
   await main(['run', '--mine'], s.deps);
   const [n] = s.notices();
   assert.equal(n.kind, 'needs-human');
   assert.match(n.detail, /session failed/);
   assert.ok(fs.existsSync(s.clone(11)));
+  s.out.length = 0;
+  await main(['run', '--mine'], s.deps);
+  assert.equal(s.calls.length, 1, 'no second session while the clone is there');
+  assert.deepEqual(s.notices(), [], 'and no repeated notice');
+  fs.rmSync(s.clone(11), { recursive: true });
+  await main(['run', '--mine'], s.deps);
+  assert.equal(s.calls.length, 2, 'retried after the human removed the clone');
 });
 
 test('run: a clone left from an earlier run is not overwritten', async () => {
@@ -231,6 +265,12 @@ test('run: a clone left from an earlier run is not overwritten', async () => {
   assert.equal(s.calls.length, 0);
   assert.equal(fs.readFileSync(path.join(s.clone(11), 'keep.txt'), 'utf8'), 'mine');
   assert.match(s.notices()[0].detail, /left from an earlier run/);
+  s.out.length = 0;
+  await main(['run', '--mine'], s.deps);
+  assert.deepEqual(s.notices(), [], 'told once');
+  fs.rmSync(s.clone(11), { recursive: true });
+  await main(['run', '--mine'], s.deps);
+  assert.equal(s.calls.length, 1, 'the item was kept, so removing the directory lets it run');
 });
 
 test('run: --limit caps the sessions per run', async () => {
@@ -257,6 +297,10 @@ test('notify: IWATCH_NOTIFY_CMD gets kind, title and url as argv, no shell; a fa
   assert.equal(c.file, '/usr/local/bin/my-notify');
   assert.deepEqual(c.args.slice(0, 1), ['--flag']);
   assert.deepEqual(c.args.slice(1, 3), ['done', `#11 ${s.pr11.title}`]);
+  const u = setup({ env: { IWATCH_NOTIFY_CMD: 'n' } });
+  u.deps.gh = fakeGh({ 'pr list mine': [{ ...u.pr11, title: 'bad \u001b]52;c;x\u0007 title' }], 'pr list open': [{ number: 11 }] }).gh;
+  await main(['run', '--mine'], u.deps);
+  assert.ok(!u.notified[0].args.join(' ').includes('\u001b'), 'no control characters reach the notifier');
   assert.equal(c.args[3], s.pr11.url);
   assert.ok(!c.opts.shell);
   const t = setup({ env: { IWATCH_NOTIFY_CMD: 'broken' }, notify: () => { throw new Error('ENOENT'); } });

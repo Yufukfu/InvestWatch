@@ -7,15 +7,22 @@ import { safeBranch } from './prompt.mjs';
 export const TOOLS = ['Bash', 'Read', 'Edit', 'Write', 'Grep', 'Glob'];
 export const TIMEOUT_MS = 20 * 60 * 1000;
 
+// Rule semantics probed on 2.1.330 (see fixtures/README.md): a deny beats any allow, also a project one;
+// `Read(./**)` confines reads (and Grep) to the clone; Write is governed by `Edit(...)` rules; `cmd 11 *`
+// does not match `cmd 110`; a `*` inside a deny pattern matches (`gh * --repo *`); a leading VAR=x or a
+// chained `&& other` stops an allow rule matching. Project allow rules of an untrusted directory (every
+// fresh clone) are ignored in -p, so this list is the whole allow-list; project hooks still run.
 export const DENY = [
-  'Bash(gh pr review:*)', 'Bash(gh pr merge:*)', 'Bash(gh pr ready:*)', 'Bash(gh pr close:*)', 'Bash(gh api:*)',
-  'Bash(gh repo:*)', 'Bash(gh secret:*)', 'Bash(gh workflow:*)', 'Bash(gh auth:*)', 'Bash(gh alias:*)',
+  'Bash(gh pr review:*)', 'Bash(gh pr merge:*)', 'Bash(gh pr ready:*)', 'Bash(gh pr close:*)', 'Bash(gh pr create:*)', 'Bash(gh api:*)',
+  'Bash(gh repo:*)', 'Bash(gh secret:*)', 'Bash(gh workflow:*)', 'Bash(gh auth:*)', 'Bash(gh alias:*)', 'Bash(gh extension:*)',
+  'Bash(gh * --repo *)', 'Bash(gh * --repo=*)', 'Bash(gh * -R *)',
   'Bash(curl:*)', 'Bash(wget:*)', 'Bash(git push --force:*)', 'Bash(git remote:*)', 'Bash(git config:*)',
+  'Edit(./.git/**)', 'Edit(./.claude/**)', 'Read(./.env)', 'Read(./**/.env)',
   'WebFetch', 'WebSearch',
 ];
 
 const READ = [
-  'Read', 'Grep', 'Glob', 'Write', 'Edit',
+  'Read(./**)', 'Grep', 'Glob',
   'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git blame:*)',
   'Bash(ls:*)', 'Bash(gh pr view:*)', 'Bash(gh pr diff:*)', 'Bash(gh issue list:*)', 'Bash(gh issue view:*)',
 ];
@@ -33,12 +40,22 @@ export function allowList({ kind, pr, headRef, dryRun }) {
   if (!Number.isInteger(pr)) throw new Error('allowList needs a PR number');
   const fixes = kind === 'address-review' || kind === 'ci-failed';
   if (fixes && !safeBranch(headRef)) throw new Error(`refusing unsafe branch name ${JSON.stringify(headRef)}`);
-  const allow = [...READ, ...(fixes ? FIX : [])];
+  // a review edits nothing but its own reply; a fix edits the clone, never .git/ or .claude/ (see DENY)
+  const allow = [...READ, ...(fixes ? ['Edit(./**)', ...FIX] : ['Edit(./.iw-watch/**)'])];
   if (!dryRun) {
     if (fixes) allow.push(`Bash(git push origin ${headRef})`, `Bash(git push -u origin ${headRef})`);
-    allow.push(`Bash(gh pr comment ${pr}:*)`, 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)');
+    allow.push(`Bash(gh pr comment ${pr} *)`, 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)');
   }
   return allow;
+}
+
+/** Explicit denies on top: they hold even if some other settings source allowed the command */
+export function denyList({ kind, dryRun }) {
+  const fixes = kind === 'address-review' || kind === 'ci-failed';
+  const deny = [...DENY];
+  if (!fixes) deny.push('Bash(git push:*)', 'Bash(git commit:*)', 'Bash(git add:*)');
+  if (dryRun) deny.push('Bash(git push:*)', 'Bash(gh pr comment:*)', 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)');
+  return [...new Set(deny)];
 }
 
 export function claudeArgs({ kind, pr, headRef, dryRun, budgetUsd = 2, model }) {
@@ -52,7 +69,7 @@ export function claudeArgs({ kind, pr, headRef, dryRun, budgetUsd = 2, model }) 
     ...(model ? ['--model', model] : []),
     '--tools', ...TOOLS,
     '--allowedTools', ...allowList({ kind, pr, headRef, dryRun }),
-    '--disallowedTools', ...DENY,
+    '--disallowedTools', ...denyList({ kind, dryRun }),
   ];
 }
 

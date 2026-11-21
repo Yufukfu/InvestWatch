@@ -5,6 +5,8 @@
 import { spawnSync } from 'node:child_process';
 
 export const KINDS = ['done', 'draft-ready', 'needs-human'];
+// titles are other people's text; a notifier may print them to a terminal
+const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '?');
 
 export function makeNotifier({ env, stdout, stderr, now = () => Date.now(), spawn = spawnSync }) {
   const cmd = String(env.IWATCH_NOTIFY_CMD || '').trim().split(/\s+/).filter(Boolean);
@@ -14,7 +16,7 @@ export function makeNotifier({ env, stdout, stderr, now = () => Date.now(), spaw
     stdout(`${JSON.stringify(line)}\n`);
     if (!cmd.length) return;
     try {
-      const r = spawn(cmd[0], [...cmd.slice(1), notice.kind, `#${notice.pr} ${notice.title}`, notice.url || ''], { shell: false, stdio: 'ignore', timeout: 15000 });
+      const r = spawn(cmd[0], [...cmd.slice(1), notice.kind, clean(`#${notice.pr} ${notice.title}`), clean(notice.url || '')], { shell: false, stdio: 'ignore', timeout: 15000 });
       if (r?.error) throw r.error;
     } catch (e) {
       stderr(`iw-watch: notify command failed (${e.message}); the run goes on\n`);

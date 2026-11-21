@@ -27,15 +27,26 @@ export function prepareClone({ git = realGit, fs = realFs, mainRoot, item }) {
   const url = git(['-C', mainRoot, 'remote', 'get-url', 'origin']);
   const own = item.kind === 'address-review' || item.kind === 'ci-failed';
   git(['clone', '--quiet', '--reference', mainRoot, '--dissociate', '--no-tags', '--branch', own ? item.headRef : item.baseRef, '--', url, dir]);
+  let head;
   if (own) {
     git(['-C', dir, 'fetch', '--quiet', 'origin', `+refs/heads/${item.baseRef}:refs/remotes/origin/${item.baseRef}`]);
+    head = git(['-C', dir, 'rev-parse', 'HEAD']);
   } else {
-    // someone else's PR: its head, detached, so nothing here can push to their branch
-    git(['-C', dir, 'fetch', '--quiet', 'origin', `refs/pull/${Number(item.pr)}/head`]);
-    git(['-C', dir, '-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', 'FETCH_HEAD']);
+    // Someone else's PR is never checked out: its .claude/ (hooks, settings) and CLAUDE.md would load in the
+    // session, and project hooks run even in an untrusted directory. The working tree stays on the base
+    // branch; the PR head is a ref to diff and `git show` against.
+    git(['-C', dir, 'fetch', '--quiet', 'origin', `+refs/pull/${Number(item.pr)}/head:${prRef(item.pr)}`]);
+    head = git(['-C', dir, 'rev-parse', prRef(item.pr)]);
   }
-  return { dir, head: git(['-C', dir, 'rev-parse', 'HEAD']) };
+  if (fs.existsSync(path.join(dir, '.iw-watch'))) {
+    throw new NeedsHuman(`the branch already contains .iw-watch/ (the watcher's draft folder); refusing to run in ${dir}`);
+  }
+  fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
+  fs.appendFileSync(path.join(dir, '.git', 'info', 'exclude'), '\n.iw-watch/\n');
+  return { dir, head };
 }
+
+export const prRef = (pr) => `refs/iw/pr-${Number(pr)}`;
 
 /** Commits on the clone's branch that origin does not have */
 export function unpushed({ git = realGit, dir, headRef }) {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { claudeArgs, allowList, DENY, TOOLS, parseStream, runSession, childEnv, pushDenied } from './lib/session.mjs';
+import { claudeArgs, allowList, denyList, DENY, TOOLS, parseStream, runSession, childEnv, pushDenied } from './lib/session.mjs';
 
 const help = fs.readFileSync(new URL('./fixtures/claude-help.txt', import.meta.url), 'utf8');
 const stream = fs.readFileSync(new URL('./fixtures/claude-stream-denied.jsonl', import.meta.url), 'utf8');
@@ -42,7 +42,9 @@ test('headless mode: dontAsk, nobody to prompt, no persistence, restricted tools
 test('the allow-list for my PR: exact branch push, this PR only, no review, merge, ready, api or network', () => {
   const allow = allowList({ ...mine, dryRun: false });
   assert.ok(allow.includes('Bash(git push origin web/frontend-architecture)'));
-  assert.ok(allow.includes('Bash(gh pr comment 11:*)'));
+  assert.ok(allow.includes('Bash(gh pr comment 11 *)'), 'space-star: matches `11 --body-file x`, not `110` (probed on 2.1.330)');
+  assert.ok(allow.includes('Read(./**)') && allow.includes('Edit(./**)'), 'file tools scoped to the clone');
+  assert.ok(!allow.some((r) => ['Read', 'Write', 'Edit'].includes(r)), 'no unscoped file tool');
   assert.ok(allow.includes('Bash(gh issue create:*)'));
   assert.ok(allow.includes('Bash(git commit:*)'));
   assert.ok(!allow.some((r) => /git push origin:\*|git push:\*/.test(r)), 'no wildcard push');
@@ -56,7 +58,9 @@ test('the allow-list for my PR: exact branch push, this PR only, no review, merg
 test('review of someone else\'s PR: no commit, no push, no test runners', () => {
   const allow = allowList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false });
   assert.ok(!allow.some((r) => /git push|git commit|git add|npm|pytest|node --test/.test(r)), allow.join(' '));
-  assert.ok(allow.includes('Bash(gh pr comment 28:*)'));
+  assert.ok(allow.includes('Bash(gh pr comment 28 *)'));
+  assert.ok(allow.includes('Edit(./.iw-watch/**)'), 'a review writes only its reply');
+  assert.ok(!allow.includes('Edit(./**)'));
 });
 
 test('dry run: no push and no GitHub write at all', () => {
@@ -69,8 +73,21 @@ test('dry run: no push and no GitHub write at all', () => {
 test('the deny-list is passed too and names the dangerous commands', () => {
   const args = claudeArgs({ ...mine, dryRun: false, budgetUsd: 2 });
   const deny = valueAfter(args, '--disallowedTools');
-  assert.deepEqual(deny, DENY);
+  assert.deepEqual(deny, denyList({ ...mine, dryRun: false }));
+  for (const d of DENY) assert.ok(deny.includes(d), d);
+  assert.ok(valueAfter(claudeArgs({ ...mine, dryRun: true, budgetUsd: 2 }), '--disallowedTools').includes('Bash(git push:*)'), 'the dry-run denies reach the argv');
+  assert.ok(valueAfter(claudeArgs({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false, budgetUsd: 2 }), '--disallowedTools').includes('Bash(git commit:*)'), 'the review denies reach the argv');
   for (const d of ['Bash(gh pr review:*)', 'Bash(gh pr merge:*)', 'Bash(gh pr ready:*)', 'Bash(gh api:*)', 'Bash(curl:*)', 'Bash(wget:*)', 'WebFetch', 'WebSearch']) assert.ok(DENY.includes(d), d);
+});
+
+test('the deny-list blocks other repositories, git and settings files, and outward writes in a dry run', () => {
+  const deny = denyList({ ...mine, dryRun: false });
+  for (const d of ['Bash(gh * --repo *)', 'Bash(gh * --repo=*)', 'Bash(gh * -R *)', 'Bash(gh pr create:*)', 'Edit(./.git/**)', 'Edit(./.claude/**)', 'Read(./.env)']) assert.ok(deny.includes(d), d);
+  const dry = denyList({ ...mine, dryRun: true });
+  for (const d of ['Bash(git push:*)', 'Bash(gh pr comment:*)', 'Bash(gh issue create:*)', 'Bash(gh issue comment:*)']) assert.ok(dry.includes(d), `dry run: ${d}`);
+  assert.ok(!deny.includes('Bash(git push:*)'), 'outside a dry run the exact-branch push stays possible');
+  const review = denyList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false });
+  for (const d of ['Bash(git push:*)', 'Bash(git commit:*)']) assert.ok(review.includes(d), `review: ${d}`);
 });
 
 test('a branch name that is not safe never reaches the allow-list', () => {
