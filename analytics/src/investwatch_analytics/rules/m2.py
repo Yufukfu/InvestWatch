@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_left
 from functools import cached_property
 
 from ..models import RuleResult
@@ -106,7 +107,14 @@ class R3RiskNextToReturns(Rule):
             if any(o.search(s.text) for o in p["risk_ok"]) or self._hits(s.text, p["risk"], p["risk_x"])
         ]
         near = [i for i in warnings if not sentences[i].text.lstrip("( ").startswith(p["footnote"])]
-        uncovered = [c for c in claims if not any(abs(c - w) <= p["window"] for w in near)]
+        # `near` is ascending (sentence order), so a claim is covered iff the first warning at or after
+        # `c - window` is at most `c + window`. Comparing every claim with every warning was quadratic in the
+        # sentence count ("Zysk 5%. Ryzyko straty. " x 16 000 took ~65 s; PR #26 review).
+        window = p["window"]
+        uncovered = [
+            c for c in claims
+            if (i := bisect_left(near, c - window)) == len(near) or near[i] > c + window
+        ]
         if not uncovered:
             nearest = min(near, key=lambda w: abs(w - claims[0]))
             return self.result("pass", sentences[nearest].text, "Ostrzeżenie o ryzyku towarzyszy informacji o zyskach.")

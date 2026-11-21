@@ -119,6 +119,18 @@ class FirmRef(_Strict):
     match_confidence: float = Field(ge=0, le=1)
 
 
+class AdvertiserRef(_Strict):
+    """Party publishing or offering the content (M1, M3). `in_registry` is required: the schema types it
+    boolean, never null."""
+
+    name: str | None = None
+    handle: str | None = None
+    profile_url: HttpUrlStr | None = None
+    website: HttpUrlStr | None = None
+    in_registry: bool
+    on_warning_list: bool | None = None
+
+
 class ModelInfo(_Strict):
     pipeline_version: str
     llm: str | None = None
@@ -134,6 +146,7 @@ class Finding(_Strict):
     title: str
     summary: str | None = None
     firm: FirmRef | None = None
+    advertiser: AdvertiserRef | None = None
     rules: list[RuleResult]
     content_excerpt: str | None = Field(default=None, max_length=500)
     url: HttpUrlStr
