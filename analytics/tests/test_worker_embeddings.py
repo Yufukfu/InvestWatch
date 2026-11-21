@@ -276,3 +276,18 @@ def test_cli_passes_the_gate_to_analyze(tmp_path, monkeypatch, capsys):
     assert cli_mod.main([str(write_docs(tmp_path)), "--no-llm"]) == 0
     capsys.readouterr()
     assert seen and all(isinstance(kw["gate"], Gate) and kw["gate"].settings.enabled for kw in seen)
+
+
+def test_compose_empty_values_mean_defaults():
+    """analytics/compose.yaml passes every key as `${X:-}` (an empty string when unset): empty must mean default."""
+    import re
+    from pathlib import Path
+
+    compose = (Path(__file__).resolve().parents[1] / "compose.yaml").read_text(encoding="utf-8")
+    keys = re.findall(r"^\s+((?:EMBED|GATE|NEARDUP)_[A-Z_]+): \$\{\1:-([^}]*)\}", compose, re.M)
+    assert len(keys) == 16
+    env = {k: default for k, default in keys}
+    env["EMBED_BASE_URL"] = "http://ollama:11434/v1"
+    p = preprocessing_from_env(env, claim_min_idle_ms=60000, llm_settings=llm())
+    assert p.embed.model == "bge-m3" and p.embed.dim == 1024 and p.gate.settings.enabled
+    assert p.neardup.num_perm == 128

@@ -31,7 +31,7 @@ services:
       # Embeddings (ADR 0313): local only. Empty EMBED_BASE_URL = off (model.embedder = null, dictionary-only gate).
       # With --profile llm and bge-m3 pulled (issue #65): EMBED_BASE_URL=http://ollama:11434/v1. Limits: analytics/.env.example.
       EMBED_BASE_URL: ${EMBED_BASE_URL:-}
-      EMBED_MODEL: ${EMBED_MODEL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-bge-m3}
       EMBED_API_KEY: ${EMBED_API_KEY:-}
       EMBED_DIM: ${EMBED_DIM:-}
       EMBED_TIMEOUT_S: ${EMBED_TIMEOUT_S:-}
