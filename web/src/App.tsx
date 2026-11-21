@@ -1,5 +1,5 @@
 import { HealthPage } from './features/health/HealthPage';
-import { FindingsTable } from './features/findings/FindingsTable';
+import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
 
 export function App() {
@@ -11,7 +11,7 @@ export function App() {
       </header>
       <main>
         <SummaryPage />
-        <FindingsTable />
+        <FindingsPage />
       </main>
     </div>
   );

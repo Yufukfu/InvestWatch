@@ -21,9 +21,9 @@
 
 ## 4. Findings feature
 
-- [ ] 4.1 Write failing tests: `FindingsTable` renders rows, the loading text and the error alert from props with no `Provider`, and renders `<img src=x onerror=alert(1)>` as text; `useFindings` maps the contract mock to `FindingRow[]` and reports `isError` when the request fails.
-- [ ] 4.2 Create `features/findings/model.ts`, `data/useFindings.ts` (maps DTO to `FindingRow`, `status` and `module` assigned from the generated types), `components/FindingsTable.tsx` and `FindingsPage.tsx`; update `App.tsx`; remove the old `FindingsTable.tsx`. Verify the new tests, `App.test.tsx`, lint and typecheck pass.
-- [ ] 4.3 Mutation check (drop the mapping of `score`, swap `title` and `platform`, render title as HTML) and verify the tests catch it. Record `mutations: N tried, N caught`.
+- [x] 4.1 Write failing tests: `FindingsTable` renders rows, the loading text and the error alert from props with no `Provider`, and renders `<img src=x onerror=alert(1)>` as text; `useFindings` maps the contract mock to `FindingRow[]` and reports `isError` when the request fails.
+- [x] 4.2 Create `features/findings/model.ts`, `data/useFindings.ts` (maps DTO to `FindingRow`, `status` and `module` assigned from the generated types), `components/FindingsTable.tsx` and `FindingsPage.tsx`; update `App.tsx`; remove the old `FindingsTable.tsx`. Verify the new tests, `App.test.tsx`, lint and typecheck pass.
+- [x] 4.3 Mutation check (drop the mapping of `score`, swap `title` and `platform`, render title as HTML) and verify the tests catch it. Record `mutations: N tried, N caught`. mutations: 11 tried, 11 caught.
 
 ## 5. Closing
 
