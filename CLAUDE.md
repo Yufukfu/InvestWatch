@@ -17,17 +17,17 @@ A doc claim that matters is checked against the code before you rely on it. Afte
 
 ## Services
 
-Three modules, three owners. B defined the repository layout (root [`README.md`](README.md) has the human-facing overview and Quick Start); confirm with B before adding directories. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
+Three modules, three owners. Kacper defined the repository layout (root [`README.md`](README.md) has the human-facing overview and Quick Start); confirm with Kacper before adding directories. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
 
 | Directory | Owner | Role | Rules |
 |---|---|---|---|
-| `scraper/` | A | collectors, queue, scheduler, `documents` writer | [`scraper/CLAUDE.md`](scraper/CLAUDE.md) |
-| `analytics/` | C | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
-| `web/` | B | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
-| `contracts/` | C | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
-| `infra/` | B | shared infrastructure: Postgres, Redis, object storage (MinIO), optional Ollama (`--profile llm`), HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
+| `scraper/` | Adam | collectors, queue, scheduler, `documents` writer | [`scraper/CLAUDE.md`](scraper/CLAUDE.md) |
+| `analytics/` | Damian | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
+| `web/` | Kacper | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
+| `contracts/` | Damian | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
+| `infra/` | Kacper | shared infrastructure: Postgres, Redis, object storage (MinIO), optional Ollama (`--profile llm`), HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 
-`api/` (C) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
+`api/` (Damian) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
 
 ## Process in one line
 

@@ -1,4 +1,4 @@
-# infra (owner B)
+# infra (owner Kacper)
 
 Shared infrastructure: Postgres, Redis, object storage (MinIO), the optional Ollama profile and the Caddy HTTPS gateway. The root `compose.yaml` only `include:`s each module's own `compose.yaml`. What runs where, the roles and the TLS setup are in [`README.md`](README.md); the reasoning is in [ADR 0202](../.docs/decisions/0202-deployment-topology.md) and [ADR 0306](../.docs/decisions/0306-object-storage-image.md). Don't restate them here.
 

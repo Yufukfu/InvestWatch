@@ -22,5 +22,5 @@ Kacper's second review of PR #10 (head after the first review fixes) found 2 imp
 
 ## Impact
 
-- Owner: C (`analytics/`). No contract, REST route or event changes; output still validates against `finding.schema.json` v1.
+- Owner: Damian (`analytics/`). No contract, REST route or event changes; output still validates against `finding.schema.json` v1.
 - New CLI exit code 1 (some documents failed analysis); exits 0 and 2 unchanged.

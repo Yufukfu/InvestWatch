@@ -15,7 +15,7 @@ Every service is blocked on shared infrastructure that does not run yet. `main` 
 - An opt-in override `infra/compose.dev-ports.yaml` publishes Postgres, Redis and the object store on `127.0.0.1` only. It is for running a module or its tests on the host before that module has a container.
 - Record the joining contract for `scraper`, `analytics` and `api` in `infra/README.md`: networks, `depends_on` conditions and env names. Each module adds its own `compose.yaml` and Dockerfile in its own change, plus one line in the root `include:`.
 - Out of scope: the `scraper`, `analytics`, `api` and `web` containers and their Dockerfiles; the Alembic migration step (ADR 0303, `api` change); creating the stream consumer group (done by analytics with `XGROUP CREATE ... MKSTREAM`); writing default thresholds (done by `api`, ADR 0305); TLS between services; backups.
-- Owner: Damian (module C, compose infra per `.docs/integration-plan.md`). The files under `infra/`, `web/compose.yaml` and `scripts/init-env.sh` are owned by Kacper ([ADR 0202](../../../../.docs/decisions/0202-deployment-topology.md), `infra/CLAUDE.md`), so Kacper reviews the PR.
+- Owner: Damian (compose infra per `.docs/integration-plan.md`). The files under `infra/`, `web/compose.yaml` and `scripts/init-env.sh` are owned by Kacper ([ADR 0202](../../../../.docs/decisions/0202-deployment-topology.md), `infra/CLAUDE.md`), so Kacper reviews the PR.
 - Contracts: none. No JSON Schema, REST route or event shape changes. The change provides the Redis names and the bucket that integration points 2, 3 and 5 (`.docs/integration-plan.md` §2) and ADR 0305 already define.
 
 ## Capabilities

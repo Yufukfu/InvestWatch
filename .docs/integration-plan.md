@@ -6,40 +6,40 @@ Contract version: **v1** (frozen at 14:30 on Saturday; changes only after team a
 
 | Person | Module | Owns |
 |---|---|---|
-| **A** | Scraper | collectors (web + social media), job queue, scheduler, writes to `documents` + objects in MinIO |
-| **B** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel; **repository structure** |
-| **C** | Analytics + integration | database schema, contracts, REST API + WebSocket gateway, modules M1–M3, firm registry, docker-compose |
+| **Adam** | Scraper | collectors (web + social media), job queue, scheduler, writes to `documents` + objects in MinIO |
+| **Kacper** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel; **repository structure** |
+| **Damian** | Analytics + integration | database schema, contracts, REST API + WebSocket gateway, modules M1–M3, firm registry, docker-compose |
 
 Decisions from the team sync:
 
-- ✅ **C builds the REST API** (a thin layer over the same database). B works against mock data matching the contract in section 5 from the start; A focuses only on data collection.
+- ✅ **Damian builds the REST API** (a thin layer over the same database). Kacper works against mock data matching the contract in section 5 from the start; Adam focuses only on data collection.
 - ✅ **Social media:** we start with **one platform** and add more only if time allows.
 - ✅ **LLM:** accessed through an HTTP API; for the hackathon a hosted OpenAI-compatible model, with local Gemma as the env-only swap target ([ADR 0304](decisions/0304-llm-serving.md), note in section 7).
-- ✅ **Repository structure** is defined by B; the layout below is only the list of services that must exist.
+- ✅ **Repository structure** is defined by Kacper; the layout below is only the list of services that must exist.
 - ✅ **Spec-driven workflow with OpenSpec** + an AI work log (`.docs/ai-workflow.md`).
-- ⏳ Contracts (sections 3–6) – to be confirmed by A and B.
-- ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with A later.
+- ⏳ Contracts (sections 3–6) – to be confirmed by Adam and Kacper.
+- ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with Adam later.
 - ⏳ Milestone hours and the sleep rotation – to be agreed.
 
 ## 1. Architecture
 
 ```
                 ┌──────────────┐  XADD iw:documents   ┌──────────────────┐
- scheduler ────▶│  scraper (A) │ ───────────────────▶ │  analytics (C)   │
+ scheduler ────▶│  scraper (Adam) │ ───────────────────▶ │  analytics (Damian)   │
  (cron/beat)    │ Playwright,  │                      │ preprocessing,   │
                 │ httpx, UA/   │──┐                ┌──│ M1/M2/M3, LLM    │
                 │ proxy rotation  │                │  └────────┬─────────┘
                 └──────────────┘  │ INSERT         │ INSERT    │ PUBLISH iw:events
                                   ▼                ▼           ▼
                       ┌────────────────────┐   ┌──────────┐  ┌────────────────┐
-                      │ PostgreSQL         │   │ MinIO    │  │ api (C)        │
+                      │ PostgreSQL         │   │ MinIO    │  │ api (Damian)        │
                       │ sources, documents,│   │ html,    │  │ FastAPI REST + │
                       │ findings, registry │   │ screens  │  │ Socket.IO      │
                       └─────────▲──────────┘   └──────────┘  └───────┬────────┘
                                 └──────────────── SELECT ────────────┤
                                                                       ▼
                                                             ┌────────────────┐
-                                                            │ dashboard (B)  │
+                                                            │ dashboard (Kacper)  │
                                                             └────────────────┘
                      LLM endpoint (OpenAI-compatible API: hosted, or local Gemma via Ollama) ◀── analytics
 ```
@@ -47,7 +47,7 @@ Decisions from the team sync:
 Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
 `postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then `scraper`, `scheduler`, `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
-Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
+Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
 ## 2. Integration points
 
@@ -221,7 +221,7 @@ Submission deadline: **Sunday 22.11, 11:00**. Buffer: we submit at 10:30. Hours 
 | When | Milestone | Evidence |
 |---|---|---|
 | Sat 14:30 | **Contracts v1 frozen** | `contracts/*.schema.json`, mocks `findings.json`, `documents.json`; docker-compose with postgres/redis/minio starts |
-| Sat 17:00 | **Integration #1 – "thin thread"** | A pushes 1 real document → C creates a finding (even rule-based only) → B sees it in the table and gets a WS alert |
+| Sat 17:00 | **Integration #1 – "thin thread"** | Adam pushes 1 real document → Damian creates a finding (even rule-based only) → Kacper sees it in the table and gets a WS alert |
 | Sat 22:00 | **Integration #2 – all modules** | ≥ 1 source each for M1, M2, M3; filters, trend and status change work on real data |
 | Sun 03:00 | **Integration #3 – calibration** | the threshold slider changes FP/FN on the gold set; the scheduler scans periodically |
 | Sun 08:00 | **Feature freeze** | fixes only; dependency audit, README, clean console |

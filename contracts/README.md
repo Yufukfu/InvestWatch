@@ -2,7 +2,7 @@
 
 Single source of truth for data exchanged between the scraper, analytics, API and dashboard (`web/`). Background and rationale: [`.docs/integration-plan.md`](../.docs/integration-plan.md).
 
-**Status: draft v1** – proposed by C, to be confirmed by A and B (see the open decisions in the integration plan). Until confirmed, treat it as the working assumption for mocks and development.
+**Status: draft v1** – proposed by Damian, to be confirmed by Adam and Kacper (see the open decisions in the integration plan). Until confirmed, treat it as the working assumption for mocks and development.
 
 | File | Used by | Describes |
 |---|---|---|
@@ -99,7 +99,7 @@ Run it before merging any change to `contracts/`.
 
 ## Changing a contract
 
-1. Propose the change (OpenSpec change proposal) and agree it with the affected owners (A, B, C).
+1. Propose the change (OpenSpec change proposal) and agree it with the affected owners (Adam, Kacper, Damian).
 2. Update the schema, `openapi.yaml`, the mock generator and regenerate mocks.
 3. `python contracts/validate.py` must pass.
 4. Breaking changes bump the version (`v2`) in the stream message `schema` field.
