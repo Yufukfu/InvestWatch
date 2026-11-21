@@ -66,7 +66,7 @@ class Collector:
         store: SourceStore,
         ingestor,
         *,
-        urls: UrlGuard,
+        urls: Callable[[], Awaitable[UrlGuard]],
         addresses: AddressGuard,
         rotator,
         limiter,
@@ -76,15 +76,16 @@ class Collector:
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         self._store, self._ingestor = store, ingestor
-        self._urls, self._addresses, self._rotator, self._limiter = urls, addresses, rotator, limiter
+        self._urls_now, self._addresses, self._rotator, self._limiter = urls, addresses, rotator, limiter
         self._stages, self._timeout, self._max_bytes, self._clock = stages, timeout, max_bytes, clock
 
     async def run_source(self, source_id: str, started: Callable[[], Awaitable[None]]) -> AttemptResult:
         source = await self._store.get(source_id)
         if source is None or not source.collectable:  # the queue checks too; this keeps a stray caller from fetching
             return _failed(source_id, Reason.INVALID_REQUEST, "source does not exist or is not collectable")
+        urls = await self._urls_now()
         try:
-            self._urls.check(source.url, enforce_host=False)
+            urls.check(source.url, enforce_host=False)
         except FetchFailure as failure:
             return _failed(source_id, failure.reason, failure.detail)
         await started()  # the guards passed and nothing has been requested yet
@@ -92,7 +93,7 @@ class Collector:
         identity = stages.draw_identity()
         session = stages.open_session(identity)
         try:
-            return await self._collect(source, identity, session)
+            return await self._collect(source, identity, session, urls)
         except FetchDeferred as deferred:
             return AttemptResult(deferral=deferred.deferral)
         except FetchFailure as failure:
@@ -105,10 +106,10 @@ class Collector:
         finally:
             await stages.close_session(session)
 
-    async def _collect(self, source: Source, identity, session) -> AttemptResult:
+    async def _collect(self, source: Source, identity, session, urls: UrlGuard) -> AttemptResult:
         stages = self._stages
         domain = domain_of(source)
-        guard = target_guard(self._urls, self._addresses, source.url)
+        guard = target_guard(urls, self._addresses, source.url)
         proxy = self._rotator.start_run()
 
         await self._limiter.wait_turn(domain)

@@ -69,3 +69,14 @@ async def test_schedulable_lists_only_active_web_sources_with_a_cron(pool, flag)
     ids = {s.id for s in await PgSourceStore(pool).schedulable()}
 
     assert ids == {keep}
+
+
+async def test_collectable_lists_active_web_sources_with_or_without_a_cron(pool):
+    scheduled = await add(pool)
+    manual = await add(pool, cron=None)
+    await add(pool, active=False)
+    await add(pool, platform="x")
+
+    ids = {s.id for s in await PgSourceStore(pool).collectable()}
+
+    assert ids == {scheduled, manual}

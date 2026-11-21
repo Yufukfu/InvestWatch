@@ -85,6 +85,15 @@ async def resolver(host):
     return ["93.184.216.34"]
 
 
+def static_urls(hosts):
+    guard = UrlGuard(hosts)
+
+    async def urls():
+        return guard
+
+    return urls
+
+
 def make(harness, *, source_url=URL, hosts=("alfa.example.com",), source=True):
     store = FakeSourceStore()
     store.permissive = False
@@ -93,7 +102,7 @@ def make(harness, *, source_url=URL, hosts=("alfa.example.com",), source=True):
     ingestor = type("I", (), {"ingest": harness.ingest})()
     limiter = Limiter(harness.calls)
     collector = Collector(
-        store, ingestor, urls=UrlGuard(hosts), addresses=AddressGuard(resolver), rotator=Rotator(),
+        store, ingestor, urls=static_urls(hosts), addresses=AddressGuard(resolver), rotator=Rotator(),
         limiter=limiter, stages=harness.stages(), clock=lambda: NOW,
     )
     return collector, limiter

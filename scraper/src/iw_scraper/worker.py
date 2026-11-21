@@ -31,6 +31,8 @@ class RunnerSettings:
     reconnect_cap: float = 30.0
     poll_delay: float = 0.5
     consumer_block: float = 1.0
+    health_host: str = "0.0.0.0"
+    health_port: int = 8080
 
     @classmethod
     def from_env(cls) -> "RunnerSettings":

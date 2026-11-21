@@ -50,6 +50,11 @@ class PgSourceStore:
             "UPDATE sources SET last_run_at = $2, last_run_status = $3 WHERE id = $1", uuid.UUID(source_id), at, status
         )
 
+    async def collectable(self) -> Sequence[Source]:
+        """Every active `web` source: the hosts a run may be redirected to are theirs."""
+        records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active AND platform = 'web'")
+        return [_source(record) for record in records]
+
     async def schedulable(self) -> Sequence[Source]:
         records = await self._pool.fetch(
             f"SELECT {_COLUMNS} FROM sources WHERE active AND platform = 'web' AND schedule_cron IS NOT NULL"
