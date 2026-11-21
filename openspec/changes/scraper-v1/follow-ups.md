@@ -10,3 +10,4 @@ Out-of-scope review findings and "declined to judge" items, one disposition each
 | `final_url` handed to the parser must be the URL after the redirect guard | review of e41cd56, declined to judge | fix-here | task 3.1 (`fetch` returns the final URL; parse uses it) |
 | lxml behaviour on very deep or huge documents | review of e41cd56, declined to judge | fix-here | task 3.1 size cap bounds the input |
 | Database sink and proxy identifier production | review of e41cd56, declined to judge | docs | other changes: `scraper-ingest` (sink), task 4.2 (identifier) |
+| The test command in `scraper/CLAUDE.md` and the session notes (`python:3.12-slim` plus `pip install`) no longer covers `test_fetch.py`: it needs the native tls-client library, which only the image has (`docker build -f scraper/Dockerfile --target test`, mount `scraper/` over `/app/scraper`) | task 3.1 | fix-here | task 6.1: document the image-based test command in `scraper/CLAUDE.md` |

@@ -9,7 +9,7 @@ from lxml import etree, html
 
 from iw_scraper.types import Reason
 
-_HTML_TYPES = {"text/html", "application/xhtml+xml"}
+HTML_TYPES = {"text/html", "application/xhtml+xml"}
 _SKIPPED_TAGS = ("script", "style", "noscript", "template")
 _WEB_SCHEMES = {"http", "https"}
 
@@ -31,7 +31,7 @@ class ParsedPage:
     links: tuple[str, ...]
 
 
-def _header_params(content_type: str | None) -> tuple[str | None, str | None]:
+def content_type_params(content_type: str | None) -> tuple[str | None, str | None]:
     """(media type, charset) from a `Content-Type` header value."""
     if not content_type:
         return None, None
@@ -108,8 +108,8 @@ def _text(root: html.HtmlElement) -> str:
 
 def parse_page(body: bytes, content_type: str | None, final_url: str) -> ParsedPage:
     """Parse one fetched page. Raises `ParseFailure` with `parse_error` or `empty_text`."""
-    media_type, charset = _header_params(content_type)
-    if media_type is not None and media_type not in _HTML_TYPES:
+    media_type, charset = content_type_params(content_type)
+    if media_type is not None and media_type not in HTML_TYPES:
         raise ParseFailure(Reason.PARSE_ERROR, f"not an HTML response: {media_type}")
 
     root = _build_tree(body, charset)
