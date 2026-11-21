@@ -12,14 +12,14 @@ rules:
     severity: high
     legal_basis: art. 69 ust. 1 u.o.i.f.
     weight: 0.5
-    implemented: false
+    implemented: true
 
   - id: S3.2
     name: Słownictwo usług doradczych
     severity: medium
     legal_basis: null
     weight: 1.0
-    implemented: false
+    implemented: true
     params:
       phrase_patterns:
         - '(?<!\w)family\s+office(?!\w)'
@@ -35,7 +35,7 @@ rules:
     severity: high
     legal_basis: art. 76 u.o.i.f.
     weight: 1.5
-    implemented: false
+    implemented: true
     params:
       phrase_patterns:
         - '(?<!\w)dopasuj\w*\s+(?:\w+\s+){0,3}do\s+(?:Twojej|twojej|Pana|Pani|Państwa)\s+sytuacji(?!\w)'
@@ -55,7 +55,7 @@ rules:
     severity: high
     legal_basis: art. 76 u.o.i.f.
     weight: 3.0
-    implemented: false
+    implemented: true
     params:
       verb_patterns: &verbs
         - '(?<!\w)kup(?!\w)'
@@ -93,7 +93,7 @@ rules:
     severity: medium
     legal_basis: null
     weight: 1.0
-    implemented: false
+    implemented: true
     params:
       phrase_patterns:
         - '(?<!\w)abonament\w*'
@@ -109,7 +109,7 @@ rules:
     severity: low
     legal_basis: null
     weight: 0.5
-    implemented: false
+    implemented: true
     params:
       currency_patterns:
         - '\d[\d\s.,]*\s?(?:zł|PLN)(?!\w)'
@@ -130,7 +130,7 @@ rules:
     severity: low
     legal_basis: null
     weight: 0.5
-    implemented: false
+    implemented: true
     params:
       verb_patterns: *verbs
       instrument_patterns: *instruments
