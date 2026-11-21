@@ -15,8 +15,8 @@ WORKDIR /app
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
-# The registry seed sits next to src/ so config._DEFAULT_REGISTRY (src/../registry/seed.csv) resolves;
-# the rule catalogue YAML ships inside the package.
+# registry/ sits next to src/ so config._DEFAULT_REGISTRY (src/../registry/knf.csv, the real KNF snapshot with
+# knf.meta.json) resolves; seed.csv rides along as the fictional fixture. The rule catalogue ships in the package.
 COPY registry registry
 COPY src src
 

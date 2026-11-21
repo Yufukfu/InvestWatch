@@ -18,9 +18,9 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      # Registry: empty = the bundled FICTIONAL seed (3 *.example.com firms); the worker logs a registry_seed WARNING.
-      # Until a real KNF registry CSV is mounted and named here, R1 results and finding.high_risk alerts for real
-      # firms are not meaningful (a real firm is unmatched, so R1 fails). Format: analytics/registry/README.md.
+      # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
+      # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).
+      # Format and refresh: analytics/registry/README.md.
       REGISTRY_CSV: ${REGISTRY_CSV:-}
       # Optional tuning, defaults in analytics/.env.example: WORKER_CONSUMER (hostname), STREAM_BLOCK_MS,
       # CLAIM_MIN_IDLE_MS, MAX_DELIVERIES, MAX_DOCUMENT_BYTES.

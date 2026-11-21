@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 from collections.abc import Mapping
@@ -9,9 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PIPELINE_VERSION = "0.1.0"
+_REGISTRY_DIR = Path(__file__).resolve().parents[2] / "registry"
 #: The fictional 3-firm fixture whose ids match contracts/mocks; tests name it explicitly.
-SEED_REGISTRY = Path(__file__).resolve().parents[2] / "registry" / "seed.csv"
-_DEFAULT_REGISTRY = SEED_REGISTRY
+SEED_REGISTRY = _REGISTRY_DIR / "seed.csv"
+#: The real KNF register, a snapshot written by `python -m investwatch_analytics.knf` (ADR 0311).
+KNF_REGISTRY = _REGISTRY_DIR / "knf.csv"
+_DEFAULT_REGISTRY = KNF_REGISTRY
 
 
 @dataclass(frozen=True)
@@ -30,8 +34,19 @@ class Settings:
 
 def uses_seed_registry(settings: Settings) -> bool:
     """True when the registry is the bundled fictional `registry/seed.csv` (3 `*.example.com` firms): R1 results
-    and high-risk alerts for real firms are then not meaningful until `REGISTRY_CSV` names a real KNF registry."""
-    return settings.registry_csv.resolve() == _DEFAULT_REGISTRY.resolve()
+    and high-risk alerts for real firms are then not meaningful."""
+    return settings.registry_csv.resolve() == SEED_REGISTRY.resolve()
+
+
+def registry_provenance(registry_csv: Path) -> dict | None:
+    """The `<name>.meta.json` written next to a loader-made registry (`fetched_at`, counts), or None when it is
+    missing or unreadable: a hand-made registry."""
+    path = registry_csv.with_name(registry_csv.stem + ".meta.json")
+    try:
+        meta = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return meta if isinstance(meta, dict) else None
 
 
 
