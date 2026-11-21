@@ -13,7 +13,7 @@ dependencies = ["pydantic>=2.14,<3", "PyYAML>=6.0,<7", "RapidFuzz>=3.14,<4"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-investwatch_analytics = ["rules/*.yaml"]
+investwatch_analytics = ["rules/*.yaml", "knf/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

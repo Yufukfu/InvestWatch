@@ -77,7 +77,7 @@ Records with the same normalized name SHALL become one firm, whether they come f
 - **THEN** they are two firms with different ids, and neither keeps the shared alias `Alpha Capital`
 
 ### Requirement: Generated aliases
-The loader SHALL generate aliases from each name line: the line itself, its core name without legal forms, a bracketed abbreviation, the `DM` forms and the Polish case forms of the legal-form words (`Domu Maklerskiego …`), the former names, and the trade names listed in `Dodatkowe informacje`. It SHALL drop an alias with fewer than 4 letters, a single-word alias on the generic stop-list, and an alias that two firms share. It SHALL never drop the firm's full name.
+The loader SHALL generate aliases from each name line: the line itself, its core name without legal forms, a bracketed abbreviation, the `DM` forms and the Polish case forms of the legal-form words (`Domu Maklerskiego …`), the former names, and the trade names listed in `Dodatkowe informacje`. Bracketed translation lines of a name (`(ang. Bitstamp Financial Services Ltd.)`) SHALL be aliases, not part of the name. It SHALL drop an alias with fewer than 3 letters and an alias made only of generic stop-list words. An alias claimed by several firms SHALL stay only with the single firm of the highest type precedence, and SHALL be dropped from all of them when several firms share that precedence. It SHALL never drop the firm's full name.
 
 #### Scenario: Bank brokerage unit and abbreviation
 - **WHEN** the bank record is `POWSZECHNA KASA OSZCZĘDNOŚCI BANK POLSKI S.A. (PKO BP S.A.)` / `Biuro Maklerskie PKO Banku Polskiego`
@@ -88,15 +88,27 @@ The loader SHALL generate aliases from each name line: the line itself, its core
 - **THEN** the aliases include the listed trade names, and no alias contains a domain
 
 #### Scenario: Generic or short alias dropped
-- **WHEN** a firm's core name is `EXT` or the single stop-list word `Capital`
+- **WHEN** a firm's alias is `EU` or consists only of stop-list words (`Europe`, `Capital Markets`)
 - **THEN** that alias is dropped and counted, and the firm keeps its full name
 
+#### Scenario: Short brand kept
+- **WHEN** the register holds `XTB S.A.`, `mBANK S.A.` / `Biuro Maklerskie mBank` and `EXT Ltd`
+- **THEN** the aliases include `XTB`, `mBANK` and `EXT` (the registry guards short aliases when matching)
+
+#### Scenario: Shared alias stays with the Polish firm
+- **WHEN** the brokerage house `XTB S.A.` and the foreign firm without a branch `XTB Ltd` both yield the alias `XTB`
+- **THEN** `XTB S.A.` keeps `XTB`, `XTB Ltd` does not, and the summary counts one dropped shared alias
+
+#### Scenario: Translation line
+- **WHEN** a no-branch record's name cell reads `Bitstamp finančne storitve d.o.o.` / `(ang. Bitstamp Financial Services Ltd.)`
+- **THEN** the name is `Bitstamp finančne storitve d.o.o.` and `Bitstamp Financial Services Ltd.` is an alias
+
 ### Requirement: Firm domains
-The loader SHALL take a firm's `website_domains` from host-like tokens in its `Dodatkowe informacje`, normalized like `Registry` does. It SHALL exclude hosts that appear in any record's `Organ nadzoru` cell, social-platform hosts, and hosts that two firms share. A firm without domains SHALL have an empty `website_domains`. Domains from `registry/knf_domains_manual.csv` (columns `name, website_domains, source_url, verified_by_human`) SHALL be merged by normalized name. They are curated by the team, not published by KNF, so each row SHALL name the firm's official page it was checked on and SHALL carry `verified_by_human` `true` or `false`, and the meta file SHALL count curated domains apart from KNF ones. A manual row whose name is not in the register SHALL fail the run.
+The loader SHALL take a firm's `website_domains` from host-like tokens in the not-struck-through part of its `Dodatkowe informacje`, normalized like `Registry` does. It SHALL exclude hosts that appear in any record's `Organ nadzoru` cell, social-platform hosts, and hosts that two firms share. A firm without domains SHALL have an empty `website_domains`. Domains from `registry/knf_domains_manual.csv` (columns `name, website_domains, source_url, verified_by_human`) SHALL be merged by normalized name. They are curated by the team, not published by KNF, so each row SHALL name the firm's official page it was checked on and SHALL carry `verified_by_human` `true` or `false`, and the meta file SHALL count curated domains apart from KNF ones. A manual row whose name is not in the register SHALL fail the run.
 
 #### Scenario: Domains from trade-name notes
-- **WHEN** `Dodatkowe informacje` lists `www.50k.trade [od 10.05.2024] www.50coins.com`
-- **THEN** `website_domains` is `50k.trade|50coins.com`
+- **WHEN** `Dodatkowe informacje` of `50KCY LTD` lists `www.50k.trade [od 10.05.2024]` and, struck through, `www.50coins.com`
+- **THEN** `website_domains` is `50k.trade`: struck-through (former) domains are never firm domains
 
 #### Scenario: Supervisor site is not a firm domain
 - **WHEN** `Organ nadzoru` holds `www.cysec.gov.cy`
