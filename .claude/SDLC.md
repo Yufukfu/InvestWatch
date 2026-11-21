@@ -48,7 +48,7 @@ Three people, three modules, a worktree per change, ownership by directory (`scr
 
 ## Not adopted from Neopadel (on purpose)
 
-Mutation testing, the LLM-judge hook, receipt gates, retro and memory audits, Monday sync. Revisit after the hackathon if the process continues.
+Mutation-testing tooling (only the manual mutate-and-restore check in `iw-commit-cycle` is adopted), the LLM-judge hook, receipt gates, retro and memory audits, Monday sync. Revisit after the hackathon if the process continues.
 
 ## Kill switch
 

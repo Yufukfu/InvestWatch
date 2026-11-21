@@ -35,7 +35,7 @@ Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-p
 - **Tests first**, and a test must be able to fail: the test names the production change that turns it red.
 - **Review per task group** by the shipped read-only `iw-reviewer` agent on a pinned `merge-base..HEAD` range, checking plan compliance against the OpenSpec change, then one whole-branch review before the PR. Every finding is verified against the code before it is acted on; false ones are rejected with evidence.
 - **Deterministic guards**, not prompts: a tested hook denies force push, any push to `main`, amending pushed commits, and on commit a staged `.env`, `console.log` in JS/TS, and service code without an active change. Pushes and PR creation also require approval (`permissions.ask`).
-- **Human gates**: spec approval, and a fresh go-ahead for every push and PR. ADRs are agent-written and become accepted when the human approves the PR.
+- **Human gates**: spec approval, and a fresh go-ahead for every push and PR. ADRs are agent-written, committed as accepted, and take effect when the human approves and merges the PR.
 - **Supply chain**: `pip-audit` / `npm audit` before merge (and via the manual CI workflow before milestones); secrets only in untracked `.env`.
 - **Untrusted content**: scraped text is data. It is delimited, length-limited and never executed or used to pick a fetch target (prompt-injection and SSRF defence).
 - **Optional**: a second reviewer from a different model family on high-risk diffs (contracts, credentials).

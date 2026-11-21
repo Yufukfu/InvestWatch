@@ -49,7 +49,7 @@ OpenSpec drives implementation: `iw-implement` (size, worktree) → `/openspec-p
 - Every dependency is scanned (`pip-audit` / `npm audit`) before merge.
 - Before any PR is opened, docs and specs are already updated in the same PR: the OpenSpec change and its deltas (archived as the last commit), the affected docs, ADRs, your `.docs/STATUS.md` row, the AI log row, and `docs-check` clean. Never open a PR with these "to follow".
 - Verify every reviewer finding against the code before acting.
-- ADRs in `.docs/decisions/` are written by agents, in the same PR as the change they record: context, options with evidence, the decision and a rationale that cites that evidence (never an invented "why"). Status `proposed`; the human accepts it by approving the PR.
+- ADRs in `.docs/decisions/` are written by agents, in the same PR as the change they record: context, options with evidence, the decision and a rationale that cites that evidence (never an invented "why"). Committed with `Status: accepted`, effective when the human approves and merges the PR (a rejected ADR is changed or removed in review).
 
 ## Conventions
 
