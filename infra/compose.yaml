@@ -135,6 +135,9 @@ services:
     restart: unless-stopped
     volumes:
       - ollama_models:/root/.ollama
+    # /v1 cannot set num_ctx per request: a small default context silently truncates a stage-2 chunk.
+    environment:
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-8192}
     networks: [data]
     read_only: true
     tmpfs: [/tmp]

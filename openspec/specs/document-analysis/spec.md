@@ -2,7 +2,9 @@
 
 ## Purpose
 Turn one scraped document into explainable, contract-valid findings, without any infrastructure, so the same pure function can sit behind the Redis worker.
+
 ## Requirements
+
 ### Requirement: Lenient input, strict output
 Analytics SHALL accept any document that has the required `ScrapedDocument` v1 fields (`.docs/integration-plan.md` §3) and ignore unknown fields. Every `Finding` it emits SHALL validate against `contracts/schemas/finding.schema.json` v1.
 
@@ -46,7 +48,7 @@ Analytics SHALL normalize text (Unicode NFKC, collapsed whitespace) and split it
 - **THEN** the pipeline returns no findings and logs the reason `empty_text`
 
 ### Requirement: Firm registry matching
-Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL match a document to at most one firm by name or alias in the text, by the page domain, or by a fuzzy name match. The match SHALL have a confidence in 0-1. When the page host is a registered firm's domain, that firm SHALL be matched even if the text names another firm. Among equally confident name matches, the firm whose name or alias appears first in the text SHALL win, then the one with the longest quote. The fuzzy match SHALL tokenize the firm name the same way as the text, so punctuation inside a name (`Alfa-Beta`) does not lower the ratio, and a name with no word tokens SHALL never fuzzy-match. When the registry file cannot be read, the error SHALL tell the operator to set `REGISTRY_CSV`.
+Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL match a document to at most one firm by name or alias in the text, by the page domain, or by a fuzzy name match. The match SHALL have a confidence in 0-1. When the page host is a registered firm's domain, that firm SHALL be matched even if the text names another firm. When the registry file cannot be read, the error SHALL tell the operator to set `REGISTRY_CSV`.
 
 #### Scenario: Name without legal form
 - **WHEN** the text mentions `Alfa Inwestycje` and the registry holds `Alfa Inwestycje Dom Maklerski S.A.`
@@ -63,6 +65,7 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL m
 #### Scenario: Earliest name wins a tie
 - **WHEN** a page on no registered domain names two registry firms
 - **THEN** the firm named first in the text is matched, even if its full legal name appears only later
+- **AND** among equally confident name matches, the firm whose name or alias appears first in the text SHALL win, then the one with the longest quote
 
 #### Scenario: No match
 - **WHEN** no name, alias, domain or fuzzy candidate reaches the threshold
@@ -75,6 +78,11 @@ Analytics SHALL load registered firms from the CSV at `REGISTRY_CSV`. It SHALL m
 #### Scenario: Hyphenated firm name
 - **WHEN** the registry holds `Alfa-Beta Inwestycje S.A.` and the text says `Alfa-Beta Inwestycji`
 - **THEN** that firm is matched by fuzzy match
+- **AND** the fuzzy match SHALL tokenize the firm name the same way as the text, so punctuation inside a name (`Alfa-Beta`) does not lower the ratio
+
+#### Scenario: Firm name without word tokens
+- **WHEN** a registry firm's name has no word tokens
+- **THEN** that name SHALL never fuzzy-match
 
 #### Scenario: Registry path not set
 - **WHEN** `REGISTRY_CSV` points to a missing file
@@ -92,7 +100,7 @@ Analytics SHALL run M2 for documents with `source_kind` `firm_own`. In this chan
 - **THEN** no finding is returned and the log names the reason `module_not_implemented`
 
 ### Requirement: M2 finding assembly
-The M2 finding SHALL list only the results of implemented rules. It SHALL carry the raw `score` (never `risk_level`), the matched firm (or `null`), a Polish title and summary, `status: new`, the `url` and `platform` copied from the document, `content_excerpt` of at most 500 characters, and `model.llm = null`. The score SHALL be `Σ(weight·fail) / Σ(weight·applicable)` with weights high 3, medium 2, low 1, where `uncertain` counts as half a fail and `not_applicable` is excluded. The score is 0 when no rule applies. The summary SHALL name as checked only the rules that applied, and name `not_applicable` rules separately.
+The M2 finding SHALL list only the results of implemented rules. It SHALL carry the raw `score` (never `risk_level`), the matched firm (or `null`), a Polish title and summary, `status: new`, the `url` and `platform` copied from the document, `content_excerpt` of at most 500 characters, and `model.llm = null`. The score SHALL be `Σ(weight·fail) / Σ(weight·applicable)` with weights high 3, medium 2, low 1, where `uncertain` counts as half a fail and `not_applicable` is excluded.
 
 #### Scenario: Violating landing page
 - **WHEN** the mock document `m2-alfa-landing` (id `a3c88321-…`) is analyzed
@@ -109,9 +117,11 @@ The M2 finding SHALL list only the results of implemented rules. It SHALL carry 
 #### Scenario: Rule that does not apply
 - **WHEN** R3 is `not_applicable`
 - **THEN** the summary does not list R3 among the checked rules and says it does not apply
+- **AND** the summary SHALL name as checked only the rules that applied, and name `not_applicable` rules separately
+- **AND** when no rule applies (every rule is `not_applicable`), the score is 0
 
 ### Requirement: Command-line batch
-The CLI SHALL validate each document of a batch on its own. An invalid document SHALL be logged with its index and the error locations and types, without input values, and skipped. The CLI SHALL exit 2 without writing to stdout when the input has documents and none is valid, or on unreadable input or bad configuration. If analyzing a valid document raises, the CLI SHALL log the document id and the exception type (no input values), skip that document, still write the findings of the others, and exit 1. A catalogue whose root is not a mapping SHALL be bad configuration (exit 2).
+The CLI SHALL validate each document of a batch on its own. An invalid document SHALL be logged with its index and the error locations and types, without input values, and skipped. The CLI SHALL exit 2 without writing to stdout when the input has documents and none is valid. If analyzing a valid document raises, the CLI SHALL log the document id and the exception type (no input values), skip that document, still write the findings of the others, and exit 1.
 
 #### Scenario: One bad document in a batch
 - **WHEN** a list holds one valid document and one without `text`
@@ -121,6 +131,11 @@ The CLI SHALL validate each document of a batch on its own. An invalid document 
 - **WHEN** every document in the list is invalid
 - **THEN** the CLI exits 2 and writes nothing to stdout
 
+#### Scenario: Unreadable input or bad configuration
+- **WHEN** the input cannot be read, or the configuration is bad
+- **THEN** the CLI SHALL exit 2 without writing to stdout
+- **AND** a catalogue whose root is not a mapping SHALL be bad configuration (exit 2)
+
 #### Scenario: Log carries no document content
 - **WHEN** an invalid document is logged
 - **THEN** the log line does not contain the document's field values
@@ -129,3 +144,25 @@ The CLI SHALL validate each document of a batch on its own. An invalid document 
 - **WHEN** a batch holds two valid documents and analyzing the first raises an unexpected error
 - **THEN** the CLI writes the second document's finding, logs the first document's id and the exception type, and exits 1
 
+### Requirement: Linear time on hostile text
+Preprocessing and the rules-only checks SHALL run in time linear in the length of the text, because scraped text is untrusted. No regular expression on the analysis path may backtrack over a whitespace run, a digit run, a long word or a growing sentence prefix, and no rule may compare every sentence with every other. Sentence boundaries and their offsets into the original text SHALL be the same as before for ordinary text.
+
+#### Scenario: Long whitespace run
+- **WHEN** the text is `"."` followed by 50 000 spaces, or `". "` + 40 000 spaces + `abc`
+- **THEN** sentence splitting finishes in under a second
+
+#### Scenario: Abbreviation chain
+- **WHEN** the text repeats `S.A. Ab ` or `ok. 1 ` thousands of times
+- **THEN** sentence splitting finishes in under a second, and `S.A.` still never ends a sentence
+
+#### Scenario: Long digit run
+- **WHEN** the text contains 50 000 digits with no `%`
+- **THEN** the full M2 analysis finishes in under three seconds, and `Zarabiaj 12,5 % rocznie` is still an R3 claim
+
+#### Scenario: Footnote marker followed by spaces
+- **WHEN** a sentence ends and the next starts with `*` or `(*)` followed by up to three spaces and a capital
+- **THEN** a new sentence starts at the marker
+
+#### Scenario: Many claim and warning sentences
+- **WHEN** the text repeats `Zysk 5%. Ryzyko straty.` 8 000 times, or a fee stem such as `prowizj` 8 000 times in one word
+- **THEN** the full M2 analysis finishes in under three seconds, and R3's ±2 sentence window gives the same result as before
