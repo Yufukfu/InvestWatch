@@ -18,6 +18,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
 | [0304](0304-llm-serving.md) | How Gemma is served to analytics | accepted (takes effect when PR #3 merges) |
 | [0305](0305-threshold-storage.md) | Where module thresholds live and who emits `finding.high_risk` | accepted (takes effect when PR #3 merges) |
+| [0306](0306-object-storage-image.md) | Object storage and Redis images: Chainguard MinIO build, Redis 8 from the ECR mirror | accepted (takes effect when the `infra-compose` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
