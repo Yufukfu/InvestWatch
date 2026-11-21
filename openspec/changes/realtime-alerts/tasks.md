@@ -14,6 +14,6 @@
 
 ## 3. Closing
 
-- [ ] 3.1 Run against the contract mock server in headless Chrome: badge `Na żywo`, a high-risk toast within ~10 s, `Pokaż` opens the detail, console clean.
+- [x] 3.1 Run against the contract mock server in headless Chrome: badge `Na żywo`, a high-risk toast within ~10 s, `Pokaż` opens the detail, console clean.
 - [ ] 3.2 Write ADR 0208 (socket.io-client), apply the `iw-docs-update` skill (`.docs/status/dashboard.md`, `web/README.md`, `docs-check` clean) and add the `iw-ai-log` row.
 - [ ] 3.3 Run the `iw-pr-review` skill and fix real findings.
