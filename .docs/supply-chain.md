@@ -28,7 +28,7 @@ docker run --rm -v "$PWD":/src:ro -v osv-db:/root/.cache/osv-scanner \
   scan source --offline-vulnerabilities --download-offline-databases -r /src
 ```
 
-Once `osv-db` holds the database, an air-gapped host runs the same command with `--offline` in place of the two offline flags. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0208, decision 5).
+Not yet verified on this repository: a recursive `-r /src` run walks `web/node_modules` through the Docker Desktop bind mount and did not finish on an 8 GB laptop. Prefer CI, or point it at the manifests only (`-L web/package-lock.json -L api/requirements.txt …`). Once `osv-db` holds the database, an air-gapped host runs the same command with `--offline` in place of the two offline flags. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0208, decision 5).
 
 ## 3. Fixing a finding
 
