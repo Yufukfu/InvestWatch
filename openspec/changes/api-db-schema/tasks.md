@@ -32,7 +32,7 @@ Lands before change `api-v1`: groups 1-3 unblock `scraper-v1` group 5 (Adam) and
 
 ## 5. Closing
 
-- [ ] 5.1 Apply the `iw-docs-update` skill (`api/CLAUDE.md`, `api/README.md`, ADR 0307 and its row in `.docs/decisions/README.md`, the `api` row in the root `CLAUDE.md` services table and in `.docs/INDEX.md`, Damian's row in `.docs/STATUS.md`, the STATUS blocker about `api/` and the migration owner), run docs-check, run `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` and record it in `.docs/security-audit.md`, and add the `iw-ai-log` row
+- [x] 5.1 Apply the `iw-docs-update` skill (`api/CLAUDE.md`, `api/README.md`, ADR 0307 and its row in `.docs/decisions/README.md`, the `api` row in the root `CLAUDE.md` services table and in `.docs/INDEX.md`, Damian's row in `.docs/STATUS.md`, the STATUS blocker about `api/` and the migration owner), run docs-check, run `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` and record it in `.docs/security-audit.md`, and add the `iw-ai-log` row (the `.docs/STATUS.md` row and blockers are left to the coordinating session, which owns STATUS edits for this batch; it gets the final columns in the hand-over report)
 - [ ] 5.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up

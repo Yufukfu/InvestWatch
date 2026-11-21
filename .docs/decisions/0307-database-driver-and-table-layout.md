@@ -40,7 +40,8 @@ Why:
 
 ## Consequences
 
-- The scraper inserts documents with `INSERT ... ON CONFLICT DO NOTHING` and marks them with `stream_published_at`; analytics upserts findings with `ON CONFLICT (document_id, module) DO UPDATE`, leaving `status` and `note`. The exact SQL is in `api/README.md` once `api-db-schema` is applied.
+- The scraper inserts documents with `INSERT ... ON CONFLICT (source_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING` (targeted, so a reused `id` still fails) and marks them with `stream_published_at`; analytics upserts findings with `ON CONFLICT (document_id, module) DO UPDATE`, leaving `status` and `note`. The exact SQL is in `api/README.md` once `api-db-schema` is applied.
 - A new contract field nested in a JSONB column needs no migration; a new filterable field or enum value does (a new Alembic revision, reviewed by Damian).
 - JSONB contents are not validated by the database: producers validate against `contracts/` before insert.
 - Scraper and analytics may use any Postgres driver; only the API and Alembic are bound to psycopg 3.
+- `job_errors.source_id` deliberately has no foreign key, so the scraper can record an error for a scan request that names an unknown source; `documents.source_id` and `findings.document_id` keep theirs.

@@ -25,9 +25,10 @@ Three modules, three owners. B defined the repository layout (root [`README.md`]
 | `analytics/` | C | modules M1-M3, rule engine, LLM layer | [`analytics/CLAUDE.md`](analytics/CLAUDE.md) |
 | `web/` | B | frontend, alerts, calibration panel | [`web/CLAUDE.md`](web/CLAUDE.md) |
 | `contracts/` | C | JSON Schemas, OpenAPI, mocks, validator (draft v1) | [`contracts/CLAUDE.md`](contracts/CLAUDE.md) |
+| `api/` | C | shared database schema (Alembic), REST API, Socket.IO gateway | [`api/CLAUDE.md`](api/CLAUDE.md) |
 | `infra/` | B | shared infrastructure: Postgres, HTTPS gateway; root `compose.yaml` includes each module's file | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 
-`api/` (C) appears in the integration plan but not in the layout yet. Whoever creates it adds a `CLAUDE.md` first; `docs-check` enforces it.
+`api/` (C) was added by the `api-db-schema` change as ADR 0302 planned; every new service directory gets a `CLAUDE.md` first, and `docs-check` enforces it.
 
 ## Process in one line
 
