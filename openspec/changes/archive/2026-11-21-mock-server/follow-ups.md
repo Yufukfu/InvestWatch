@@ -36,3 +36,13 @@ Out-of-scope or "declined to judge" items from reviews, each with one dispositio
 | 19 | group 4 | uvicorn without `websockets` silently falls back to long-polling | fix-here (`websockets` pinned in `requirements.txt`) |
 | 31 | whole-branch review | `openapi.yaml` `SourceInput` has no `required` list, but `POST /sources` must return a full `Source`; the mock requires name, platform, url, source_kind, target_modules on POST and treats PATCH as partial | new-item (contract gap for the team, together with row 8) |
 | 32 | whole-branch review | README: `MOCK_HOST` missing, `.env` not loaded, relative screenshot URLs; AI log scenario count | fix-here (README and log row corrected) |
+| 33 | PR #8 review | `MOCK_CORS_ORIGINS=*` said to reject browser Socket.IO connections | wont-fix (false: python-engineio treats a list containing `"*"` as any origin, see row 29) |
+| 34 | PR #8 review | `target_modules` duplicates accepted although `source.schema.json` has `uniqueItems` | fix-here (422 on POST and PATCH) |
+| 35 | PR #8 review | `HttpUrl` rewrote the source `url` (trailing slash, host case) | fix-here (validated, stored as sent) |
+| 36 | PR #8 review | unknown `LOG_LEVEL` crashed with a traceback instead of exit 2 | fix-here (validated in `Settings`) |
+| 37 | PR #8 review | `last_run_status` never `running` during a manual scan | fix-here (set when the scan is accepted) |
+| 38 | PR #8 review | trend `date_from` inside an hour dropped that hour | fix-here (bucket kept while it ends after `date_from`) |
+| 39 | PR #8 review | empty `findings.json` made every replay fail with `StopIteration` | fix-here (refused at start-up) |
+| 40 | PR #8 review | replay task not cancelled at shutdown | wont-fix (uvicorn runs on `asyncio.run`, which cancels pending tasks; see row 28) |
+| 41 | PR #8 review | `MOCK_PORT` unbounded, `inf`/`nan` accepted for delays | fix-here (port <= 65535, finite numbers only) |
+| 42 | PR #8 review | `STATUSES` duplicated the `Status` literal; imports out of order | fix-here (derived with `get_args`) |

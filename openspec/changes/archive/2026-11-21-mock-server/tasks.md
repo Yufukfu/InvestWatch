@@ -40,3 +40,9 @@
 
 - [x] 6.1 Apply the iw-docs-update skill (docs, own row in `.docs/STATUS.md`, ADR drafts if any) and add the iw-ai-log row
 - [x] 6.2 Run the iw-pr-review skill and fix real findings
+
+## 7. PR #8 review follow-ups (follow-ups rows 33-42)
+
+- [x] 7.1 Sources: `target_modules` unique, `url` stored as sent; mutations: 6 tried, 6 caught
+- [x] 7.2 Settings: `LOG_LEVEL` validated, port <= 65535, finite numbers; mutations: 5 tried, 5 caught
+- [x] 7.3 Scan `running` status, trend `date_from` hour, empty findings refused; mutations: 4 tried, 4 caught

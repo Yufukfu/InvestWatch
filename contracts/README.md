@@ -66,7 +66,7 @@ Configuration (environment variables, all optional). The server reads only the p
 | `MOCK_PORT` | `8000` | HTTP port |
 | `MOCK_CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173` | browser origins allowed for REST and Socket.IO; `*` allows any |
 | `MOCK_REPLAY_INTERVAL_S` | `10` | every N seconds a new finding (cloned from a mock one) is added and `finding.created` / `finding.high_risk` are emitted, while a client is connected; `0` disables |
-| `MOCK_SCAN_DELAY_S` | `2` | seconds between `scan.started` and `scan.finished` after `POST /api/scans` |
+| `MOCK_SCAN_DELAY_S` | `2` | seconds between `scan.started` and `scan.finished` after `POST /api/scans`; the source shows `last_run_status: running` meanwhile |
 | `CONTRACTS_DIR` | the parent `contracts/` folder | where `schemas/` and `mocks/` are read from |
 | `LOG_LEVEL` | `INFO` | JSON logs on stdout |
 
