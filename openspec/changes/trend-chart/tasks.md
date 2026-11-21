@@ -10,7 +10,7 @@
 - [x] 2.2 `features/trend/components/TrendChart.tsx` and `TrendPoint` prop type
 - [x] 2.3 Test: `TrendPage` against the mock handlers shows the chart; `Godzina` pressed by default; `Dzień` sends `bucket=day`; failing request shows the error text; pending shows the loading text
 - [x] 2.4 `features/trend/data/useTrend.ts` and `TrendPage.tsx`; mount in `App.tsx`; polish styles for 375, 768 and 1280 px
-- [x] 2.5 Mutation check — mutations: 7 tried, 7 caught
+- [x] 2.5 Mutation check — mutations: 9 tried, 9 caught (7 at implementation, 2 for the UTC tick and responsive-path fixes)
 
 ## 3. Closing
 
