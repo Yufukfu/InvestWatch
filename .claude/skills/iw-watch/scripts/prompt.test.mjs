@@ -91,6 +91,9 @@ test('the prompt tells the agent how commands are checked (the live run lost eve
   assert.match(p, /no `timeout`/i);
   assert.match(p, /npm --prefix web/);
   assert.match(p, /denied[^.]*not[^.]*git/i);
+  assert.match(p, /review-fixes/);
+  assert.match(p, /never[^.]*IW_SKIP_SPEC/i);
+  assert.match(p, /Write tool[^.]*not[^.]*(heredoc|redirect)/i);
 });
 
 test('review prompt: read-only, comment only, approval left to a human', () => {

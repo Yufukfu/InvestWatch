@@ -42,8 +42,10 @@ const FIX = [
   'Bash(node --test:*)', 'Bash(npm test:*)', 'Bash(npm run test:*)', 'Bash(npm run lint:*)', 'Bash(npm run typecheck:*)',
   'Bash(npx vitest run:*)', 'Bash(npx tsc:*)', 'Bash(npx oxlint:*)',
   // a package below the root without cd: npm --prefix web test
-  'Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test:*)', 'Bash(npm --prefix * run test:*)',
-  'Bash(npm --prefix * run lint:*)', 'Bash(npm --prefix * run typecheck:*)',
+  // plain * only: a rule with an inner * and a trailing :* never matched (live run on PR #40)
+  'Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test)', 'Bash(npm --prefix * test *)',
+  'Bash(npm --prefix * run lint)', 'Bash(npm --prefix * run typecheck)',
+  'Bash(git restore --staged:*)',
   'Bash(pytest:*)', 'Bash(python -m pytest:*)', 'Bash(uv run pytest:*)',
   'Bash(openspec validate:*)', 'Bash(node .claude/skills/iw-docs-update/scripts/docs-check.mjs:*)',
 ];

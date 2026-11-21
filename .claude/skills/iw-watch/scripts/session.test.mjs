@@ -101,7 +101,9 @@ test('lessons from the live run on PR #39: cd into the clone, the reply folder, 
   assert.ok(allow.includes(`Bash(cd ${cwd})`) && allow.includes(`Bash(cd ${cwd}/*)`), 'agents write "cd <clone> && git status"; every part of a chain must be allowed');
   assert.ok(!allow.some((r) => r === 'Bash(cd:*)' || r === 'Bash(cd *)'), 'cd only into the clone');
   assert.ok(allow.includes('Edit(./.iw-watch/**)'), 'Edit(./**) does not cover dot-directories (probe), so the reply folder is listed');
-  for (const r of ['Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test:*)', 'Bash(npm --prefix * run test:*)', 'Bash(npm --prefix * run lint:*)', 'Bash(npm --prefix * run typecheck:*)', 'Bash(npx oxlint:*)']) assert.ok(allow.includes(r), r);
+  // live run on PR #40: a rule with an inner * and a trailing :* never matched (`npm --prefix web test` denied), plain * did
+  for (const r of ['Bash(npm --prefix * ci --ignore-scripts)', 'Bash(npm --prefix * test)', 'Bash(npm --prefix * test *)', 'Bash(npm --prefix * run lint)', 'Bash(npm --prefix * run typecheck)', 'Bash(npx oxlint:*)', 'Bash(git restore --staged:*)']) assert.ok(allow.includes(r), r);
+  assert.ok(!allow.some((r) => /\* .*:\*\)$/.test(r) && r.startsWith('Bash(npm')), 'no rule mixes an inner * with :*');
   const review = allowList({ kind: 'review', pr: 28, headRef: 'api/x', dryRun: false, cwd });
   assert.ok(!review.some((r) => /npm|npx/.test(r)), 'a review still runs no code');
   assert.ok(valueAfter(claudeArgs({ ...mine, dryRun: false, budgetUsd: 2, cwd }), '--allowedTools').includes(`Bash(cd ${cwd})`));
