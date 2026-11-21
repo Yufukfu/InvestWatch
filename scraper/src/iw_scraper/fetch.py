@@ -71,11 +71,14 @@ class FetchResult:
 class FetchFailure(Exception):
     """The fetch produced nothing usable; `reason` is a `Reason` from the closed set."""
 
-    def __init__(self, reason: Reason, detail: str, proxy_id: str | None = None) -> None:
+    def __init__(
+        self, reason: Reason, detail: str, proxy_id: str | None = None, retry_after: str | None = None
+    ) -> None:
         super().__init__(detail)
         self.reason = reason
         self.detail = detail
         self.proxy_id = proxy_id  # the proxy involved, for `scrape_meta.proxy`; never its URL
+        self.retry_after = retry_after  # the raw `Retry-After` header of the answer, for `DomainGate`
 
 
 class ProxyAuthFailure(FetchFailure):
@@ -157,9 +160,9 @@ def _block_marker(body: bytes) -> str | None:
     return next((m.decode() for m in _BLOCK_MARKERS if m in lowered), None)
 
 
-def _read_checked_body(path: str, headers: dict[str, str], max_bytes: int) -> bytes:
+def _read_checked_body(path: str, headers: dict[str, str], max_bytes: int, html_only: bool = True) -> bytes:
     media_type, _ = content_type_params(headers.get("content-type"))
-    if media_type is not None and media_type not in HTML_TYPES:
+    if html_only and media_type is not None and media_type not in HTML_TYPES:
         raise FetchFailure(Reason.PARSE_ERROR, f"not an HTML response: {media_type}")
     size = os.path.getsize(path)
     if size > max_bytes:
@@ -174,6 +177,7 @@ async def _request_once(
     guard: TargetGuard | None,
     timeout: float,
     max_bytes: int,
+    html_only: bool = True,
 ) -> tuple[int, dict[str, str], bytes]:
     try:
         parts = urlsplit(url)
@@ -212,7 +216,7 @@ async def _request_once(
         if status == 407 and choice is not None:  # the proxy itself refused us, whatever the wording
             raise ProxyAuthFailure(Reason.HTTP_ERROR, "proxy answered 407")
         is_redirect = status in _REDIRECT_STATUSES and "location" in headers
-        body = b"" if is_redirect or not 200 <= status < 300 else _read_checked_body(path, headers, max_bytes)
+        body = b"" if is_redirect or not 200 <= status < 300 else _read_checked_body(path, headers, max_bytes, html_only)
         return status, headers, body
     finally:
         if os.path.exists(path):
@@ -226,6 +230,7 @@ async def _request_through_proxies(
     guard: TargetGuard | None,
     timeout: float,
     max_bytes: int,
+    html_only: bool = True,
 ) -> tuple[int, dict[str, str], bytes, ProxyChoice | None]:
     """One request, each time through the proxy the run picks. A 407 cools that proxy and tries another."""
     while True:  # every 407 cools one more proxy, so the picks run out in at most len(proxies) rounds
@@ -233,7 +238,7 @@ async def _request_through_proxies(
         if isinstance(choice, Deferral):
             raise FetchDeferred(choice)
         try:
-            return (*await _request_once(session, url, choice, guard, timeout, max_bytes), choice)
+            return (*await _request_once(session, url, choice, guard, timeout, max_bytes, html_only), choice)
         except ProxyAuthFailure:
             proxies.penalize(choice)
         except FetchFailure as failure:
@@ -263,10 +268,11 @@ async def fetch(
             if status in _REDIRECT_STATUSES and "location" in headers:
                 current = urljoin(current, headers["location"])
                 continue
+            retry_after = headers.get("retry-after")
             if status in _BLOCK_STATUSES:
-                raise FetchFailure(Reason.BLOCKED, f"HTTP {status}", proxy_id)
+                raise FetchFailure(Reason.BLOCKED, f"HTTP {status}", proxy_id, retry_after)
             if not 200 <= status < 300:
-                raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}", proxy_id)
+                raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}", proxy_id, retry_after)
             if not body:
                 raise FetchFailure(Reason.BLOCKED, "empty response body", proxy_id)
             if marker := _block_marker(body):

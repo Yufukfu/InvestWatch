@@ -32,3 +32,41 @@ def proxy_settings() -> tuple[list[str], str, float]:
     if not math.isfinite(cooldown) or cooldown <= 0:
         raise ValueError("PROXY_COOLDOWN_SECONDS must be a positive number")
     return proxies, mode, cooldown
+
+
+DEFAULT_REDIS_URL = "redis://localhost:6379/0"
+DEFAULT_DOMAIN_MIN_INTERVAL_SECONDS = 5.0
+DEFAULT_MAX_RETRY_AFTER_SECONDS = 300.0
+DEFAULT_DOMAIN_FAILURE_THRESHOLD = 5
+DEFAULT_DOMAIN_PAUSE_SECONDS = 600.0
+
+
+def _positive_number(name: str, default: float) -> float:
+    try:
+        value = float(os.environ.get(name, default))
+    except ValueError:
+        value = math.nan
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a positive number")
+    return value
+
+
+def rate_limit_settings() -> tuple[str, float]:
+    """(`REDIS_URL`, `DOMAIN_MIN_INTERVAL_SECONDS`). The URL may hold a password: never log it."""
+    url = os.environ.get("REDIS_URL", DEFAULT_REDIS_URL)
+    return url, _positive_number("DOMAIN_MIN_INTERVAL_SECONDS", DEFAULT_DOMAIN_MIN_INTERVAL_SECONDS)
+
+
+def domain_gate_settings() -> tuple[float, int, float]:
+    """(`MAX_RETRY_AFTER_SECONDS`, `DOMAIN_FAILURE_THRESHOLD`, `DOMAIN_PAUSE_SECONDS`)."""
+    try:
+        threshold = int(os.environ.get("DOMAIN_FAILURE_THRESHOLD", DEFAULT_DOMAIN_FAILURE_THRESHOLD))
+    except ValueError:
+        threshold = 0
+    if threshold < 1:
+        raise ValueError("DOMAIN_FAILURE_THRESHOLD must be a whole number of at least 1")
+    return (
+        _positive_number("MAX_RETRY_AFTER_SECONDS", DEFAULT_MAX_RETRY_AFTER_SECONDS),
+        threshold,
+        _positive_number("DOMAIN_PAUSE_SECONDS", DEFAULT_DOMAIN_PAUSE_SECONDS),
+    )

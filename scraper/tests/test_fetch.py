@@ -589,3 +589,33 @@ async def test_a_failed_close_is_logged_without_credentials(stub, monkeypatch, c
 
     assert "closing the session failed" in caplog.text
     assert "secret" not in caplog.text
+
+
+@pytest.mark.parametrize("status, reason", [(429, Reason.BLOCKED), (503, Reason.HTTP_ERROR), (403, Reason.BLOCKED)])
+async def test_a_failure_carries_the_retry_after_the_source_sent(stub, status, reason):
+    stub.route("/slow", status=status, body=b"later", headers={"Retry-After": "30"})
+
+    with pytest.raises(FetchFailure) as caught:
+        await fetch(stub.url("/slow"), IDENTITY, None)
+
+    assert caught.value.reason is reason
+    assert caught.value.retry_after == "30"
+
+
+async def test_a_failure_without_retry_after_carries_none(stub):
+    stub.route("/slow", status=429, body=b"later")
+
+    with pytest.raises(FetchFailure) as caught:
+        await fetch(stub.url("/slow"), IDENTITY, None)
+
+    assert caught.value.retry_after is None
+
+
+async def test_a_failure_on_a_redirect_target_carries_that_hops_retry_after(stub):
+    stub.route("/start", status=302, headers={"Location": "/slow", "Retry-After": "999"}, content_type=None)
+    stub.route("/slow", status=429, body=b"later", headers={"Retry-After": "45"})
+
+    with pytest.raises(FetchFailure) as caught:
+        await fetch(stub.url("/start"), IDENTITY, None)
+
+    assert caught.value.retry_after == "45"
