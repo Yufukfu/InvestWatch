@@ -35,16 +35,16 @@ For a valid message `{document_id, schema: "v1"}` the worker SHALL load the docu
 - **WHEN** the process dies after the commit and before XACK
 - **THEN** the message stays pending and is redelivered later, and that redelivery is handled as a duplicate delivery
 
-### Requirement: Duplicate delivery is a no-op
-The worker SHALL treat a message as already processed when findings stored from the same `document_id` exist. In that case it SHALL write nothing, publish nothing and acknowledge with the log reason `already_processed`. Two deliveries of the same message SHALL leave the store and the event stream as one delivery does.
+### Requirement: Duplicate delivery is idempotent
+A redelivered message, or a second message for the same `document_id` (the scraper's republish sweep, a manual re-XADD), SHALL be analysed again and saved through the `(document_id, module)` upsert, so its findings are reported `updated` and publish no event. Two deliveries of the same message SHALL leave the same finding rows (same ids, `status`, `note`, `detected_at`) and the same events as one delivery; only the analysis fields and `updated_at` are refreshed. The outcome is logged as `stored` with `created: 0` and the number updated.
 
 #### Scenario: Same message delivered twice
 - **WHEN** the same `document_id` is delivered twice, sequentially or by two consumers
 - **THEN** exactly one finding per module exists and exactly one `finding.created` event per finding was published
 
-#### Scenario: Two messages for the same document id
-- **WHEN** the scraper's republish sweep XADDs a second message for a `document_id` that is already processed
-- **THEN** the second message is acknowledged with reason `already_processed`
+#### Scenario: Re-analysis after a pipeline fix
+- **WHEN** a processed `document_id` is XADDed again after the rules changed
+- **THEN** its finding keeps its `id` and `status`, carries the new score and rules, and no event is published
 
 ### Requirement: Poison messages
 The worker SHALL acknowledge, without storing or publishing anything, a message that can never succeed. It SHALL log one JSON line at level `WARNING` with the stream message id, the `document_id` if known, and one of these reasons: `invalid_message` (missing or non-UUID `document_id`, or `schema` other than `v1`), `document_not_found` (no row with that id), `invalid_document` (the row fails `ScrapedDocument` validation; the log names the field), or `max_deliveries_exceeded` (the delivery count reached `MAX_DELIVERIES`, default 5, after repeated unexpected errors).
@@ -103,7 +103,7 @@ The worker SHALL call `analyze` with the registry and catalogue loaded once at s
 - **THEN** the stored finding has `model.llm` null and `model.pipeline_version` set
 
 ### Requirement: Observability and graceful stop
-The worker SHALL log JSON lines to stdout, never using `print`. One line per message SHALL carry the stream id, `document_id`, outcome (`stored`, `already_processed`, `no_findings` or a poison reason), the number of findings and the duration in ms. It SHALL serve `GET /health` on `HEALTH_PORT` (default 8001), returning 200 with `{"status": "ok", "redis": true, "db": true}` when both dependencies answer and 503 with the failing one marked `false` otherwise. On SIGTERM or SIGINT it SHALL finish the current message and exit 0.
+The worker SHALL log JSON lines to stdout, never using `print`. One line per message SHALL carry the stream id, `document_id`, outcome (`stored`, `no_findings` or a poison reason), the numbers of findings created and updated, and the duration in ms. It SHALL serve `GET /health` on `HEALTH_PORT` (default 8001), returning 200 with `{"status": "ok", "redis": true, "db": true}` when both dependencies answer and 503 with the failing one marked `false` otherwise. On SIGTERM or SIGINT it SHALL finish the current message and exit 0.
 
 #### Scenario: Health with Postgres down
 - **WHEN** `/health` is called while Postgres is unreachable
