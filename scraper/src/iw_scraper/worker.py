@@ -14,8 +14,8 @@ from arq.connections import RedisSettings
 from arq.worker import Worker
 
 from iw_scraper.config import from_env
-from iw_scraper.jobs import QueueSettings, job_function
-from iw_scraper.supervise import CONNECTION_ERRORS, supervise
+from iw_scraper.jobs import ARQ_OPTIONS, QueueSettings, job_function
+from iw_scraper.supervise import CONNECTION_ERRORS, JOB_CONNECTION_ERRORS, supervise
 
 logger = logging.getLogger(__name__)
 MAIN_TASK_POLL = 0.01
@@ -52,19 +52,24 @@ async def run_worker(
     *,
     stop: asyncio.Event,
     retry_on: tuple[type[BaseException], ...] = CONNECTION_ERRORS,
+    job_retry_on: tuple[type[BaseException], ...] = JOB_CONNECTION_ERRORS,
 ) -> None:
-    """Run the arq worker until `stop`, rebuilding it with backoff whenever a dependency goes away."""
+    """Run the arq worker until `stop`, rebuilding it with backoff whenever a dependency goes away.
+
+    `retry_on` is what restarts the worker; `job_retry_on` is what a single job requeues itself on.
+    """
 
     async def one_life() -> None:
         worker = Worker(
             functions=[job_function(queue)],
             redis_settings=RedisSettings.from_dsn(runner.redis_url),
-            ctx={**ctx, "settings": queue},
+            ctx={"retry_on": job_retry_on, **ctx, "settings": queue},
             max_jobs=runner.max_jobs,
             poll_delay=runner.poll_delay,
             job_completion_wait=runner.shutdown_deadline,
             retry_jobs=True,  # a job cancelled at the deadline goes back to the queue
             handle_signals=False,
+            **ARQ_OPTIONS,
         )
         drain = asyncio.create_task(_drain_when_stopped(worker, stop))
         try:
