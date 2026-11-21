@@ -10,6 +10,9 @@ from iw_scraper.types import JobError, Reason
 STREAM = "iw:documents"
 DEFAULT_GRACE = timedelta(seconds=60)
 SCHEMA_VERSION = "v1"
+# Redis runs with `noeviction` and a small memory limit (infra/README.md), so a full stream would fail every
+# write. The scraper caps it when it publishes; a consumer that falls more than this far behind loses entries.
+STREAM_MAXLEN = 10_000
 # A hung Redis must not hold a pooled connection and the sweep's row locks forever. The timeout surfaces as
 # TimeoutError (an OSError), which callers already treat as "publish failed".
 PUBLISH_TIMEOUT_S = 5.0
@@ -25,9 +28,10 @@ FOR UPDATE SKIP LOCKED
 """
 
 
-async def publish(redis, document_id: str, stream: str = STREAM) -> None:
-    """`XADD iw:documents * document_id <uuid> schema v1`. Call only after the row is committed."""
-    await asyncio.wait_for(redis.xadd(stream, {"document_id": document_id, "schema": SCHEMA_VERSION}), PUBLISH_TIMEOUT_S)
+async def publish(redis, document_id: str, stream: str = STREAM, *, maxlen: int = STREAM_MAXLEN) -> None:
+    """`XADD iw:documents MAXLEN ~ 10000 * document_id <uuid> schema v1`. Call only after the row is committed."""
+    message = {"document_id": document_id, "schema": SCHEMA_VERSION}
+    await asyncio.wait_for(redis.xadd(stream, message, maxlen=maxlen, approximate=True), PUBLISH_TIMEOUT_S)
 
 
 async def mark_published(pool: asyncpg.Pool, document_id: str) -> None:

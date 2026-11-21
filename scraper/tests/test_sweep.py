@@ -89,7 +89,7 @@ async def test_concurrent_sweep_skips_rows_claimed_by_a_running_one(pool, stream
             self.release = asyncio.Event()
             self.published = []
 
-        async def xadd(self, stream, fields):
+        async def xadd(self, stream, fields, **kwargs):
             self.published.append(fields["document_id"])
             self.inside.set()
             await self.release.wait()
@@ -136,3 +136,15 @@ async def test_an_unexpected_publish_error_keeps_earlier_markers_and_is_recorded
     assert await published_at(pool, second) is None
     async with pool.acquire() as conn:
         assert await conn.fetchval("SELECT reason FROM job_errors") == "publish_failed"
+
+
+async def test_publishing_caps_the_stream_approximately(redis_client, stream_name):
+    # approximate trimming drops whole blocks of ~100 entries, so 450 entries against a cap of 100 must shrink
+    for _ in range(450):
+        await publisher.publish(redis_client, str(uuid.uuid4()), stream_name, maxlen=100)
+    assert 100 <= await redis_client.xlen(stream_name) < 450
+    await redis_client.delete(stream_name)
+
+
+async def test_the_default_cap_is_the_one_infra_documents():
+    assert publisher.STREAM_MAXLEN == 10_000

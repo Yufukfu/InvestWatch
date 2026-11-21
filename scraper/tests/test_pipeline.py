@@ -35,7 +35,7 @@ class SpyRedis:
         self.pool = pool
         self.row_visible = []
 
-    async def xadd(self, stream, fields):
+    async def xadd(self, stream, fields, **kwargs):
         async with self.pool.acquire() as conn:
             self.row_visible.append(
                 await conn.fetchval(
