@@ -27,34 +27,22 @@
 8. **Events are built from the save result,** so the `id` is the stored row's id, also when a concurrent save won the insert. The publisher serializes the `event` envelope with `emitted_at = now()` and no `risk_level`. Tests validate it against `events.schema.json` when `CONTRACTS_DIR` is set, the same skip rule as the skeleton's contract tests.
 9. **Document loading:** `SELECT` the simple columns plus `payload`, merge them as `{**payload, **columns}`, then `ScrapedDocument.model_validate`. Columns win, because they are what the scraper indexes and deduplicates on.
 10. **`/health` with stdlib `http.server` in a daemon thread.** It is the convention every service follows (§7) without pulling in a web framework. It pings Redis and runs `SELECT 1` with a 1 s timeout. The Docker HEALTHCHECK calls it with `python -c` (the slim image has no curl).
-11. **Container.** The Dockerfile is `public.ecr.aws/docker/library/python:3.13-slim` (infra rule: images from the ECR mirror). It installs pinned requirements first for layer caching, copies `src/` and `registry/`, creates user `iw` (uid 10001) and sets `USER 10001`. The entrypoint is `python -m investwatch_analytics.worker`. `analytics/compose.yaml` follows `web/compose.yaml`: `read_only: true`, `tmpfs /tmp`, `cap_drop: [ALL]`, `no-new-privileges`, CPU and memory limits, the networks `iw-data` (Postgres) and Redis's network **[reconcile-infra]**, and `depends_on` on healthy Postgres and Redis plus the completed API migration job **[reconcile-api]**. `iw-data` is internal, so a hosted LLM later needs an egress network. That is not needed in this change. The skeleton targets `>=3.12`, and the image pins 3.13.
+11. **Container.** The Dockerfile is `public.ecr.aws/docker/library/python:3.13-slim` (infra rule: images from the ECR mirror). It installs pinned requirements first for layer caching, copies `src/` and `registry/`, creates user `iw` (uid 10001) and sets `USER 10001`. The entrypoint is `python -m investwatch_analytics.worker`. `analytics/compose.yaml` follows `web/compose.yaml`: `read_only: true`, `tmpfs /tmp`, `cap_drop: [ALL]`, `no-new-privileges`, CPU and memory limits, the networks `iw-data` (Postgres) and Redis's network **[reconcile-infra]**, and `depends_on` on healthy Postgres and Redis plus `api-migrate: {condition: service_completed_successfully}` (the one-shot Alembic job in `api/compose.yaml`). `iw-data` is internal, so a hosted LLM later needs an egress network. That is not needed in this change. The skeleton targets `>=3.12`, and the image pins 3.13.
 12. **Config additions** in `config.py`, all env-only: `DATABASE_URL` and `REDIS_URL` (required for the worker, not for the CLI), `WORKER_CONSUMER` (default hostname), `STREAM_BLOCK_MS` (5000), `CLAIM_MIN_IDLE_MS` (60000), `MAX_DELIVERIES` (5) and `HEALTH_PORT` (8001). Stream, group, channel and key names are contract constants in code, not env.
 
 No ADR: the irreversible choices (schema ownership, threshold storage, event producer) are already ADRs 0303 and 0305. The ones here are local to `analytics/` and easy to change.
 
-## Assumed table shape [reconcile-api]
+## Table shape (reconciled with api-db-schema)
 
-The source is `api-db-schema` on branch `api/api-v1` (proposal commit `fec1c7c`; its migration is being implemented now). The columns are final only once the coordinator forwards them. Task 2.1 reconciles them, and `analytics/tests/sql/schema.sql` mirrors them as a test-only fixture.
+Reconciled in task 2.1 against `api-db-schema` on branch `api/api-v1` at `1be0451`: Alembic revisions `0001_initial` and `0002_query_indexes`, the SQL section of the api README and `findings_upsert()` in the api package's `db/sql.py` (both on that branch). `analytics/tests/sql/schema.sql` mirrors the three tables analytics touches (`sources`, `documents`, `findings`) for the Postgres store tests only. The migration stays the source of truth.
 
-The worker connects as `iw_app` and needs `SELECT` on `documents` and `SELECT, INSERT, UPDATE` on `findings`. It does not need `DELETE`. `infra/postgres/init/01-app-role.sh` grants CRUD on tables created by `iw_admin`.
+The worker connects as `iw_app` (`infra/postgres/init/01-app-role.sh` grants CRUD on tables `iw_admin` creates). It reads `documents` and inserts or updates `findings`. It never deletes, and never writes `status` or `note`.
 
-`documents` (written by the scraper; read only here): `id uuid pk`, `source_id uuid null`, `platform text`, `source_kind text`, `url text`, `canonical_url text null`, `fetched_at timestamptz`, `published_at timestamptz null`, `http_status int null`, `lang text null`, `title text null`, `text text`, `content_hash text`, `stream_published_at timestamptz null` (the scraper's marker, ignored here), `payload jsonb` (`author`, `links`, `media`, `screenshots`, `blocks`, `scrape_meta`). Whether `html_object_key` is a column or in `payload` does not matter, because the loader merges both.
+`documents` (written by the scraper; read only here): scalar columns `id, source_id, platform, source_kind, url, canonical_url, fetched_at, published_at, http_status, lang, title, text, content_hash, html_object_key`, plus `payload jsonb` (`author, links, media, screenshots, blocks, scrape_meta`), `stream_published_at` and `created_at`, which are not read here. The loader merges the scalar columns over `payload`. Because of `NOT NULL` on `text`, the CHECKs on `platform`, `source_kind`, `lang` and `content_hash`, and `payload` being an object, an invalid document in the database can only be a value the schema does not constrain: a non-http(s) `url`, or a malformed nested object in `payload`.
 
-`findings` (written here; `status` and `note` updated by the API):
+`findings` (written here; `status` and `note` updated by the API): `id, document_id → documents (ON DELETE CASCADE), module, score, status default 'new', title, summary, firm jsonb, advertiser jsonb, rules jsonb default '[]', content_excerpt (≤ 500), url, platform, note, detected_at, updated_at, model jsonb`. Constraint `uq_findings_document_module (document_id, module)`. There is no `risk_level`. The upsert is the README statement verbatim: `ON CONFLICT ON CONSTRAINT uq_findings_document_module DO UPDATE SET score, title, summary, firm, advertiser, rules, content_excerpt, url, platform, model, updated_at = excluded.*`, with `RETURNING ..., (xmax = 0) AS inserted` to tell `created` from `updated`. `advertiser` is written as null until the `Finding` model carries it (follow-up 3).
 
-| Column | Type | Note |
-|---|---|---|
-| `id` | uuid pk | producer-generated uuid4 |
-| `document_id` | uuid fk → documents | |
-| `module` | text, CHECK `M1`/`M2`/`M3` | |
-| `score` | double precision, CHECK 0-1 | |
-| `status` | text default `new`, CHECK contract enum | owned by the API after insert |
-| `note` | text null | owned by the API, never written here |
-| `title`, `summary`, `content_excerpt` | text | |
-| `url`, `platform` | text | denormalized |
-| `firm`, `advertiser`, `rules`, `model` | jsonb | as in `Finding` |
-| `detected_at`, `updated_at` | timestamptz | |
-| unique | `(document_id, module)` | upsert key |
+Postgres store details: one connection per thread (`autocommit` plus an explicit transaction per save), reopened on the next call after an `OperationalError`. `SerializationFailure` and `DeadlockDetected` are `StoreUnavailable` but keep the connection. An `IntegrityError`, such as a finding whose document is missing, is a plain `StoreError`. Error messages keep only the exception class and the first libpq line, never the DSN.
 
 ## Assumed infra [reconcile-infra]
 

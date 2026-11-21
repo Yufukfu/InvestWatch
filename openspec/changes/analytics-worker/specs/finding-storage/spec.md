@@ -20,12 +20,12 @@ Analytics SHALL access persistence only through a store interface with the opera
 - **THEN** the loaded document equals the original `ScrapedDocument`
 
 #### Scenario: Unknown id
-- **WHEN** `load_document` is called with an id that has no row
+- **WHEN** `load_document` is called with an id that has no row, or with a string that is not a UUID
 - **THEN** it returns not found (the worker maps it to `document_not_found`)
 
 #### Scenario: Invalid row
-- **WHEN** the row's `text` is null (an empty string is valid input; the pipeline skips it as `empty_text`)
-- **THEN** a validation error naming `text` is raised (the worker maps it to `invalid_document`)
+- **WHEN** the row's `url` is not an absolute http(s) URL, or a `payload` block has a `viewport` outside the contract enum
+- **THEN** a validation error naming `url` (or `blocks.0.viewport`) is raised (the worker maps it to `invalid_document`)
 
 ### Requirement: Atomic save
 `save_findings` SHALL write all findings of one document in a single transaction: either all are committed or none. It SHALL return each finding as persisted, with its final `id` and whether it was `created` or `updated`.

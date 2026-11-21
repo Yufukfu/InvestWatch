@@ -58,7 +58,7 @@ The worker SHALL acknowledge, without storing or publishing anything, a message 
 - **THEN** it is acknowledged with reason `document_not_found` and no finding exists
 
 #### Scenario: Invalid document
-- **WHEN** the row has empty `fetched_at` or a `source_kind` outside the contract enum
+- **WHEN** the row's `url` is not an absolute http(s) URL, or its `payload` holds a malformed block
 - **THEN** it is acknowledged with reason `invalid_document`, and the log names the failing field
 
 #### Scenario: Pipeline keeps crashing

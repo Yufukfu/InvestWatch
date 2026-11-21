@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import threading
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
@@ -131,3 +132,156 @@ class InMemoryStore:
     def findings_for_document(self, document_id: str) -> list[Finding]:
         self._check()
         return [f for (doc_id, _), f in sorted(self._findings.items()) if doc_id == document_id]
+
+
+# ---- Postgres -----------------------------------------------------------------------------------
+
+#: Scalar `documents` columns (api-db-schema revision 0001); everything else lives in `payload`.
+DOCUMENT_COLUMNS = (
+    "id", "source_id", "platform", "source_kind", "url", "canonical_url", "fetched_at", "published_at",
+    "http_status", "lang", "title", "text", "content_hash", "html_object_key",
+)
+#: `findings` columns analytics reads back into a `Finding` (`advertiser` is not in the model yet).
+FINDING_COLUMNS = (
+    "id", "document_id", "module", "score", "status", "title", "summary", "firm", "rules", "content_excerpt",
+    "url", "platform", "note", "detected_at", "updated_at", "model",
+)
+_JSON_COLUMNS = ("firm", "advertiser", "rules", "model")
+_INSERT_COLUMNS = (
+    "id", "document_id", "module", "score", "status", "title", "summary", "firm", "advertiser", "rules",
+    "content_excerpt", "url", "platform", "detected_at", "updated_at", "model",
+)
+#: The upsert documented in api/README.md (`findings_upsert()` in api-db-schema). Keeps id, detected_at,
+#: status and note; `xmax = 0` is true only for a freshly inserted row.
+_UPSERT_SQL = (
+    f"INSERT INTO findings ({', '.join(_INSERT_COLUMNS)}) "
+    f"VALUES ({', '.join(['%s'] * len(_INSERT_COLUMNS))}) "
+    "ON CONFLICT ON CONSTRAINT uq_findings_document_module DO UPDATE SET "
+    + ", ".join(
+        f"{c} = excluded.{c}"
+        for c in ("score", "title", "summary", "firm", "advertiser", "rules", "content_excerpt", "url",
+                  "platform", "model", "updated_at")
+    )
+    + f" RETURNING {', '.join(FINDING_COLUMNS)}, (xmax = 0) AS inserted"
+)
+_LOAD_SQL = f"SELECT {', '.join(DOCUMENT_COLUMNS)}, payload FROM documents WHERE id = %s"
+_FINDINGS_SQL = f"SELECT {', '.join(FINDING_COLUMNS)} FROM findings WHERE document_id = %s ORDER BY module"
+
+
+def _plain(value: Any) -> Any:
+    return str(value) if isinstance(value, uuid.UUID) else value
+
+
+def _finding_from_row(row: Mapping[str, Any]) -> Finding:
+    return Finding.model_validate({c: _plain(row[c]) for c in FINDING_COLUMNS})
+
+
+class PostgresStore:
+    """Store on the shared Postgres (connect as `iw_app`). One connection per thread, reopened after a drop."""
+
+    def __init__(self, dsn: str, *, connect_timeout: int = 5) -> None:
+        self._dsn = dsn
+        self._connect_timeout = connect_timeout
+        self._local = threading.local()
+        self._all: list[Any] = []
+        self._all_lock = threading.Lock()
+
+    def _conn(self):
+        import psycopg
+        from psycopg.rows import dict_row
+
+        conn = getattr(self._local, "conn", None)
+        if conn is None or conn.closed:
+            conn = psycopg.connect(self._dsn, autocommit=True, row_factory=dict_row,
+                                   connect_timeout=self._connect_timeout)
+            self._local.conn = conn
+            with self._all_lock:
+                self._all.append(conn)
+        return conn
+
+    def _drop_conn(self) -> None:
+        conn = getattr(self._local, "conn", None)
+        self._local.conn = None
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # already broken; nothing left to release
+                pass
+
+    def _run(self, op: Callable[[Any], Any]) -> Any:
+        """Run `op(conn)` and translate driver errors into the store's taxonomy."""
+        import psycopg
+        from psycopg import errors
+
+        try:
+            return op(self._conn())
+        except (errors.SerializationFailure, errors.DeadlockDetected) as exc:
+            raise StoreUnavailable(f"retryable conflict: {type(exc).__name__}") from exc
+        except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
+            self._drop_conn()
+            # libpq messages name host and port, never the password; still keep only the class and the
+            # first line so a DSN can never reach the logs.
+            first_line = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
+            raise StoreUnavailable(f"{type(exc).__name__}: {first_line}") from exc
+        except psycopg.IntegrityError as exc:
+            raise StoreError(f"integrity: {type(exc).__name__}: {exc.diag.constraint_name}") from exc
+
+    def load_document(self, document_id: str) -> ScrapedDocument:
+        try:
+            key = uuid.UUID(document_id)
+        except (ValueError, AttributeError, TypeError):
+            raise NotFound(str(document_id)) from None
+        row = self._run(lambda conn: conn.execute(_LOAD_SQL, (key,)).fetchone())
+        if row is None:
+            raise NotFound(document_id)
+        payload = row.pop("payload") or {}
+        return document_from_row({c: _plain(v) for c, v in row.items()}, payload)
+
+    def save_findings(self, document: ScrapedDocument, findings: Sequence[Finding]) -> list[SavedFinding]:
+        from psycopg.types.json import Jsonb
+
+        def params(f: Finding) -> list[Any]:
+            data = f.model_dump(mode="json")
+            values = {
+                **{c: getattr(f, c, None) for c in _INSERT_COLUMNS},
+                "id": uuid.UUID(f.id),
+                "document_id": uuid.UUID(f.document_id),
+                "status": "new",
+                "detected_at": f.detected_at,
+                "updated_at": f.updated_at,
+            }
+            for c in _JSON_COLUMNS:
+                values[c] = Jsonb(data[c]) if data.get(c) is not None else None
+            values["rules"] = Jsonb(data["rules"])
+            return [values[c] for c in _INSERT_COLUMNS]
+
+        def op(conn) -> list[SavedFinding]:
+            saved = []
+            with conn.transaction():
+                for f in findings:
+                    row = conn.execute(_UPSERT_SQL, params(f)).fetchone()
+                    saved.append(SavedFinding(_finding_from_row(row), "created" if row["inserted"] else "updated"))
+            return saved
+
+        return self._run(op)
+
+    def findings_for_document(self, document_id: str) -> list[Finding]:
+        rows = self._run(lambda conn: conn.execute(_FINDINGS_SQL, (uuid.UUID(document_id),)).fetchall())
+        return [_finding_from_row(r) for r in rows]
+
+    def ping(self) -> bool:
+        """`SELECT 1` for /health; False instead of raising."""
+        try:
+            self._run(lambda conn: conn.execute("SELECT 1").fetchone())
+            return True
+        except StoreError:
+            return False
+
+    def close(self) -> None:
+        with self._all_lock:
+            conns, self._all = self._all, []
+        for conn in conns:
+            try:
+                conn.close()
+            except Exception:  # best effort at shutdown
+                pass

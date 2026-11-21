@@ -1,6 +1,6 @@
 # Tasks
 
-Precondition: `analytics-skeleton` is merged and this branch is rebased on it. Groups 1 and 3 need no infra. Group 2 waits for the final `api-db-schema` columns, which the coordinator forwards. Group 5 waits for `infra-compose`.
+Precondition: `analytics-skeleton` is merged and this branch is rebased on it. Groups 1 and 3 need no infra. Group 2 is reconciled with `api-db-schema` at `api/api-v1` `1be0451`. Group 5 waits for `infra-compose`.
 
 ## 1. Config and store interface with the in-memory store
 
@@ -10,10 +10,10 @@ Precondition: `analytics-skeleton` is merged and this branch is rebased on it. G
 
 ## 2. Postgres store
 
-- [ ] 2.1 Reconcile the assumed `documents` / `findings` columns and grants with the final `api-db-schema` migration (design "Assumed table shape"); record the result in `design.md`; write `analytics/tests/sql/schema.sql` mirroring that migration, with a header naming the source revision and saying it is test-only
-- [ ] 2.2 Failing test: the group 1 scenario suite parametrized over `PostgresStore` (skipped without `TEST_DATABASE_URL`; the fixture applies `tests/sql/schema.sql`), plus concurrent upsert to one row (one `created`, one `updated`), and connection refused raising `StoreUnavailable` with no partial write
-- [ ] 2.3 `PostgresStore` (psycopg 3, one transaction per save, the `ON CONFLICT (document_id, module) DO UPDATE` statement from `api-db-schema`'s `findings_upsert()`, `RETURNING id, xmax = 0`); pin `psycopg[binary]`; tests green; `pip-audit -r analytics/requirements.txt` clean
-- [ ] 2.4 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Reconcile the assumed `documents` / `findings` columns and grants with the final `api-db-schema` migration (design "Assumed table shape"); record the result in `design.md`; write `analytics/tests/sql/schema.sql` mirroring that migration, with a header naming the source revision and saying it is test-only
+- [x] 2.2 Failing test: the group 1 scenario suite parametrized over `PostgresStore` (skipped without `TEST_DATABASE_URL`; the fixture applies `tests/sql/schema.sql`), plus concurrent upsert to one row (one `created`, one `updated`), and connection refused raising `StoreUnavailable` with no partial write
+- [x] 2.3 `PostgresStore` (psycopg 3, one transaction per save, the `ON CONFLICT (document_id, module) DO UPDATE` statement from `api-db-schema`'s `findings_upsert()`, `RETURNING id, xmax = 0`); pin `psycopg[binary]`; tests green; `pip-audit -r analytics/requirements.txt` clean
+- [x] 2.4 Mutation check; `mutations: 15 tried, 15 caught` (run against a throwaway Postgres 17 on 127.0.0.1:55433; three first survived and got tests: firm JSON round trip, a dropped still-open connection, a kept connection on a conflict)
 
 ## 3. Events and thresholds
 
