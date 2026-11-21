@@ -24,15 +24,15 @@ rules:
     - Scenarios for scraped content cover the failure path (blocked, empty, malformed), not only success.
     - Reference the contracts in .docs/integration-plan.md instead of restating them.
   design:
-    - Record choices that are hard to reverse as an ADR draft in .docs/decisions/ for a human to decide.
+    - Record choices that are hard to reverse as an ADR in .docs/decisions/ (written by the agent, status proposed, in this change's PR).
   tasks:
     - Each task group is one commit-sized unit whose first task is its failing test. Keep tasks under about 2 hours.
-    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, your own row in .docs/STATUS.md, ADR drafts) and add the iw-ai-log row; (2) run the iw-pr-review skill and fix real findings.
+    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, your own row in .docs/STATUS.md, ADRs) and add the iw-ai-log row; (2) run the iw-pr-review skill and fix real findings.
 
 operations:
   apply:
     guidance:
-      - Before committing each task group, load and follow the iw-commit-cycle skill (test first, stage and commit as separate calls, iw-reviewer once per task group or before a push). Do not implement outside this apply flow.
+      - Before committing each task group, load and follow the iw-commit-cycle skill (test first, mutation check, stage and commit as separate calls, iw-reviewer once per task group or before a push). Do not implement outside this apply flow.
       - When all tasks are complete, run /openspec-archive-change as the last commit of the branch, then stop and hand the PR body to the human. Never push or open the PR yourself.
   archive:
     guidance:
