@@ -16,7 +16,7 @@ The dashboard (`web/`, Kacper) is built against `contracts/openapi.yaml` and run
 - `GET /health` reports the API and its dependencies (Postgres, Redis, MinIO).
 - Add the `api` service to `api/compose.yaml` on `iw-edge` and `iw-data`, behind the Caddy gateway that already routes `/api` and `/socket.io` to `api:8000`.
 - Reuse, by copying and adapting, the request models, error handlers, filter semantics and OpenAPI response checker of the archived mock server (`contracts/mock-server` branch), so the real API behaves like the mock the dashboard was built against.
-- Owner: Damian (module C, `api/`).
+- Owner: Damian (`api/`).
 - Out of scope: authentication and roles (open question), the tables themselves (`api-db-schema`), writing findings or documents (analytics, scraper), the scheduler and the consumer of `iw:scan-requests` (scraper), computing calibration curves (analytics eval writes `calibration_points`), and the Redis/MinIO containers (`infra-compose`).
 
 ## Contracts
