@@ -43,6 +43,12 @@ def test_build_does_not_store_raw_html_in_the_document(source):
     assert "html" not in build(source)
 
 
+def test_build_drops_a_page_supplied_html_object_key(source):
+    # only the pipeline sets it, after a real upload; a page must not point a row at an arbitrary object
+    doc = build(source, {"url": PAGE["url"], "text": "Zysk", "html_object_key": "html/someone-elses.html"})
+    assert "html_object_key" not in doc
+
+
 def test_build_does_not_mutate_the_page(source):
     page = dict(PAGE)
     build(source, page)

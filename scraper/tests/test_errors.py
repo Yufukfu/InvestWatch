@@ -1,10 +1,11 @@
 """The job_errors sink (real PostgreSQL)."""
 
+import time
 import uuid
 
 import pytest
 
-from iw_scraper.ingest.errors import record_error
+from iw_scraper.ingest.errors import record_error, redact
 from iw_scraper.types import JobError, Reason
 
 
@@ -67,3 +68,63 @@ async def test_a_source_id_that_is_not_a_uuid_is_kept_in_the_detail_not_lost(poo
 async def test_plain_detail_is_kept_verbatim(pool):
     await record_error(pool, JobError(Reason.HTTP_ERROR, "status 503 from alfa.example.com", None))
     assert (await rows(pool))[0]["detail"] == "status 503 from alfa.example.com"
+
+
+@pytest.mark.parametrize(
+    "hostile",
+    ["key" * 2000, "session" * 1500, "a" * 20000, "token=" * 3000, "x:" * 5000, "http://" + "u:p@" * 3000, "-" * 20000],
+)
+def test_redaction_stays_fast_on_hostile_input(hostile):
+    # detail can carry page or proxy text; a backtracking regex must not block the event loop
+    started = time.perf_counter()
+    redact(hostile)
+    assert time.perf_counter() - started < 0.5
+
+
+@pytest.mark.parametrize(
+    "detail,secret",
+    [
+        ("proxy user:p@ss@10.0.0.1:8080 refused", "ss@"),
+        ("sent Bearer abc123xyz to proxy", "abc123xyz"),
+        ("sess_id=sid-31337 expired", "sid-31337"),
+        ("credential=cred-8080 rejected", "cred-8080"),
+        ("proxy http://:hunter2@10.0.0.1:8080 refused", "hunter2"),
+    ],
+)
+def test_residual_credential_shapes_are_redacted(detail, secret):
+    assert secret not in redact(detail)
+
+
+def test_plain_details_survive_redaction():
+    for detail in ["status 503 from alfa.example.com", "connect to host:5432 timed out", "Key (source_id)=(x) already exists"]:
+        assert redact(detail) == detail
+
+
+async def test_long_detail_still_keeps_a_non_uuid_source_id(pool):
+    await record_error(pool, JobError(Reason.INVALID_REQUEST, "x" * 5000, "not-a-uuid"))
+    stored = (await rows(pool))[0]
+    assert stored["source_id"] is None
+    assert "not-a-uuid" in stored["detail"]
+    assert len(stored["detail"]) <= 300
+
+
+async def test_log_line_does_not_carry_a_secret_source_id(pool, caplog):
+    # a scan request can name any string as the source; it reaches the log as well as the table
+    with caplog.at_level("WARNING", logger="iw_scraper.ingest"):
+        await record_error(pool, JobError(Reason.INVALID_REQUEST, "unknown source", "password=hunter2"))
+    assert "job_error" in caplog.text
+    assert "hunter2" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "detail,secret",
+    [
+        ("(source_id=password=hunter2) unknown source", "hunter2"),
+        ("GET /p?a=1&password=hunter2&b=2 failed", "hunter2"),
+        ("a=b;token=abc999 rejected", "abc999"),
+        ("x=y,secret=s3cr3t-9 rejected", "s3cr3t-9"),
+        ("level=warn msg=failed api_key=k-4242", "k-4242"),
+    ],
+)
+def test_a_secret_nested_after_a_harmless_pair_is_still_redacted(detail, secret):
+    assert secret not in redact(detail)

@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 
 from iw_scraper.types import Source
 
-# the parsed page carries the raw HTML for the object store; it is not part of the ScrapedDocument
-_PAGE_ONLY_KEYS = frozenset({"html"})
+# the parsed page carries the raw HTML for the object store; it is not part of the ScrapedDocument. The object
+# key is set by the pipeline after a real upload, never taken from a page.
+_PAGE_ONLY_KEYS = frozenset({"html", "html_object_key"})
 
 
 def normalise_text(text: str) -> str:

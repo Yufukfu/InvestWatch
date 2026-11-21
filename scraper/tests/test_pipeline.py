@@ -185,19 +185,15 @@ async def test_existing_bucket_passes_the_startup_check(storage):
 
 
 async def test_missing_bucket_fails_clearly_and_is_not_created(storage):
+    import asyncio
+
     from iw_scraper.ingest.storage import BucketMissing
 
-    missing = Storage(storage.endpoint, storage.access_key, storage.secret_key, bucket="iw-raw-does-not-exist")
-    try:
+    name = f"iw-raw-missing-{uuid.uuid4().hex[:10]}"
+    missing = Storage(storage.endpoint, storage.access_key, storage.secret_key, bucket=name)
+    with pytest.raises(BucketMissing, match=name):
         await missing.check_bucket()
-    except BucketMissing as exc:
-        assert "iw-raw-does-not-exist" in str(exc)
-    else:
-        raise AssertionError("check_bucket accepted a missing bucket")
-    try:
-        await missing.check_bucket()  # still missing: the check must not create it
-    except BucketMissing:
-        pass
+    assert await asyncio.to_thread(missing._client.bucket_exists, name) is False  # checked, never created
 
 
 class HungRedis:
@@ -266,3 +262,32 @@ async def test_failing_dedup_check_uploads_nothing_and_records_an_error(
     assert result.outcome == "failed"
     assert await storage.list_keys() == []
     assert await reasons(pool) == ["storage_error"]
+
+
+@pytest.mark.parametrize("text", ["", "  \n\t "])
+async def test_blank_text_records_empty_text_and_stores_nothing(pool, storage, redis_client, stream_name, seeded_source, text):
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, {**PAGE, "text": text})
+    assert result.outcome == "failed"
+    assert result.error.reason is Reason.EMPTY_TEXT
+    assert await storage.list_keys() == []
+    assert await doc_count(pool) == 0
+    assert await reasons(pool) == ["empty_text"]
+
+
+async def test_returned_error_detail_is_redacted_too(pool, storage, redis_client, stream_name, seeded_source, monkeypatch):
+    async def failing_insert(*_args):
+        raise RuntimeError("connect to http://user:hunter2@10.0.0.1:5432 failed")
+
+    monkeypatch.setattr(pipeline, "insert_document", failing_insert)
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source)
+    assert "hunter2" not in result.error.detail  # a caller that logs result.error must not leak it
+
+
+async def test_unexpected_publish_error_after_commit_is_recorded_not_raised(pool, storage, stream_name, seeded_source):
+    class BuggyRedis:
+        async def xadd(self, *args, **kwargs):
+            raise TypeError("client bug")
+
+    result = await run(Ingestor(pool, storage, BuggyRedis(), stream=stream_name), seeded_source)
+    assert result.outcome == "inserted"  # the document is stored; the sweep announces it
+    assert await reasons(pool) == ["publish_failed"]

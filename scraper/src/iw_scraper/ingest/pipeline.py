@@ -4,8 +4,6 @@ import logging
 from datetime import datetime
 
 import asyncpg
-from redis.exceptions import RedisError
-
 from iw_scraper.ingest.document import build_document
 from iw_scraper.ingest.errors import record_error, redact
 from iw_scraper.ingest.publisher import STREAM, mark_published, publish
@@ -72,7 +70,7 @@ class Ingestor:
     async def _announce(self, document_id: str, source_id: str) -> None:
         try:
             await publish(self.redis, document_id, self.stream)
-        except (RedisError, OSError) as exc:
+        except Exception as exc:  # RedisError, a timeout, or a client bug: the row is stored either way
             await self._record(JobError(Reason.PUBLISH_FAILED, f"publish failed: {exc}", source_id))
             return  # the row stays unpublished; the sweep republishes it
         try:
@@ -90,6 +88,8 @@ class Ingestor:
             log.error(json.dumps({"event": "orphan_object", "key": key, "error": redact(str(exc))}))
 
     async def _fail(self, error: JobError) -> IngestResult:
+        # redact once, here: the returned error is what callers log, as well as what the sink stores
+        error = JobError(error.reason, redact(error.detail), error.source_id)
         await self._record(error)
         return IngestResult("failed", error=error)
 

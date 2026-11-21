@@ -10,48 +10,77 @@ from iw_scraper.types import JobError
 log = logging.getLogger("iw_scraper.ingest")
 
 _MAX_DETAIL = 300
+# Redaction runs on text that page or proxy content can influence, so its input is bounded first. The bound is
+# far above _MAX_DETAIL: whatever lies past it is dropped anyway, so a half-cut secret at the bound cannot reach
+# the stored text. Every pattern below is at worst quadratic in this length.
+_MAX_REDACT_INPUT = 2000
 
-# credentials in a URL (scheme://user:pass@host, greedy to the LAST "@" of the token so a password containing
-# "@" or "/" is covered), scheme-less user:pass@host, key=value / "key": "value" pairs whose name looks secret,
-# and auth headers (the whole rest of the line)
-_URL_USERINFO = re.compile(r"(\w+://)\S*@")
-_BARE_USERINFO = re.compile(r"\b[^\s/:@]+:[^\s/@]+@(?=[\w.-]+)")
-_SECRET_PAIR = re.compile(
-    r"(?i)([\w-]*(?:password|passwd|pwd|token|secret|key|signature|session)[\w-]*[\"']?)"
-    r"(\s*[=:]\s*)(?:\"[^\"]*\"|'[^']*'|\S+)"
-)
+# credentials as userinfo (`user:pass@host`, with or without a scheme; greedy to the LAST "@" of the token so a
+# password containing "@" or "/" is covered), bearer tokens, auth headers (the rest of the line), and
+# name=value / "name": "value" pairs whose NAME looks secret. The pair pattern does not mention the secret words:
+# it finds `name sep value` and the name is judged in code, which keeps the regex free of nested repetition.
+_BARE_USERINFO = re.compile(r"\b[^\s/:@]+:\S*@(?=[\w.-]+)")
+_BEARER = re.compile(r"(?i)\bbearer\s+\S+")
 _AUTH_HEADER = re.compile(r"(?i)\b(authorization|proxy-authorization|cookie|set-cookie)(\s*:\s*).*")
+_PAIR = re.compile(r"([\w-]+[\"']?)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)")
+_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential")
+
+
+def _mask_secret_pairs(text: str) -> str:
+    """Mask the value of every pair whose name looks secret.
+
+    For a harmless name only `name=` is consumed, so a secret nested in its value (`a=1&password=x`,
+    `(source_id=password=x)`) is still found by the next search.
+    """
+    out: list[str] = []
+    pos = 0
+    while (match := _PAIR.search(text, pos)) is not None:
+        out.append(text[pos : match.start()])
+        name, separator = match.group(1), match.group(2)
+        if any(part in name.lower() for part in _SECRET_NAME_PARTS):
+            out.append(f"{name}{separator}***")
+            pos = match.end()
+        else:
+            out.append(f"{name}{separator}")
+            pos = match.start(3)
+    out.append(text[pos:])
+    return "".join(out)
 
 
 def redact(detail: str) -> str:
     """Last line of defence: `detail` should never hold credentials, and if it does they are not stored.
 
-    Over-redacting is acceptable here; leaking is not. The detail is also capped, because driver messages can
-    be long.
+    Over-redacting is acceptable here; leaking is not. A space inside an unquoted secret value is not
+    recoverable (`password=a b c` keeps ` b c`), which is why callers must not put credentials in a detail.
+    The result is capped, because driver messages can be long.
     """
-    detail = _URL_USERINFO.sub(r"\1***@", detail)
+    detail = detail[:_MAX_REDACT_INPUT]
     detail = _BARE_USERINFO.sub("***@", detail)
+    detail = _BEARER.sub("Bearer ***", detail)
     detail = _AUTH_HEADER.sub(r"\1\2***", detail)
-    detail = _SECRET_PAIR.sub(r"\1\2***", detail)
+    detail = _mask_secret_pairs(detail)
     return detail[:_MAX_DETAIL]
 
 
 def _source_uuid(source_id: str | None) -> tuple[uuid.UUID | None, str]:
-    """A scan request can name any string as a source; keep a non-UUID one in the detail instead of failing."""
+    """A scan request can name any string as a source; keep a non-UUID one in the detail instead of failing.
+
+    The returned prefix goes in FRONT of the detail so the length cap can never push it out.
+    """
     if source_id is None:
         return None, ""
     try:
         return uuid.UUID(source_id), ""
     except ValueError:
-        return None, f" (source_id={source_id})"
+        return None, f"(source_id={source_id}) "
 
 
 async def record_error(pool: asyncpg.Pool, error: JobError) -> None:
     """Write one `job_errors` row and one JSON log line."""
-    source_uuid, suffix = _source_uuid(error.source_id)
-    detail = redact(error.detail + suffix)
+    source_uuid, prefix = _source_uuid(error.source_id)
+    detail = redact(prefix + error.detail)
     log.warning(
-        json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": error.source_id, "detail": detail})
+        json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": redact(str(error.source_id)), "detail": detail})
     )
     async with pool.acquire() as conn:
         await conn.execute(

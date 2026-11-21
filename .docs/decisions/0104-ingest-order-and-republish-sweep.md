@@ -28,7 +28,7 @@ Option 3.
 ## Consequences
 
 - Analytics must treat `iw:documents` as at-least-once. That is already how the plan describes the stream (consumer group, `XPENDING` / `XCLAIM`).
-- The sweep has to be scheduled; that is `scraper-orchestration`. `Storage.check_bucket` is likewise called from that entry point.
+- Nothing calls `Ingestor`, `sweep` or `Storage.check_bucket` yet. Scheduling the sweep, calling `check_bucket` at startup, the sink adapter and the `page` dict are wiring that still has to be assigned between `scraper-v1` and `scraper-orchestration` (follow-up 1 in [`follow-ups.md`](../../openspec/changes/scraper-ingest/follow-ups.md)).
 - A hard crash between the upload and the insert can still leave an orphan object. Cancellation and every error path remove it; a periodic list-and-diff of `iw-raw` against `documents.html_object_key` is a possible follow-up.
 - Stream trimming (`MAXLEN`) is not decided here.
 - A schema change needs a new Alembic revision from C; the test schema `scraper/tests/schema.sql` mirrors `0001_initial` and has to follow it.
