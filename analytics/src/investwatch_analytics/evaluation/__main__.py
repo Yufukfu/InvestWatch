@@ -4,7 +4,8 @@
     python analytics/eval/run.py ...   (same thing)
 
 Rules-only and deterministic by default. stdout: the JSON report; stderr: JSON logs.
-Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`) or a gold document failed analysis;
+Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`) or a gold document failed analysis
+(then nothing is stored);
 2 invalid gold set, registry, catalogue or configuration (nothing analyzed, nothing written);
 3 the run could not be stored (report still printed, nothing written).
 """
@@ -93,13 +94,20 @@ def main(argv: list[str] | None = None) -> int:
         factory = _judge_factory()
         if factory is None or not build.has_judge:
             return _fail("invalid configuration", error="no LLM judge in this build (analytics-llm-p0 not merged)")
-        judge = factory()
+        try:
+            judge = factory()
+        except Exception as exc:  # class only: a client error may quote the key or the endpoint
+            return _fail("invalid configuration", error=f"LLM judge could not be built ({type(exc).__name__})")
 
     report = evaluate(items, registry=registry, build=build, now=datetime.now(timezone.utc),
                       gold_sha256=gold_sha256, judge=judge, modules=args.module)
     report["store"] = None
     code = 0
-    if dsn is not None:
+    if dsn is not None and report["run"]["analysis_errors"]:
+        # A crashed gold document would be stored as false negatives: a bug, not a measurement.
+        log.error("calibration run not stored", extra={"error": "gold documents failed analysis",
+                                                       "gold_ids": report["run"]["analysis_errors"]})
+    elif dsn is not None:
         try:
             report["store"] = store.write_run(dsn, report)
         except StoreError as exc:

@@ -135,7 +135,7 @@ def test_report_json_is_sorted_and_stable():
 def run_id(items, build, gold=GOLD_SHA, version=None):
     kw = {"pipeline_version": version} if version else {}
     return evaluate(items, registry=Registry.from_csv(DEFAULT_REGISTRY), build=build, now=NOW, gold_sha256=gold,
-                    **kw)["run"]["run_id"]
+                    **kw)["modules"]["M2"]["run_id"]
 
 
 def test_deterministic_run_id_inputs():
@@ -152,7 +152,30 @@ def test_deterministic_run_id_inputs():
 def test_explicit_run_id_wins():
     a = item(1, {"M2": ("positive", {})})
     rid = "12345678-1234-4234-8234-123456789012"
-    assert run([a], FakeBuild({a.document.id: [("M2", 0.9)]}), run_id=rid)["run"]["run_id"] == rid
+    assert run([a], FakeBuild({a.document.id: [("M2", 0.9)]}), run_id=rid)["modules"]["M2"]["run_id"] == rid
+
+
+def test_run_id_is_per_module():
+    a = item(1, {"M1": ("positive", {}), "M2": ("positive", {})})
+    full = run([a], FakeBuild({a.document.id: [("M1", 0.9), ("M2", 0.9)]}))
+    m1_changed = run([a], FakeBuild({a.document.id: [("M1", 0.2), ("M2", 0.9)]}))
+    only_m2 = run([a], FakeBuild({a.document.id: [("M1", 0.9), ("M2", 0.9)]}), modules=["M2"])
+    assert full["modules"]["M2"]["run_id"] == m1_changed["modules"]["M2"]["run_id"] == only_m2["modules"]["M2"]["run_id"]
+    assert full["modules"]["M1"]["run_id"] != m1_changed["modules"]["M1"]["run_id"]
+    assert full["modules"]["M1"]["run_id"] != full["modules"]["M2"]["run_id"]
+
+
+def test_llm_run_gets_random_ids():
+    a = item(1, {"M2": ("positive", {})})
+    build = FakeBuild({a.document.id: [("M2", 0.9)]})
+    first = run([a], build, judge=lambda: None)["modules"]["M2"]["run_id"]
+    assert first != run([a], build, judge=lambda: None)["modules"]["M2"]["run_id"]
+    assert first[14] == "4"
+
+
+def test_not_run_module_has_no_run_id():
+    a = item(1, {"M1": ("positive", {}), "M2": ("positive", {})})
+    assert "run_id" not in run([a], FakeBuild({a.document.id: [("M2", 0.9)]}))["modules"]["M1"]
 
 
 def test_origins_are_counted():

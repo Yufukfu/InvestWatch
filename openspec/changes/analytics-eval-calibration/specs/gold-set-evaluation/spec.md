@@ -101,7 +101,7 @@ For each rule or signal with labels, the report SHALL give `tp`, `fp`, `fn`, `tn
 - **THEN** that label counts as not flagged in both readings
 
 ### Requirement: Stored calibration run
-With `--db`, the evaluation SHALL write one run to `calibration_points`: one `run_id` and one `computed_at` (UTC) for all rows, 19 rows per evaluated module with `module`, `threshold`, `tp`, `fp`, `fn`, `tn`, `precision`, `recall`, `f1` and `labeled_samples` (the number of gold documents labeled for that module), all in one transaction. For a rules-only run, `run_id` SHALL be a UUID derived from the gold-set content hash, the pipeline version and the computed points; per module the evaluation SHALL write nothing when the module's latest stored run already has that `run_id`, SHALL move `computed_at` of existing rows with that `run_id` to now when another run is newer, and SHALL insert the rows otherwise. An `--llm` run SHALL get a random UUID v4 and always be inserted. The rows SHALL be what `GET /api/calibration` returns for that module when it has no analyst labels. Without `--db` it SHALL NOT connect to a database.
+With `--db`, the evaluation SHALL write one run to `calibration_points`: one `computed_at` (UTC) for all rows and one `run_id` per evaluated module, 19 rows per evaluated module with `module`, `threshold`, `tp`, `fp`, `fn`, `tn`, `precision`, `recall`, `f1` and `labeled_samples` (the number of gold documents labeled for that module), all in one transaction. For a rules-only run, a module's `run_id` SHALL be a UUID derived from the gold-set content hash, the pipeline version, the module and its computed points; per module the evaluation SHALL write nothing when the module's latest stored run already has that `run_id`, SHALL move `computed_at` of existing rows with that `run_id` to now when another run is newer, and SHALL insert the rows otherwise. An `--llm` run SHALL get a random UUID v4 and always be inserted. A run in which a gold document failed analysis SHALL NOT be stored. The rows SHALL be what `GET /api/calibration` returns for that module when it has no analyst labels. Without `--db` it SHALL NOT connect to a database.
 
 #### Scenario: API serves the stored run
 - **WHEN** the evaluation runs with `--db` and M2 has no labeled findings
@@ -115,13 +115,21 @@ With `--db`, the evaluation SHALL write one run to `calibration_points`: one `ru
 - **WHEN** one gold label changes between two runs with `--db`
 - **THEN** the second run inserts a new run with a different `run_id`, which the API returns
 
+#### Scenario: Another module changed
+- **WHEN** only M3's points change between two runs with `--db`, or the second run uses `--module M2`
+- **THEN** M2 is reported `unchanged` and gets no new rows
+
+#### Scenario: Crashed gold document
+- **WHEN** the pipeline raises on one gold document during a run with `--db`
+- **THEN** nothing is stored, the report lists that gold id under `analysis_errors`, and the exit code is 1
+
 #### Scenario: Rolled-back code
 - **WHEN** run A is stored, then run B, then the code that produced A runs again
 - **THEN** no row is inserted, A's rows get the new `computed_at`, and the API returns A's points
 
 #### Scenario: Database down
 - **WHEN** the database is unreachable or the insert fails
-- **THEN** the run exits 3, no row of this run is in `calibration_points`, the report is still printed, and the log names neither the database URL nor its password
+- **THEN** the run exits 3, no row of this run is in `calibration_points`, the report is still printed, and the log names neither the database URL, its host nor its password (also when the password holds an unescaped `@`)
 
 #### Scenario: Bad database URL
 - **WHEN** `--db` is given and `DATABASE_URL` is missing or cannot be parsed

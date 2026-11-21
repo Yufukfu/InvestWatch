@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -122,6 +123,40 @@ def test_store_unavailable_exits_3_with_report(tmp_path, capsys, monkeypatch):
     assert "calibration run not stored" in out.err
 
 
+def test_analysis_error_is_not_stored(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@localhost/db")
+    monkeypatch.setattr(store, "write_run", lambda *a, **k: pytest.fail("a run with a crashed document was stored"))
+
+    def boom(self, doc, **kw):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(cli.load_build().__class__, "analyze", boom)
+    assert cli.main(["--gold", str(gold(tmp_path)), "--db"]) == 1
+    out = capsys.readouterr()
+    assert json.loads(out.out)["store"] is None
+    assert "not stored" in out.err
+
+
+def test_judge_factory_failure_is_a_configuration_error(tmp_path, capsys, no_db, monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "http://ollama:11434/v1")
+
+    def factory():
+        raise ValueError("LLM_MODEL missing; key sk-SECRET")
+
+    monkeypatch.setattr(cli, "_judge_factory", lambda: factory)
+    real = cli.load_build
+
+    def with_judge():
+        build = real()
+        build.has_judge = True
+        return build
+
+    monkeypatch.setattr(cli, "load_build", with_judge)
+    assert cli.main(["--gold", str(gold(tmp_path)), "--llm"]) == 2
+    err = capsys.readouterr().err
+    assert "ValueError" in err and "sk-SECRET" not in err
+
+
 def test_module_option_restricts_evaluation(tmp_path, capsys, no_db):
     assert cli.main(["--gold", str(gold(tmp_path, "M2", "M3")), "--module", "M2"]) == 0
     assert set(json.loads(capsys.readouterr().out)["modules"]) == {"M2"}
@@ -149,6 +184,6 @@ def test_bad_registry_exits_2(tmp_path, capsys, no_db):
 @pytest.mark.parametrize("argv", [["eval/run.py", "--help"], ["-m", "investwatch_analytics.evaluation", "--help"]])
 def test_both_entry_points(argv):
     r = subprocess.run([sys.executable, *argv], cwd=ANALYTICS, capture_output=True, text=True,
-                       env={"PYTHONPATH": str(ANALYTICS / "src"), "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")})
+                       env={**os.environ, "PYTHONPATH": str(ANALYTICS / "src")})
     assert r.returncode == 0, r.stderr
     assert "--gold" in r.stdout and "--db" in r.stdout

@@ -24,13 +24,15 @@ ORDER BY threshold
 """
 
 
-def report(run_id: str, computed_at: str = "2026-11-21T23:00:00Z", *, m2_scores=(0.9, 0.2), not_run=("M1",)):
+def report(run_id: str, computed_at: str = "2026-11-21T23:00:00Z", *, m2_scores=(0.9, 0.2), not_run=("M1",),
+           m3_run_id: str | None = None):
     pairs = [(m2_scores[0], True), (m2_scores[1], False)]
-    modules = {"M2": {"status": "evaluated", "labeled_samples": 2, "points": curve(pairs)},
-               "M3": {"status": "evaluated", "labeled_samples": 1, "points": curve([(0.8, True)])}}
+    modules = {"M2": {"status": "evaluated", "run_id": run_id, "labeled_samples": 2, "points": curve(pairs)},
+               "M3": {"status": "evaluated", "run_id": m3_run_id or run_id, "labeled_samples": 1,
+                      "points": curve([(0.8, True)])}}
     for m in not_run:
         modules[m] = {"status": "not_run", "labeled_samples": 3, "points": []}
-    return {"run": {"run_id": run_id, "computed_at": computed_at}, "modules": modules}
+    return {"run": {"computed_at": computed_at}, "modules": modules}
 
 
 @pytest.fixture
@@ -67,7 +69,15 @@ def test_one_run_writes_19_rows_per_evaluated_module(db):
     assert write_run(db, r) == {"M2": "inserted", "M3": "inserted"}
     assert count(db) == 38
     runs = rows(db, "SELECT DISTINCT run_id, computed_at FROM calibration_points")
-    assert len(runs) == 1 and str(runs[0]["run_id"]) == r["run"]["run_id"]
+    assert len(runs) == 1 and str(runs[0]["run_id"]) == r["modules"]["M2"]["run_id"]
+
+
+def test_each_module_is_written_under_its_own_run_id(db):
+    a, b = rid(), rid()
+    write_run(db, report(a))
+    assert write_run(db, report(a, "2026-11-22T00:00:00Z", m3_run_id=b)) == {"M2": "unchanged", "M3": "inserted"}
+    ids = {(r["module"], str(r["run_id"])) for r in rows(db, "SELECT DISTINCT module, run_id FROM calibration_points")}
+    assert ids == {("M2", a), ("M3", a), ("M3", b)}
 
 
 def test_rows_are_what_the_api_returns(db):
@@ -81,7 +91,7 @@ def test_rows_are_what_the_api_returns(db):
 def test_same_run_again_writes_nothing(db):
     r = report(rid())
     write_run(db, r)
-    assert write_run(db, report(r["run"]["run_id"], "2026-11-22T01:00:00Z")) == {"M2": "unchanged", "M3": "unchanged"}
+    assert write_run(db, report(r["modules"]["M2"]["run_id"], "2026-11-22T01:00:00Z")) == {"M2": "unchanged", "M3": "unchanged"}
     assert count(db) == 38
     assert {str(x["computed_at"]) for x in rows(db, "SELECT DISTINCT computed_at FROM calibration_points")} == {
         "2026-11-21 23:00:00+00:00"}
@@ -108,7 +118,8 @@ def test_failure_on_the_last_row_leaves_no_row(db):
 
 def test_not_run_module_keeps_its_older_run(db):
     old = report(rid(), "2026-11-21T22:00:00Z", not_run=())
-    old["modules"]["M1"] = {"status": "evaluated", "labeled_samples": 4, "points": curve([(0.7, True)])}
+    old["modules"]["M1"] = {"status": "evaluated", "run_id": rid(), "labeled_samples": 4,
+                            "points": curve([(0.7, True)])}
     write_run(db, old)
     assert write_run(db, report(rid(), "2026-11-21T23:00:00Z")) == {"M2": "inserted", "M3": "inserted"}
     m1 = latest(db, "M1")
@@ -128,6 +139,13 @@ def test_unreachable_server(db):
         write_run(dead, report(rid()), connect_timeout=2)
     assert "s3cret-pw" not in str(exc.value) and dead not in str(exc.value)
     assert count(db) == 0
+
+
+def test_password_with_at_sign_never_reaches_the_message(db):
+    # libpq reads "se@cret@nohost" as user:se, host cret@nohost: the error would quote part of the password.
+    with pytest.raises(StoreUnavailable) as exc:
+        write_run("postgresql://u:se@cret@nohost.invalid/db", report(rid()), connect_timeout=2)
+    assert "cret" not in str(exc.value) and "nohost" not in str(exc.value)
 
 
 @pytest.mark.parametrize("dsn", ["postgresql://u:s3cret-pw@[bad", "host=x password='s3cret-pw"])

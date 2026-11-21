@@ -1,6 +1,7 @@
 """Write one evaluation run into `calibration_points` (gold-set-evaluation "Stored calibration run", design 7).
 
-All modules in one transaction, so `GET /api/calibration` never serves half a run. Per evaluated module:
+All modules in one transaction, so `GET /api/calibration` never serves half a run. Each evaluated module
+carries its own `run_id` (runner). Per evaluated module:
 - `unchanged`: the module's latest run (the API's ordering) already has this `run_id`: nothing is written;
 - `refreshed`: rows with this `run_id` exist but another run is newer (code rolled back): their
   `computed_at` moves to this run's time, so the API serves them again;
@@ -43,13 +44,13 @@ def write_run(dsn: str, report: dict, *, connect_timeout: int = 5) -> dict[str, 
 
     check_dsn(dsn)
 
-    run_id = uuid.UUID(report["run"]["run_id"])
     computed_at = datetime.fromisoformat(report["run"]["computed_at"].replace("Z", "+00:00"))
     evaluated = {m: e for m, e in sorted(report["modules"].items()) if e["status"] == "evaluated"}
     outcome: dict[str, str] = {}
     try:
         with psycopg.connect(dsn, connect_timeout=connect_timeout) as conn, conn.transaction():
             for module, entry in evaluated.items():
+                run_id = uuid.UUID(entry["run_id"])
                 row = conn.execute(_LATEST, (module,)).fetchone()
                 if row is not None and row[0] == run_id:
                     outcome[module] = "unchanged"
@@ -61,9 +62,8 @@ def write_run(dsn: str, report: dict, *, connect_timeout: int = 5) -> dict[str, 
                     cur.executemany(_INSERT, [_row(run_id, module, p, entry, computed_at) for p in entry["points"]])
                 outcome[module] = "inserted"
     except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
-        # libpq names host and port, never the password; keep the class and first line only anyway.
-        first_line = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
-        raise StoreUnavailable(f"{type(exc).__name__}: {first_line}") from None
+        # Class only: libpq quotes the host, and an unescaped "@" in the password makes part of it the host.
+        raise StoreUnavailable(f"{type(exc).__name__}: database unreachable") from None
     except psycopg.Error as exc:
         # Constraint or grant problems: class and SQLSTATE only, driver messages can echo row values.
         raise StoreError(f"{type(exc).__name__} (sqlstate {exc.sqlstate})") from None

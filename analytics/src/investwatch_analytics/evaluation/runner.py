@@ -87,10 +87,10 @@ def _ids_counter() -> Callable[[], str]:
     return lambda: str(uuid.UUID(int=next(counter), version=4))
 
 
-def _run_id(gold_sha256: str, pipeline_version: str, modules: dict[str, dict]) -> str:
-    points = {m: r["points"] for m, r in sorted(modules.items()) if r["status"] == "evaluated"}
+def _run_id(gold_sha256: str, pipeline_version: str, module: str, points: list[dict]) -> str:
+    """Per module, so a change in one module (or `--module`) never re-stores another's unchanged curve."""
     digest = hashlib.sha256(json.dumps(points, sort_keys=True).encode()).hexdigest()
-    return str(uuid.uuid5(RUN_NAMESPACE, f"{gold_sha256}|{pipeline_version}|{digest}"))
+    return str(uuid.uuid5(RUN_NAMESPACE, f"{gold_sha256}|{pipeline_version}|{module}|{digest}"))
 
 
 def evaluate(
@@ -121,6 +121,7 @@ def evaluate(
         if judge is None or not findings or any(f.model is None or f.model.llm is None for f in findings):
             without_llm += 1
 
+    llm_run_id = str(uuid.uuid4())  # an LLM run is not reproducible: always stored as a new run
     report_modules: dict[str, dict] = {}
     for module in wanted:
         labeled = [i for i in items if module in i.expect]
@@ -137,7 +138,8 @@ def evaluate(
                  for i in labeled]
         points = curve(pairs)
         default = DEFAULT_THRESHOLDS[module]
-        report_modules[module] = {"status": "evaluated", **entry, "points": points,
+        mid = run_id or (llm_run_id if judge is not None else _run_id(gold_sha256, pipeline_version, module, points))
+        report_modules[module] = {"status": "evaluated", "run_id": mid, **entry, "points": points,
                                   "at_default_threshold": next(p for p in points if p["threshold"] == default),
                                   "rules": _rules(module, labeled, found, build.catalogues)}
 
@@ -145,8 +147,6 @@ def evaluate(
     if judge is not None:
         llm = getattr(judge, "model", None) or "configured"
     run = {
-        "run_id": run_id or (_run_id(gold_sha256, pipeline_version, report_modules) if judge is None
-                             else str(uuid.uuid4())),
         "computed_at": now.isoformat().replace("+00:00", "Z"),
         "gold_sha256": gold_sha256,
         "pipeline_version": pipeline_version,

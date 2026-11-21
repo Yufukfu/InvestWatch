@@ -21,7 +21,7 @@ The jury scores "trafność klasyfikacji ryzyka przez moduły AI oraz wpływ zmi
 - Fictional `analytics/eval/registry.csv` for every evaluation (option 1, second choice).
 - Both readings in the report, `strict` (`uncertain` = not flagged) as the headline in the README and slides (Damian).
 - Reimplemented counting in `investwatch_analytics.evaluation.metrics` with the API's grid and conventions, pinned by parity tests on the rest-api spec scenario.
-- One-shot service `analytics-eval` in the default stack, no profile (Damian: Opis §3 asks for the stack "jedną komendą" and the jury tests the panel on it). Idempotent: a rules-only run's `run_id` is a UUID v5 of the gold file hash, the pipeline version and the computed points, a deliberate exception to the UUID v4 convention. Per module, an identical latest run writes nothing, an identical older run gets a new `computed_at`, anything else inserts 19 rows. `--llm` runs get a UUID v4.
+- One-shot service `analytics-eval` in the default stack, no profile (Damian: Opis §3 asks for the stack "jedną komendą" and the jury tests the panel on it). Idempotent: a rules-only run gives each module a `run_id` that is a UUID v5 of the gold file hash, the pipeline version, the module and its computed points, a deliberate exception to the UUID v4 convention. Per module, an identical latest run writes nothing, an identical older run gets a new `computed_at`, anything else inserts 19 rows. `--llm` runs get a UUID v4.
 - `GET /api/calibration` sums the label counts and the latest gold run's counts per threshold and recomputes the ratios (Damian: one or two analyst labels must never replace the gold curve). Response shape and parameters unchanged.
 
 ## Consequences
