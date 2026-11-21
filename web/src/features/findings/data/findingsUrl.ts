@@ -1,4 +1,5 @@
 import type { GetFindingsApiArg } from '../../../api/generated';
+import { isUuid } from '../../../url/uuid';
 import {
   MODULES,
   PAGE_SIZES,
@@ -16,7 +17,6 @@ import {
 export const DEFAULT_FILTERS: FindingFilters = { status: [], sort: '-detected_at', page: 1, pageSize: 25 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function oneOf<T extends string>(values: readonly T[], v: string | null): T | undefined {
   return v !== null && (values as readonly string[]).includes(v) ? (v as T) : undefined;
@@ -58,7 +58,7 @@ export function parseFilters(search: string): FindingFilters {
 
 export function parseSelected(search: string): string | undefined {
   const id = new URLSearchParams(search).get('finding');
-  return id !== null && UUID.test(id) ? id : undefined;
+  return isUuid(id) ? id : undefined;
 }
 
 // Defaults are omitted, so the unfiltered view has a clean URL.

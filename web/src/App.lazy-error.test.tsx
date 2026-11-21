@@ -5,6 +5,8 @@ import { App } from './App';
 import summary from './test/fixtures/summary.json';
 import { makeStore } from './test/store';
 
+vi.mock('socket.io-client', async () => (await import('./test/inertSocket')).inertSocketModule);
+
 // A lazy chunk that cannot load (stale tab after a redeploy): reading the export rejects the import.
 vi.mock('./features/trend/TrendPage', () => ({
   get TrendPage() {

@@ -11,6 +11,12 @@ Data collection service: collectors for web pages and social media, job queue, s
 
 The queue's own Redis keys are prefixed `iw:scraper:` (queue `iw:scraper:queue`; jobs and results are JSON); only `arq`'s `arq:job:` and `arq:result:` keys are fixed by the library. A scheduler that starts late enqueues the slots of the last five minutes it missed.
 
+## Run in the stack
+
+`docker compose up --build` at the repository root starts `worker`, `scheduler` and a one-shot `seed` (`scraper/compose.yaml`) after `api-migrate` and `minio-init`; there is nothing to start by hand. `seed` registers the KNF source with the cron `SCRAPER_SEED_CRON` (default `0 */6 * * *`, UTC; an invalid value stops the stack at `seed`), so the scheduler scans it on schedule; a scan can also be requested from the dashboard. Scale collectors with `docker compose up --scale worker=3`, keep one `scheduler`. Operator settings (`PROXY_LIST`, `SCRAPER_SEED_CRON`, `FETCH_*`, ...) are in the root `.env.example`. `worker` needs internet access (`egress`); `worker` serves `/health` on `SCRAPER_HEALTH_PORT` to the stack's networks only, and no scraper container publishes a host port.
+
+Hardware: the containers are limited to 1 CPU / 768 MB (`worker`), 0.5 CPU / 256 MB (`scheduler`) and 0.5 CPU / 128 MB (`seed`, exits after seconds), about 2 CPUs and 1.2 GB together at most. These limits are first estimates, not measured on the demo machine. Check the deployment with `scraper/tests/stack.sh` (needs Docker and network; `config`, `root` and `run` groups; `STACK_ROOT=1` runs it through the root `compose.yaml`).
+
 ## Import saved samples
 
 `python -m iw_scraper.sample_import DIR` loads saved files (`.html`, `.htm`, `.txt`, `.md`) through the normal ingest: validation, dedup by `content_hash`, raw HTML to MinIO, a `documents` row, `XADD iw:documents`. It makes no network request except to PostgreSQL, Redis and MinIO and needs the same environment as the worker. Run it in the scraper image with the directory mounted read-only (`docker run --rm -v "$PWD/samples:/samples:ro" --env-file .env iw-scraper python -m iw_scraper.sample_import /samples/uknf --kind third_party --modules M3`, on the stack's network); a rerun inserts nothing and reports duplicates.
@@ -32,6 +38,12 @@ COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml
 ```
 
 Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
+
+## Effectiveness report
+
+`python -m iw_scraper.report [--since HOURS] [--json]` (needs `DATABASE_URL`; run it in the scraper image) prints what the scraper collected and what failed from `sources`, `documents` and `job_errors`: per active source the last run status, documents (total, in the window, latest `fetched_at`) and job errors of the window by reason; then the never-run and no-document sources, inactive sources apart, and totals (documents by platform and kind, share with raw HTML, errors by reason). `--since` is a whole number of hours from 1 to 87600, ten years (default 24); `--json` prints one JSON object. It reads all three tables in one read-only, repeatable-read transaction (one snapshot), shows sources by id and name (no URL) and never `job_errors.detail`; the report goes to stdout, log lines to stderr, and a database failure exits non-zero.
+
+It cannot give a success rate: the schema keeps only the last run of each source, so statuses are of the last run and nothing older, and the header says so.
 
 ## Author provenance
 

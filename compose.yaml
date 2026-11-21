@@ -6,3 +6,4 @@ include:
   - web/compose.yaml
   - api/compose.yaml
   - analytics/compose.yaml
+  - scraper/compose.yaml
