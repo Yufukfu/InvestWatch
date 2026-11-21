@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import asyncpg
 from arq.connections import ArqRedis, RedisSettings
 
-from iw_scraper.collect import Collector
+from iw_scraper.collect import Collector, Stages
 from iw_scraper.config import (
     DEFAULT_SOCIAL_MAX_POSTS, fetch_settings, proxy_settings, rate_limit_settings, social_max_posts, target_settings,
 )
@@ -96,12 +96,13 @@ def assemble(
     timeout: float,
     max_bytes: int,
     max_posts: int = DEFAULT_SOCIAL_MAX_POSTS,
+    stages: Stages | None = None,
 ) -> Runtime:
     store = PgSourceStore(pool)
     collector = Collector(
         store, Ingestor(pool, storage, redis),
         urls=urls, addresses=addresses, rotator=rotator, limiter=limiter, timeout=timeout, max_bytes=max_bytes,
-        social_max_posts=max_posts,
+        social_max_posts=max_posts, stages=stages or Stages(),
     )
     return Runtime(pool, storage, redis, store, collector)
 

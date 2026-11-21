@@ -21,6 +21,8 @@ COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml
 
 Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
 
+Opt-in live smoke tests make real requests and are deselected by default (`-m scraper_live`); the Telegram one collects the public channel named in `IW_LIVE_TELEGRAM_HANDLE` once.
+
 ## Author provenance
 
 Analytics routes a post to M2 (published by the firm itself) from `author.handle`, `author.profile_url` and the host of `url` (`advertiser.publisher_firm`; `url` is the guarded fetch URL, so a collector must never take it from markup), so where they come from decides whether an impersonator can fake a firm post (issue 36). Read from the code on `main`:

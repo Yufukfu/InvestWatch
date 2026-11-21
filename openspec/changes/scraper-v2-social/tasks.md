@@ -23,9 +23,9 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 3. End to end
 
-- [ ] 3.1 Failing end-to-end test on docker compose: a seeded `platform = other` source `https://t.me/s/<handle>` whose pages (two saved pages) are served by an injected `Stages.fetch` stub, because the URL form and the `t.me` host are fixed by the spec and the HTTP stub is on loopback (ingest, PostgreSQL, MinIO, the stream and the scan events are the production wiring) yields schema-valid `documents` rows with per-post MinIO objects, `iw:documents` entries and `scan.finished`; a rerun adds nothing and the stub records one page request. `SOCIAL_MAX_POSTS` is in `.env.example`
-- [ ] 3.2 Opt-in live smoke test (marker `scraper_live`, deselected by default and outside CI) that collects one public channel once through the full stack; its handle comes from an environment variable
-- [ ] 3.3 Mutation check; line reads `mutations: n/a, end-to-end and smoke tests only` unless code changed
+- [x] 3.1 Failing end-to-end test on docker compose: a seeded `platform = other` source `https://t.me/s/<handle>` whose pages (two saved pages) are served by an injected `Stages.fetch` stub, because the URL form and the `t.me` host are fixed by the spec and the HTTP stub is on loopback (ingest, PostgreSQL, MinIO, the stream and the scan events are the production wiring) yields schema-valid `documents` rows with per-post MinIO objects, `iw:documents` entries and `scan.finished`; a rerun adds nothing and the stub records one page request. `SOCIAL_MAX_POSTS` is in `.env.example`
+- [x] 3.2 Opt-in live smoke test (marker `scraper_live`, deselected by default and outside CI) that collects one public channel once through the full stack; its handle comes from an environment variable
+- [x] 3.3 Mutation check; mutations: 1 tried, 1 caught (the `stages` passthrough in `assemble`; the rest is end-to-end and smoke tests only)
 
 ## 4. Seeds
 
