@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investwatch-analytics"
+version = "0.1.0"
+description = "InvestWatch analytics: preprocessing, KNF registry matching, UKNF rule engine (M1-M3)."
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.14,<3", "PyYAML>=6.0,<7", "RapidFuzz>=3.14,<4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+investwatch_analytics = ["rules/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]

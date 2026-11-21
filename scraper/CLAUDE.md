@@ -1,4 +1,4 @@
-# scraper (module A)
+# scraper (Adam's module)
 
 Collects web and social-media content and writes `ScrapedDocument` rows (contract v1, `.docs/integration-plan.md` §3) plus HTML and screenshots to MinIO. Downstream, `analytics` consumes the Redis Stream `iw:documents`; the scraper knows nothing about analytics.
 

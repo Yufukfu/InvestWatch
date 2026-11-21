@@ -88,6 +88,27 @@ jobs:
             echo "::endgroup::"
           done
 
+  contracts:
+    # Own job: the loop above only sees top-level */requirements.txt, so contracts/mock-server
+    # is skipped there, and the mock server needs Python 3.13 (pyproject.toml).
+    name: Contracts and mock server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Validate contracts (schemas, mocks, referential integrity, OpenAPI parse)
+        run: |
+          pip install -r contracts/requirements.txt
+          python contracts/validate.py
+      - name: Audit and test the mock server
+        working-directory: contracts/mock-server
+        run: |
+          pip install -r requirements-dev.txt
+          pip-audit -r requirements.txt -r requirements-dev.txt
+          pytest -q
+
   node:
     name: Node services
     runs-on: ubuntu-latest
@@ -96,7 +117,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Test and audit each Node service that has a package-lock.json
+      - name: Audit, lint, typecheck and test each Node service that has a package-lock.json
         shell: bash
         run: |
           set -euo pipefail
@@ -104,7 +125,7 @@ jobs:
             [ -f "$lock" ] || continue
             dir=$(dirname "$lock")
             echo "::group::$dir"
-            (cd "$dir" && npm ci && npm audit --audit-level=high && npm test --if-present)
+            (cd "$dir" && npm ci && npm audit --audit-level=high && npm run lint --if-present && npm run typecheck --if-present && npm test --if-present)
             echo "::endgroup::"
           done
 

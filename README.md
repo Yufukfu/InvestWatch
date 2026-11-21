@@ -6,11 +6,11 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 
 | Folder | Purpose | Owner |
 |---|---|---|
-| [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler | A |
-| [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM | C |
-| [`web/`](web/) | dashboard | B |
-| [`infra/`](infra/) | shared infrastructure: Postgres, HTTPS gateway | B |
-| [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI), mocks, validator – draft v1 | C |
+| [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler | Adam |
+| [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM | Damian |
+| [`web/`](web/) | dashboard | Kacper |
+| [`infra/`](infra/) | shared infrastructure: Postgres, HTTPS gateway | Kacper |
+| [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI), mocks, validator – draft v1 | Damian |
 | [`.docs/`](.docs/) | project documentation (English): plans, decisions, AI work log | all |
 | [`doc/`](doc/) | UKNF challenge materials (Polish), removed before hand-in | – |
 

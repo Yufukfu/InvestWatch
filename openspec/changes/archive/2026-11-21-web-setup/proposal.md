@@ -1,6 +1,6 @@
 ## Why
 
-The dashboard (module B) needs a runnable foundation before feature work: a React app that talks to the API only through a client generated from the shared OpenAPI contract, contract mocks so B is not blocked on `api`, and a `docker compose up` stack with the database and a single HTTPS entry point. Modules must stay independently deployable (jury criterion: architecture, 20%).
+The dashboard (Kacper's module) needs a runnable foundation before feature work: a React app that talks to the API only through a client generated from the shared OpenAPI contract, contract mocks so Kacper is not blocked on `api`, and a `docker compose up` stack with the database and a single HTTPS entry point. Modules must stay independently deployable (jury criterion: architecture, 20%).
 
 ## What Changes
 
@@ -21,7 +21,7 @@ The dashboard (module B) needs a runnable foundation before feature work: a Reac
 
 ## Impact
 
-- Owner: B (`web/`, repository layout, new `infra/`). `infra/` is a new top-level directory decided by B.
+- Owner: Kacper (`web/`, repository layout, new `infra/`). `infra/` is a new top-level directory decided by Kacper.
 - Contracts: consumes `contracts/openapi.yaml` and `contracts/mocks/` read-only; **changes no contract, route or event**.
-- The integration plan names C as owner of docker-compose: the root file only includes module files, so C (and A) add their own `compose.yaml` without touching B's.
-- Out of scope: dashboard features (filters, trend, alerts, calibration), Socket.IO client, Redis/MinIO, the `api` service, DB schema (Alembic, C).
+- The integration plan names Damian as owner of docker-compose: the root file only includes module files, so Damian (and Adam) add their own `compose.yaml` without touching Kacper's.
+- Out of scope: dashboard features (filters, trend, alerts, calibration), Socket.IO client, Redis/MinIO, the `api` service, DB schema (Alembic, Damian).
