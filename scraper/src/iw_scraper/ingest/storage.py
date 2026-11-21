@@ -23,7 +23,7 @@ class Storage:
         self._client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
 
     async def check_bucket(self) -> None:
-        """Fail clearly if the bucket is missing. It is created by `minio-init` (module C), never here: the
+        """Fail clearly if the bucket is missing. It is created by `minio-init` (Damian's stack), never here: the
         app user is limited to this bucket and may not be allowed to create one."""
         exists = await asyncio.to_thread(self._client.bucket_exists, self.bucket)
         if not exists:

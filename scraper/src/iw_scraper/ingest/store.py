@@ -17,7 +17,7 @@ class IngestResult:
 
 
 # Named conflict target, as in api/README.md: a bare ON CONFLICT DO NOTHING would also hide a reused `id`.
-# It must match the partial unique index `uq_documents_source_hash` (module C's migration 0001).
+# It must match the partial unique index `uq_documents_source_hash` (Damian's migration 0001).
 _INSERT = """
 INSERT INTO documents
   (id, source_id, platform, source_kind, url, canonical_url, fetched_at, published_at, http_status, lang,
