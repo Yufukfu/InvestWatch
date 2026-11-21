@@ -10,17 +10,19 @@
 ## 2. Discord notices (optional)
 
 1. In Discord: the channel → Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL. The URL is a secret: anyone who has it can post to the channel.
-2. Put two variables in `~/.zshenv`, not `~/.zshrc`. zsh reads `~/.zshenv` in every shell, including the one the launchd job starts, so the terminal, `/loop` and the scheduled run all see them:
+2. Put these variables in `~/.zshenv`, not `~/.zshrc`. zsh reads `~/.zshenv` in every shell, including the one the launchd job starts, so the terminal, `/loop` and the scheduled run all see them:
 
    ```sh
    export IWATCH_DISCORD_WEBHOOK="https://discord.com/api/webhooks/<id>/<token>"
+   export IWATCH_DISCORD_USER_ID="<your Discord user id>"   # optional: "hey, I need you @you" when it needs you
    export IWATCH_NOTIFY_CMD="node $HOME/Projects/InvestWatch/.claude/skills/iw-watch/scripts/notify-discord.mjs"
    ```
 
    Then run `chmod 600 ~/.zshenv`. Never put the URL in the repository, in a `.env` that gets copied around, or in a skill file.
-3. Test it: `node .claude/skills/iw-watch/scripts/notify-discord.mjs done "#0 test" https://github.com`.
+   Your user id: Discord → User Settings → Advanced → Developer Mode on, then right-click your name → Copy User ID. Only that id is ever pinged, and only on a "needs you" message.
+3. Test it: `node .claude/skills/iw-watch/scripts/notify-discord.mjs needs-human "#0 test" https://github.com` (with the user id set, it pings you).
 
-The agent never sees these variables: the runner removes every `IWATCH_*` and `IW_*` variable from the environment of the session it starts.
+The agent never sees these variables: the session it starts gets an allow-list of the environment (PATH, HOME, locale, the Claude login), nothing else.
 
 ## 3. Run it
 

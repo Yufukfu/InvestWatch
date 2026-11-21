@@ -72,7 +72,7 @@ Drafts, session summaries (cost, denials) and the state live outside the repo in
 
 ### Notifications
 
-`IWATCH_NOTIFY_CMD` is run once per notice with `<kind> <"#pr title"> <url>` as separate arguments, never through a shell; use a script path without spaces. For a Discord channel: `IWATCH_DISCORD_WEBHOOK=<webhook URL>` (a secret: an environment variable in `~/.zshenv`, see the README next to this file) and `IWATCH_NOTIFY_CMD="node /abs/path/.claude/skills/iw-watch/scripts/notify-discord.mjs"`.
+`IWATCH_NOTIFY_CMD` is run once per notice with `<kind> <"#pr title"> <url>` as separate arguments, never through a shell; use a script path without spaces. For a Discord channel: `IWATCH_DISCORD_WEBHOOK=<webhook URL>` (a secret: an environment variable in `~/.zshenv`, see the README next to this file) and `IWATCH_NOTIFY_CMD="node /abs/path/.claude/skills/iw-watch/scripts/notify-discord.mjs"`. With `IWATCH_DISCORD_USER_ID=<Discord user id>` a needs-human message starts with "hey, I need you @<you>"; nothing else can ping.
 
 ### Answering the agent
 

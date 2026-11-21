@@ -11,6 +11,18 @@ test('the message names the kind, the PR and the link, and mentions nobody', () 
   assert.ok(m.content.length <= 2000);
 });
 
+test('needs-human pings the configured Discord user, and only that user; other kinds and bad ids ping nobody', () => {
+  const m = message(['needs-human', '#40 t <@999999999999999999> @everyone', 'https://github.com/x/y/pull/40'], { userId: '123456789012345678' });
+  assert.ok(m.content.startsWith('hey, I need you <@123456789012345678>\n'));
+  assert.deepEqual(m.allowed_mentions, { parse: [], users: ['123456789012345678'] }, 'the id in the title is not pinged');
+  assert.deepEqual(message(['done', '#40 t', 'u'], { userId: '123456789012345678' }).allowed_mentions, { parse: [] });
+  for (const bad of ['kacper', '@here', '12', '123456789012345678> @everyone']) {
+    const b = message(['needs-human', '#40 t', 'u'], { userId: bad });
+    assert.ok(!b.content.startsWith('hey'), bad);
+    assert.deepEqual(b.allowed_mentions, { parse: [] }, bad);
+  }
+});
+
 test('send posts JSON to the webhook from the environment, and refuses anything but a Discord webhook URL', async () => {
   const calls = [];
   const fetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 204 }; };
