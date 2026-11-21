@@ -34,7 +34,7 @@ Precondition: `analytics-skeleton` is merged (PR #10, `main` 2f1a66a) and this b
 - [x] 5.2 Failing tests: `/health` 200 with both up, 503 with `"db": false` when the store is down, 503 with `"redis": false` when Redis is down
 - [x] 5.3 `health.py` (stdlib `http.server` thread); `analytics/Dockerfile` (`public.ecr.aws/docker/library/python:3.13-slim`, uid 10001, HEALTHCHECK), `.dockerignore`, `analytics/compose.yaml` (hardened like `web/compose.yaml`), one `include:` line in the root `compose.yaml` (announced to B), `.env.example` additions; tests green
 - [x] 5.4 Manual check: `docker build` succeeds, `id -u` in the image is not 0, `docker compose up --build` makes `analytics` healthy, and an `XADD iw:documents * document_id <mock id> schema v1` for a seeded mock document yields a `findings` row and a `finding.created` message seen with `SUBSCRIBE iw:events`
-- [x] 5.5 Mutation check; `mutations: 11 tried, 11 caught` (`health.py` 6/6; the SIGTERM path 5/5, where two first survived: `StopRequested` became a `BaseException` and the handler install got a test). Dockerfile and compose are config: `mutations: n/a, config only`, verified by 5.4 instead
+- [x] 5.5 Mutation check; `mutations: 11 tried, 11 caught` (`health.py` 6/6; the SIGTERM path 5/5, where two first survived: `StopRequested` became a `BaseException` and the handler install got a test). Dockerfile and compose are config: `mutations: n/a, config only`, verified by 5.4 instead. After the iw-reviewer fixes (health ping on a short-lived connection, a taken `HEALTH_PORT` exits 2, only the first signal raises, base image pinned by digest): `mutations: 3 tried, 3 caught`
 
 ## 7. Advertiser on `Finding` (issue #20, follow-up 3)
 

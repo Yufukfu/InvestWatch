@@ -1,7 +1,8 @@
 # analytics/ deployment unit: the iw:documents stream worker. Self-contained build context (analytics-plan §12.1):
 #   docker build -t investwatch/analytics analytics
 # Config is env only (analytics/.env.example). Rules-only for now: no LLM call, model.llm = null.
-FROM public.ecr.aws/docker/library/python:3.13-slim
+# Pinned by digest like infra's images; bump deliberately (docker pull, then docker image inspect --format '{{.RepoDigests}}').
+FROM public.ecr.aws/docker/library/python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

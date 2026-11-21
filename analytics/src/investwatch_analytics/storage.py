@@ -292,11 +292,18 @@ class PostgresStore:
         return [_finding_from_row(r) for r in rows]
 
     def ping(self) -> bool:
-        """`SELECT 1` for /health; False instead of raising."""
+        """`SELECT 1` for /health on a short-lived connection, closed before returning; False instead of raising.
+
+        Never the per-thread connection: the health server runs each request on a new thread, and a cached
+        connection per request would leak one Postgres slot per health check.
+        """
+        import psycopg
+
         try:
-            self._run(lambda conn: conn.execute("SELECT 1").fetchone())
+            with psycopg.connect(self._dsn, connect_timeout=self._connect_timeout) as conn:
+                conn.execute("SELECT 1").fetchone()
             return True
-        except StoreError:
+        except Exception:  # down, auth, anything: the check only answers yes or no
             return False
 
     def close(self) -> None:

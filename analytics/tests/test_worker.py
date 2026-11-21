@@ -695,3 +695,39 @@ def test_installed_handlers_route_signals_to_the_worker(r, store, registry, cata
     finally:
         for sig, handler in saved.items():
             signal.signal(sig, handler)
+
+
+def test_second_signal_never_raises(r, store, registry, catalogue):
+    w = make_worker(r, store, registry, catalogue)
+    w._idle_read = True
+    with pytest.raises(StopRequested):
+        w.handle_signal()
+    w.handle_signal()  # e.g. a second SIGTERM during cleanup, flag still set: no exception
+    assert w._stop
+
+
+def test_main_exits_2_when_the_health_port_is_taken(capsys, monkeypatch):
+    import socket
+
+    import investwatch_analytics.worker as worker_mod
+
+    class NoConnect:
+        def __init__(self, *a, **k):
+            pass
+
+        def close(self):
+            pass
+
+        def ping(self):
+            return False
+
+    monkeypatch.setattr(worker_mod.redis.Redis, "from_url", classmethod(lambda cls, *a, **k: NoConnect()))
+    with socket.socket() as taken:
+        taken.bind(("0.0.0.0", 0))
+        taken.listen()
+        port = taken.getsockname()[1]
+        env = {"DATABASE_URL": "postgresql://u@127.0.0.1:1/db", "REDIS_URL": "redis://127.0.0.1:1/0",
+               "HEALTH_PORT": str(port)}
+        assert main(env) == 2
+    out = capsys.readouterr().out
+    assert "HEALTH_PORT" in out and "config_error" in out

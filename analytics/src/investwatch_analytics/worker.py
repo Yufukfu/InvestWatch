@@ -101,8 +101,9 @@ class Worker:
         once (a message the server handed over in that instant stays pending and is reclaimed later). While a
         message is being processed only the flag is set and that message finishes. Docker Desktop stops
         containers after 1 s, Linux after 10 s; a full STREAM_BLOCK_MS wait would be SIGKILLed on the former."""
+        first = not self._stop
         self.request_stop()
-        if self._idle_read:
+        if first and self._idle_read:  # a second signal (e.g. during cleanup) never raises
             raise StopRequested
 
     def ensure_group(self) -> None:
@@ -295,8 +296,15 @@ def main(env: Mapping[str, str] | None = None) -> int:
     # /health has its own short-timeout clients, so a slow dependency never blocks the HTTP thread or the loop.
     health_redis = redis.Redis.from_url(worker_settings.redis_url, socket_timeout=1, socket_connect_timeout=1)
     health_store = PostgresStore(worker_settings.database_url, connect_timeout=1)
-    health = start_health_server(worker_settings.health_port,
-                                 {"redis": lambda: bool(health_redis.ping()), "db": health_store.ping})
+    try:
+        health = start_health_server(worker_settings.health_port,
+                                     {"redis": lambda: bool(health_redis.ping()), "db": health_store.ping})
+    except OSError as exc:  # port taken or not allowed
+        log.error("worker not started", extra={"reason": "config_error",
+                                               "error": f"HEALTH_PORT {worker_settings.health_port}: {exc.strerror}"})
+        for closable in (health_redis, health_store, store, client):
+            closable.close()
+        return 2
     log.info("worker starting", extra={"consumer": worker_settings.consumer, "stream": STREAM, "group": GROUP,
                                        "health_port": worker_settings.health_port})
     try:

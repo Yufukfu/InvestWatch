@@ -64,3 +64,47 @@ def test_other_paths_are_404(serve):
     port = serve(redis=lambda: True, db=lambda: True)
     assert get(port, "/")[0] == 404
     assert get(port, "/health/x")[0] == 404
+
+
+def test_db_check_never_leaks_connections(serve, monkeypatch):
+    """Each /health request runs on a new thread; the db check must not keep a connection per thread."""
+    import psycopg
+
+    from investwatch_analytics.storage import PostgresStore
+
+    opened: list = []
+
+    class FakeConn:
+        closed = False
+
+        def __init__(self) -> None:
+            opened.append(self)
+
+        def execute(self, *a, **k):
+            return self
+
+        def fetchone(self):
+            return (1,)
+
+        def close(self) -> None:
+            self.closed = True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            self.close()
+
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: FakeConn())
+    store = PostgresStore("postgresql://u@127.0.0.1:1/db")
+    port = serve(redis=lambda: True, db=store.ping)
+    for _ in range(20):
+        assert get(port)[0] == 200
+    assert len(opened) == 20 and all(c.closed for c in opened)
+    assert store._all == []
+
+
+def test_db_check_false_when_unreachable():
+    from investwatch_analytics.storage import PostgresStore
+
+    assert PostgresStore("postgresql://u@127.0.0.1:1/db", connect_timeout=1).ping() is False
