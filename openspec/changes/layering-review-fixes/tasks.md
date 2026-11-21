@@ -8,18 +8,18 @@
 
 ## 2. Health and summary types
 
-- [ ] 2.1 Write failing tests: `HealthBadge` renders the raw value for an unknown state; polling is asserted as `pollingInterval: 30000` (mocked generated hook, own test file); `useSummary` failure test waits for the settled state; all five status labels and the fallback are asserted in `FindingsTable`.
-- [ ] 2.2 Move `HealthState` and `SummaryCounts` to `model.ts`, restore the label fallback, drop the `pollingInterval` parameter; verify tests, lint, typecheck.
-- [ ] 2.3 Mutation check on the label fallback, the interval and the status labels; list every mutant and result on this line.
+- [x] 2.1 Write failing tests: `HealthBadge` renders the raw value for an unknown state; polling is asserted as `pollingInterval: 30000` (mocked generated hook, own test file); `useSummary` failure test waits for the settled state; all five status labels and the fallback are asserted in `FindingsTable`.
+- [x] 2.2 Move `HealthState` and `SummaryCounts` to `model.ts`, restore the label fallback, drop the `pollingInterval` parameter; verify tests, lint, typecheck.
+- [x] 2.3 Mutation check on the label fallback, the interval and the status labels; list every mutant and result on this line. Mutants: drop `?? state` in `HealthBadge`; `POLL_MS` 30 s to 60 s; drop the polling option; status label `new` reworded; `confirmed` swapped to another label; `closed` replaced; drop `?? f.status` in `FindingsTable`; `useSummary` returns zeros instead of `undefined` without data. mutations: 8 tried, 8 caught.
 
 ## 3. Wiring tests
 
-- [ ] 3.1 Add `FindingsPage`, `SummaryPage` and `HealthPage` tests (loading, error, data through a real store) and a summary case in `App.test.tsx`; `App.test.tsx` and tests use `makeStore` from `test/store.tsx`.
-- [ ] 3.2 Mutation check on the page wiring (drop `isError`, `isLoading`, swap props); list every mutant and result on this line.
+- [x] 3.1 Add `FindingsPage`, `SummaryPage` and `HealthPage` tests (loading, error, data through a real store) and a summary case in `App.test.tsx`; `App.test.tsx` and tests use `makeStore` from `test/store.tsx`.
+- [x] 3.2 Mutation check on the page wiring (drop `isError`, `isLoading`, swap props); list every mutant and result on this line. Mutants: `FindingsPage` `isLoading` forced false, `isError` forced false, `rows` forced undefined; `SummaryPage` data forced undefined; `HealthPage` state forced `ok`; `App` without `SummaryPage`; `App` without `HealthPage`; `FindingsTable` `isError ||` dropped. `isError` forced false in `FindingsPage` survived: it is only observable on a failed refetch with stale rows, so the table-level case (`isError` with rows) was added and kills the table mutant; the page mutant stays equivalent with these fixtures. mutations: 8 tried, 7 caught, 1 equivalent (documented).
 
 ## 4. Closing
 
-- [ ] 4.1 Apply `iw-docs-update`: `.claude/rules/web-dashboard.md` wording for types-only `model.ts`, AI log row, `docs-check` clean.
+- [x] 4.1 Apply `iw-docs-update`: `.claude/rules/web-dashboard.md` wording for types-only `model.ts`, AI log row, `docs-check` clean.
 - [ ] 4.2 Run `iw-pr-review`; fix real findings.
 
 ## Workflow follow-up

@@ -53,6 +53,12 @@ describe('FindingsTable', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
   });
 
+  it('shows the error alert instead of stale rows when a refetch failed', () => {
+    render(<FindingsTable rows={[row()]} isLoading={false} isError />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
   it('shows the error alert when there are no rows and no error flag', () => {
     render(<FindingsTable rows={undefined} isLoading={false} isError={false} />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
