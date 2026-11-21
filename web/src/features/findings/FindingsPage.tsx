@@ -2,12 +2,27 @@ import { FindingDetailPanel } from './components/FindingDetailPanel';
 import { FindingsFilters } from './components/FindingsFilters';
 import { FindingsPager } from './components/FindingsPager';
 import { FindingsTable } from './components/FindingsTable';
+import { StatusEditor } from './components/StatusEditor';
 import { useFindingDetail } from './data/useFindingDetail';
 import { useFindings } from './data/useFindings';
+import { useStatusChange } from './data/useStatusChange';
 
 function DetailContainer({ id, onClose }: { id: string; onClose: () => void }) {
   const d = useFindingDetail(id);
-  return <FindingDetailPanel {...d} onClose={onClose} />;
+  const change = useStatusChange(id);
+  const editor = d.detail && (
+    // key: once the API returns the saved values, the form restarts from them.
+    <StatusEditor
+      key={`${d.detail.status}|${d.detail.note ?? ''}`}
+      status={d.detail.status}
+      note={d.detail.note}
+      onSave={change.save}
+      isSaving={change.isSaving}
+      saved={change.saved}
+      error={change.error}
+    />
+  );
+  return <FindingDetailPanel {...d} onClose={onClose} statusEditor={editor} />;
 }
 
 export function FindingsPage() {

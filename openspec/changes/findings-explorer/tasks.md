@@ -26,9 +26,9 @@
 
 ## 5. Status change
 
-- [ ] 5.1 Failing tests: PATCH body, status shown from response, pending disables, 422/500 shows error and keeps old status, list refreshes; tag invalidation via `enhanceEndpoints`.
-- [ ] 5.2 Implement status select, note and save. Tests pass.
-- [ ] 5.3 Mutation check; `mutations: N tried, N caught`.
+- [x] 5.1 Failing tests: PATCH body, status shown from response, pending disables, 422/500 shows error and keeps old status, list refreshes; tag invalidation via `enhanceEndpoints`.
+- [x] 5.2 Implement status select, note and save. Tests pass.
+- [x] 5.3 Mutation check; mutations: 11 tried, 11 caught (two survivors closed with no-change submit and no-early-confirmation cases)
 
 ## 6. Closing
 

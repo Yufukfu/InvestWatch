@@ -180,3 +180,7 @@ button.link:hover { color: #1e40af; }
 .excerpt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .shot { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; }
 .detail-footer { margin-top: 24px; font-size: 15px; }
+.status-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.status-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.status-actions p { margin: 0; }
+.saved { color: #14532d; font-weight: 600; }
