@@ -3,7 +3,7 @@
 Data collection service: collectors for web pages and social media, job queue, scheduler.
 
 - **Owner:** Adam
-- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage, queue and schedule follow in `scraper-ingest` and `scraper-orchestration`; the first social platform is `scraper-v2`.
+- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; queue and schedule follow in `scraper-orchestration`; the first social platform is `scraper-v2`.
 
 ## Run the tests
 
@@ -15,6 +15,8 @@ docker network create iw-scraper-test
 docker run -d --name iw-scraper-test-redis --network iw-scraper-test redis:7
 docker run --rm --network iw-scraper-test -e REDIS_URL=redis://iw-scraper-test-redis:6379/0 iw-scraper:test
 ```
+
+The ingest tests also need real PostgreSQL, Redis and MinIO, addressed by `IW_TEST_PG_DSN`, `IW_TEST_REDIS_URL`, `IW_TEST_MINIO_ENDPOINT`, `IW_TEST_MINIO_ACCESS_KEY` and `IW_TEST_MINIO_SECRET_KEY`; without them they are skipped, and with `CI` set they fail. The schema they run on is `tests/schema.sql`, a throwaway copy of Damian's `api/migrations` (0001-0003); the service itself never creates tables or the `iw-raw` bucket.
 
 ## Configuration
 
