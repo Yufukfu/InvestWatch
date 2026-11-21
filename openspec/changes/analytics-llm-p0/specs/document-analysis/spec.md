@@ -43,9 +43,14 @@ The M2 finding SHALL list only the results of implemented rules. It SHALL carry 
 - **WHEN** the mock document `m2-bank-ok` (id `5030107e-…`) is analyzed
 - **THEN** no rule result is `fail`, R4 and R6 are `not_applicable`, and the score is 0
 
-#### Scenario: Unmatched firm on its own page
-- **WHEN** a `firm_own` document matches no registry firm
+#### Scenario: Builder without a firm match
+- **WHEN** the M2 builder is called directly with a context that has no firm match
 - **THEN** the finding has `firm: null` and R1 `fail`
+- **AND** the pipeline never produces an M2 finding with `firm: null`, because routing sends only registered firms to M2
+
+#### Scenario: Firm matched by domain only
+- **WHEN** a `firm_own` page on the Alfa domain does not name the firm in its text
+- **THEN** the M2 finding has the Alfa firm and R1 `fail`
 
 #### Scenario: Rule that does not apply
 - **WHEN** R3 is `not_applicable`

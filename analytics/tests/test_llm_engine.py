@@ -246,7 +246,10 @@ def test_evidence_check_over_mocks_with_a_judge(mock_documents, registry, catalo
     for raw in mock_documents:
         doc = ScrapedDocument.model_validate(raw)
         for f in analyze(doc, registry=registry, catalogue=catalogue, now=NOW, judge=judge):
-            assert all(r.evidence is None or r.evidence in doc.text for r in f.rules)
+            from investwatch_analytics.rules.engine import metadata_fields
+
+            fields = metadata_fields(doc)  # M1/M3 signals may quote the handle, a link or the URL (#35)
+            assert all(r.evidence is None or any(r.evidence in x for x in fields) for r in f.rules)
             assert [e.message for e in finding_validator.iter_errors(f.to_contract())] == []
 
 
