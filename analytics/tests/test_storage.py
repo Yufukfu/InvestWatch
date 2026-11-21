@@ -1,6 +1,7 @@
 """finding-storage scenarios (openspec/specs/finding-storage/spec.md).
 
-The suite runs on every store backend in STORE_BACKENDS. The Postgres backend needs TEST_DATABASE_URL (a
+The suite runs on every store backend in STORE_BACKENDS. The Postgres backend needs TEST_DATABASE_URL, or CI's
+TEST_DATABASE_ADMIN_URL (a
 throwaway server; the URL's role must be allowed to CREATE DATABASE) and is skipped without it. Each test
 session creates its own database from tests/sql/schema.sql (a test-only mirror of the api-db-schema
 migration) and drops it at the end.
@@ -17,7 +18,7 @@ from datetime import timedelta
 
 import pytest
 
-from conftest import NOW, make_doc
+from conftest import NOW, make_doc, pg_test_url
 from investwatch_analytics.models import AdvertiserRef, Finding, ScrapedDocument
 from investwatch_analytics.storage import (
     InvalidDocument,
@@ -54,7 +55,7 @@ SCHEMA_SQL = pathlib.Path(__file__).parent / "sql" / "schema.sql"
 
 @pytest.fixture(scope="session")
 def pg_url():
-    admin_url = os.environ.get("TEST_DATABASE_URL")
+    admin_url = pg_test_url()
     if not admin_url:
         pytest.skip("TEST_DATABASE_URL not set")
     import psycopg

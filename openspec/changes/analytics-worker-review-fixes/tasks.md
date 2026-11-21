@@ -8,9 +8,9 @@
 
 ## 2. Postgres and Redis tests run in CI
 
-- [ ] 2.1 `TEST_DATABASE_URL` falls back to `TEST_DATABASE_ADMIN_URL`, `TEST_REDIS_URL` to `IW_TEST_REDIS_URL`; run the suite with only the CI variable names set and confirm 0 skipped
-- [ ] 2.2 One-time comparison of `tests/sql/schema.sql` with `alembic upgrade head` (api image) by `pg_dump --schema-only` of `sources`, `documents`, `findings`; record the result in `follow-ups.md`
-- [ ] 2.3 Mutation check; `mutations: n/a, test configuration only` (no production logic)
+- [x] 2.1 `TEST_DATABASE_URL` falls back to `TEST_DATABASE_ADMIN_URL`, `TEST_REDIS_URL` to `IW_TEST_REDIS_URL`; run the suite with only the CI variable names set and confirm 0 skipped (398 passed, 0 skipped)
+- [x] 2.2 One-time comparison of `tests/sql/schema.sql` with `alembic upgrade head` (api image) by `pg_dump --schema-only` of `sources`, `documents`, `findings`; record the result in `follow-ups.md` (identical once the mirror took the real, double-prefixed CHECK names; it now uses them)
+- [x] 2.3 Mutation check; `mutations: n/a, test configuration only` (no production logic)
 
 ## 3. Compose, docs and follow-ups
 

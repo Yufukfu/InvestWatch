@@ -13,7 +13,7 @@ import fakeredis
 import pytest
 import redis
 
-from conftest import NOW, make_doc
+from conftest import NOW, make_doc, redis_test_url
 from investwatch_analytics.registry import Registry
 from investwatch_analytics.config import Settings
 from investwatch_analytics.rules.engine import Catalogue
@@ -530,9 +530,9 @@ def test_main_exits_non_zero_on_bad_registry(tmp_path, capsys):
 # ---- real Redis ---------------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not os.environ.get("TEST_REDIS_URL"), reason="TEST_REDIS_URL not set")
+@pytest.mark.skipif(not redis_test_url(), reason="TEST_REDIS_URL / IW_TEST_REDIS_URL not set")
 def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue, caplog):
-    real = redis.Redis.from_url(os.environ["TEST_REDIS_URL"], decode_responses=True)
+    real = redis.Redis.from_url(redis_test_url(), decode_responses=True)
     stream = f"{STREAM}:test:{uuid.uuid4().hex[:8]}"
     try:
         w = make_worker(real, store, registry, catalogue, consumer="a", max_deliveries=3, claim_min_idle_ms=0,
