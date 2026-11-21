@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from iw_scraper.ratelimit import host_key
+
 # scraper/src/iw_scraper/config.py -> repository root is four levels up from this file
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -69,4 +71,34 @@ def domain_gate_settings() -> tuple[float, int, float]:
         _positive_number("MAX_RETRY_AFTER_SECONDS", DEFAULT_MAX_RETRY_AFTER_SECONDS),
         threshold,
         _positive_number("DOMAIN_PAUSE_SECONDS", DEFAULT_DOMAIN_PAUSE_SECONDS),
+    )
+
+
+DEFAULT_ALLOWED_PORTS = (80, 443)
+
+
+def _host_list(name: str, *, strip_www: bool) -> frozenset[str]:
+    hosts = (item.strip().lower() for item in os.environ.get(name, "").split(","))
+    return frozenset(host_key(h) if strip_www else h for h in hosts if h)
+
+
+def _ports() -> tuple[int, ...]:
+    raw = os.environ.get("ALLOWED_PORTS")
+    if raw is None:
+        return DEFAULT_ALLOWED_PORTS
+    try:
+        ports = [int(item) for item in raw.split(",") if item.strip()]
+    except ValueError:
+        ports = []
+    if not ports or not all(0 < port < 65536 for port in ports):
+        raise ValueError("ALLOWED_PORTS must be a comma-separated list of ports between 1 and 65535")
+    return tuple(dict.fromkeys(ports))
+
+
+def target_settings() -> tuple[tuple[int, ...], frozenset[str], frozenset[str]]:
+    """(`ALLOWED_PORTS`, `COMPOSE_INTERNAL_HOSTS`, `FETCH_EXTRA_HOSTS`): what the target guards enforce."""
+    return (
+        _ports(),
+        _host_list("COMPOSE_INTERNAL_HOSTS", strip_www=False),
+        _host_list("FETCH_EXTRA_HOSTS", strip_www=True),
     )

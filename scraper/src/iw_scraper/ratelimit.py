@@ -31,10 +31,14 @@ return slot - now
 """
 
 
+def host_key(hostname: str) -> str:
+    """A lowercase hostname without a leading `www.`: `www.` and the bare host count as one host."""
+    return hostname.removeprefix(_WWW)
+
+
 def domain_key(url_or_host: str) -> str:
-    """The lowercase host without a leading `www.`: what a politeness rule is keyed by."""
-    host = urlsplit(url_or_host if "://" in url_or_host else "//" + url_or_host).hostname or ""
-    return host.removeprefix(_WWW)
+    """The `host_key` of a URL or host: what a politeness rule is keyed by."""
+    return host_key(urlsplit(url_or_host if "://" in url_or_host else "//" + url_or_host).hostname or "")
 
 
 def _check_interval(interval_seconds: float) -> float:

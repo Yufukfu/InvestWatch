@@ -28,3 +28,5 @@ Out-of-scope review findings and "declined to judge" items, one disposition each
 | An empty host gives the shared rate-limit key `iw:rl:` | review of b3f9d3d, finding 5 | wont-fix | the target guard refuses a URL without a host before any limiter call |
 | `robots.txt` is refetched on every run and is not itself rate limited | review of b3f9d3d, declined to judge | wont-fix | v1 fetches one URL per run (design.md); the run composer in `scraper-orchestration` spaces the two requests with `DomainLimiter` |
 | Lua scripts on the pinned Redis version | review of b3f9d3d, declined to judge | docs | tests ran against `redis:7`; the compose Redis image is pinned by `scraper-orchestration` |
+| Scraped `canonical_url` and `links` are checked by `UrlGuard` directly, but nothing yet fetches them | task 5.2 | docs | v1 fetches one URL per run; the guard is tested on both |
+| The address guard resolves with the scraper's own DNS even behind a proxy, which resolves again | task 5.3 | wont-fix | accepted in `design.md` (SSRF residual risk): `PROXY_LIST` is operator-controlled |
