@@ -14,6 +14,12 @@ _MULTIPLIERS = {"K": 1_000, "M": 1_000_000}
 _COUNT = re.compile(r"^(\d+(?:\.\d+)?)([KM])?$", re.IGNORECASE)
 _WEB_SCHEMES = {"http", "https"}
 NETWORK = "telegram"
+_CHANNEL_URL = re.compile(r"^https://t\.me/s/[A-Za-z0-9_]{5,32}$")
+
+
+def valid_url(url: str) -> bool:
+    """`https://t.me/s/<handle>`, the handle 5 to 32 letters, digits or underscores."""
+    return _CHANNEL_URL.fullmatch(url) is not None
 
 
 def _has_class(name: str) -> str:

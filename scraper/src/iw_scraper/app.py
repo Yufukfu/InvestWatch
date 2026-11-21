@@ -17,7 +17,9 @@ import asyncpg
 from arq.connections import ArqRedis, RedisSettings
 
 from iw_scraper.collect import Collector
-from iw_scraper.config import fetch_settings, proxy_settings, rate_limit_settings, target_settings
+from iw_scraper.config import (
+    DEFAULT_SOCIAL_MAX_POSTS, fetch_settings, proxy_settings, rate_limit_settings, social_max_posts, target_settings,
+)
 from iw_scraper.health import check_redis, serve_health
 from iw_scraper.ingest.errors import record_error as store_job_error
 from iw_scraper.ingest.pipeline import Ingestor
@@ -93,11 +95,13 @@ def assemble(
     limiter,
     timeout: float,
     max_bytes: int,
+    max_posts: int = DEFAULT_SOCIAL_MAX_POSTS,
 ) -> Runtime:
     store = PgSourceStore(pool)
     collector = Collector(
         store, Ingestor(pool, storage, redis),
         urls=urls, addresses=addresses, rotator=rotator, limiter=limiter, timeout=timeout, max_bytes=max_bytes,
+        social_max_posts=max_posts,
     )
     return Runtime(pool, storage, redis, store, collector)
 
@@ -128,7 +132,7 @@ async def runtime(redis_url: str):
                 addresses=AddressGuard(internal_hosts=internal_hosts),
                 rotator=ProxyRotator(proxies, mode, cooldown),
                 limiter=DomainLimiter(redis, interval),
-                timeout=timeout, max_bytes=max_bytes,
+                timeout=timeout, max_bytes=max_bytes, max_posts=social_max_posts(),
             )
         finally:
             await redis.aclose()

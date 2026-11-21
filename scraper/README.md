@@ -46,6 +46,7 @@ Environment only; defaults in `scraper/.env.example`. `config.py` reads and vali
 | `DOMAIN_MIN_INTERVAL_SECONDS` | `5` | minimum gap between request starts per domain, all workers |
 | `FETCH_TIMEOUT_SECONDS` | `20` | per-request timeout |
 | `FETCH_MAX_BYTES` | `5242880` | response size cap (5 MiB) |
+| `SOCIAL_MAX_POSTS` | `40` | posts of a social channel read per run, twenty a page (a Telegram source URL is `https://t.me/s/<handle>`) |
 | `ALLOWED_PORTS` | `80,443` | ports the scraper may request |
 | `COMPOSE_INTERNAL_HOSTS` | empty | extra host names refused as internal (bare names are always refused) |
 | `FETCH_EXTRA_HOSTS` | empty | hosts allowed for redirects and scraped links besides the active sources |

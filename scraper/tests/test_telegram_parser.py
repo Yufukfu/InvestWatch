@@ -323,3 +323,23 @@ def test_permalink_off_t_me_or_for_another_message_is_replaced_by_the_data_post_
     channel = parse(page, SUBE_URL)
 
     assert channel.posts[0].permalink == "https://t.me/kanalx/5"
+
+
+@pytest.mark.parametrize(
+    "url, expected",
+    [
+        ("https://t.me/s/SubeTradingPL", True),
+        ("https://t.me/s/abcde", True),
+        ("https://t.me/s/" + "a" * 32, True),
+        ("https://t.me/s/" + "a" * 33, False),
+        ("https://t.me/s/abcd", False),
+        ("https://t.me/SubeTradingPL", False),
+        ("https://t.me/s/SubeTradingPL?before=10", False),
+        ("http://t.me/s/SubeTradingPL", False),
+        ("https://t.me/s/Sube-Trading", False),
+    ],
+)
+def test_channel_url_form(url, expected):
+    from iw_scraper.social.telegram import valid_url
+
+    assert valid_url(url) is expected

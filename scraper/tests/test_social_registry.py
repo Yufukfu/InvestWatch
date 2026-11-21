@@ -29,7 +29,7 @@ def test_host_with_a_collector_returns_it():
     reg = CollectorRegistry()
     reg.register("t.me", collector)
 
-    assert reg.for_url("https://t.me/s/SubeTradingPL") is collector
+    assert reg.for_url("https://t.me/s/SubeTradingPL").parse is collector
 
 
 def test_host_without_a_collector_returns_none():
@@ -40,7 +40,7 @@ def test_www_and_bare_host_are_one_host():
     reg = CollectorRegistry()
     reg.register("www.example.com", collector)
 
-    assert reg.for_url("https://example.com/a") is collector
+    assert reg.for_url("https://example.com/a").parse is collector
 
 
 def test_duplicate_registration_is_refused():
@@ -50,7 +50,7 @@ def test_duplicate_registration_is_refused():
     with pytest.raises(ValueError):
         reg.register("T.ME", other_collector)
 
-    assert reg.for_url("https://t.me/s/x") is collector
+    assert reg.for_url("https://t.me/s/x").parse is collector
 
 
 def test_telegram_is_registered_by_default():

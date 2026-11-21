@@ -5,12 +5,14 @@ between attempts: a failure becomes an `AttemptResult`, and a `Retry-After` is p
 Request starts are spaced by the shared `DomainLimiter`, once before `robots.txt` and once before the page.
 """
 
+import logging
 import math
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from urllib.parse import urlsplit
 
 from iw_scraper.document import build_document
 from iw_scraper.fetch import FetchDeferred, FetchFailure, close_session, fetch, open_session
@@ -18,12 +20,16 @@ from iw_scraper.identities import draw_identity
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure, parse_page
 from iw_scraper.robots import check_robots
+from iw_scraper.social.model import build_page
+from iw_scraper.social.registry import registry as social_registry
 from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.targets import AddressGuard, UrlGuard, target_guard
 from iw_scraper.types import JobError, Reason, Source
 
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024
+DEFAULT_SOCIAL_MAX_POSTS = 40  # `SOCIAL_MAX_POSTS`: two pages of twenty
+_log = logging.getLogger(__name__)
 _MAX_DIGITS = 15  # more digits than this is beyond any cap; `int()` also refuses 4300+ digits
 
 
@@ -73,16 +79,20 @@ class Collector:
         stages: Stages = Stages(),
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         max_bytes: int = DEFAULT_MAX_BYTES,
+        social_max_posts: int = DEFAULT_SOCIAL_MAX_POSTS,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         self._store, self._ingestor = store, ingestor
         self._urls_now, self._addresses, self._rotator, self._limiter = urls, addresses, rotator, limiter
         self._stages, self._timeout, self._max_bytes, self._clock = stages, timeout, max_bytes, clock
+        self._social_max_posts = social_max_posts
 
     async def run_source(self, source_id: str, started: Callable[[], Awaitable[None]]) -> AttemptResult:
         source = await self._store.get(source_id)
         if source is None or not source.collectable:  # the queue checks too; this keeps a stray caller from fetching
             return _failed(source_id, Reason.INVALID_REQUEST, "source does not exist or is not collectable")
+        if source.platform != "web" and not social_registry.for_url(source.url).valid_url(source.url):
+            return _failed(source_id, Reason.INVALID_REQUEST, "source URL is not a valid channel URL for its host")
         urls = await self._urls_now()
         try:
             urls.check(source.url, enforce_host=False)
@@ -120,6 +130,8 @@ class Collector:
         )
         if not verdict.allowed:  # not a block signal: no identity is blamed
             return _failed(source.id, Reason.BLOCKED, verdict.detail)
+        if source.platform != "web":
+            return await self._collect_social(source, identity, session, proxy, guard, domain)
 
         await self._limiter.wait_turn(domain)
         began = time.monotonic()
@@ -138,3 +150,58 @@ class Collector:
         if stored.outcome == "failed":  # the ingestor has recorded it in `job_errors`
             return AttemptResult(error=stored.error, recorded=True)
         return AttemptResult(documents=1 if stored.outcome == "inserted" else 0)
+
+    async def _collect_social(self, source: Source, identity, session, proxy, guard, domain: str) -> AttemptResult:
+        """Read a channel's pages, newest first, through the same fetch path as a web page.
+
+        Paging is stateless: follow the older-posts link until `social_max_posts` posts were seen, there is no
+        older link, or a page brought nothing new. A failure on a later page keeps the earlier documents.
+        """
+        stages = self._stages
+        parse = social_registry.for_url(source.url).parse
+        url, seen, stored = source.url, 0, 0
+        while True:
+            await self._limiter.wait_turn(domain)
+            began = time.monotonic()
+            try:
+                result = await stages.fetch(
+                    url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
+                )
+                if not urlsplit(result.url).path.startswith("/s/"):  # the host answers a redirect to the profile
+                    raise ParseFailure(Reason.PARSE_ERROR, "no public preview for this channel")
+                channel = parse(result.body, result.url)
+            except (FetchDeferred, FetchFailure, ParseFailure) as failure:
+                if stored == 0:
+                    raise
+                return self._partial(source.id, failure, stored)
+            duration_ms = int((time.monotonic() - began) * 1000)
+            fetched_at = self._clock()
+            inserted = 0
+            for post in channel.posts:
+                outcome = await self._ingestor.ingest(
+                    build_page(channel, post, http_status=result.status), source,
+                    fetched_at=fetched_at, duration_ms=duration_ms, proxy=result.proxy_id,
+                )
+                if outcome.outcome == "failed":  # the ingestor has recorded it in `job_errors`
+                    return AttemptResult(documents=stored + inserted, error=outcome.error, recorded=True)
+                inserted += outcome.outcome == "inserted"
+            stored += inserted
+            seen += channel.seen
+            _log.info(
+                "social page of %s: %d posts with text, %d skipped without text, %d new",
+                domain, len(channel.posts), channel.skipped, inserted,
+            )
+            if inserted == 0 or channel.older_url is None or seen >= self._social_max_posts:
+                return AttemptResult(documents=stored)
+            url = channel.older_url
+
+    def _partial(self, source_id: str, failure: Exception, documents: int) -> AttemptResult:
+        """A later page failed: the documents of the earlier pages stay, the failure is reported once."""
+        if isinstance(failure, FetchDeferred):
+            return AttemptResult(documents=documents, deferral=failure.deferral)
+        if isinstance(failure, FetchFailure):
+            return _failed(
+                source_id, failure.reason, failure.detail, documents=documents, http_status=failure.http_status,
+                retry_after=retry_after_seconds(failure.retry_after, self._clock()),
+            )
+        return _failed(source_id, failure.reason, failure.detail, documents=documents)
