@@ -74,7 +74,7 @@ class R3RiskNextToReturns(Rule):
         if not claims:
             return self.result("not_applicable", None, "Materiał nie zawiera obietnic zysku ani stóp zwrotu.")
         warnings = [i for i, s in enumerate(sentences) if self._hits(s.text, p["risk"], p["risk_x"])]
-        near = [i for i in warnings if not sentences[i].text.startswith(p["footnote"])]
+        near = [i for i in warnings if not sentences[i].text.lstrip("( ").startswith(p["footnote"])]
         uncovered = [c for c in claims if not any(abs(c - w) <= p["window"] for w in near)]
         if not uncovered:
             nearest = min(near, key=lambda w: abs(w - claims[0]))

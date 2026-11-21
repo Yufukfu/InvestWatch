@@ -67,6 +67,19 @@ def test_bad_rule_id_rejected(tmp_path):
         Catalogue.load(p)
 
 
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "  - {id: R3, name: x, severity: high, legal_basis: null, implemented: true, params: {window: two}}\n",
+        "  - {id: R3, name: x, severity: high, legal_basis: null, implemented: true, params: {claim_patterns: ['(']}}\n",
+        "  - R3\n",
+    ],
+)
+def test_malformed_params_fail_at_load(tmp_path, entry):
+    with pytest.raises(CatalogueError, match="R3"):
+        Catalogue.load(_write(tmp_path, "rules:\n" + entry))
+
+
 def test_implemented_rule_without_code_rejected(tmp_path):
     p = _write(tmp_path, "rules:\n  - {id: R9, name: x, severity: low, legal_basis: null, implemented: true}\n")
     with pytest.raises(CatalogueError, match="R9"):
@@ -224,6 +237,49 @@ def test_r3_return_verb_without_percent_is_a_claim(registry, catalogue):
 def test_r3_risk_word_alone_is_a_warning(registry, catalogue):
     text = "Zysk 8% rocznie. Risk warning: CFDs are complex instruments."
     assert results(text, registry, catalogue)["R3"].result == "pass"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Gwarantowany zysk 10% miesięcznie bez żadnego ryzyka!",
+        "Zarabiaj 10% rocznie. Brak ryzyka, pełna gwarancja.",
+        "Zarabiaj 10% rocznie. Nie ponosisz żadnego ryzyka.",
+        "Zarabiaj 10% rocznie. Ryzyko? Minimalne.",
+        "Zarabiaj 10% rocznie przy minimalnym ryzyku.",
+    ],
+)
+def test_r3_risk_denial_is_not_a_warning(text, registry, catalogue):
+    assert results(text, registry, catalogue)["R3"].result == "fail"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Zarabiaj 18% rocznie! * Inwestowanie wiąże się z ryzykiem utraty kapitału.",
+        "Zarabiaj 18% rocznie! (*) Inwestowanie wiąże się z ryzykiem utraty kapitału.",
+    ],
+)
+def test_r3_spaced_footnote_markers_are_footnotes(text, registry, catalogue):
+    r = results(text, registry, catalogue)["R3"]
+    assert r.result == "fail" and r.evidence == "Zarabiaj 18% rocznie!"
+
+
+def test_r3_income_forms(registry, catalogue):
+    assert results("Gwarantowany dochód 1000 zł miesięcznie.", registry, catalogue)["R3"].result == "fail"
+    assert results("Stały przychód co miesiąc.", registry, catalogue)["R3"].result == "fail"
+    assert results("Do sprawy dochodzi nowa oferta.", registry, catalogue)["R3"].result == "not_applicable"
+
+
+@pytest.mark.parametrize("text", ["Prowizja 0% na akcje z GPW.", "Konto 100% online."])
+def test_r3_non_return_percentages(text, registry, catalogue):
+    assert results(text, registry, catalogue)["R3"].result == "not_applicable"
+
+
+def test_r3_loss_verbs_are_warnings(registry, catalogue):
+    assert results("Zarabiaj 18% rocznie! Możesz stracić część pieniędzy.", registry, catalogue)["R3"].result == "pass"
+    text = "Zarabiaj 18% rocznie! Nasza strategia działa."
+    assert results(text, registry, catalogue)["R3"].result == "fail"
 
 
 def test_r3_english_warning_counts(registry, catalogue):

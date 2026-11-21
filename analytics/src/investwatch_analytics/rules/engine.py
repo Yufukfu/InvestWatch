@@ -102,6 +102,8 @@ class Catalogue:
         specs: list[RuleSpec] = []
         seen: set[str] = set()
         for entry in data.get("rules") or []:
+            if not isinstance(entry, dict):
+                raise CatalogueError(f"{path}: entry {entry!r} is not a mapping")
             rule_id = str(entry.get("id", ""))
             if not re.match(RULE_ID_PATTERN, rule_id) or not rule_id.startswith("R"):
                 raise CatalogueError(f"{path}: invalid rule id {rule_id!r}")
@@ -114,10 +116,29 @@ class Catalogue:
             implemented = bool(entry.get("implemented", False))
             if implemented and rule_id not in _RULES:
                 raise CatalogueError(f"{path}: {rule_id} is marked implemented but has no rule class")
+            params = _check_params(path, rule_id, entry.get("params") or {})
             seen.add(rule_id)
             specs.append(RuleSpec(rule_id, entry["name"], entry["severity"], entry.get("legal_basis"),
-                                  implemented, dict(entry.get("params") or {})))
+                                  implemented, params))
         return cls(specs)
+
+
+def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
+    """Fail at load, not on the first document: every `*_patterns` list compiles, `window` is an int."""
+    if not isinstance(params, dict):
+        raise CatalogueError(f"{path}: {rule_id} params must be a mapping")
+    for key, value in params.items():
+        if key.endswith("_patterns") or key == "labels":
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise CatalogueError(f"{path}: {rule_id} {key} must be a list of strings")
+            if key.endswith("_patterns"):
+                try:
+                    compile_patterns(value)
+                except re.error as exc:
+                    raise CatalogueError(f"{path}: {rule_id} {key} has an invalid regex ({exc})") from exc
+    if "window" in params and (not isinstance(params["window"], int) or params["window"] < 0):
+        raise CatalogueError(f"{path}: {rule_id} window must be a non-negative integer")
+    return dict(params)
 
 
 def run_rules(catalogue: Catalogue, ctx: Context) -> list[RuleResult]:

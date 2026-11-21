@@ -15,7 +15,7 @@ _WS = re.compile(r"\s+")
 
 # A boundary: sentence-final punctuation, then whitespace, then something that starts a sentence.
 _BOUNDARY = re.compile(
-    r"(?:(?<=[.!?…])|(?<=[.!?…][”\"»)]))\s+(?=[\"'„«(\[*¹²³]?[A-ZĄĆĘŁŃÓŚŹŻ0-9#])|\n\s*\n"
+    r"(?:(?<=[.!?…])|(?<=[.!?…][”\"»)]))\s+(?=(?:\(\*\)|[\"'„«(\[*¹²³])?\s*[A-ZĄĆĘŁŃÓŚŹŻ0-9#])|\n\s*\n"
 )
 # Tokens that end with a period but do not end a sentence.
 _ABBREV = re.compile(

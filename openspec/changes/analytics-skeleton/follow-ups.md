@@ -16,4 +16,6 @@ Out-of-scope reviewer findings and "declined to judge" items, one disposition ea
 | 11 | review group 3 | Fuzzy match still accepts one-letter variants of common words (`bank przykładowo` → Bank Przykładowy, 0.80) | `wont-fix` for now: a fuzzy match never makes R1 pass, and the confidence is on the finding; revisit for M1/M3 |
 | 12 | review group 3 | Inflected names (`Banku Przykładowego`) and spaced-out names are not matched | `new-item`: alias stems or lemmatization with the real KNF loader |
 | 13 | review group 3 | `FIRM_TYPES` duplicates `models.RegistryType` | `wont-fix`: same values, one-line sync if the contract enum changes |
+| 14 | review group 4 | `stop\w* zwrotu` needs exactly one space; `Zyskaj dostęp` counts as a return claim | `wont-fix` for now: regex-version limits, borderline cases go to the LLM layer (plan §5) |
+| 15 | review group 4 | R2 dictionary lacks `materiał sponsorowany` / `współpraca reklamowa` | `new-item`: decide with M1 (S1.3) which labels count as an ad label for R2 |
 | 9 | review group 2 | Initials like `J. Kowalski` split into two sentences | `wont-fix` for now: rare in marketing copy, only lengthens or shortens a quote |
