@@ -19,6 +19,12 @@ from ..registry import FirmMatch, Registry
 
 DEFAULT_CATALOGUE = Path(__file__).with_name("m2_rules.yaml")
 SEVERITIES = {"high", "medium", "low"}
+# Every rule parameter a rule class reads (rules/m2.py); anything else in the YAML is a typo.
+KNOWN_PARAMS = {
+    "labels", "prominent_sentences", "negation_before",
+    "window", "claim_patterns", "claim_exclude_patterns", "risk_patterns",
+    "risk_override_patterns", "risk_exclude_patterns", "footnote_markers",
+}
 _RULES: dict[str, type["Rule"]] = {}
 
 
@@ -128,11 +134,15 @@ class Catalogue:
 def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
     """Fail at load, not on the first document: every parameter a rule reads is checked here.
 
+    Only known keys are accepted (a typo like `windw` must not silently fall back to a default);
     `*_patterns` lists and `negation_before` compile; `labels` and `footnote_markers` are lists of
-    strings; `window` and `prominent_sentences` are non-negative integers.
+    non-empty strings; `window` and `prominent_sentences` are non-negative integers.
     """
     if not isinstance(params, dict):
         raise CatalogueError(f"{path}: {rule_id} params must be a mapping")
+    unknown = sorted(set(params) - KNOWN_PARAMS)
+    if unknown:
+        raise CatalogueError(f"{path}: {rule_id} has unknown param(s) {', '.join(map(str, unknown))}")
     for key, value in params.items():
         if key == "footnote_markers" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
@@ -148,8 +158,9 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a non-negative integer")
         if key.endswith("_patterns") or key == "labels":
-            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-                raise CatalogueError(f"{path}: {rule_id} {key} must be a list of strings")
+            # An empty label becomes a regex that matches anywhere, so R2 would always pass.
+            if not isinstance(value, list) or not all(isinstance(v, str) and (v or key != "labels") for v in value):
+                raise CatalogueError(f"{path}: {rule_id} {key} must be a list of {'non-empty ' if key == 'labels' else ''}strings")
             if key.endswith("_patterns"):
                 try:
                     compile_patterns(value)

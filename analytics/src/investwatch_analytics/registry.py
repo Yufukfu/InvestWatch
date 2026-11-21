@@ -151,6 +151,8 @@ class Registry:
 def _best_fuzzy(core: str, words: list[str]) -> float:
     # Tokenize the name like the text, so "Alfa-Beta Inwestycje" compares as "alfa beta inwestycje".
     target_words = [w.lower() for w in _WORD.findall(core)]
+    if not target_words:  # a name of punctuation only ("&") would otherwise match every text at ratio 100
+        return 0.0
     n = len(target_words)
     target = " ".join(target_words)
     grams = (" ".join(words[i:i + n]) for i in range(len(words) - n + 1))

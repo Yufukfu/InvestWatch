@@ -409,7 +409,7 @@ def _catalogue_with(tmp_path, old: str, new: str) -> Path:
     "old, new, key",
     [
         ("negation_before: '(?:", "negation_before: '((?:", "negation_before"),
-        ("negation_before: '", "negation_before: ['x']\n      unused_: '", "negation_before"),
+        ("negation_before: '", "negation_before: ['x']\n      # '", "negation_before"),
         ("prominent_sentences: 2", "prominent_sentences: two", "prominent_sentences"),
         ("prominent_sentences: 2", "prominent_sentences: -1", "prominent_sentences"),
         ("prominent_sentences: 2", "prominent_sentences: true", "prominent_sentences"),
@@ -451,3 +451,32 @@ def test_r3_denial_word_does_not_swallow_a_following_warning(text, registry, cat
 )
 def test_r2_not_only_does_not_negate(text, registry, catalogue):
     assert results(text, registry, catalogue)["R2"].result == "pass"
+
+
+@pytest.mark.parametrize(
+    "denial",
+    [
+        "Zero ryzyk.",
+        "Brak ryzyk.",
+        "Bez ryzyk!",
+        "I nie ponosisz żadnych ryzyk.",
+        "Nie ma ryzyka utraty kapitału.",
+        "Nie ma ryzyka straty.",
+        "Żadnego ryzyka straty.",
+        "Nie ma żadnego ryzyka utraty.",
+        "Nie istnieje ryzyko utraty kapitału.",
+        "Nie ma ryzyka.",
+    ],
+)
+def test_r3_plural_and_nie_ma_denials_are_not_warnings(denial, registry, catalogue):
+    assert results(f"Zarabiaj 12% rocznie. {denial}", registry, catalogue)["R3"].result == "fail"
+
+
+def test_empty_label_fails_at_load(tmp_path):
+    with pytest.raises(CatalogueError, match="labels"):
+        Catalogue.load(_catalogue_with(tmp_path, "        - reklama\n", '        - ""\n'))
+
+
+def test_unknown_param_key_fails_at_load(tmp_path):
+    with pytest.raises(CatalogueError, match="windw"):
+        Catalogue.load(_catalogue_with(tmp_path, "      window: 2", "      windw: 2"))

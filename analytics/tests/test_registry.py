@@ -249,3 +249,13 @@ def test_fuzzy_short_hyphenated_name_compares_tokens(tmp_path):
     )
     m = Registry.from_csv(csv).match("Klienci Alfa-Bety są zadowoleni.", "https://x.example.org/")
     assert m is not None and m.firm.id == ALFA_ID and m.method == "fuzzy"
+
+
+def test_name_without_word_tokens_never_fuzzy_matches(tmp_path):
+    csv = tmp_path / "r.csv"
+    csv.write_text(
+        "id,name,aliases,type,country,website_domains,source_url\n"
+        f"{ALFA_ID},& S.A.,,brokerage_house,PL,,\n",
+        encoding="utf-8",
+    )
+    assert Registry.from_csv(csv).match("Dowolny tekst bez nazwy.", "https://x.example.org/") is None

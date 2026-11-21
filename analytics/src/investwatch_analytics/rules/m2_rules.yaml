@@ -75,10 +75,12 @@ rules:
         # Affirmed exclusion of loss ("wykluczamy straty", "gwarantujemy brak straty") is a denial.
         - '\bwyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\bgwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
-        # A denial word governs the genitive ("bez ryzyka", "brak ryzyka"); a nominative "ryzyko" after
-        # it starts a new phrase ("bez opłat ryzyko utraty kapitału" is a warning), as does any risk
-        # word between the denial word and the loss word.
-        - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}ryzyka\b(?:\s+(?:utrat|strat)\w*)?'
+        # A denial word governs the genitive, singular or plural ("bez ryzyka", "zero ryzyk", "nie ma
+        # ryzyka straty"); a nominative "ryzyko" after it starts a new phrase ("bez opłat ryzyko utraty
+        # kapitału" is a warning), as does any risk word between the denial word and the loss word.
+        - '\b(?:bez|brak\w*|zero|żadn\w*|nie ponosi\w*|nie ma)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}ryzyka?\b(?:\s+(?:utrat|strat)\w*)?'
+        # "nie istnieje" takes the nominative: "nie istnieje ryzyko utraty".
+        - '\bnie\s+istnieje\s+(?:\w+\s+)?ryzyk\w*(?:\s+(?:utrat|strat)\w*)?'
         - '\b(?:nie|bez|żadn\w*)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\b(?:minimaln|nisk|znikom)\w*\s+ryzyk\w*'
         - '\bryzyk\w*\s*\?'

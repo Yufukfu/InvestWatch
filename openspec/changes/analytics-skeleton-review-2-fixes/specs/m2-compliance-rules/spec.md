@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Rule catalogue
-The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a/R12b) from `m2_rules.yaml`. Each entry has a Polish name, a severity, a legal basis, its dictionaries and an `implemented` flag. Only implemented rules SHALL run. Loading SHALL validate every rule parameter the rules read (pattern lists and `negation_before` compile, `window` and `prominent_sentences` are non-negative integers, `labels` and `footnote_markers` are lists of strings) and the YAML root SHALL be a mapping, so a bad catalogue fails at load and never on the first document.
+The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a/R12b) from `m2_rules.yaml`. Each entry has a Polish name, a severity, a legal basis, its dictionaries and an `implemented` flag. Only implemented rules SHALL run. Loading SHALL validate every rule parameter the rules read (pattern lists and `negation_before` compile, `window` and `prominent_sentences` are non-negative integers, `labels` and `footnote_markers` are lists of strings) `labels` SHALL be non-empty, unknown parameter keys SHALL be rejected, and the YAML root SHALL be a mapping, so a bad catalogue fails at load and never on the first document.
 
 #### Scenario: Catalogue is complete
 - **WHEN** the catalogue is loaded
@@ -47,7 +47,7 @@ R2 SHALL pass when the text contains an advertising label from its dictionary (f
 - **THEN** R2 is `pass`
 
 ### Requirement: R3 risk information next to return claims
-R3 SHALL be `not_applicable` when the text makes no return claim (percent figures, or return vocabulary such as `zysk`, `zarob…`, `stopa zwrotu`). It SHALL pass when every return-claim sentence has a risk warning within the configured sentence window (default ±2). Otherwise it SHALL fail, quoting the first uncovered claim. A warning marked as a footnote (leading `*` or `¹`) SHALL NOT count as next to the claim. A loss denial (`bez ryzyka`, `nie stracisz`) SHALL NOT count as a warning, but a negated exclusion of loss (`nie jest wykluczona utrata`, `nie można wykluczyć straty`, `nie gwarantujemy braku strat`) SHALL. An affirmed exclusion (`wykluczamy straty`, `nie tylko wyklucza straty`, `gwarantujemy brak straty`) is a denial. A denial SHALL NOT swallow a warning that follows it: `bez opłat ryzyko utraty kapitału` still counts as a warning.
+R3 SHALL be `not_applicable` when the text makes no return claim (percent figures, or return vocabulary such as `zysk`, `zarob…`, `stopa zwrotu`). It SHALL pass when every return-claim sentence has a risk warning within the configured sentence window (default ±2). Otherwise it SHALL fail, quoting the first uncovered claim. A warning marked as a footnote (leading `*` or `¹`) SHALL NOT count as next to the claim. A loss denial (`bez ryzyka`, `nie stracisz`) SHALL NOT count as a warning, but a negated exclusion of loss (`nie jest wykluczona utrata`, `nie można wykluczyć straty`, `nie gwarantujemy braku strat`) SHALL. An affirmed exclusion (`wykluczamy straty`, `nie tylko wyklucza straty`, `gwarantujemy brak straty`) is a denial. A denial SHALL NOT swallow a warning that follows it: `bez opłat ryzyko utraty kapitału` still counts as a warning. Plural and `nie ma` denials (`zero ryzyk`, `nie ma ryzyka straty`, `nie istnieje ryzyko utraty`) SHALL NOT count as warnings.
 
 #### Scenario: No return claim
 - **WHEN** the text is `Otwórz IKE i inwestuj długoterminowo.`
@@ -71,6 +71,10 @@ R3 SHALL be `not_applicable` when the text makes no return claim (percent figure
 
 #### Scenario: Affirmed exclusion of loss
 - **WHEN** `Zarabiaj 12% rocznie.` is followed by `Nasz fundusz nie tylko wyklucza straty, ale daje spokój.`
+- **THEN** R3 is `fail`
+
+#### Scenario: Plural and nie ma denials
+- **WHEN** `Zarabiaj 12% rocznie.` is followed by `Zero ryzyk.` or `Nie ma ryzyka utraty kapitału.`
 - **THEN** R3 is `fail`
 
 #### Scenario: Denial word before a warning
