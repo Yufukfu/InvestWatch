@@ -3,6 +3,7 @@
 import asyncio
 import json
 import uuid
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from iw_scraper.ingest.document import build_document
@@ -97,3 +98,36 @@ async def test_parallel_inserts_of_the_same_page_yield_one_row(pool, seeded_sour
     results = await asyncio.gather(*(insert_document(pool, build(seeded_source)) for _ in range(5)))
     assert sorted(r.outcome for r in results) == ["duplicate"] * 4 + ["inserted"]
     assert await count(pool) == 1
+
+
+def build_post(source, permalink, text="Zysk do 20%"):
+    page = {"url": permalink, "canonical_url": permalink, "text": text}
+    return build_document(page, replace(source, platform="other"), fetched_at=FETCHED_AT, duration_ms=10, proxy=None)
+
+
+async def test_identical_text_in_two_posts_is_two_documents(pool, seeded_source):
+    first = await insert_document(pool, build_post(seeded_source, "https://t.me/h/1"))
+    second = await insert_document(pool, build_post(seeded_source, "https://t.me/h/2"))
+
+    assert (first.outcome, second.outcome) == ("inserted", "inserted")
+    assert await count(pool) == 2
+
+
+async def test_same_post_collected_again_is_a_duplicate(pool, seeded_source):
+    await insert_document(pool, build_post(seeded_source, "https://t.me/h/1"))
+
+    again = await insert_document(pool, build_post(seeded_source, "https://t.me/h/1"))
+
+    assert again.outcome == "duplicate"
+    assert await count(pool) == 1
+
+
+async def test_post_edited_between_runs_is_a_second_row_for_the_same_permalink(pool, seeded_source):
+    await insert_document(pool, build_post(seeded_source, "https://t.me/h/1"))
+
+    edited = await insert_document(pool, build_post(seeded_source, "https://t.me/h/1", text="Zysk do 30%"))
+
+    assert edited.outcome == "inserted"
+    async with pool.acquire() as conn:
+        urls = await conn.fetchval("SELECT count(DISTINCT url) FROM documents")
+    assert await count(pool) == 2 and urls == 1

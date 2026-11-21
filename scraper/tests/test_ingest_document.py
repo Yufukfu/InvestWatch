@@ -2,6 +2,7 @@
 
 import hashlib
 import uuid
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -182,3 +183,59 @@ def test_decomposed_and_composed_text_hash_to_the_literal():
 def test_unicode_whitespace_collapses_to_one_space():
     assert normalise_text(" a 　\t b ") == "a b"
     assert content_hash(" a 　b ") == "c8687a08aa5d6ed2044328fa6a697ab8e96dc34291e8c2034ae8c38e6fcc6d65"
+
+
+# Literal sha256 values, computed outside the code under test:
+#   web:   sha256("Zysk do 20%")
+#   other: sha256("<permalink>\nZysk do 20%")
+WEB_HASH = "35864f838dfec0cd765ac334f77c5250f3283ccedbb2e7df3eaccf16e32ccf23"
+POST_1_HASH = "d4cbae09d5fa394917285424922a9888128ab9073b047d1aef3257bc2ac28952"
+POST_2_HASH = "f45585b336868db3cfb0649746979c159430a3262b22a1caf93ddca562c23b5a"
+
+
+def post_page(url: str, canonical_url: str | None = "") -> dict:
+    page = {"url": url, "text": "Zysk do 20%", "html": "<div>x</div>"}
+    if canonical_url != "":
+        page["canonical_url"] = canonical_url
+    return page
+
+
+def test_web_page_hash_is_the_text_alone(source):
+    doc = build(source, post_page("https://t.me/h/1", "https://t.me/h/1"))
+
+    assert doc["platform"] == "web"
+    assert doc["content_hash"] == WEB_HASH
+
+
+def test_same_text_at_two_permalinks_has_two_hashes(source):
+    social = replace(source, platform="other")
+
+    first = build(social, post_page("https://t.me/h/1", "https://t.me/h/1"))
+    second = build(social, post_page("https://t.me/h/2", "https://t.me/h/2"))
+
+    assert first["content_hash"] == POST_1_HASH
+    assert second["content_hash"] == POST_2_HASH
+
+
+def test_same_post_collected_again_has_the_same_hash(source):
+    social = replace(source, platform="other")
+
+    assert (
+        build(social, post_page("https://t.me/h/1", "https://t.me/h/1"))["content_hash"]
+        == build(social, post_page("https://t.me/h/1", "https://t.me/h/1"))["content_hash"]
+    )
+
+
+def test_a_tracking_parameter_on_the_url_does_not_change_the_hash(source):
+    social = replace(source, platform="other")
+
+    doc = build(social, post_page("https://t.me/h/1?single", "https://t.me/h/1"))
+
+    assert doc["content_hash"] == POST_1_HASH
+
+
+def test_without_a_canonical_url_the_url_is_hashed(source):
+    social = replace(source, platform="other")
+
+    assert build(social, post_page("https://t.me/h/1", None))["content_hash"] == POST_1_HASH
+    assert build(social, post_page("https://t.me/h/1"))["content_hash"] == POST_1_HASH

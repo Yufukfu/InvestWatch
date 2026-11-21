@@ -51,12 +51,10 @@ class PgSourceStore:
         )
 
     async def collectable(self) -> Sequence[Source]:
-        """Every active `web` source: the hosts a run may be redirected to are theirs."""
-        records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active AND platform = 'web'")
-        return [_source(record) for record in records]
+        """Every active source a collector reads (`Source.collectable`): the hosts a run may be redirected to are theirs."""
+        records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active")
+        return [source for source in map(_source, records) if source.collectable]
 
     async def schedulable(self) -> Sequence[Source]:
-        records = await self._pool.fetch(
-            f"SELECT {_COLUMNS} FROM sources WHERE active AND platform = 'web' AND schedule_cron IS NOT NULL"
-        )
-        return [_source(record) for record in records]
+        records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active AND schedule_cron IS NOT NULL")
+        return [source for source in map(_source, records) if source.collectable]
