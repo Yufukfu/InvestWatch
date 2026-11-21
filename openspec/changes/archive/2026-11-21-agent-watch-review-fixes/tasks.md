@@ -44,4 +44,4 @@ Reviews: Adam on PR #48 (6008196884, 6008229345, 6008399494). Tests: `node --tes
 ## 8. Closing
 
 - [x] 8.1 ADR 0210, README, SKILL.md and `docs-check`.
-- [ ] 8.2 Run `iw-pr-review` with `focus: security`, then `/openspec-archive-change` as the last commit.
+- [x] 8.2 Run `iw-pr-review` with `focus: security`, then `/openspec-archive-change` as the last commit.
