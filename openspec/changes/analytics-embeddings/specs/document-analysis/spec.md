@@ -119,7 +119,7 @@ A near-duplicate SHALL still be analyzed and get its own findings. Its group SHA
 A Redis error SHALL skip detection, logged as `neardup_unavailable`, never raised. Without an index (CLI), detection is off.
 
 #### Scenario: Changed page version
-- **WHEN** a firm page is re-scraped with one paragraph changed, giving a new `document_id`
+- **WHEN** a firm page is re-scraped with one sentence changed (10 of 400 words), giving a new `document_id`
 - **THEN** both documents are in one group and each has its own M2 finding (the `Finding` contract is unchanged)
 
 #### Scenario: Group keys

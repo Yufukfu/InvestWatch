@@ -1,7 +1,9 @@
 pydantic==2.14.4
 PyYAML==6.0.4
+datasketch==2.0.0
 httpx==0.28.1
 numpy==2.5.5
 RapidFuzz==3.14.6
 psycopg[binary]==3.3.9
 redis==8.1.0
+scipy==1.18.1
