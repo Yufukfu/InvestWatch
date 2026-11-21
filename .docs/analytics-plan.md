@@ -194,7 +194,7 @@ analytics/
       router.py       – which modules to run (source_kind × registry result)
       m2.py           – rule results → Finding (Polish title and summary)
     pipeline.py       – document → findings (pure function, no I/O)
-    storage.py        – store interface + Postgres (documents/findings) + in-memory store for tests
+    storage.py        – store interface + Postgres (documents/findings); test doubles live in testing.py
     events.py         – publish to `iw:events` (Redis Pub/Sub) + no-op publisher; every message is the
                         envelope {type, emitted_at (UTC ISO), data} with data exactly {id, module, score,
                         title, url, platform} (no risk_level from analytics) – the API relay silently drops

@@ -25,6 +25,12 @@
 - [x] 5.2 `preprocessing._BOUNDARY` with possessive `\s++` and a `\s{0,3}` marker gap, abbreviation checks on a 16-character window; R3 claim and exclusion percent patterns `(?<!\d)\d++(?:[.,]\d++)?`; R1-R3 and registry regexes timed on 11 hostile inputs at 20k and 40k characters (all linear after the fix; 1 MB worst case 0.9-17 s); old and new splitter identical on 20 009 texts
 - [x] 5.3 Mutation check; `mutations: 10 tried, 8 caught, 2 equivalent` (possessive whitespace and the bounded marker gap each keep the boundary linear alone; reverting both is caught)
 
+## 6. Size cap on the uncompressed payload (second review)
+
+- [x] 6.1 Failing test: a 3 MB compressible payload over the 2 MB cap is rejected by the Postgres store (fails with `pg_column_size`)
+- [x] 6.2 `_SIZE_SQL` measures `octet_length(payload::text)`; tests green
+- [x] 6.3 Mutation check; `mutations: 1 tried, 1 caught` (reverting to `pg_column_size`)
+
 ## 4. Closing
 
 - [x] 4.1 Apply the iw-docs-update skill (own `.docs/status/platform.md` section, `docs-check` clean) and add the iw-ai-log row

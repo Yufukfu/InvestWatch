@@ -116,7 +116,9 @@ _UPSERT_SQL = (
 )
 _LOAD_SQL = f"SELECT {', '.join(DOCUMENT_COLUMNS)}, payload FROM documents WHERE id = %s"
 #: Measured in the database first, so an oversized row is never transferred or parsed.
-_SIZE_SQL = "SELECT octet_length(text) + pg_column_size(payload) AS size FROM documents WHERE id = %s"
+#: `octet_length(payload::text)`, not `pg_column_size(payload)`: the latter is the stored, TOAST-compressed size, so a
+#: 10 MB compressible payload measured ~114 KB and slipped past the cap (PR #26 review). Postgres detoasts it, not us.
+_SIZE_SQL = "SELECT octet_length(text) + octet_length(payload::text) AS size FROM documents WHERE id = %s"
 _FINDINGS_SQL = f"SELECT {', '.join(FINDING_COLUMNS)} FROM findings WHERE document_id = %s ORDER BY module"
 
 

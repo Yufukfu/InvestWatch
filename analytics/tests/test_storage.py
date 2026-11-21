@@ -491,3 +491,15 @@ def test_postgres_size_is_measured_in_the_database(pg_url):
         store.load_document(DOC_ID)
     store.close()
     backend.close()
+
+
+def test_postgres_cap_counts_the_uncompressed_payload(pg_url):
+    """A highly compressible payload is tiny on disk (TOAST) but huge once loaded: it must still hit the cap."""
+    backend = PostgresBackend(pg_url)
+    backend.seed(columns(text="Reklama. Krótki tekst."), {"author": {"name": "x" * 3_000_000}})  # ~3 MB, compresses to KB
+    store = PostgresStore(pg_url)  # default cap 2 MB
+    with pytest.raises(InvalidDocument) as err:
+        store.load_document(DOC_ID)
+    assert "too large" in str(err.value)
+    store.close()
+    backend.close()
