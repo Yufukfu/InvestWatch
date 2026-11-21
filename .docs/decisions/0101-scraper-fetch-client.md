@@ -1,14 +1,12 @@
 # 0101. Scraper fetch client
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-21
-- Deciders: (human, module A; to be filled in)
-
-Agent draft: Context, Options and evidence only. The decision and its rationale are for a human.
+- Deciders: agent-written; accepted by the human via the PR that merges `scraper-v1`
 
 ## Context
 
-The scraper's fetch ladder (`iw-scraper-conventions`) needs an async client that looks like a real browser at the TLS, HTTP/2 and header level for most HTML and XHR requests. The `fetch(url, identity)` seam in `openspec/changes/scraper-v1/design.md` keeps the choice swappable, but Docker images, tests and proxy handling depend on it. Used by the `web-collection` capability.
+The scraper's fetch ladder (`iw-scraper-conventions`) needs an async client that looks like a real browser at the TLS, HTTP/2 and header level for most HTML and XHR requests. The `fetch(url, identity, proxy)` seam in `openspec/changes/scraper-v1/design.md` keeps the choice swappable, but Docker images, tests and proxy handling depend on it. Used by the `web-collection` capability.
 
 ## Options considered
 
@@ -25,14 +23,18 @@ Evidence read from packages installed into a scratch venv (Python 3.9.6): `noble
 3. **`httpx` 0.28.1**
    - Mature async client with no browser TLS impersonation: the TLS and HTTP/2 fingerprint is Python/OpenSSL's, so fingerprinting sites can tell it apart from a browser. Suitable only for sources that do not fingerprint, as the conventions already note.
 
+4. **In-house evidence** (read in `hen68/cheaply-self-hosted`, `shared/src/cheaply_shared/http.py`, not run): a working Python module builds a `noble_tls.Session` with a Chrome identifier, random TLS extension order and an explicit `header_order` tuple, one fresh session per request, and its README excludes the module from lint because byte fidelity matters. `NeoPadel/neopadel` (JS) records that its tls-client native library is pre-warmed at deploy time with a rollback if the download fails, and that header order must be captured on the wire because DevTools shows headers alphabetised. Neither repo uses `curl_cffi`.
+
 ## Decision
 
-(to be written by a human)
+Use **`noble-tls`** behind the `fetch(url, identity, proxy)` seam, porting the session and header-order pattern from the in-house module above, and pre-warm its native library in the Docker image build so the container needs no network at run time. The image pins Python 3.12; task 2.1 runs the test suite on it, since the evidence was read on 3.9.6 and the package README names 3.10. `curl_cffi` stays the fallback behind the same seam.
+
+Rationale, from the evidence above: a working in-house Python implementation already exists for exactly the properties we need (explicit header order, fresh session per request, random extension order; our session is per run, which is a coarser version of the same pattern), so we port proven code instead of writing a wrapper from memory; the one drawback found, the runtime download of the Go library from GitHub (`updater/file_fetch.py`), has an in-house answer (pre-warm at build, fail the build if it fails). `curl_cffi` bundles its code and ties identity to one `impersonate` value, and no in-house code uses it. Neither package's API as read shows resolved-IP pinning, and for `noble-tls` the header-order parameter is evidenced only by the in-house code, so task 1.5 settles both before anything is built. `httpx` has no browser TLS fingerprint and remains a fallback for non-fingerprinting sources only.
 
 ## Consequences
 
-(to be written by a human)
-
-Contract note: `scrape_meta.scraper` in `contracts/schemas/scraped-document.schema.json` allows `playwright|httpx|api|manual`, and none describes a TLS-impersonating client (`noble-tls` or `curl_cffi`), so whichever is chosen needs a value agreed with C (task 1.3 of `scraper-v1`).
-
-Points a decider may want checked before choosing: that the target sources accept each client in a short manual probe, how the image gets the `noble-tls` binary in an offline demo, and which Python version `scraper/` pins.
+- Task 1.5 is a spike on the installed package before any code is written: can `noble-tls` take an explicit header order, follow redirects manually, pin a resolved IP (or does that need a local pinning layer), and stream with a size cap. If it fails a hard requirement of the spec, this ADR is superseded by one choosing `curl_cffi`.
+- The build needs network once (library download); a failed download fails the image build.
+- Proxy credentials stay in env; `scrape_meta.proxy` holds an identifier only.
+- Fingerprint quality against real targets is untested; task 3.1 includes a manual probe of the first target.
+- The `scrape_meta.scraper` value for this client is open with C (task 1.3); the field is not required by the schema.
