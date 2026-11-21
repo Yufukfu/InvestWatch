@@ -244,13 +244,31 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
     return () => previous?.focus();
   }, []);
 
-  // Escape closes from anywhere, also after a save re-rendered the form and focus fell back to <body>.
+  // Modal: everything outside the panel is inert and the page does not scroll while it is open.
+  useEffect(() => {
+    const panel = panelRef.current;
+    const others = Array.from(document.body.children).filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && !el.contains(panel) && !el.hasAttribute('inert'),
+    );
+    others.forEach((el) => el.setAttribute('inert', ''));
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      others.forEach((el) => el.removeAttribute('inert'));
+      document.body.style.overflow = overflow;
+    };
+  }, []);
+
+  // Escape closes from anywhere. In a field that holds text the first Escape only moves focus to
+  // `Zamknij` (the text is kept); the next one closes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      // Escape in a field that holds text belongs to that field (unsaved note, search box).
       const t = e.target;
-      if ((t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement) && t.value !== '') return;
+      if ((t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement) && t.value !== '') {
+        closeRef.current?.focus();
+        return;
+      }
       onClose();
     };
     document.addEventListener('keydown', onKey);
@@ -259,6 +277,13 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
 
   let content: ReactNode;
   if (notFound) content = <p role="alert">To zgłoszenie nie istnieje.</p>;
+  else if (isError && detail)
+    content = (
+      <>
+        <p role="alert">Nie udało się odświeżyć szczegółów; pokazano ostatnio pobrane dane.</p>
+        <Body d={detail} statusEditor={statusEditor} />
+      </>
+    );
   else if (isError) content = <p role="alert">Nie udało się pobrać szczegółów zgłoszenia.</p>;
   else if (isLoading || !detail) content = <p className="muted" role="status">Ładowanie szczegółów…</p>;
   else content = <Body d={detail} statusEditor={statusEditor} />;
@@ -287,7 +312,7 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
       }}
     >
       <div className="detail-header">
-        <h2 id="detail-title">{detail && !isError ? detail.title : 'Szczegóły zgłoszenia'}</h2>
+        <h2 id="detail-title">{detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}</h2>
         <button ref={closeRef} type="button" className="btn" onClick={onClose}>
           Zamknij
         </button>

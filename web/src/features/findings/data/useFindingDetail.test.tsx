@@ -1,9 +1,12 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import detail from '../../../test/fixtures/finding-detail.json';
 import { server } from '../../../test/setup';
-import { storeWrapper } from '../../../test/store';
+import { makeStore, storeWrapper } from '../../../test/store';
+import { Provider } from 'react-redux';
+import type { ReactNode } from 'react';
+import { investWatchApi } from '../../../api/generated';
 import { useFindingDetail } from './useFindingDetail';
 
 describe('useFindingDetail', () => {
@@ -52,5 +55,33 @@ describe('useFindingDetail', () => {
     const { result } = renderHook(() => useFindingDetail(detail.id), { wrapper: storeWrapper() });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.notFound).toBe(false);
+  });
+
+  it('never shows the previous finding while another id loads', async () => {
+    const { result, rerender } = renderHook(({ id }) => useFindingDetail(id), {
+      wrapper: storeWrapper(),
+      initialProps: { id: detail.id as string },
+    });
+    await waitFor(() => expect(result.current.detail?.id).toBe(detail.id));
+    rerender({ id: '00000000-0000-4000-8000-000000000000' });
+    expect(result.current.detail).toBeUndefined();
+    await waitFor(() => expect(result.current.notFound).toBe(true));
+    expect(result.current.detail).toBeUndefined();
+  });
+
+  it('keeps the last detail when a refetch fails', async () => {
+    let fail = false;
+    server.use(http.get('http://localhost/api/findings/:id', () => (fail ? HttpResponse.json({ error: 'x' }, { status: 500 }) : HttpResponse.json(detail))));
+    const store = makeStore();
+    const { result } = renderHook(() => useFindingDetail(detail.id), {
+      wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>,
+    });
+    await waitFor(() => expect(result.current.detail).toBeDefined());
+    fail = true;
+    act(() => {
+      store.dispatch(investWatchApi.util.invalidateTags(['findings']));
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.detail?.id).toBe(detail.id);
   });
 });

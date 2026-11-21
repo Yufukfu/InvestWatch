@@ -114,8 +114,8 @@ describe('FindingsPage', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
-    const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.');
+    const alert = within(dialog).getByRole('alert');
+    await waitFor(() => expect(alert).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.'));
     expect(within(dialog).getByText('transition not allowed')).toBeInTheDocument();
     expect(within(dialog).getByText('Nowe', { selector: 'dd' })).toBeInTheDocument();
   });
@@ -191,5 +191,26 @@ describe('FindingsPage', () => {
     act(() => hold.release?.());
     await waitFor(() => expect(screen.getByRole('table').parentElement).toHaveAttribute('aria-busy', 'false'));
     expect(control).toHaveFocus();
+  });
+
+  it('after a keyboard save, focus stays inside the dialog', async () => {
+    let saved = { status: detail.status, note: detail.note as string | null };
+    server.use(
+      http.get('http://localhost/api/findings/:id', () => HttpResponse.json({ ...detail, ...saved })),
+      http.patch('http://localhost/api/findings/:id', async ({ request }) => {
+        saved = { ...saved, ...((await request.json()) as object) };
+        return HttpResponse.json({ ...detail, ...saved });
+      }),
+    );
+    window.history.replaceState(null, '', `/?finding=${detail.id}`);
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
+    const save = within(dialog).getByRole('button', { name: 'Zapisz' });
+    save.focus();
+    fireEvent.click(save);
+    await waitFor(() => expect(within(dialog).getByText('Zamknięte', { selector: 'dd' })).toBeInTheDocument());
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(within(dialog).getByRole('status')).toHaveTextContent('Zapisano.');
   });
 });

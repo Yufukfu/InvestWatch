@@ -49,11 +49,14 @@ function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
 export type FindingDetailState = { detail: FindingDetail | undefined; isLoading: boolean; isError: boolean; notFound: boolean };
 
 export function useFindingDetail(id: string | undefined): FindingDetailState {
-  const { currentData, isFetching, isError, error } = useGetFindingsByIdQuery(id ? { id } : skipToken);
+  const { data, isFetching, isError, error } = useGetFindingsByIdQuery(id ? { id } : skipToken);
+  // `data` keeps the last loaded detail when a refetch fails; never show another finding's data.
+  const own = data && data.id === id ? data : undefined;
+  const notFound = isError && typeof error === 'object' && error !== null && 'status' in error && error.status === 404;
   return {
-    detail: currentData ? toDetail(currentData) : undefined,
-    isLoading: isFetching && !currentData,
+    detail: own ? toDetail(own) : undefined,
+    isLoading: isFetching && !own,
     isError,
-    notFound: isError && typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
+    notFound,
   };
 }

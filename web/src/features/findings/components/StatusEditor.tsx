@@ -16,6 +16,14 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
   const id = useId();
   const [nextStatus, setNextStatus] = useState<FindingStatus>(status);
   const [text, setText] = useState(note ?? '');
+  // New saved values from the API (after a save or a refetch) reset the form in place: no re-mount,
+  // so keyboard focus stays where it was, inside the dialog.
+  const [saved0, setSaved0] = useState({ status, note });
+  if (saved0.status !== status || saved0.note !== note) {
+    setSaved0({ status, note });
+    setNextStatus(status);
+    setText(note ?? '');
+  }
   const nextNote = text.trim() === '' ? null : text.trim();
   const statusChanged = nextStatus !== status;
   const noteChanged = nextNote !== (note ?? null);
@@ -26,7 +34,7 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
       aria-label="Zmiana statusu"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!statusChanged && !noteChanged) return;
+        if (isSaving || (!statusChanged && !noteChanged)) return;
         onSave({ ...(statusChanged ? { status: nextStatus } : {}), ...(noteChanged ? { note: nextNote } : {}) });
       }}
     >
@@ -53,21 +61,18 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
         <button type="submit" className="btn btn-primary" disabled={isSaving || (!statusChanged && !noteChanged)}>
           {isSaving ? 'Zapisywanie…' : 'Zapisz'}
         </button>
-        {error && (
-          <div className="save-error">
-            <p role="alert">Nie udało się zapisać zmiany: {error.message}</p>
-            {error.detail && (
-              <p className="muted">
-                Odpowiedź serwera: <span lang="en">{error.detail}</span>
-              </p>
-            )}
-          </div>
-        )}
-        {saved && !error && (
-          <p role="status" className="saved">
-            Zapisano.
-          </p>
-        )}
+        {/* Both live regions are always in the DOM, so a new message is announced. */}
+        <div className="save-error" role="alert">
+          {error && <p>Nie udało się zapisać zmiany: {error.message}</p>}
+          {error?.detail && (
+            <p className="muted">
+              Odpowiedź serwera: <span lang="en">{error.detail}</span>
+            </p>
+          )}
+        </div>
+        <p role="status" className="saved">
+          {saved ? 'Zapisano.' : ''}
+        </p>
       </div>
     </form>
   );

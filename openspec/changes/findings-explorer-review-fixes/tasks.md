@@ -8,9 +8,9 @@
 
 ## 2. Detail and status change
 
-- [ ] 2.1 Failing tests: the editor keeps focus after a save (no re-mount) and the live region is always present; a second submit while saving sends no second PATCH; the panel portal makes the rest of the page `inert` and locks scroll, and both are restored on close; Escape in a filled field focuses `Zamknij`, a second Escape closes; a failed refetch keeps the detail with an inline alert; a changed id never shows the previous detail; screenshot paths `//evil.example/x.png` and `/other/x.png` are not loaded.
-- [ ] 2.2 Implement in `StatusEditor`, `useStatusChange`, `FindingDetailPanel`, `useFindingDetail`, `FindingsPage`. Tests pass.
-- [ ] 2.3 Mutation check (changed guards plus Adam's survivors for this group); `mutations: N tried, N caught`.
+- [x] 2.1 Failing tests: the editor keeps focus after a save (no re-mount) and the live region is always present; a second submit while saving sends no second PATCH; the panel portal makes the rest of the page `inert` and locks scroll, and both are restored on close; Escape in a filled field focuses `Zamknij`, a second Escape closes; a failed refetch keeps the detail with an inline alert; a changed id never shows the previous detail; screenshot paths `//evil.example/x.png` and `/other/x.png` are not loaded.
+- [x] 2.2 Implement in `StatusEditor`, `useStatusChange`, `FindingDetailPanel`, `useFindingDetail`, `FindingsPage`. Tests pass.
+- [x] 2.3 Mutation check (changed guards plus Adam's survivors for this group); mutations: 9 tried, 9 caught (two equivalent mutants found, the redundant conditions removed)
 
 ## 3. Lint, contrast and closing
 
