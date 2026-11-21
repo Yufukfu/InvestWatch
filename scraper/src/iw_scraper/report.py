@@ -243,9 +243,9 @@ FROM documents GROUP BY platform, source_kind
 
 
 async def collect(conn, *, hours: int, now: datetime) -> Report:
-    """The report of the three tables, read in one read-only transaction (a snapshot the database enforces)."""
+    """The report of the three tables, read in one read-only repeatable-read transaction (one snapshot, enforced by the database)."""
     start = window_start(now, hours)
-    async with conn.transaction(readonly=True):
+    async with conn.transaction(isolation="repeatable_read", readonly=True):
         rows = Rows(
             sources=await conn.fetch(_SOURCES, start),
             errors=await conn.fetch(_ERRORS, start),
@@ -281,8 +281,9 @@ async def run(argv: Sequence[str], dsn: str | None, *, now: datetime | None = No
             built = await collect(conn, hours=hours, now=now or datetime.now(UTC))
         finally:
             await conn.close()
-    except (OSError, TimeoutError, asyncpg.PostgresError) as error:
-        log.error("report failed: %s: %s", type(error).__name__, error)  # the formatter redacts DSN secrets
+    except (OSError, TimeoutError, asyncpg.PostgresError, asyncpg.InterfaceError, ValueError) as error:
+        # Only the type: a malformed DSN raises a ValueError whose message quotes part of the password.
+        log.error("report failed: %s (check DATABASE_URL)", type(error).__name__)
         return 1
     sys.stdout.write(render_json(built) if as_json else render_table(built))
     return 0

@@ -312,6 +312,64 @@ async def test_collecting_writes_no_row_and_its_connection_refuses_a_write(pool)
     assert await counts(pool) == before
 
 
+async def test_the_three_queries_share_one_snapshot_when_a_document_lands_between_them(pool):
+    await fill(pool)
+    landed: list[bool] = []
+
+    class Probe:
+        """Commits one document from another connection right after the first query."""
+
+        def __init__(self, conn):
+            self.conn = conn
+
+        def transaction(self, **kwargs):
+            return self.conn.transaction(**kwargs)
+
+        async def fetch(self, query, *args):
+            rows = await self.conn.fetch(query, *args)
+            if not landed:
+                await add_document(pool, ALFA, NOW)
+                landed.append(True)
+            return rows
+
+    async with pool.acquire() as conn:
+        built = await collect(Probe(conn), hours=24, now=NOW)
+
+    assert landed == [True]
+    per_source = sum(entry.documents_total for entry in (*built.active, *built.inactive))
+    assert built.documents_total == per_source + 1  # the unattributed fixture document; the late one is in neither
+
+
+@pytest.mark.parametrize("dsn", ["postgresql://iw:hun/ter2@db:5x/iw", "postgresql://iw:hun/ter2@db:5432/iw"])
+async def test_a_malformed_database_url_logs_one_line_without_any_part_of_the_password(dsn, capsys, log_lines):
+    code = await run([], dsn, now=NOW)
+
+    assert code != 0 and capsys.readouterr().out == ""
+    [line] = log_lines()
+    assert line["level"] == "ERROR" and "hun" not in json.dumps(line) and "ter2" not in json.dumps(line)
+
+
+async def test_an_interface_error_from_the_driver_logs_one_line_and_fails(monkeypatch, capsys, log_lines):
+    class Closed:
+        async def close(self):
+            pass
+
+    async def connect(dsn):
+        return Closed()
+
+    async def collect_closed(conn, **kwargs):
+        raise asyncpg.InterfaceError("connection is closed")
+
+    monkeypatch.setattr(report_module.asyncpg, "connect", connect)
+    monkeypatch.setattr(report_module, "collect", collect_closed)
+
+    code = await run([], "postgresql://iw:hunter2@db:5432/iw", now=NOW)
+
+    assert code != 0 and capsys.readouterr().out == ""
+    [line] = log_lines()
+    assert line["level"] == "ERROR" and "hunter2" not in json.dumps(line)
+
+
 @pytest.fixture
 def log_lines():
     """The root logger's JSON lines, collected for one test, then the handlers are put back."""
