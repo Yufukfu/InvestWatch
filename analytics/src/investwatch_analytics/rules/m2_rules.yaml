@@ -4,6 +4,15 @@
 # Patterns are Python regexes, matched case-insensitively against the ORIGINAL document text.
 # A pattern that starts with `\d+` gets `(?<!\d)` so it is tried once per number, not once per digit
 # (quadratic on a long digit run otherwise; see tests/test_rules_m2_p0.py, adversarial input).
+# Dictionaries shared by several rules (YAML anchors); the loader reads only `rules`.
+shared:
+  past_performance_disclaimers: &past_performance_disclaimers
+    - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+    - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+    - '\b(?:past|historical)\s+(?:performance|results?|returns?)\b.{0,60}?\b(?:is not|are not|does not|do not|isn.t|aren.t|not a|no guarantee)\b'
+    - '\b(?:osiągnięt\w*\s+w\s+przeszłości|historyczn\w*|przeszł\w*)\s+wynik\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+    - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
+
 rules:
   - id: R1
     name: Identyfikacja firmy
@@ -42,6 +51,8 @@ rules:
     implemented: true
     params:
       window: 2
+      # A warning window + 1 .. window + borderline_margin sentences away is the only case sent to the LLM.
+      borderline_margin: 2
       claim_patterns:
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
         - '\bzysk\w*'
@@ -53,20 +64,21 @@ rules:
         - '\bprzych[óo]d\w*'
         - '\bprofit\w*'
         - '\breturns?\b'
-      claim_exclude_patterns:
+      # Shared with R14 (alias *return_figure_exclude): an edit here changes R14 too.
+      claim_exclude_patterns: &return_figure_exclude
         # `\b`: without it every repeat of a stem inside one long word ("prowizjprowizj...") started a match
         # whose `\w*` ran to the end of the word, quadratic (PR #26 review).
         - '\b(?:prowizj|opłat|podat|marż)\w*\s+\d+(?:[.,]\d+)?\s?%'
         - '\b100\s?%\s+(?:online|bezpieczn\w*|za darmo|darmow\w*)'
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s*(?:prowizj\w*|opłat\w*|marż\w*|podatk\w*|commission|fees?)'
-      risk_patterns:
+      risk_patterns: &risk_patterns
         - '\bstra(?:t[aęyo]|ci|ć)\w*'
         - '\bryzyk\w*'
         - '\butrat\w*'
         - '\brisk\w*'
         - '\blos(?:s|ing|e)\b'
       # Double negatives ("nie są wolne od ryzyka") are warnings even though they contain a denial phrase.
-      risk_override_patterns:
+      risk_override_patterns: &risk_override_patterns
         - '\bnie\s+(?:ma|są|jest)\s+(?:\w+\s+){0,2}(?:bez\s+|woln\w*\s+od\s+)ryzyk\w*'
         - '\bno\s+\w+\s+is\s+risk[- ]free'
         - '\bnot\s+risk[- ]free'
@@ -75,7 +87,7 @@ rules:
         - '\bnie\s+(?:(?:jest|są|można|da\s+się)\s+)?wyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         # "nie gwarantujemy braku strat", "nie gwarantujemy uniknięcia straty".
         - '\bnie\s+gwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
-      risk_exclude_patterns:
+      risk_exclude_patterns: &risk_exclude_patterns
         # Affirmed exclusion of loss ("wykluczamy straty", "gwarantujemy brak straty") is a denial.
         - '\bwyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\bgwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
@@ -91,21 +103,197 @@ rules:
         - '\bwoln\w* od ryzyka\b'
         - '\bno risk\b'
         - '\brisk[- ]free\b'
-      footnote_markers: ["*", "¹", "²", "³"]
+      footnote_markers: &footnote_markers ["*", "¹", "²", "³"]
+    # LLM refinement (analytics-llm-p0 group 9): only the borderline proximity case is deferred, never an
+    # absent or footnote-only warning (ZASÓB: the warning "bezpośrednio towarzyszy" the claim).
+    llm:
+      when: uncertain
+      question: >-
+        Czy ostrzeżenie o ryzyku bezpośrednio towarzyszy informacji o zyskach (to samo zdanie, akapit lub
+        blok)? Odpowiedz fail, jeśli ostrzeżenie jest oddzielone od obietnicy zysku, pass, jeśli jej
+        bezpośrednio towarzyszy. Zacytuj dosłownie zdanie z obietnicą zysku lub z ostrzeżeniem.
 
-  - {id: R4, name: Rozmiar czcionki ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565, implemented: false}
+  # ZASÓB R4: risk font vs "przeważająca wielkość czcionki materiału" (dominant size = length-weighted median
+  # of the visible blocks per viewport). Visual: not_applicable without `blocks`, never pass.
+  - id: R4
+    name: Rozmiar czcionki ryzyka
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. c rozp. del. 2017/565
+    implemented: true
+    params:
+      min_ratio: 0.75
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
+  # R5 (P1, not built here): not_applicable with "brak informacji o ryzyku" when the material has none (ZASÓB).
   - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
-  - {id: R6, name: Zakrywanie / ukrywanie ryzyka, severity: high, legal_basis: art. 44 ust. 2 lit. e rozp. del. 2017/565, implemented: false}
+  # ZASÓB R6 "ryzyko ukryte w przypisach": a risk block only in the footer / legal region or a footnote and
+  # not in the viewport on load. Visual: not_applicable without `blocks`, never pass. Viewports desktop,
+  # mobile, tablet; the worst one is reported. `visible` is R5's, `requires_interaction` is R7's.
+  - id: R6
+    name: Zakrywanie / ukrywanie ryzyka
+    severity: high
+    legal_basis: art. 44 ust. 2 lit. e rozp. del. 2017/565
+    implemented: true
+    params:
+      hiding_regions: [footer, legal]
+      # A past-performance disclaimer is risk information too (shared with R4 and R14).
+      disclaimer_patterns: *past_performance_disclaimers
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      footnote_markers: *footnote_markers
+  # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
   - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
   - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
   - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
+  # R11 (P2): ZASÓB "Flaguje w raporcie" – report a detected comparison even when it is compliant.
   - {id: R11, name: Porównania produktów, severity: medium, legal_basis: null, implemented: false}
   - {id: R12a, name: Wyniki historyczne – okres, severity: medium, legal_basis: null, implemented: false}
   - {id: R12b, name: Wyniki historyczne – waluta i koszty, severity: medium, legal_basis: null, implemented: false}
   - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: null, implemented: false}
-  - {id: R14, name: Ostrzeżenie przy wynikach historycznych, severity: high, legal_basis: art. 44 ust. 4 lit. d rozp. del. 2017/565, implemented: false}
+  # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
+  # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").
+  - id: R14
+    name: Ostrzeżenie przy wynikach historycznych
+    severity: high
+    legal_basis: art. 44 ust. 4 lit. d rozp. del. 2017/565
+    implemented: true
+    params:
+      # A past-performance sentence: a return figure plus a past marker (or a year <= the fetch year
+      # with no future marker in the sentence).
+      figure_patterns:
+        - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
+      # Past results in any unit (coordinator answer, follow-up R9): an amount next to return vocabulary.
+      amount_patterns:
+        - '\b\d+(?:[.,]\d+)?\s?(?:zł|PLN|EUR|USD|€|\$)'
+      amount_return_patterns:
+        - '\bzysk\w*'
+        - '\bzarobi\w*'
+        - '\bwypracowa\w*'
+        - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
+        - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+        - '\bdoch(?:ód|od(?!z))\w*'
+        - '\b(?:profit|return|gain)\w*'
+      figure_exclude_patterns: *return_figure_exclude
+      # R14 only: percentages that are not returns (share of clients or accounts, bonuses).
+      figure_extra_exclude_patterns:
+        - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
+        - '\bbonus\w*\s+(?:\w+\s+)?\d+(?:[.,]\d+)?\s?%'
+        - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
+      past_patterns:
+        - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
+        - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
+        - '\bosiągn(?:ął|ęła|ęło|ęli|ęły|ęliśmy)\b'
+        - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
+        - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+        - '\bda(?:ł|ła|ło|li|ły)\b'
+        - '\bwzr[oó]s(?:ł|ła|ło|ły|li)\b'
+        - '\bhistoryczn\w*'
+        - '\b(?:w|przez|za)\s+ostatni\w*\s+(?:\d+\s+)?(?:lat\w*|rok\w*|miesi\w*|kwarta\w*)'
+        - '\bw\s+(?:zeszłym|ubiegłym|poprzednim)\s+(?:roku|kwartale|miesiącu)'
+        - '\bpast performance\b'
+        - '\b(?:returned|delivered|gained|grew)\b'
+      future_patterns:
+        - '\bspodziewa\w*'
+        - '\bprognoz\w*'
+        - '\bbędzie\w*'
+        - '\bbędą\b'
+        - '\bprzewidu\w*'
+        - '\bplanuje\w*'
+        - '\bcel\w*\b'
+        - '\bexpect\w*'
+        - '\bwill\b'
+        - '\bforecast\w*'
+        - '\bzyskaj\w*'
+        - '\bzarabiaj\w*'
+        - '\bmożesz\b'
+        - '\bnawet\b'
+        - '\bważn\w*\s+do\b'
+        - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
+  # R15 (P1): ZASÓB "Flaguje w raporcie" – report a detected forecast even when it is compliant.
   - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
   - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
-  - {id: R17, name: Zakaz sugerowania aprobaty organu nadzoru, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}
-  - {id: R18, name: Nadzór jako argument bezpieczeństwa, severity: high, legal_basis: art. 44 ust. 8 rozp. del. 2017/565, implemented: false}
+  # ZASÓB R17: a supervisor mention "używane do sugerowania zatwierdzenia lub aprobaty produktu/usługi".
+  # Stating supervision alone is not a violation: detect the mention, then classify its use. An approval word
+  # in the same sentence is a rules fail; otherwise pass rules-only, and the LLM judges the wording (always).
+  - id: R17
+    name: Zakaz sugerowania aprobaty organu nadzoru
+    severity: high
+    legal_basis: art. 44 ust. 8 rozp. del. 2017/565
+    implemented: true
+    params:
+      supervisor_patterns: &supervisor_patterns
+        - '\bU?KNF\b'
+        - '\bnadz[oó]r\w*'
+        - '\bESMA\b'
+        - '\bregulowan\w*\s+(?:przez|i\s+nadzorowan)'
+        - '\blicencj\w*\s+(?:\w+\s+){0,2}(?:U?KNF|ESMA|Komisj\w*|maklersk\w*|na\s+prowadzenie)'
+        - '\bsupervis\w*'
+        - '\bregulated\s+by\b'
+        - '\b(?:FCA|CySEC|BaFin)\b'
+      # Not the regulator: a company's supervisory board, or "nadzorowany przez" someone other than a supervisor.
+      supervisor_exclude_patterns: &supervisor_exclude_patterns
+        - '\brad\w*\s+nadzorcz\w*'
+        - '\bnadz[oó]r\w*\s+przez\s+(?!(?:U?KNF|ESMA|Komisj\w*|FCA|CySEC|BaFin)\b)\w+(?:\s+\w+){0,2}'
+      approval_patterns:
+        - '\bzatwierdz\w*'
+        - '\bzaaprobowa\w*'
+        - '\baprob\w*'
+        - '\b(?:rekomendowan|polecan)\w*\s+przez\b'
+        - '\bcertyfik\w*\s+(?:\w+\s+){0,2}(?:U?KNF|ESMA|Komisj\w*)'
+        - '\b(?:approved|endorsed|certified|recommended)\s+by\b'
+      # Negated approval and the lawful prospectus statement are not a rules fail (the LLM still judges them).
+      approval_exclude_patterns:
+        - '\bnie\s+(?:\w+\s+){0,2}(?:zatwierdz|zaaprob|aprob|rekomend|polec|certyfik|approv|endors)\w*'
+        - '\bzatwierdzeni\w*\s+prospekt\w*'
+        - '\bprospekt\w*\s+(?:\w+\s+){0,3}zatwierdz\w*'
+        - '\bnot\s+(?:been\s+)?(?:approved|endorsed)'
+    llm:
+      when: always
+      question: >-
+        Czy odwołanie do organu nadzoru (np. KNF, ESMA) jest użyte tak, że sugeruje zatwierdzenie lub aprobatę
+        produktu albo usługi przez ten organ? Samo stwierdzenie, że firma podlega nadzorowi, nie jest
+        naruszeniem (pass). Odpowiedz fail, jeśli treść sugeruje aprobatę, i zacytuj dosłownie to zdanie.
+
+  # ZASÓB R18, a "szczególny przypadek" of R17: supervision used as a safety argument ("w pełni bezpieczna –
+  # spełniamy rygorystyczne wymogi nadzorcze KNF"). A safety word in the same sentence as the mention is a
+  # deterministic fail (never deferred); a safety word only in a neighbouring sentence is uncertain and goes to
+  # the LLM.
+  - id: R18
+    name: Nadzór jako argument bezpieczeństwa
+    severity: high
+    legal_basis: art. 44 ust. 8 rozp. del. 2017/565
+    implemented: true
+    params:
+      supervisor_patterns: *supervisor_patterns
+      supervisor_exclude_patterns: *supervisor_exclude_patterns
+      safety_patterns:
+        - '\bbezpieczn\w*'
+        - '\bbezpiecze[nń]\w*'
+        - '\bgwarant\w*'
+        - '\bpewn(?:a|e|y|ą|ość|ości)\b'
+        - '\bchronion\w*'
+        - '\bbez\s+ryzyka\b'
+        - '\bsafe(?:ly|ty)?\b'
+        - '\bsecure\w*'
+        - '\bguaranteed\b'
+        - '\bprotected\b'
+      # A negated guarantee is a disclaimer, not a safety argument ("nadzór KNF nie gwarantuje bezpieczeństwa").
+      safety_exclude_patterns:
+        - '\bnie\s+(?:\w+\s+){0,2}(?:gwarant|zapewni|chroni)\w*(?:\s+\w+){0,3}'
+        # The mandatory investor-compensation-scheme fact is not a safety argument (coordinator answer, R31).
+        - '\bchronion\w*\s+(?:\w+\s+){0,2}(?:system\w*\s+rekompensat\w*|rekompensat\w*)'
+        - '\b(?:does|do|is|are)\s+not\s+(?:\w+\s+)?(?:guarantee|protect|secure)\w*(?:\s+\w+){0,3}'
+      window: 1
+    llm:
+      when: uncertain
+      question: >-
+        Czy nadzór (np. KNF) jest w tej treści użyty jako argument, że inwestycja lub środki klienta są
+        bezpieczne, gwarantowane lub pewne? Odpowiedz fail i zacytuj dosłownie zdanie, jeśli tak; pass, jeśli
+        nadzór i bezpieczeństwo nie są ze sobą powiązane.

@@ -15,7 +15,8 @@ Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modu
 - Every `iw:events` message is the envelope `{type, emitted_at (UTC ISO), data}` with `data` exactly `{id, module, score, title, url, platform}` (the schema's optional `risk_level` is never sent by analytics); the API relay silently drops anything else ([integration-plan §6](../.docs/integration-plan.md), `contracts/schemas/events.schema.json`).
 - Logs are JSON on stdout, except the CLI (`python -m investwatch_analytics.cli`), which logs to stderr because its stdout is the findings JSON. A collector of CLI runs reads stderr.
 - Scraped text is untrusted: put it in a delimited block, tell the model to ignore instructions inside it, limit its length.
-- LLM: an OpenAI-compatible chat completions API configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`). A hosted provider is allowed (mentor exception); local Ollama `/v1` with `gemma3:4b` must keep working as the swap target, so no provider-specific SDK or features ([ADR 0304](../.docs/decisions/0304-llm-serving.md)).
+- LLM: an OpenAI-compatible chat completions API configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, limits in `.env.example`). Hosted default Gemma 4 on the Gemini API ([ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)); local Ollama `/v1` with `gemma3:4b` must keep working as the swap target, so no provider-specific SDK or features ([ADR 0304](../.docs/decisions/0304-llm-serving.md)).
+- The LLM only decides checks the rules defer: an `llm:` block in the catalogue plus the rule's `ask_llm`. Never send a deterministic rules-only verdict, and never let a verdict carry a quote that is not in the document ([ADR 0309](../.docs/decisions/0309-llm-prompt-and-cache-contract.md)). Tests never call a real LLM: `tests/llm_stub.py` and the conftest guard.
 
 ## Stack and done
 

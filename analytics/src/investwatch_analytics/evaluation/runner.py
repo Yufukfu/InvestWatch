@@ -164,9 +164,7 @@ def evaluate(
                                   "at_recommended_threshold": next((p for p in points if p["threshold"] == rec), None),
                                   "rules": _rules(module, labeled, found, build.catalogues)}
 
-    llm = None
-    if judge is not None:
-        llm = getattr(judge, "model", None) or "configured"
+    llm = judge_model_name(judge)
     run = {
         "computed_at": now.isoformat().replace("+00:00", "Z"),
         "gold_sha256": gold_sha256,
@@ -222,3 +220,10 @@ def write_thresholds(path: Path, report: dict) -> dict[str, float]:
 
 def report_json(report: dict) -> str:
     return json.dumps(report, sort_keys=True, ensure_ascii=False, indent=2) + "\n"
+
+
+def judge_model_name(judge: Any) -> str | None:
+    """The model a run used: the `LlmJudge.model_name` (analytics-llm-p0), "configured" for an unnamed judge."""
+    if judge is None:
+        return None
+    return getattr(judge, "model_name", None) or getattr(judge, "model", None) or "configured"
