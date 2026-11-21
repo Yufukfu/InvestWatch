@@ -13,8 +13,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       HEALTH_PORT: "8001"
-      # LLM (ADR 0304), from the root .env; empty LLM_BASE_URL = rules-only (model.llm = null). Default: a hosted
-      # OpenAI-compatible model (mentor exception); local swap target: LLM_BASE_URL=http://ollama:11434/v1,
+      # LLM (ADR 0304, 0317), from the root .env; empty LLM_BASE_URL = rules-only (model.llm = null). Default: hosted
+      # Gemma 4 on the Gemini API (OpenAI-compatible endpoint, mentor exception); local swap target: LLM_BASE_URL=http://ollama:11434/v1,
       # LLM_MODEL=gemma3:4b, LLM_API_KEY=ollama with --profile llm. Limits: analytics/.env.example.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-}
@@ -26,6 +26,8 @@ services:
       LLM_CACHE_TTL_S: ${LLM_CACHE_TTL_S:-}
       LLM_BREAKER_FAILURES: ${LLM_BREAKER_FAILURES:-}
       LLM_BREAKER_COOLDOWN_S: ${LLM_BREAKER_COOLDOWN_S:-}
+      # Must stay above LLM_DOC_BUDGET_S * 1000 (the worker refuses to start otherwise); 90000 for hosted Gemma.
+      CLAIM_MIN_IDLE_MS: ${CLAIM_MIN_IDLE_MS:-}
       # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
       # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).
       # Format and refresh: analytics/registry/README.md.

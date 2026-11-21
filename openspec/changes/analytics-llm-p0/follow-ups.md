@@ -135,4 +135,19 @@ Every regex that R3, R4, R6, R14, R17 and R18 use (107 patterns) was timed on 14
 | R57 | review group 8 | A merged verdict kept the rules-only `evidence_locator` | `fix-here`: cleared when the evidence changes |
 | R58 | review group 8 | Task 8.1 "S-ids accepted for non-M2 catalogues" is not in this branch's loader | `docs`: provided by #35 (`_ID_PREFIX`); this branch's tests build S-id catalogues directly |
 | R59 | review group 8, for the #35 merge | `RuleSpec` gains `llm` here and `weight` in #35, and #35's loader passes `weight` by position | `fix-here` at the merge: pass `weight=` and `llm=` by keyword; default `run_rules(module=catalogue.module)` once #35's `Catalogue.module` exists |
-| R60 | review group 8, declined | With `when: always`, an M3 LLM verdict can open or close #35's M3 gates, and the M3 call runs before those gates | `new-item`: product and cost decision for M3 (Damian) |
+| R60 | review group 8, declined | With `when: always`, an M3 LLM verdict can open or close #35's M3 gates, and the M3 call runs before those gates | decided, see below |
+
+## Coordinator decisions and task 12.4 (hosted Gemma 4)
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R60 | decided by Damian, 2026-11-21 | M3 LLM call before #35's gates | closed: "Tylko gdy reguły coś znalazły". S3.3 and S3.4 are `when: uncertain` (their rules return `uncertain` exactly on a candidate), so no M3 request without an M3 rule signal; a test pins it. Reason: it saves the Gemma quota, and an M3 found by the LLM alone is out of scope for the hackathon |
+| R61 | task 12.4 | Hosted Gemma 4 prefixes every answer with `<thought>…</thought>`, even in JSON mode | `fix-here`: the client strips one leading thought block (and a ```json fence); any other wrapper stays malformed (ADR 0317) |
+| R62 | embeddings-session review | A deeply nested JSON body raised `RecursionError` out of the client | `fix-here`: every parse error is `LlmMalformed` |
+| R63 | embeddings-session review | `LLM_BASE_URL` with a bad port or embedded whitespace passed startup | `fix-here`: the port is read during the check; whitespace and control characters are a config error |
+| R64 | task 12.4 | Gemma 4 latency (15-60 s) exceeds the default `LLM_TIMEOUT_S=20` | `docs`: ADR 0317 and `.env.example` give `LLM_TIMEOUT_S=45`, `LLM_DOC_BUDGET_S=50`, `CLAIM_MIN_IDLE_MS=90000` for the hosted Gemma; the defaults stay for faster endpoints |
+| R65 | full suite | The new M2 rules pushed `test_redos.py::test_r3_patterns_are_fast_on_hostile_input[claim-warning-pairs]` (an absolute 3 s limit on 16,000 sentences) over its limit | `fix-here`: R14 checks the cheap past marker before the figure, R14/R17/R18 use one alternation per pattern list and a raw pre-check; the test now passes on its own. Its flakiness under load is the separate main-branch fix the coordinator named (ratio-based timing), not changed here |
+| R66 | ADR 0316 procedure | The re-measured M2 default threshold is 0.1 (was 0.25): more applicable, passing rules lower the M2 scores | `fix-here`: `eval/thresholds.json`, `events.DEFAULT_THRESHOLDS` and the API's `DEFAULTS` updated; `new-item` for Damian: check that 0.1 is acceptable for the demo |
+| R67 | cut plan | R10 (language consistency) and the per-sentence language guess were not built | `new-item`: a follow-up change; the R10 requirement and the Preprocessing delta were removed from this change's specs, and R10 stays `implemented: false` |
+| R68 | ADR 0317 | Whether a small Gemma 4 build exists for Ollama | `new-item`: not checked; `gemma3:4b` stays the local swap target |
+| R69 | task 12.4 | About half the hosted calls returned 503 "high demand" on 2026-11-21 | `docs`: the demo must pre-warm the cache and keep the Ollama profile ready (ADR 0317) |

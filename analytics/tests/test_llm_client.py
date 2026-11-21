@@ -384,3 +384,11 @@ def test_bad_port_or_whitespace_in_base_url(url):
 
 def test_valid_port_is_accepted():
     assert LlmSettings.from_env({"LLM_BASE_URL": "http://ollama:11434/v1", "LLM_MODEL": "m"}).enabled
+
+
+def test_hosted_gemma_limits_pass_the_budget_check():
+    """ADR 0317: LLM_TIMEOUT_S=45, LLM_DOC_BUDGET_S=50 with CLAIM_MIN_IDLE_MS=90000 must start the worker."""
+    s = LlmSettings.from_env({"LLM_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai",
+                              "LLM_MODEL": "gemma-4-31b-it", "LLM_API_KEY": "k", "LLM_TIMEOUT_S": "45",
+                              "LLM_DOC_BUDGET_S": "50"}, claim_min_idle_ms=90000)
+    assert (s.timeout_s, s.doc_budget_s, s.mode) == (45, 50, "hosted")

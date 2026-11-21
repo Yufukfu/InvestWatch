@@ -31,6 +31,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0312](0312-gold-set-evaluation.md) | Gold-set evaluation feeds the calibration panel: fictional eval registry, strict/review readings, idempotent default-stack run, labels plus gold in the API | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
 | [0315](0315-m2-art44-element-ownership.md) | M2: one owner rule per art. 44 element (count once); R15 reports every detected forecast, R11 flags only violations | accepted (takes effect when the `analytics-m2-p1-rules` PR merges) |
 | [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
+| [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted (takes effect when the `analytics-llm-p0` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 

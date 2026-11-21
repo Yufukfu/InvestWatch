@@ -43,4 +43,5 @@ Rationale: the Ollama `/v1` limitation means option 1 can lose text silently on 
 - With a dead endpoint, a document costs at most one timeout until the breaker opens, and then nothing for the cooldown.
 - If the infra smoke run shows a larger Ollama default, or the gold set shows that smaller chunks judge better, `LLM_CHUNK_CHARS` changes by env. This ADR is superseded only if the split strategy itself changes.
 - With very long sentences a fixed 4-sentence overlap would advance by one sentence per request, so four chunks would cover only about a quarter of a long page; the half-chunk cap keeps the advance at about half a chunk (found in the group 6 review of `analytics-llm-p0`).
+- **Real worst case of one request:** the 3 s connect timeout, plus a read timeout per read while the response headers arrive, plus the body, which the total deadline (`LLM_TIMEOUT_S`) bounds. A server that trickles its *headers* is therefore bounded only per read (follow-up R38). The per-document budget is checked between requests, so one document can overrun it by at most one request.
 - `.docs/analytics-plan.md` §7 is updated in the same PR with these defaults.
