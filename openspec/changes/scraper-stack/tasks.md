@@ -23,4 +23,4 @@ Before group 1: the branch is on `origin/main` (it has PR #38; the branch was cu
 ## 4. Closing tasks
 
 - [x] 4.1 Apply the `iw-docs-update` skill (`scraper/README.md` Quick Start and hardware note, `scraper/CLAUDE.md`, `.docs/status/scraper.md`, `.docs/integration-plan.md` §2 and diagram, grep `infra/README.md` and `.docs/INDEX.md` for the service name), run `docs-check` clean, and add the `iw-ai-log` row
-- [ ] 4.2 Run the `iw-pr-review` skill and fix real findings
+- [x] 4.2 Run the `iw-pr-review` skill and fix real findings
