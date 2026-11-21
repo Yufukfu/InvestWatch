@@ -8,10 +8,11 @@ from pathlib import Path
 
 import pytest
 
+from iw_scraper import sample_import
 from iw_scraper.ingest.pipeline import Ingestor
 from iw_scraper.parsing import ParseFailure, parse_page
 from iw_scraper.pgstore import PgSourceStore
-from iw_scraper.sample_import import ManifestError, Summary, exit_code, import_directory, load_manifest, read_sample, scan
+from iw_scraper.sample_import import ManifestError, Summary, exit_code, import_directory, load_manifest, main, read_sample, scan
 from iw_scraper.types import Reason
 
 PAGE = (
@@ -484,3 +485,49 @@ async def test_every_file_gets_a_json_log_line_and_the_summary_is_logged_not_pri
 def test_the_exit_code_is_non_zero_only_when_a_file_failed():
     assert exit_code(Summary(inserted=2, duplicate=1, skipped=3)) == 0
     assert exit_code(Summary(inserted=2, failed=1)) == 1
+
+
+# --- usage errors: refused before any store is opened -----------------------------------------------------------
+
+
+@pytest.fixture
+def no_stores(monkeypatch):
+    """A usage error must end the command before it connects to anything, so nothing can have been ingested."""
+
+    def opened(*_):
+        raise AssertionError("a store was opened")
+
+    monkeypatch.setattr(sample_import, "_ingestor", opened)
+
+
+@pytest.mark.parametrize(
+    ("manifest", "flags", "event", "names"),
+    [
+        (None, [], "manifest_invalid", "--kind"),
+        (None, ["--kind", "unknown"], "manifest_invalid", "--modules"),
+        ('source_kind = "bank"\ntarget_modules = ["M3"]', [], "manifest_invalid", "source_kind"),
+        ('source_kind = "unknown"\ntarget_modules = ["M3"]\npublished_at = "yesterday"', [], "manifest_invalid", "published_at"),
+    ],
+)
+async def test_a_directory_that_cannot_be_described_is_refused_with_exit_2(
+    directory, no_stores, caplog, manifest, flags, event, names
+):
+    put(directory, "a.txt", "x")
+    if manifest is not None:
+        put(directory, "samples.toml", manifest)
+    caplog.set_level(logging.INFO, logger="iw_scraper.sample_import")
+
+    code = await main([str(directory), *flags])
+
+    assert code == 2
+    assert [line["error"] for line in events(caplog, event)] == [events(caplog, event)[0]["error"]]
+    assert names in events(caplog, event)[0]["error"] and str(directory) not in events(caplog, event)[0]["error"]
+
+
+async def test_a_missing_directory_is_refused_with_exit_2_without_naming_its_path(tmp_path, no_stores, caplog):
+    caplog.set_level(logging.INFO, logger="iw_scraper.sample_import")
+
+    code = await main([str(tmp_path / "nope"), "--kind", "unknown", "--modules", "M1"])
+
+    assert code == 2
+    assert len(events(caplog, "usage_error")) == 1 and "nope" not in events(caplog, "usage_error")[0]["error"]

@@ -16,7 +16,7 @@
 
 ## 3. Usage and a rehearsal
 
-- [ ] 3.1 Test the usage errors: no manifest and no `--kind`/`--modules`, a missing directory, an invalid manifest creates no source row
+- [x] 3.1 Test the usage errors: no manifest and no `--kind`/`--modules`, a missing directory, an invalid manifest creates no source row (`mutations: 5 tried, 5 caught`)
 - [ ] 3.2 Rehearse once against the running stack, through compose with the directory mounted read-only, using two saved real pages from `scraper/tests/fixtures/` copied to a scratch directory: the documents reach `iw:documents`, analytics produces findings and a high-risk one reaches the dashboard alert (record the outcome in the PR, not a bundled demo set; if `scraper-stack` is not merged, run the image directly and say so)
 - [ ] 3.3 Commit
 
