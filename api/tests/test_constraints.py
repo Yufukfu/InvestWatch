@@ -227,6 +227,17 @@ def test_required_document_field_missing(app_engine, missing):
             _insert(conn, documents, row)
 
 
+@pytest.mark.parametrize("column", ["firm", "advertiser", "model"])
+def test_null_jsonb_field_is_sql_null(app_engine, column):
+    """A contract null must be SQL NULL, not the JSON value null, or `IS NULL` filters miss it."""
+    with app_engine.begin() as conn:
+        doc = _add_doc(conn)
+        row = finding_row(doc["id"], firm=None, advertiser=None, model=None)
+        _insert(conn, findings, row)
+        col = findings.c[column]
+        assert conn.execute(select(func.count()).select_from(findings).where(col.is_(None))).scalar_one() == 1
+
+
 def test_finding_has_no_risk_level_column():
     assert "risk_level" not in findings.c
 

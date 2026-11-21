@@ -1,8 +1,8 @@
 ## 1. Null JSONB fields
 
-- [ ] 1.1 Test: a finding inserted with `firm`, `advertiser`, `model` = `None` has `firm IS NULL` (and the other two) in SQL
-- [ ] 1.2 `JSONB(none_as_null=True)` on the three nullable columns; `alembic check` stays clean
-- [ ] 1.3 Mutation check
+- [x] 1.1 Test: a finding inserted with `firm`, `advertiser`, `model` = `None` has `firm IS NULL` (and the other two) in SQL
+- [x] 1.2 `JSONB(none_as_null=True)` on the three nullable columns; `alembic check` stays clean
+- [x] 1.3 Mutation check — mutations: 3 tried, 3 caught
 
 ## 2. Redaction
 
