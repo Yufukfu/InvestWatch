@@ -97,6 +97,9 @@ def main(argv: list[str] | None = None) -> int:
     except (RegistryError, CatalogueError) as exc:
         return _fail("invalid configuration", error=str(exc))
 
+    if args.write_thresholds is not None and args.llm:
+        return _fail("invalid configuration", error="--write-thresholds needs a rules-only run (ADR 0316)")
+
     judge = None
     if args.llm:
         if not (os.environ.get("LLM_BASE_URL") or "").strip():
@@ -123,10 +126,14 @@ def main(argv: list[str] | None = None) -> int:
         except StoreError as exc:
             log.error("calibration run not stored", extra={"error": str(exc)})
             code = 3
-    if args.write_thresholds is not None:
-        if args.llm:
-            return _fail("invalid configuration", error="--write-thresholds needs a rules-only run (ADR 0316)")
-        written = write_thresholds(args.write_thresholds, report)
+    if args.write_thresholds is not None and report["run"]["analysis_errors"]:
+        # Same reason as the store: zero scores from a crashed document would move the defaults.
+        log.error("default thresholds not written", extra={"error": "gold documents failed analysis"})
+    elif args.write_thresholds is not None:
+        try:
+            written = write_thresholds(args.write_thresholds, report)
+        except (OSError, ValueError) as exc:  # JSONDecodeError is a ValueError
+            return _fail("invalid configuration", error=f"thresholds file: {type(exc).__name__}: {exc}")
         log.info("default thresholds written", extra={"thresholds": written, "file": str(args.write_thresholds)})
     for module, entry in report["modules"].items():
         log.info("module evaluated", extra={"eval_module": module, "status": entry["status"],

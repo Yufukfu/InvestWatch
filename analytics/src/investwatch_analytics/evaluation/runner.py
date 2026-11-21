@@ -26,7 +26,7 @@ from ..registry import Registry
 from ..rules.engine import Catalogue
 from .gold import GoldItem, rule_status
 from .known_ids import MODULES, Catalogues
-from .metrics import curve, recommended_threshold, rule_metrics
+from .metrics import curve, f1_plateau, recommended_threshold, rule_metrics
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ DEFAULT_GOLD = EVAL_DIR / "gold.jsonl"
 DEFAULT_REGISTRY = EVAL_DIR / "registry.csv"
 #: The one source of the default thresholds (ADR 0316); api DEFAULTS and events.DEFAULT_THRESHOLDS are copies.
 THRESHOLDS_FILE = EVAL_DIR / "thresholds.json"
+#: ADR 0305's original defaults, reported next to the recommendation for comparison (ADR 0316).
+ADR_0305_DEFAULTS = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
 #: Namespace of the deterministic run id (design decision 7); never change it, or every stored run is "new".
 RUN_NAMESPACE = uuid.UUID("6f1d3c2a-9b8e-4d7f-a6c5-0e1f2a3b4c5d")
 
@@ -141,6 +143,9 @@ def evaluate(
         mid = run_id or (llm_run_id if judge is not None else _run_id(gold_sha256, pipeline_version, module, points))
         report_modules[module] = {"status": "evaluated", "run_id": mid, **entry, "points": points,
                                   "recommended_threshold": rec,
+                                  "f1_plateau": f1_plateau(points),
+                                  "at_adr_0305_default": next(p for p in points
+                                                              if p["threshold"] == ADR_0305_DEFAULTS[module]),
                                   "at_recommended_threshold": next((p for p in points if p["threshold"] == rec), None),
                                   "rules": _rules(module, labeled, found, build.catalogues)}
 
@@ -187,6 +192,8 @@ def write_thresholds(path: Path, report: dict) -> dict[str, float]:
         current = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError:
         current = {}
+    if not isinstance(current, dict):
+        raise ValueError(f"{path}: not a JSON object of module thresholds")
     for module, entry in report["modules"].items():
         if entry["status"] == "evaluated" and entry.get("recommended_threshold") is not None:
             current[module] = entry["recommended_threshold"]

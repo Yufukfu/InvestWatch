@@ -46,15 +46,15 @@ docker compose run --rm analytics-eval        # the same in the stack
 
 The one-shot `analytics-eval` service runs `--db` on every `docker compose up`, after `api-migrate`. It stores a module's run only when the gold set, the pipeline version or the results changed, so restarts add nothing. `GET /api/calibration` adds analysts' `confirmed` / `false_positive` labels to that run's counts. The report gives precision, recall and F1 per module on the thresholds 0.05-0.95, counted the same way as the API. Per rule or signal it gives two readings: **`strict` (the headline: `uncertain` counts as not flagged)** and `review` (`uncertain` counts as flagged). Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`, no rows stored for it) or a gold document crashed the pipeline (nothing stored); 2 invalid gold set or configuration; 3 the database write failed.
 
-Latest rules-only numbers (build `analytics-m1-m3` 6da4f1f with this change); module points at the recommended threshold, rules as `strict` precision / recall:
+Latest rules-only numbers (build `main` bb770a0 with this change). Recommended threshold = higher end of the plateau of thresholds whose F1 is within 0.02 of the best; rules as `strict` precision / recall:
 
-| Module | Recommended threshold (best F1) | At it | At the old ADR 0305 default | Rules |
+| Module (gold cases) | Recommended (plateau) | At it | At the old ADR 0305 default | Rules |
 |---|---|---|---|---|
-| M1 | 0.65 (F1 0.889) | precision 1.0, recall 0.8 (tp 8, fn 2, tn 8) | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
-| M2 | 0.25 (F1 0.703) | precision 0.929, recall 0.565 (tp 13, fp 1, fn 10, tn 11) | 0.5: F1 0.4 | R1 1.0 / 1.0, R2 1.0 / 1.0, R3 0.78 / 1.0 (R4-R18 not in this build) |
-| M3 | 0.25 (F1 0.706) | precision 0.857, recall 0.6 (tp 6, fp 1, fn 4, tn 7) | 0.7: F1 0 | S3.1 1.0 / 0.53, S3.8 1.0 / 1.0 |
+| M1 (18: 10 / 8) | 0.65 (0.40-0.65) | precision 1.0, recall 0.8, F1 0.889 | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
+| M2 (35: 23 / 12) | 0.25 (0.05-0.25) | precision 0.923, recall 0.522, F1 0.667 | 0.5: F1 0.345 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0 (R4-R18 not in this build) |
+| M3 (18: 10 / 8) | 0.25 (0.25 only) | precision 0.875, recall 0.7, F1 0.778 | 0.7: F1 0 | S3.1 1.0 / 0.67, S3.2 1.0 / 0.71, S3.8 1.0 / 1.0 |
 
-S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
+M3's 0.25 is below the S3.4 gate cap (0.4, ADR 0308), so capped findings alert; see ADR 0316 for the trade-off. S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
 
 **Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md)): the recommended thresholds are the defaults the API writes when `iw:settings:thresholds` is missing (M1 0.65, M2 0.25, M3 0.25). [`eval/thresholds.json`](eval/thresholds.json) is the source. `python eval/run.py --write-thresholds` rewrites it, and the API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from it: `tests/test_eval_thresholds.py` fails until they match a fresh run. M2's value is low because only part of the 18 rules run today, and it moves when more rules or the LLM land.
 

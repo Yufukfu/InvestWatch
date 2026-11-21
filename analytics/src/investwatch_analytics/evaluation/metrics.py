@@ -50,15 +50,26 @@ def curve(pairs: Iterable[tuple[float, bool]]) -> list[dict]:
     return [point(t, *confusion(pairs, t)) for t in GRID]
 
 
+#: F1 within this of the best counts as the plateau (ADR 0316): its higher end is the recommendation.
+PLATEAU_F1 = 0.02
+
+
+def f1_plateau(points: list[dict]) -> list[float] | None:
+    """[lowest, highest] grid threshold whose F1 is within PLATEAU_F1 of the best; None when every F1 is 0."""
+    best = max((p["f1"] for p in points), default=0.0)
+    if best <= 0:
+        return None
+    near = [p["threshold"] for p in points if p["f1"] >= round(best - PLATEAU_F1, 3)]
+    return [min(near), max(near)]
+
+
 def recommended_threshold(points: list[dict]) -> float | None:
-    """Grid threshold with the best F1, the higher threshold on a tie (precision wins); None when every F1 is 0.
+    """Higher end of the F1 plateau, so a tie or a near-tie goes to precision; None when every F1 is 0.
 
     ADR 0316: these become the default thresholds the API writes when `iw:settings:thresholds` is missing.
     """
-    best = max(points, key=lambda p: (p["f1"], p["threshold"]), default=None)
-    if best is None or best["f1"] <= 0:
-        return None
-    return best["threshold"]
+    plateau = f1_plateau(points)
+    return plateau[1] if plateau else None
 
 
 def _counts(observations: list[tuple[bool, bool]]) -> dict:

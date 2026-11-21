@@ -68,7 +68,7 @@ Base: `origin/analytics/analytics-worker` (#26), rebased on each newer tip. Stag
 
 - [x] 12.1 Failing tests (`tests/test_eval_thresholds.py`, runner and CLI tests): `recommended_threshold` = best F1, higher threshold on a tie, null when the best F1 is 0; `--write-thresholds` writes the file and keeps a module without a recommendation; the committed `analytics/eval/thresholds.json` equals a fresh rules-only run; `api` `DEFAULTS` and `events.DEFAULT_THRESHOLDS` equal the file; the FP/FN scenario uses the recommended threshold
 - [x] 12.2 Runner, `__main__.py` (`--write-thresholds`), `eval/thresholds.json`, `api/src/investwatch_api/thresholds.py` `DEFAULTS`, `analytics/src/investwatch_analytics/events.py` `DEFAULT_THRESHOLDS`; ADR 0316 with its README row; tests green in both modules
-- [x] 12.3 Mutation check (tie direction, null on zero F1, the write path, each copy); `mutations: 7 tried, 7 caught`. Values on `analytics-m1-m3` 6da4f1f: M1 0.65, M2 0.25, M3 0.25. Two older tests that assumed the 0305 values now pin their own thresholds (`test_events.py` event shape and partial key, `api` `test_risk_filter_uses_the_same_rule`)
+- [x] 12.3 Mutation check (tie direction, null on zero F1, the write path, each copy); `mutations: 7 tried, 7 caught`. Values on `analytics-m1-m3` 6da4f1f: M1 0.65, M2 0.25, M3 0.25. Two older tests that assumed the 0305 values now pin their own thresholds (`test_events.py` event shape and partial key, `api` `test_risk_filter_uses_the_same_rule`); plateau rule and review fixes (`--llm` refused before analysis, no write after a crash, bad file exits 2): `mutations: 7 tried, 7 caught`
 
 ## 10. Closing (first pass)
 

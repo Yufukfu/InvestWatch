@@ -96,7 +96,7 @@ For each module with labels, the evaluation SHALL pair each labeled document's l
 - **THEN** the 0.95 point has `precision 1.0`, `recall 0.0` and `f1 0.0`
 
 ### Requirement: Recommended threshold
-For each evaluated module the report SHALL give `recommended_threshold`: the grid threshold with the highest `f1` of the module curve, the higher threshold on a tie. When the best `f1` is 0, the module SHALL have no recommended threshold.
+For each evaluated module the report SHALL give `f1_plateau`, the lowest and highest grid threshold whose `f1` is within 0.02 of the module curve's best, and `recommended_threshold`, the plateau's higher end, plus the points at both and at ADR 0305's default. When the best `f1` is 0, both SHALL be null.
 
 #### Scenario: Best F1 wins
 - **WHEN** a module's curve has `f1` 0.70 at 0.25 and 0.67 at 0.3
@@ -106,9 +106,13 @@ For each evaluated module the report SHALL give `recommended_threshold`: the gri
 - **WHEN** a module's curve has its best `f1` 0.889 at every threshold from 0.4 to 0.65
 - **THEN** `recommended_threshold` is 0.65
 
+#### Scenario: Near-tie goes to the higher threshold
+- **WHEN** a module's curve has `f1` 0.80 at 0.3, 0.79 at 0.35 and 0.785 at 0.4
+- **THEN** `f1_plateau` is [0.3, 0.4] and `recommended_threshold` is 0.4
+
 #### Scenario: Nothing found
 - **WHEN** every point of a module has `f1` 0
-- **THEN** `recommended_threshold` is null
+- **THEN** `recommended_threshold` and `f1_plateau` are null
 
 #### Scenario: Thresholds move FP and FN
 - **WHEN** the committed gold set is evaluated rules-only
@@ -128,6 +132,10 @@ For each evaluated module the report SHALL give `recommended_threshold`: the gri
 #### Scenario: Writing the file
 - **WHEN** the evaluation runs with `--write-thresholds`
 - **THEN** `analytics/eval/thresholds.json` holds the run's recommended thresholds, and a module without one keeps its previous value
+
+#### Scenario: Thresholds not written from a bad run
+- **WHEN** `--write-thresholds` is combined with `--llm`, or a gold document crashed the pipeline, or the file is not a JSON object
+- **THEN** the file is unchanged; with `--llm` or a bad file the run exits 2 (with `--llm` before analyzing), after a crash it exits 1
 
 ### Requirement: Per-rule and per-signal metrics
 For each labeled rule or signal the report SHALL give `tp`, `fp`, `fn`, `tn`, `precision`, `recall` and `f1` in two readings, `strict` (a predicted `uncertain` counts as not flagged) and `review` (it counts as flagged), plus counts of `uncertain` and of `applicability_errors`. Gold `fail` SHALL be a positive and `pass` a negative; gold `not_applicable` SHALL stay out of the counts.

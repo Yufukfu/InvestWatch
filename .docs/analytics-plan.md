@@ -133,7 +133,7 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 - Script `analytics/eval/run.py` (`python -m investwatch_analytics.evaluation`): precision / recall / F1 per module and per rule (`strict` headline, `review` counts `uncertain` as flagged), threshold curve with the API's counting → with `--db` stored in `calibration_points`, one idempotent run per module. The one-shot `analytics-eval` compose service runs it on every `docker compose up`; `/api/calibration` adds analyst labels to the stored run.
 - Unit tests for P0 rules (pytest, 2–3 cases per rule) – fast feedback loop while tuning dictionaries.
 - Default thresholds are the best-F1 thresholds of the rules-only gold run (ADR 0316): M1 0.65, M2 0.25, M3 0.25 (`analytics/eval/thresholds.json`).
-- In the demo: show how moving the M2 threshold from 0.25 to 0.5 changes the number of alerts and FP/FN (rules-only gold set: tp 13 → 6, fp 1 → 1, fn 10 → 17).
+- In the demo: show how moving the M2 threshold from 0.25 to 0.5 changes the number of alerts and FP/FN (rules-only gold set: tp 12 → 5, fp 1 → 1, fn 11 → 18).
 
 ## 9. Schedule for Damian (Sat 13:30 → Sun 10:30)
 
@@ -227,7 +227,7 @@ Total ≈ 4 h. Steps 1–6 need no infrastructure and are fully testable locally
 ### 12.4 Decisions to confirm
 
 1. **`documents` / `findings` tables:** migrations belong to the API (Alembic). Until the API exists, a temporary `analytics/sql/schema.sql`, later moved into the migrations.
-2. **Threshold for `finding.high_risk`:** analytics reads thresholds from the Redis key `iw:settings:thresholds` written by the API, with defaults 0.6 / 0.5 / 0.7 when missing (since ADR 0316: the gold-set best-F1 thresholds, `analytics/eval/thresholds.json`) – to be added to the contract.
+2. **Threshold for `finding.high_risk`:** analytics reads thresholds from the Redis key `iw:settings:thresholds` written by the API, with the gold-set evaluation's thresholds as defaults when missing (ADR 0316, `analytics/eval/thresholds.json`; ADR 0305 first set 0.6 / 0.5 / 0.7) – to be added to the contract.
 3. **KNF registry:** fictional firms in tests to start with; the real KNF page loader is a separate step after the skeleton.
 4. **LLM (Gemma):** outside the skeleton; `model.llm = null` marks rules-only mode.
 5. **OpenSpec:** this plan becomes a change proposal (`proposal.md`, `tasks.md`, spec) once Kacper sets up the structure with OpenSpec.
