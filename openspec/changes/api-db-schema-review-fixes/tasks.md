@@ -32,4 +32,4 @@
 ## 6. Closing
 
 - [x] 6.1 Apply iw-docs-update (STATUS row, duplicate AI log row, README, follow-ups) and add the iw-ai-log row
-- [ ] 6.2 Run iw-pr-review checks and fix real findings
+- [x] 6.2 Run iw-pr-review checks and fix real findings (iw-reviewer, focus security: 2 low findings, both verified and documented; declined items in `follow-ups.md`)

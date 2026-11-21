@@ -3,6 +3,9 @@
 Revision ID: 0003
 Revises: 0002
 Create Date: 2026-11-21
+
+The upgrade fails if a row already has text = '' (none can: the scraper never stores empty text, and nothing
+is deployed before this revision). Fix such rows by hand before upgrading.
 """
 
 from __future__ import annotations

@@ -77,7 +77,7 @@ The same statements in Python (SQLAlchemy) are in `src/investwatch_api/db/sql.py
 
 ## Running it
 
-Migrations, in the stack: the root `compose.yaml` includes `api/compose.yaml`, whose `api-migrate` uses the `postgres` service and `data` network of `infra/compose.yaml` and runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. The admin URL is built from `POSTGRES_ADMIN_*` without percent-encoding, so a hand-set password must not contain `@ : / # %` (`scripts/init-env.sh` generates hex). A service that writes the database waits for it:
+Migrations, in the stack: the root `compose.yaml` includes `api/compose.yaml`, whose `api-migrate` uses the `postgres` service and `data` network of `infra/compose.yaml` and runs `alembic upgrade head` as `iw_admin` once Postgres is healthy, then exits. The admin URL is built from `POSTGRES_ADMIN_*` without percent-encoding, so a hand-set password must not contain `@ : / # %` or whitespace (a space would also defeat the log redactor; `scripts/init-env.sh` generates hex). A service that writes the database waits for it:
 
 ```yaml
 depends_on:
