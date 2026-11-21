@@ -16,7 +16,7 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 
 ## Active OpenSpec changes
 
-- `calibration-panel` (stacked on `realtime-alerts`, PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
+- none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
 
 ## Blockers and open decisions
 
