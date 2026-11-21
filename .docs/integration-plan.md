@@ -186,13 +186,13 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
-| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults 0.6 / 0.5 / 0.7 written when missing); analytics reads the same key (ADR 0305) |
+| GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults written when missing: the gold-set evaluation's best-F1 thresholds, today 0.65 / 0.25 / 0.4, ADR 0316); analytics reads the same key (ADR 0305) |
 | GET / POST / PATCH | `/sources` | list and edit sources |
 | POST | `/scans` | `{ "source_id": "..." }` – manually trigger a scan (XADD to `iw:scan-requests`). The scraper owns the consumer side: its consumer group on `iw:scan-requests` runs the scan and publishes `scan.started` / `scan.finished` on `iw:events` (§6). Until the scraper reads the stream, the request is queued and nothing runs |
 | GET | `/documents/{id}/screenshot/{viewport}` | screenshot preview from MinIO |
 | GET | `/health` | service status (for the demo) |
 
-Calibration: TP/FP/FN are computed from findings labeled by analysts (`confirmed` / `false_positive`) and from the **gold set** (UKNF samples + our own labels, table `gold_labels`). This way the threshold slider shows precision and recall changing live.
+Calibration: TP/FP/FN are the sum of findings labeled by analysts (`confirmed` / `false_positive`) and the latest **gold-set** run stored in `calibration_points` by the analytics evaluation (file `analytics/eval/gold.jsonl`, not a table; ADR 0312). This way the threshold slider shows precision and recall changing live, and a few labels never replace the gold curve.
 
 ## 6. Real-time events
 

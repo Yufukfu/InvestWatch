@@ -129,10 +129,11 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 
 ## 8. Evaluation and calibration
 
-- **Gold set**: samples from the UKNF USB stick + ~20 hand-made examples per module (positive and negative, including hard cases). File `analytics/eval/gold.jsonl`: `{ document, module, label, rules: {R3: "fail", …} }`.
-- Script `analytics/eval/run.py`: precision / recall / F1 per module and per rule, threshold curve → stored in table `calibration_points` (used by `/api/calibration`).
+- **Gold set** (change `analytics-eval-calibration`, ADR 0312): `analytics/eval/gold.jsonl`, one line per document: `{ id, origin, basis, hard_case?, document, expect: { M2: { label, rules: { R3: "fail", … } } } }`, so one document can be labeled for M1 and M3 at once. `doc/` has no sample ads, so all lines are synthetic with fictional firms (own registry `analytics/eval/registry.csv`); UKNF samples, if they arrive, are added as `origin: uknf-sample` with no code change. Labeling rules: `analytics/eval/README.md`.
+- Script `analytics/eval/run.py` (`python -m investwatch_analytics.evaluation`): precision / recall / F1 per module and per rule (`strict` headline, `review` counts `uncertain` as flagged), threshold curve with the API's counting → with `--db` stored in `calibration_points`, one idempotent run per module. The one-shot `analytics-eval` compose service runs it on every `docker compose up`; `/api/calibration` adds analyst labels to the stored run.
 - Unit tests for P0 rules (pytest, 2–3 cases per rule) – fast feedback loop while tuning dictionaries.
-- In the demo: show how moving the M2 threshold from 0.5 to 0.7 changes the number of alerts and FP/FN.
+- Default thresholds are the best-F1 thresholds of the rules-only gold run (ADR 0316): M1 0.65, M2 0.25, M3 0.4 (M3 raised from its best-F1 0.25 to the S3.4 gate cap; `analytics/eval/thresholds.json`).
+- In the demo: show how moving the M2 threshold from 0.25 to 0.5 changes the number of alerts and FP/FN (rules-only gold set: tp 12 → 5, fp 1 → 1, fn 11 → 18).
 
 ## 9. Schedule for Damian (Sat 13:30 → Sun 10:30)
 
@@ -226,7 +227,7 @@ Total ≈ 4 h. Steps 1–6 need no infrastructure and are fully testable locally
 ### 12.4 Decisions to confirm
 
 1. **`documents` / `findings` tables:** migrations belong to the API (Alembic). Until the API exists, a temporary `analytics/sql/schema.sql`, later moved into the migrations.
-2. **Threshold for `finding.high_risk`:** analytics reads thresholds from the Redis key `iw:settings:thresholds` written by the API, with defaults 0.6 / 0.5 / 0.7 when missing – to be added to the contract.
+2. **Threshold for `finding.high_risk`:** analytics reads thresholds from the Redis key `iw:settings:thresholds` written by the API, with the gold-set evaluation's thresholds as defaults when missing (ADR 0316, `analytics/eval/thresholds.json`; ADR 0305 first set 0.6 / 0.5 / 0.7) – to be added to the contract.
 3. **KNF registry:** fictional firms in tests to start with; the real KNF page loader is a separate step after the skeleton.
 4. **LLM (Gemma):** outside the skeleton; `model.llm = null` marks rules-only mode.
 5. **OpenSpec:** this plan becomes a change proposal (`proposal.md`, `tasks.md`, spec) once Kacper sets up the structure with OpenSpec.
