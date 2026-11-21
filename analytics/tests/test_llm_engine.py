@@ -344,3 +344,71 @@ def test_merge_clears_a_stale_locator(registry):
     ctx = ctx_for("Tekst bloku. Inny fragment tekstu.", registry)
     [r] = run_rules(Catalogue([spec]), ctx, judge=judge, module="M3")
     assert r.evidence == "Inny fragment tekstu." and r.evidence_locator is None
+
+
+# ---- M1 / M3 through the pipeline (after #35) ----------------------------------------------------------
+
+
+def _mock(mock_documents, prefix):
+    return ScrapedDocument.model_validate(next(d for d in mock_documents if d["id"].startswith(prefix)))
+
+
+class RecordingJudge(FakeJudge):
+    def judge(self, **kw):
+        self.calls.append(kw)
+        asked = {c.rule_id for c in kw["checks"]}
+        verdicts = {k: v for k, v in self.verdicts.items() if k in asked}
+        return JudgeOutcome(verdicts=verdicts, model=self.model_name if verdicts else None)
+
+
+def test_m1_signal_refined_through_the_pipeline(mock_documents, registry, catalogue):
+    from investwatch_analytics.pipeline import analyze
+
+    doc = _mock(mock_documents, "3c41441c")
+    judge = RecordingJudge(LlmVerdict("S1.5", "fail", "to najlepsza decyzja w moim życiu", "Treść promocyjna."))
+    findings = analyze(doc, registry=registry, catalogue=catalogue, now=NOW, judge=judge)
+    [m1f] = [f for f in findings if f.module == "M1"]
+    s15 = by_id(m1f.rules)["S1.5"]
+    assert s15.result == "fail" and s15.method in ("llm", "hybrid") and m1f.model.llm == "gemma3:4b"
+    assert "gemma3:4b" in m1f.summary and "Tryb regułowy" not in m1f.summary
+    m1_calls = [c for c in judge.calls if c["module"] == "M1"]
+    assert m1_calls and "M1" in m1_calls[0]["module_context"]
+
+
+def test_m3_signal_refined_through_the_pipeline(mock_documents, registry, catalogue):
+    from investwatch_analytics.pipeline import analyze
+
+    doc = _mock(mock_documents, "007bbcee")
+    quote = "dopasujemy portfel do Twojej sytuacji"
+    judge = RecordingJudge(LlmVerdict("S3.3", "fail", quote, "Personalizacja."))
+    [m3f] = [f for f in analyze(doc, registry=registry, catalogue=catalogue, now=NOW, judge=judge) if f.module == "M3"]
+    assert by_id(m3f.rules)["S3.3"].evidence == quote and m3f.model.llm == "gemma3:4b"
+    m3_calls = [c for c in judge.calls if c["module"] == "M3"]
+    assert m3_calls and "M3" in m3_calls[0]["module_context"]
+
+
+def test_m1_m3_without_a_judge_stay_rules_only(mock_documents, registry, catalogue):
+    from investwatch_analytics.pipeline import analyze
+
+    for prefix in ("3c41441c", "007bbcee"):
+        for f in analyze(_mock(mock_documents, prefix), registry=registry, catalogue=catalogue, now=NOW):
+            assert f.model.llm is None and "Tryb regułowy" in f.summary
+            assert all(r.method == "rule" for r in f.rules)
+
+
+def test_m1_m3_judge_failure_keeps_rules_only(mock_documents, registry, catalogue):
+    from investwatch_analytics.pipeline import analyze
+
+    for prefix in ("3c41441c", "007bbcee"):
+        doc = _mock(mock_documents, prefix)
+        with_judge = analyze(doc, registry=registry, catalogue=catalogue, now=NOW, judge=FakeJudge(status="unavailable"))
+        without = analyze(doc, registry=registry, catalogue=catalogue, now=NOW)
+        assert [f.rules for f in with_judge] == [f.rules for f in without]
+        assert all(f.model.llm is None for f in with_judge)
+
+
+def test_module_defaults_to_the_catalogues_own(registry):
+    spec = RuleSpec("S3.9", "x", "high", None, True, {}, llm={"question": "Q?", "when": "uncertain"})
+    judge = FakeJudge()
+    run_rules(Catalogue([spec], module="M3"), ctx_for("Tekst.", registry), judge=judge)
+    assert judge.calls[0]["module"] == "M3"
