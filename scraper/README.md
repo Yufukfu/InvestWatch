@@ -3,7 +3,11 @@
 Data collection service: collectors for web pages and social media, job queue, scheduler.
 
 - **Owner:** Adam
-- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; queue and schedule follow in `scraper-orchestration`; the first social platform is `scraper-v2`.
+- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; the queue, scheduler, scan requests, events and the run that joins all pieces (`scraper-orchestration`) are implemented. The first social platform is `scraper-v2`.
+
+## Run
+
+`python -m iw_scraper worker` runs the job worker, the scan-request consumer (Redis Stream `iw:scan-requests`) and `GET /health` (port `SCRAPER_HEALTH_PORT`, default 8080, not published by compose). `python -m iw_scraper scheduler` enqueues due sources and runs the republish sweep; run exactly one per stack (a second only wastes ticks, jobs are de-duplicated by slot). Both stop gracefully on SIGTERM: running jobs finish for `SCRAPER_SHUTDOWN_DEADLINE`, the rest is requeued. `python -m iw_scraper.seed` registers the KNF source once. Needs `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` (`MINIO_BUCKET`, `MINIO_SECURE` optional) besides `REDIS_URL`; the stack's `api-migrate` must have run first.
 
 ## Run the tests
 
@@ -17,7 +21,7 @@ Without those services (a bare `docker run` of the image) the service-backed tes
 
 ## Configuration
 
-Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; the run that joins the pieces (`scraper-orchestration`) passes the values on, so until it exists the library takes them as parameters. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
+Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; `app.py` passes the values on. The queue, worker and health settings are `SCRAPER_<FIELD>` variables, listed with their defaults in `.env.example`. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
 
 | Variable | Default | Meaning |
 |---|---|---|

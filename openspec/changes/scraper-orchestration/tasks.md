@@ -28,7 +28,7 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 
 ## 4. Closing
 
-- [ ] 4.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md`, `iw-scraper-conventions` (session per attempt, proxy per request, a block ends the run and backoff is owned by the queue, not in-run identity rotation), `CONTRACTS_DIR` and the `SCRAPER_*` settings in `.env.example` (done; `PROXY_*` and `COMPOSE_INTERNAL_HOSTS` belong to `scraper-v1`, see `follow-ups.md`) and a note to C for the §7 list, your row in `.docs/STATUS.md`), run docs-check, and add the `iw-ai-log` row
+- [x] 4.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md`, `iw-scraper-conventions` (session per attempt, proxy per request, a block ends the run and backoff is owned by the queue, not in-run identity rotation), `CONTRACTS_DIR` and the `SCRAPER_*` settings in `.env.example` (done; `PROXY_*` and `COMPOSE_INTERNAL_HOSTS` belong to `scraper-v1`, see `follow-ups.md`) and a note to C for the §7 list, your row in `.docs/STATUS.md`), run docs-check, and add the `iw-ai-log` row
 - [ ] 4.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
