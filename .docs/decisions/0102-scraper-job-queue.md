@@ -1,14 +1,12 @@
 # 0102. Scraper job queue and scheduler
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-21
-- Deciders: (human, Adam's module; to be filled in)
-
-Agent draft: Context, Options and evidence only. The decision and its rationale are for a human.
+- Deciders: agent-written; accepted by the human via the PR that merges `scraper-v1`
 
 ## Context
 
-`scraper-v1` (`openspec/changes/scraper-v1/design.md`) needs to run collection per `sources.schedule_cron`, bound per-domain concurrency, retry transient failures and survive a restart. The stack already has PostgreSQL and Redis (`.docs/integration-plan.md` §1). The fetch path is `asyncio`-only (`iw-scraper-conventions`), so a sync-only worker would need a thread or process per job. Open source and on-premise only.
+`scraper-v1` (`openspec/changes/archive/2026-11-21-scraper-v1/design.md`) needs to run collection per `sources.schedule_cron`, bound per-domain concurrency, retry transient failures and survive a restart. The stack already has PostgreSQL and Redis (`.docs/integration-plan.md` §1). The fetch path is `asyncio`-only (`iw-scraper-conventions`), so a sync-only worker would need a thread or process per job. Open source and on-premise only.
 
 ## Options considered
 
@@ -29,10 +27,12 @@ Not looked at: Celery, Dramatiq, Temporal (heavier than the hackathon needs, by 
 
 ## Decision
 
-(to be written by a human)
+Use **`arq`** (Redis) with a thin scheduler that enqueues a job per active source from `schedule_cron`.
+
+Rationale, from the evidence above: it is a native `async` queue with per-function `timeout`, `max_tries` and `Retry` (`procrastinate` is also async-first; `APScheduler` has no queue; `rq` is sync-only), it needs Redis only, which the stack already has, and it adds no tables to a PostgreSQL schema that Damian's module owns (unlike `procrastinate`). In-house evidence (`hen68/cheaply-self-hosted`, `shared/ratelimit.py`) gives a Redis token-bucket limiter with a local fallback to port for per-domain limits; neither in-house repo uses a queue library.
 
 ## Consequences
 
-(to be written by a human)
-
-Points a decider may want checked: whether the cron string in `sources` must be used as is, whether the dedup unique index and `job_errors` should live in the same transaction as the queue, and who owns extra PostgreSQL tables.
+- `arq` cron is field-based, so `schedule_cron` strings are parsed by us; an invalid expression is a recorded `invalid_request`, not a crash. Each due job gets a unique id per source and cron slot so replicas do not double-enqueue; that relies on `arq` rejecting a duplicate job id, which nothing read here confirms, so `scraper-orchestration` verifies it with a test.
+- The evidence shows `max_jobs` per worker and no per-domain limit, so per-domain control is ours and lives in Redis: a counting semaphore for jobs running at once and a token bucket for request starts, not in-process state.
+- Nothing read shows how pending jobs behave when a worker stops mid-job; `scraper-orchestration` tests resume after restart against a real Redis before the spec's resume scenario is relied on, and this ADR is superseded if it fails.
