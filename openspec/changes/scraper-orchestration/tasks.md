@@ -23,13 +23,13 @@ Each group from 1 on is one commit. Its first task is the failing test and its l
 - [x] 3.2 Failing tests, then `GET /health` (200, or 503 naming the dependency) and single-line JSON logs on stdout; the operable scenarios pass
 - [x] 3.3 Failing end-to-end test on docker compose with the saved KNF page behind a local stub server and one worker: a seeded source yields a schema-valid `documents` row, a MinIO object, an `iw:documents` entry and `scan.finished`, and a rerun adds nothing. Fix only what this test shows, within this change's specs (`app.py`, `tests/test_e2e.py`; the `worker` and `scheduler` commands are `python -m iw_scraper worker|scheduler`); `mutations: 8 tried, 8 caught`; review fixes: `mutations: 7 tried, 6 caught` (the survivor is the one-line argv wiring of the seed command); whole-branch review fixes: `mutations: 10 tried, 10 caught`
 - [x] 3.4 Failing end-to-end test with two workers and two simultaneous scan requests for one source: exactly one `documents` row for an unchanged page, one `iw:documents` entry (`tests/test_e2e.py`, two workers and consumers)
-- [ ] 3.5 Opt-in live smoke test (marker `scraper_live`, deselected by default and outside CI) fetching the real KNF page once through the full stack, plus a seed script that inserts the KNF `sources` row (`seed.py` with `mutations: 3 tried, 3 caught` and `tests/test_live.py` are written; the live run waits for a human go-ahead, as it makes a real request to knf.gov.pl)
+- [x] 3.5 Opt-in live smoke test (marker `scraper_live`, deselected by default and outside CI) fetching the real KNF page once through the full stack, plus a seed script that inserts the KNF `sources` row (`seed.py` with `mutations: 3 tried, 3 caught` and `tests/test_live.py` are written; the live run passed once on 2026-11-21 with the human's go-ahead: one document from the real KNF page, status ok)
 - [x] 3.6 Mutation check; `mutations: 31 tried, 30 caught` (n/a for the end-to-end and smoke tests 3.3-3.5; guards of 3.1-3.2: supervisor, worker runner, cancel lock, health, log format and redaction. Survivor: waiting for cancelled jobs before `close()`, which only matters when a second cancel arrives after the first was delivered; arq merges the two in the same tick, so no test can force it. One mutant, the supervisor returning when its work returns, was confirmed by running its test by hand because the batch run mis-parsed the output)
 
 ## 4. Closing
 
 - [x] 4.1 Apply the `iw-docs-update` skill (`scraper/CLAUDE.md`, `iw-scraper-conventions` (session per attempt, proxy per request, a block ends the run and backoff is owned by the queue, not in-run identity rotation), `CONTRACTS_DIR` and the `SCRAPER_*` settings in `.env.example` (done; `PROXY_*` and `COMPOSE_INTERNAL_HOSTS` belong to `scraper-v1`, see `follow-ups.md`) and a note to C for the §7 list, your row in `.docs/STATUS.md`), run docs-check, and add the `iw-ai-log` row
-- [ ] 4.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
+- [x] 4.2 Run the `iw-pr-review` skill and fix real findings; `iw-reviewer` reports no open blocking findings
 
 ## Workflow follow-up
 
