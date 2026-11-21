@@ -4,8 +4,8 @@
 The loader SHALL read the four KNF list pages linked from the summary page in annexes 1 and 2 (brokerage houses, banks conducting brokerage activity, branches of foreign investment firms, foreign investment firms without a branch). It SHALL follow `?page=N` from page 1 until a page adds no new record, and SHALL fail when the page count exceeds 100. It SHALL check that the summary page still links each of the four list paths. It SHALL send at most 2 requests per second with a timeout, and SHALL retry a failed request at most 3 times with backoff. Unit tests SHALL use saved page snapshots and never the network.
 
 #### Scenario: All lists paginated
-- **WHEN** the no-branch list has 36 pages and page 37 returns the same records as page 36
-- **THEN** the loader reads pages 1-36, stops at page 37, and records 712 records for that list
+- **WHEN** a list's last page N is answered again for page N+1, as KNF does (the no-branch list had 36 pages, 712 records, on 2026-11-21)
+- **THEN** the loader reads pages 1 to N, stops after page N+1, and keeps every record of pages 1 to N once
 
 #### Scenario: Page down
 - **WHEN** a list page answers HTTP 503 or times out on all attempts
