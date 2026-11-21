@@ -2,18 +2,36 @@
 
 Data collection service: collectors for web pages and social media, job queue, scheduler.
 
-- **Owner:** A
-- **Status:** queue, scan requests, scheduler, events, health and graceful shutdown are built (`openspec/changes/scraper-orchestration/`); the collector and ingest are separate changes. The service entry commands arrive with them.
-- **Queue:** `arq` on Redis ([ADR 0102](../.docs/decisions/0102-scraper-job-queue.md)). A job holds a per-source run lock, respects a per-domain concurrency cap, retries timeouts and HTTP 5xx with backoff, and reports `scan.started` / `scan.finished` on Redis `iw:events`.
+- **Owner:** Adam
+- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; queue and schedule follow in `scraper-orchestration`; the first social platform is `scraper-v2`.
 
 ## Run the tests
 
-Needs Docker (the tests use a real Redis). From the repository root:
+Python 3.12 and the native TLS library are only in the image. From the repository root, one command starts the same Redis, PostgreSQL and MinIO images as the stack and runs every test, including the ingest and queue tests:
 
 ```bash
 COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml run --rm --build test
 ```
 
+Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
+
 ## Configuration
 
-Environment variables only; see [`.env.example`](.env.example). `REDIS_URL` is required, everything else has a default.
+Environment only; defaults in `scraper/.env.example`. `config.py` reads and validates each variable; the run that joins the pieces (`scraper-orchestration`) passes the values on, so until it exists the library takes them as parameters. Proxy URLs may hold credentials: they are never logged, only a `proxy-xxxxxxxx` identifier is.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PROXY_LIST` | empty (direct) | comma-separated `http`, `https` or `socks5` proxy URLs |
+| `PROXY_ROTATION` | `per_request` | `per_request` or `per_session` |
+| `PROXY_COOLDOWN_SECONDS` | `90` | how long a proxy that answered 407 is skipped |
+| `REDIS_URL` | `redis://localhost:6379/0` | shared rate limit, deferrals and domain pause |
+| `DOMAIN_MIN_INTERVAL_SECONDS` | `5` | minimum gap between request starts per domain, all workers |
+| `MAX_RETRY_AFTER_SECONDS` | `300` | cap on a `Retry-After` wait |
+| `DOMAIN_FAILURE_THRESHOLD` | `5` | consecutive failure outcomes before a domain is paused |
+| `DOMAIN_PAUSE_SECONDS` | `600` | length of that pause |
+| `FETCH_TIMEOUT_SECONDS` | `20` | per-request timeout |
+| `FETCH_MAX_BYTES` | `5242880` | response size cap (5 MiB) |
+| `ALLOWED_PORTS` | `80,443` | ports the scraper may request |
+| `COMPOSE_INTERNAL_HOSTS` | empty | extra host names refused as internal (bare names are always refused) |
+| `FETCH_EXTRA_HOSTS` | empty | hosts allowed for redirects and scraped links besides the active sources |
+| `CONTRACTS_DIR` | `<repo>/contracts` | JSON Schemas used for validation |

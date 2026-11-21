@@ -2,7 +2,7 @@
 
 - Status: proposed
 - Date: 2026-11-21
-- Deciders: (human, module A with C; to be filled in)
+- Deciders: (human, Adam's module with Damian; to be filled in)
 
 Agent draft: Context and criteria only. No candidate was researched, so there is no evidence on access or terms yet; the decision and its rationale are for a human.
 

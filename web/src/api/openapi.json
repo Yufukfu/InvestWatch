@@ -1,0 +1,1850 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "InvestWatch API",
+    "version": "1.0.0",
+    "description": "REST API between the `api` service (owner: C) and the dashboard (owner: B).\nReal-time events are delivered over Socket.IO (namespace `/events`), see `schemas/events.schema.json`.\nMock responses for every endpoint are in `mocks/`.\n"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api",
+      "description": "Local docker-compose"
+    }
+  ],
+  "tags": [
+    {
+      "name": "findings"
+    },
+    {
+      "name": "stats"
+    },
+    {
+      "name": "calibration"
+    },
+    {
+      "name": "settings"
+    },
+    {
+      "name": "sources"
+    },
+    {
+      "name": "documents"
+    },
+    {
+      "name": "system"
+    }
+  ],
+  "paths": {
+    "/findings": {
+      "get": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "List findings",
+        "description": "Sorted by `detected_at` descending unless `sort` is given. Each item includes the derived `risk_level`.",
+        "parameters": [
+          {
+            "name": "module",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "M1",
+                "M2",
+                "M3"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Comma-separated list",
+            "schema": {
+              "type": "string",
+              "example": "new,in_review"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "risk_level",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          },
+          {
+            "name": "score_min",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Full-text search in title",
+            "excerpt": null,
+            "firm and advertiser": null,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "detected_at",
+                "-detected_at",
+                "score",
+                "-score"
+              ],
+              "default": "-detected_at"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/page_size"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of findings (mock `mocks/findings.json`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "total",
+                    "page",
+                    "page_size"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/findings/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Finding details with its document",
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/finding-detail.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema"
+                    }
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "$id": "https://investwatch.local/contracts/v1/scraped-document.schema.json",
+                      "title": "ScrapedDocument",
+                      "description": "A single piece of content collected by the scraper. Stored in the `documents` table (simple columns + JSONB payload). Produced by the scraper, consumed by analytics and the API.",
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "platform",
+                        "source_kind",
+                        "url",
+                        "fetched_at",
+                        "text"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "$ref": "#/paths/~1findings~1{id}/get/responses/200/content/application~1json/schema/properties/document/$defs/uuid"
+                        },
+                        "source_id": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/paths/~1findings~1{id}/get/responses/200/content/application~1json/schema/properties/document/$defs/uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Row in the `sources` table; null for ad-hoc URLs."
+                        },
+                        "platform": {
+                          "$ref": "#/paths/~1findings~1{id}/get/responses/200/content/application~1json/schema/properties/document/$defs/platform"
+                        },
+                        "source_kind": {
+                          "type": "string",
+                          "enum": [
+                            "firm_own",
+                            "third_party",
+                            "unknown"
+                          ],
+                          "description": "firm_own = published by the investment firm itself (M2); third_party = published by someone else (M1/M3)."
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "canonical_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "uri"
+                        },
+                        "fetched_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "published_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "http_status": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 100,
+                          "maximum": 599
+                        },
+                        "lang": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ISO 639-1 code if known; analytics detects it anyway.",
+                          "pattern": "^[a-z]{2}$"
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "Clean text of the whole material (no HTML)."
+                        },
+                        "content_hash": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^[a-f0-9]{64}$",
+                          "description": "sha256 of the normalized text, for deduplication."
+                        },
+                        "author": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "handle": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "profile_url": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "uri"
+                            },
+                            "followers": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            }
+                          }
+                        },
+                        "links": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "href"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "href": {
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "rel": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Raw rel attribute, e.g. 'nofollow sponsored'."
+                              }
+                            }
+                          }
+                        },
+                        "media": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "type",
+                              "object_key"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "image",
+                                  "video"
+                                ]
+                              },
+                              "object_key": {
+                                "type": "string",
+                                "description": "Key in the MinIO bucket `iw-raw`, e.g. media/{document_id}/0.jpg"
+                              },
+                              "alt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "ocr_text": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Filled by analytics if OCR is run."
+                              }
+                            }
+                          }
+                        },
+                        "html_object_key": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "html/{document_id}.html in MinIO."
+                        },
+                        "screenshots": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "desktop": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "tablet": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "mobile": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          }
+                        },
+                        "blocks": {
+                          "type": "array",
+                          "description": "Rendered text blocks from Playwright. Needed only for the visual M2 rules (R4-R8, R13); empty for social media posts.",
+                          "items": {
+                            "$ref": "#/paths/~1findings~1{id}/get/responses/200/content/application~1json/schema/properties/document/$defs/block"
+                          }
+                        },
+                        "scrape_meta": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "additionalProperties": true,
+                          "properties": {
+                            "scraper": {
+                              "type": "string",
+                              "enum": [
+                                "playwright",
+                                "httpx",
+                                "api",
+                                "manual"
+                              ]
+                            },
+                            "user_agent": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "proxy": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "Proxy identifier, never credentials."
+                            },
+                            "duration_ms": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            }
+                          }
+                        }
+                      },
+                      "$defs": {
+                        "uuid": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                        },
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "web",
+                            "facebook",
+                            "instagram",
+                            "tiktok",
+                            "youtube",
+                            "x",
+                            "forum",
+                            "other"
+                          ]
+                        },
+                        "block": {
+                          "type": "object",
+                          "required": [
+                            "viewport",
+                            "text",
+                            "font_size_px",
+                            "visible"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "viewport": {
+                              "type": "string",
+                              "enum": [
+                                "desktop",
+                                "tablet",
+                                "mobile"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "tag": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "font_size_px": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "font_weight": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 100,
+                              "maximum": 1000
+                            },
+                            "color": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^#[0-9a-fA-F]{6}$"
+                            },
+                            "background_color": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^#[0-9a-fA-F]{6}$"
+                            },
+                            "bbox": {
+                              "type": [
+                                "array",
+                                "null"
+                              ],
+                              "description": "[x, y, width, height] in CSS pixels relative to the page.",
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 4,
+                              "maxItems": 4
+                            },
+                            "visible": {
+                              "type": "boolean",
+                              "description": "Rendered and not hidden by display/visibility/opacity/zero size."
+                            },
+                            "in_viewport_on_load": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ],
+                              "description": "Visible without scrolling."
+                            },
+                            "requires_interaction": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ],
+                              "description": "Hidden behind <details>, accordion, tooltip, modal or a link."
+                            },
+                            "region": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "main",
+                                "header",
+                                "footer",
+                                "legal",
+                                "aside",
+                                "overlay",
+                                null
+                              ]
+                            },
+                            "overflow_clipped": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ],
+                              "description": "Text is cut off at this viewport."
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "screenshot_urls": {
+                      "type": "object",
+                      "description": "API URLs for the screenshots, keyed by viewport",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Change status / add a note",
+        "description": "Emits `finding.updated` over Socket.IO.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": false,
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "new",
+                      "in_review",
+                      "confirmed",
+                      "false_positive",
+                      "closed"
+                    ]
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated finding",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://investwatch.local/contracts/v1/finding.schema.json",
+                  "title": "Finding",
+                  "description": "Result of one analytics module (M1, M2 or M3) for one document. Stored in the `findings` table, served by the API. `risk_level` is NOT stored - the API derives it from `score` and the current module threshold.",
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "document_id",
+                    "module",
+                    "score",
+                    "status",
+                    "title",
+                    "url",
+                    "platform",
+                    "rules",
+                    "detected_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema/$defs/uuid"
+                    },
+                    "document_id": {
+                      "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema/$defs/uuid"
+                    },
+                    "module": {
+                      "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema/$defs/module"
+                    },
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Raw score; higher = more likely a violation."
+                    },
+                    "risk_level": {
+                      "type": "string",
+                      "enum": [
+                        "high",
+                        "medium",
+                        "low"
+                      ],
+                      "description": "Present only in API responses: high >= threshold, medium >= threshold - 0.2, otherwise low."
+                    },
+                    "status": {
+                      "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema/$defs/status"
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Short user-facing title (Polish)."
+                    },
+                    "summary": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "2-3 sentence user-facing rationale (Polish)."
+                    },
+                    "firm": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "description": "Investment firm the material concerns (M1, M2).",
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "registry_id": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema/$defs/uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "registry_type": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "brokerage_house",
+                            "brokerage_bank",
+                            "foreign_branch",
+                            "foreign_no_branch",
+                            null
+                          ]
+                        },
+                        "authorized": {
+                          "type": "boolean"
+                        },
+                        "match_confidence": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    },
+                    "advertiser": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "description": "Party publishing or offering the content (M1, M3).",
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "handle": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "profile_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "uri"
+                        },
+                        "website": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "uri"
+                        },
+                        "in_registry": {
+                          "type": "boolean"
+                        },
+                        "on_warning_list": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ],
+                          "description": "Entity appears on the KNF public warnings list."
+                        }
+                      }
+                    },
+                    "rules": {
+                      "type": "array",
+                      "description": "M2: results of the 18 UKNF rules (R1-R18); M1/M3: signals (S1.x / S3.x).",
+                      "items": {
+                        "$ref": "#/paths/~1findings~1{id}/patch/responses/200/content/application~1json/schema/$defs/rule_result"
+                      }
+                    },
+                    "content_excerpt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 500
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "platform": {
+                      "type": "string",
+                      "enum": [
+                        "web",
+                        "facebook",
+                        "instagram",
+                        "tiktok",
+                        "youtube",
+                        "x",
+                        "forum",
+                        "other"
+                      ]
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Analyst note set via PATCH."
+                    },
+                    "detected_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "model": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "pipeline_version": {
+                          "type": "string"
+                        },
+                        "llm": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "null = rules-only mode (LLM unavailable)."
+                        },
+                        "embedder": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "$defs": {
+                    "uuid": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                    },
+                    "module": {
+                      "type": "string",
+                      "enum": [
+                        "M1",
+                        "M2",
+                        "M3"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "new",
+                        "in_review",
+                        "confirmed",
+                        "false_positive",
+                        "closed"
+                      ]
+                    },
+                    "rule_result": {
+                      "type": "object",
+                      "required": [
+                        "rule_id",
+                        "name",
+                        "result",
+                        "severity"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "rule_id": {
+                          "type": "string",
+                          "pattern": "^(R([1-9]|1[0-8])|R12[ab]|S[13]\\.[0-9]+)$",
+                          "description": "R1-R18 (incl. R12a/R12b) for M2, S1.x for M1, S3.x for M3."
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "result": {
+                          "type": "string",
+                          "enum": [
+                            "fail",
+                            "pass",
+                            "not_applicable",
+                            "uncertain"
+                          ],
+                          "description": "For M1/M3 signals: fail = signal detected (suspicious)."
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": [
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "evidence": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Exact quote from the document (verified substring)."
+                        },
+                        "evidence_locator": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "viewport": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "desktop",
+                                "tablet",
+                                "mobile",
+                                null
+                              ]
+                            },
+                            "bbox": {
+                              "type": [
+                                "array",
+                                "null"
+                              ],
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 4,
+                              "maxItems": 4
+                            }
+                          }
+                        },
+                        "explanation": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "User-facing (Polish)."
+                        },
+                        "legal_basis": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "method": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "rule",
+                            "llm",
+                            "hybrid",
+                            null
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/stats/trend": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Number of findings over time per module",
+        "parameters": [
+          {
+            "name": "module",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "M1",
+                "M2",
+                "M3"
+              ]
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "day"
+              ],
+              "default": "hour"
+            }
+          },
+          {
+            "name": "risk_level",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/trend.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "bucket",
+                    "points"
+                  ],
+                  "properties": {
+                    "bucket": {
+                      "type": "string",
+                      "enum": [
+                        "hour",
+                        "day"
+                      ]
+                    },
+                    "points": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "t",
+                          "M1",
+                          "M2",
+                          "M3"
+                        ],
+                        "properties": {
+                          "t": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "M1": {
+                            "type": "integer"
+                          },
+                          "M2": {
+                            "type": "integer"
+                          },
+                          "M3": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats/summary": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Counters for the dashboard header",
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/summary.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "total",
+                    "by_module",
+                    "by_status",
+                    "by_platform",
+                    "by_risk_level"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "by_module": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "by_status": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "by_platform": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "by_risk_level": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "last_scan_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Precision/recall curve for the threshold slider",
+        "description": "Computed from analyst labels (confirmed / false_positive) and the gold set.",
+        "parameters": [
+          {
+            "name": "module",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "M1",
+                "M2",
+                "M3"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/calibration-M2.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "module",
+                    "current_threshold",
+                    "labeled_samples",
+                    "points"
+                  ],
+                  "properties": {
+                    "module": {
+                      "type": "string",
+                      "enum": [
+                        "M1",
+                        "M2",
+                        "M3"
+                      ]
+                    },
+                    "current_threshold": {
+                      "type": "number"
+                    },
+                    "labeled_samples": {
+                      "type": "integer"
+                    },
+                    "points": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "threshold",
+                          "tp",
+                          "fp",
+                          "fn",
+                          "tn",
+                          "precision",
+                          "recall"
+                        ],
+                        "properties": {
+                          "threshold": {
+                            "type": "number"
+                          },
+                          "tp": {
+                            "type": "integer"
+                          },
+                          "fp": {
+                            "type": "integer"
+                          },
+                          "fn": {
+                            "type": "integer"
+                          },
+                          "tn": {
+                            "type": "integer"
+                          },
+                          "precision": {
+                            "type": "number"
+                          },
+                          "recall": {
+                            "type": "number"
+                          },
+                          "f1": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/thresholds": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Current thresholds per module",
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/thresholds.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thresholds"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update thresholds (recomputes risk_level for all findings)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Thresholds"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved thresholds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thresholds"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/sources": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "List sources",
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/sources.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/paths/~1sources/post/responses/201/content/application~1json/schema"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Add a source",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://investwatch.local/contracts/v1/source.schema.json",
+                  "title": "Source",
+                  "description": "A place the scraper collects content from. Stored in the `sources` table; managed by the scraper, editable from the dashboard.",
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "platform",
+                    "url",
+                    "source_kind",
+                    "target_modules",
+                    "active"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "type": "string",
+                      "enum": [
+                        "web",
+                        "facebook",
+                        "instagram",
+                        "tiktok",
+                        "youtube",
+                        "x",
+                        "forum",
+                        "other"
+                      ]
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Start URL, profile URL or search query URL."
+                    },
+                    "source_kind": {
+                      "type": "string",
+                      "enum": [
+                        "firm_own",
+                        "third_party",
+                        "unknown"
+                      ]
+                    },
+                    "target_modules": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "M1",
+                          "M2",
+                          "M3"
+                        ]
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    },
+                    "schedule_cron": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Cron expression, e.g. '0 */6 * * *'; null = manual only."
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "last_run_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "last_run_status": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "ok",
+                        "partial",
+                        "failed",
+                        "running",
+                        null
+                      ]
+                    },
+                    "documents_count": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/sources/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Edit a source (e.g. toggle active, change schedule)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1sources/post/responses/201/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/scans": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Trigger a manual scan of a source",
+        "description": "Pushes a message to Redis Stream `iw:scan-requests`. Progress arrives as `scan.started` / `scan.finished` events.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "source_id"
+                ],
+                "properties": {
+                  "source_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Scan queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queued": {
+                      "type": "boolean"
+                    },
+                    "source_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/documents/{id}/screenshot/{viewport}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        },
+        {
+          "name": "viewport",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "tablet",
+              "mobile"
+            ]
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Screenshot image from MinIO",
+        "responses": {
+          "200": {
+            "description": "PNG image",
+            "content": {
+              "image/png": {}
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Status of the API and its dependencies",
+        "responses": {
+          "200": {
+            "description": "Mock `mocks/health.json`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "services"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "degraded",
+                        "down"
+                      ]
+                    },
+                    "services": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "ok",
+                          "degraded",
+                          "down"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "page_size": {
+        "name": "page_size",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        }
+      }
+    },
+    "schemas": {
+      "Thresholds": {
+        "type": "object",
+        "required": [
+          "M1",
+          "M2",
+          "M3"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "M1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "M2": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "M3": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "SourceInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "facebook",
+              "instagram",
+              "tiktok",
+              "youtube",
+              "x",
+              "forum",
+              "other"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "firm_own",
+              "third_party",
+              "unknown"
+            ]
+          },
+          "target_modules": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "M1",
+                "M2",
+                "M3"
+              ]
+            },
+            "minItems": 1
+          },
+          "schedule_cron": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "details": {}
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Invalid request body or parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

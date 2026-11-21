@@ -6,48 +6,48 @@ Contract version: **v1** (frozen at 14:30 on Saturday; changes only after team a
 
 | Person | Module | Owns |
 |---|---|---|
-| **A** | Scraper | collectors (web + social media), job queue, scheduler, writes to `documents` + objects in MinIO |
-| **B** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel; **repository structure** |
-| **C** | Analytics + integration | database schema, contracts, REST API + WebSocket gateway, modules M1–M3, firm registry, docker-compose |
+| **Adam** | Scraper | collectors (web + social media), job queue, scheduler, writes to `documents` + objects in MinIO |
+| **Kacper** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel; **repository structure** |
+| **Damian** | Analytics + integration | database schema, contracts, REST API + WebSocket gateway, modules M1–M3, firm registry, docker-compose |
 
 Decisions from the team sync:
 
-- ✅ **C builds the REST API** (a thin layer over the same database). B works against mock data matching the contract in section 5 from the start; A focuses only on data collection.
+- ✅ **Damian builds the REST API** (a thin layer over the same database). Kacper works against mock data matching the contract in section 5 from the start; Adam focuses only on data collection.
 - ✅ **Social media:** we start with **one platform** and add more only if time allows.
 - ✅ **LLM:** accessed through an HTTP API; for the hackathon a hosted OpenAI-compatible model, with local Gemma as the env-only swap target ([ADR 0304](decisions/0304-llm-serving.md), note in section 7).
-- ✅ **Repository structure** is defined by B; the layout below is only the list of services that must exist.
+- ✅ **Repository structure** is defined by Kacper; the layout below is only the list of services that must exist.
 - ✅ **Spec-driven workflow with OpenSpec** + an AI work log (`.docs/ai-workflow.md`).
-- ⏳ Contracts (sections 3–6) – to be confirmed by A and B.
-- ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with A later.
+- ⏳ Contracts (sections 3–6) – to be confirmed by Adam and Kacper.
+- ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with Adam later.
 - ⏳ Milestone hours and the sleep rotation – to be agreed.
 
 ## 1. Architecture
 
 ```
                 ┌──────────────┐  XADD iw:documents   ┌──────────────────┐
- scheduler ────▶│  scraper (A) │ ───────────────────▶ │  analytics (C)   │
+ scheduler ────▶│  scraper (Adam) │ ───────────────────▶ │  analytics (Damian)   │
  (cron/beat)    │ Playwright,  │                      │ preprocessing,   │
                 │ httpx, UA/   │──┐                ┌──│ M1/M2/M3, LLM    │
                 │ proxy rotation  │                │  └────────┬─────────┘
                 └──────────────┘  │ INSERT         │ INSERT    │ PUBLISH iw:events
                                   ▼                ▼           ▼
                       ┌────────────────────┐   ┌──────────┐  ┌────────────────┐
-                      │ PostgreSQL         │   │ MinIO    │  │ api (C)        │
+                      │ PostgreSQL         │   │ MinIO    │  │ api (Damian)        │
                       │ sources, documents,│   │ html,    │  │ FastAPI REST + │
                       │ findings, registry │   │ screens  │  │ Socket.IO      │
                       └─────────▲──────────┘   └──────────┘  └───────┬────────┘
                                 └──────────────── SELECT ────────────┤
                                                                       ▼
                                                             ┌────────────────┐
-                                                            │ dashboard (B)  │
+                                                            │ dashboard (Kacper)  │
                                                             └────────────────┘
                      LLM endpoint (OpenAI-compatible API: hosted, or local Gemma via Ollama) ◀── analytics
 ```
 
-Services in `docker-compose.yml` (single `docker compose up` command):
-`postgres`, `redis`, `minio`, `scraper`, `scheduler`, `analytics`, `api`, `dashboard` (+ `ollama` behind a compose profile, the local LLM fallback from ADR 0304).
+Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
+`postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then `scraper`, `scheduler`, `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
-Required service folders (exact layout per B): `scraper` (A), `analytics` (C), `api` (C), `dashboard` (B), `contracts` (C – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `docker-compose.yml` and `.env.example` at the root.
+Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
 ## 2. Integration points
 
@@ -121,7 +121,8 @@ Minimum required for analytics to work: `id, platform, url, fetched_at, text, so
 `blocks` and `screenshots` are required only for the visual rules; without them rules R4–R8 and R13 get `not_applicable`, never a false "pass".
 
 Table `sources` (managed by the scraper, editable from the dashboard):
-`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at`.
+`id, name, platform, url, source_kind, target_modules ["M1","M2","M3"], schedule_cron, active, last_run_at, last_run_status (ok|partial|failed|running)`.
+The scraper writes only `last_run_at` and `last_run_status`. `documents_count` in the `Source` contract ([`source.schema.json`](../contracts/schemas/source.schema.json)) is not a column: the API counts the source's `documents` rows on read (total, not the last job).
 
 ## 4. Contract: `Finding` (analytics → database → API)
 
@@ -181,7 +182,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | GET | `/findings` | list; filters: `module, status, platform, source_id, risk_level, score_min, date_from, date_to, q` |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
-| GET | `/stats/trend` | `?module&bucket=hour|day&date_from&date_to` → `[{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }]` |
+| GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
 | GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level` |
@@ -201,7 +202,7 @@ Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`):
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
 | `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
 | `finding.updated` | `{ id, status }` | status change (sync between tabs) |
-| `scan.started` / `scan.finished` | `{ source_id, documents }` | scan progress bar |
+| `scan.started` / `scan.finished` | `{ source_id, documents, status }`: `documents` = new documents of that job (integer or null), `status` = `ok\|partial\|failed` or null ([`events.schema.json`](../contracts/schemas/events.schema.json)) | scan progress bar |
 
 ## 7. Shared conventions
 
@@ -221,7 +222,7 @@ Submission deadline: **Sunday 22.11, 11:00**. Buffer: we submit at 10:30. Hours 
 | When | Milestone | Evidence |
 |---|---|---|
 | Sat 14:30 | **Contracts v1 frozen** | `contracts/*.schema.json`, mocks `findings.json`, `documents.json`; docker-compose with postgres/redis/minio starts |
-| Sat 17:00 | **Integration #1 – "thin thread"** | A pushes 1 real document → C creates a finding (even rule-based only) → B sees it in the table and gets a WS alert |
+| Sat 17:00 | **Integration #1 – "thin thread"** | Adam pushes 1 real document → Damian creates a finding (even rule-based only) → Kacper sees it in the table and gets a WS alert |
 | Sat 22:00 | **Integration #2 – all modules** | ≥ 1 source each for M1, M2, M3; filters, trend and status change work on real data |
 | Sun 03:00 | **Integration #3 – calibration** | the threshold slider changes FP/FN on the gold set; the scheduler scans periodically |
 | Sun 08:00 | **Feature freeze** | fixes only; dependency audit, README, clean console |

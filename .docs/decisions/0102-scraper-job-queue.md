@@ -6,7 +6,7 @@
 
 ## Context
 
-`scraper-v1` (`openspec/changes/scraper-v1/design.md`) needs to run collection per `sources.schedule_cron`, bound per-domain concurrency, retry transient failures and survive a restart. The stack already has PostgreSQL and Redis (`.docs/integration-plan.md` §1). The fetch path is `asyncio`-only (`iw-scraper-conventions`), so a sync-only worker would need a thread or process per job. Open source and on-premise only.
+`scraper-v1` (`openspec/changes/archive/2026-11-21-scraper-v1/design.md`) needs to run collection per `sources.schedule_cron`, bound per-domain concurrency, retry transient failures and survive a restart. The stack already has PostgreSQL and Redis (`.docs/integration-plan.md` §1). The fetch path is `asyncio`-only (`iw-scraper-conventions`), so a sync-only worker would need a thread or process per job. Open source and on-premise only.
 
 ## Options considered
 
@@ -17,7 +17,7 @@ Evidence read from packages installed into a scratch venv (Python 3.9.6). Nothin
    - Needs Redis only (`redis[hiredis]<6`); `requires-python >=3.9`. The cron syntax is field-based (`hour`, `minute`, ...), not a cron string, so `sources.schedule_cron` would need translating.
 2. **`procrastinate` 3.6.0** (PostgreSQL)
    - Async-first; periodic tasks in `periodic.py`, retry strategies in `retry.py`, own SQL schema (`schema.py`, `sql/`), worker and CLI. Uses `psycopg[pool]`, `croniter`, `attrs`; `requires-python >=3.9`.
-   - Needs no Redis for the queue, and queued jobs share the transaction database; adds its own tables to PostgreSQL that module C does not own.
+   - Needs no Redis for the queue, and queued jobs share the transaction database; adds its own tables to PostgreSQL that Damian's module does not own.
 3. **`APScheduler` 3.11.3** (scheduler only)
    - `AsyncIOScheduler` runs coroutines in the service's own event loop; no separate worker or broker. Persistent job stores need extras (`sqlalchemy`, `redis`). Retries and per-domain limits must be written by us. `requires-python >=3.8`.
 4. **`rq` 2.8.0** (Redis)
@@ -29,7 +29,7 @@ Not looked at: Celery, Dramatiq, Temporal (heavier than the hackathon needs, by 
 
 Use **`arq`** (Redis) with a thin scheduler that enqueues a job per active source from `schedule_cron`.
 
-Rationale, from the evidence above: it is a native `async` queue with per-function `timeout`, `max_tries` and `Retry` (`procrastinate` is also async-first; `APScheduler` has no queue; `rq` is sync-only), it needs Redis only, which the stack already has, and it adds no tables to a PostgreSQL schema that module C owns (unlike `procrastinate`). In-house evidence (`hen68/cheaply-self-hosted`, `shared/ratelimit.py`) gives a Redis token-bucket limiter with a local fallback to port for per-domain limits; neither in-house repo uses a queue library.
+Rationale, from the evidence above: it is a native `async` queue with per-function `timeout`, `max_tries` and `Retry` (`procrastinate` is also async-first; `APScheduler` has no queue; `rq` is sync-only), it needs Redis only, which the stack already has, and it adds no tables to a PostgreSQL schema that Damian's module owns (unlike `procrastinate`). In-house evidence (`hen68/cheaply-self-hosted`, `shared/ratelimit.py`) gives a Redis token-bucket limiter with a local fallback to port for per-domain limits; neither in-house repo uses a queue library.
 
 ## Consequences
 
