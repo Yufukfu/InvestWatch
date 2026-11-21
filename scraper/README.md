@@ -7,9 +7,17 @@ Data collection service: collectors for web pages and social media, job queue, s
 
 ## Run
 
-`python -m iw_scraper worker` runs the job worker, the scan-request consumer (Redis Stream `iw:scan-requests`) and `GET /health` (port `SCRAPER_HEALTH_PORT`, default 8080, not published by compose). `python -m iw_scraper scheduler` enqueues due sources and runs the republish sweep; run exactly one per stack (a second only wastes ticks, jobs are de-duplicated by slot). Both stop gracefully on SIGTERM: running jobs finish for `SCRAPER_SHUTDOWN_DEADLINE`, the rest is requeued. `python -m iw_scraper.seed [CRON]` registers the KNF source (optional 5-field `CRON`) and every source of the `scraper/seeds/*.toml` files, one `[[source]]` table per page (`name`, `url`, `source_kind`, `target_modules`, optional `schedule_cron` and `platform`, default `web`). It validates all files before writing anything, leaves a source whose URL is already registered untouched (dashboard edits survive) and is safe to run twice or at once. To add a source, add a table to a seed file and run it again. `pytest -m scraper_live tests/test_seed_live.py` re-checks that every seeded URL is final and fetchable; it makes real requests, so run it deliberately. Needs `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` (`MINIO_BUCKET`, `MINIO_SECURE` optional) besides `REDIS_URL`; the stack's `api-migrate` must have run first.
+`python -m iw_scraper worker` runs the job worker, the scan-request consumer (Redis Stream `iw:scan-requests`) and `GET /health` (port `SCRAPER_HEALTH_PORT`, default 8080, not published by compose). `python -m iw_scraper scheduler` enqueues due sources and runs the republish sweep; run exactly one per stack (a second only wastes ticks, jobs are de-duplicated by slot). Both stop gracefully on SIGTERM: running jobs finish for `SCRAPER_SHUTDOWN_DEADLINE`, the rest is requeued. `python -m iw_scraper.seed [CRON]` registers the KNF source (optional 5-field `CRON`) and every source of the `scraper/seeds/*.toml` files, one `[[source]]` table per page (`name`, `url`, `source_kind`, `target_modules`, optional `schedule_cron` and `platform`, default `web`). It validates all files before writing anything, leaves a source whose URL is already registered untouched (dashboard edits survive) and is safe to run twice or at once. To add a source, add a table to a seed file and run it again. `pytest -m scraper_live tests/test_seed_live.py` re-checks that every seeded URL is final and fetchable; it makes real requests, so run it deliberately. The worker and the scheduler need `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` (`MINIO_BUCKET`, `MINIO_SECURE` optional) besides `REDIS_URL`; the stack's `api-migrate` must have run first.
 
 The queue's own Redis keys are prefixed `iw:scraper:` (queue `iw:scraper:queue`; jobs and results are JSON); only `arq`'s `arq:job:` and `arq:result:` keys are fixed by the library. A scheduler that starts late enqueues the slots of the last five minutes it missed.
+
+`python -m iw_scraper.discover [--since HOURS] [--limit N] [--dry-run]` reads the links of documents already stored and inserts new hosts as inactive `[candidate] <host>` sources (no network call, [ADR 0108](../.docs/decisions/0108-source-discovery-candidates.md)); approve one with `PATCH /api/sources/{id}` (set `active`, a real `name`, `source_kind`, `schedule_cron`), and run one discovery at a time. Needs only `DATABASE_URL`.
+
+## Run in the stack
+
+`docker compose up --build` at the repository root starts `worker`, `scheduler` and a one-shot `seed` (`scraper/compose.yaml`) after `api-migrate` and `minio-init`; there is nothing to start by hand. `seed` registers the KNF source with the cron `SCRAPER_SEED_CRON` (default `0 */6 * * *`, UTC; an invalid value stops the stack at `seed`), so the scheduler scans it on schedule; a scan can also be requested from the dashboard. Scale collectors with `docker compose up --scale worker=3`, keep one `scheduler`. Operator settings (`PROXY_LIST`, `SCRAPER_SEED_CRON`, `FETCH_*`, ...) are in the root `.env.example`. `worker` needs internet access (`egress`); `worker` serves `/health` on `SCRAPER_HEALTH_PORT` to the stack's networks only, and no scraper container publishes a host port.
+
+Hardware: the containers are limited to 1 CPU / 768 MB (`worker`), 0.5 CPU / 256 MB (`scheduler`) and 0.5 CPU / 128 MB (`seed`, exits after seconds), about 2 CPUs and 1.2 GB together at most. These limits are first estimates, not measured on the demo machine. Check the deployment with `scraper/tests/stack.sh` (needs Docker and network; `config`, `root` and `run` groups; `STACK_ROOT=1` runs it through the root `compose.yaml`).
 
 ## Run the tests
 
@@ -22,6 +30,12 @@ COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml
 Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
 
 Opt-in live smoke tests make real requests and are deselected by default (`-m scraper_live`); the Telegram one collects the public channel named in `IW_LIVE_TELEGRAM_HANDLE` once.
+
+## Effectiveness report
+
+`python -m iw_scraper.report [--since HOURS] [--json]` (needs `DATABASE_URL`; run it in the scraper image) prints what the scraper collected and what failed from `sources`, `documents` and `job_errors`: per active source the last run status, documents (total, in the window, latest `fetched_at`) and job errors of the window by reason; then the never-run and no-document sources, inactive sources apart, and totals (documents by platform and kind, share with raw HTML, errors by reason). `--since` is a whole number of hours from 1 to 87600, ten years (default 24); `--json` prints one JSON object. It reads all three tables in one read-only, repeatable-read transaction (one snapshot), shows sources by id and name (no URL) and never `job_errors.detail`; the report goes to stdout, log lines to stderr, and a database failure exits non-zero.
+
+It cannot give a success rate: the schema keeps only the last run of each source, so statuses are of the last run and nothing older, and the header says so.
 
 ## Author provenance
 
