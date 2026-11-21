@@ -187,6 +187,7 @@ async def test_concurrent_full_runs_leave_one_row_per_url_including_knf(pool, tm
 async def test_a_database_error_after_connecting_exits_with_a_fixed_message(pool, monkeypatch):
     # the public schema of the test database has no `sources` table, so the first query fails after the connection worked
     monkeypatch.setenv("DATABASE_URL", os.environ["IW_TEST_PG_DSN"])
+    monkeypatch.setattr("sys.argv", ["seed"])  # not pytest's own arguments: the first one is read as the cron
 
     with pytest.raises(SystemExit) as failed:
         await main()
@@ -200,6 +201,7 @@ async def test_a_bug_after_connecting_is_not_reported_as_a_database_failure(pool
 
     monkeypatch.setattr("iw_scraper.seed.seed_all", broken)
     monkeypatch.setenv("DATABASE_URL", os.environ["IW_TEST_PG_DSN"])
+    monkeypatch.setattr("sys.argv", ["seed"])
 
     with pytest.raises(ValueError, match="a bug of ours"):
         await main()
