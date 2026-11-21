@@ -14,7 +14,7 @@ from importlib import resources
 
 from ..registry import _normalize_domain, core_name
 from .fetch import LISTS, SUMMARY_URL, FetchedList
-from .parse import RawRecord, country_code
+from .parse import COUNTRIES, RawRecord, country_code
 
 #: Fixed namespace of registry ids (ADR 0311). Never change it: every stored `registry_id` derives from it.
 NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, SUMMARY_URL)
@@ -36,7 +36,7 @@ _QUOTES = str.maketrans("", "", "\"'„”“‚’`«»")
 _WORD = re.compile(r"\w+", re.UNICODE)
 _COMPANY_SUFFIX = re.compile(
     r"[\s,]+(s\.\s?a\.|sp\.\s?z\s?o\.\s?o\.|spółka akcyjna|ltd\.?|limited|gmbh|ag|a\.s\.|s\.r\.o\.|b\.v\.|n\.v\.|"
-    r"sas|s\.a\.s\.|as|asa|a/s|ab|oy|plc|se|s\.p\.a\.|s\.l\.|d\.o\.o\.|llc)\s*$",
+    r"sas|s\.a\.s\.|as|asa|a/s|ab|oy|plc|se|s\.p\.a\.|s\.l\.|s\.a\.u\.|o\.c\.p\.|d\.o\.o\.|llc|ood)\s*$",
     re.IGNORECASE,
 )
 _BRACKETS = re.compile(r"\(([^()]+)\)")
@@ -68,7 +68,11 @@ def _stopwords() -> frozenset[str]:
     return frozenset(w for line in text.splitlines() if (w := line.split("#", 1)[0].strip().casefold()))
 
 
-STOPWORDS = _stopwords()
+#: Generic words plus country names (`(Cyprus)` in a firm name is no alias): Polish from the country map.
+STOPWORDS = _stopwords() | {w.casefold() for name in COUNTRIES for w in name.split()}
+#: Single words that name a well-known company outside the register (`PGE`: PGE Polska Grupa Energetyczna, not
+#: PGE Dom Maklerski). Dropped as a bare alias only; longer forms (`PGE Dom Maklerski`) stay.
+AMBIGUOUS_WORDS = frozenset({"pge"})
 
 
 @dataclass
@@ -110,7 +114,7 @@ def split_name(record: RawRecord) -> tuple[str, list[str]]:
 def _without_suffix(text: str) -> str:
     previous = None
     while previous != text:
-        previous, text = text, _COMPANY_SUFFIX.sub("", text).strip(" ,.")
+        previous, text = text, _COMPANY_SUFFIX.sub("", text).strip(" ,")
     return text
 
 
@@ -175,6 +179,8 @@ def _alias_rejection(alias: str) -> str | None:
         return "too_short"
     if all(w in STOPWORDS for w in words):
         return "generic"
+    if len(words) == 1 and words[0] in AMBIGUOUS_WORDS:
+        return "ambiguous"
     return None
 
 
@@ -229,17 +235,25 @@ def build(fetched: dict[str, FetchedList], *, previous: dict[str, str] | None = 
 
 
 def _carry_ids(firms: list[Firm], previous: dict[str, str], report: BuildReport) -> None:
+    """Keep the previous CSV's id: for the same name first (a firm renamed in an earlier reload keeps the
+    carried id, not uuid5 of its new name), else for a struck former name. Never an id another firm holds.
+    Firms are visited in a fixed order, so two firms naming the same former name resolve the same way."""
     used = {f.id for f in firms}
-    for firm in firms:
-        if normalize_name(firm.name) in previous:
+
+    def take(firm: Firm, old_id: str) -> bool:
+        if old_id == firm.id or old_id in used:
+            return old_id == firm.id
+        used.discard(firm.id)
+        firm.id = old_id
+        used.add(old_id)
+        return True
+
+    for firm in sorted(firms, key=lambda f: (TYPE_ORDER[f.type], normalize_name(f.name))):
+        if (old_id := previous.get(normalize_name(firm.name))) and take(firm, old_id):
             continue
-        olds = [*firm.former_names, NAME_SEPARATOR.join(firm.former_names)]
-        for old in olds:
+        for old in [*firm.former_names, NAME_SEPARATOR.join(firm.former_names)]:
             old_id = previous.get(normalize_name(old))
-            if old_id and old_id not in used:
-                used.discard(firm.id)
-                firm.id = old_id
-                used.add(old_id)
+            if old_id and old_id != firm.id and take(firm, old_id):
                 report.renamed.append((old, firm.name))
                 break
 
@@ -274,19 +288,26 @@ def _filter_aliases(firms: list[Firm], report: BuildReport) -> None:
         firm.aliases = kept
 
 
+def _on(host: str, bases) -> bool:
+    return any(host == b or host.endswith("." + b) for b in bases)
+
+
 def _filter_domains(firms: list[Firm], supervisor_hosts: set[str], report: BuildReport) -> None:
-    owners: dict[str, set[str]] = defaultdict(set)
+    """Drop supervisor and social hosts (and their subdomains); a domain several firms list stays with the
+    single firm of the highest type precedence, as aliases do (`xtb.com`: Polish XTB S.A. over XTB Ltd)."""
+    claims: dict[str, dict[str, str]] = defaultdict(dict)
     for firm in firms:
         for d in firm.domains:
-            owners[d].add(firm.id)
+            claims[d][firm.id] = firm.type
+    owners = {d: alias_owner(list(v.items())) for d, v in claims.items()}
     for firm in firms:
         kept = []
         for d in firm.domains:
-            if d in supervisor_hosts:
+            if _on(d, supervisor_hosts):
                 reason = "supervisor"
-            elif any(d == s or d.endswith("." + s) for s in SOCIAL_HOSTS):
+            elif _on(d, SOCIAL_HOSTS):
                 reason = "social"
-            elif len(owners[d]) > 1:
+            elif owners[d] != firm.id:
                 reason = "shared"
             else:
                 kept.append(d)

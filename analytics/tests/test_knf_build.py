@@ -257,3 +257,89 @@ def test_unknown_country_is_empty_and_counted():
 
 def test_record_counts(built):
     assert built[1].records == {"brokerage_houses": 28, "banks": 10, "branches": 10, "no_branch": 52}
+
+
+# ---- review fixes (group 2) -------------------------------------------------------------------------
+
+
+def _previous(firms) -> dict[str, str]:
+    return {normalize_name(f.name): f.id for f in firms}
+
+
+def test_renamed_id_survives_a_second_reload():
+    old_id = firm_id("EFIX DOM MAKLERSKI S.A.")
+    rec = _record("<span>CERES DOM INWESTYCYJNY S.A.<br /><strike>EFIX DOM MAKLERSKI S.A.</strike></span>")
+    lists = _fetched(brokerage_houses=_list("brokerage_houses", rec))
+    first, _ = build(lists, previous={normalize_name("EFIX DOM MAKLERSKI S.A."): old_id})
+    second, report = build(lists, previous=_previous(first))
+    third, _ = build(lists, previous=_previous(second))
+    assert first[0].id == second[0].id == third[0].id == old_id
+    assert report.renamed == []  # already carried, not a new rename
+
+
+def test_previous_id_for_the_same_name_is_kept_even_if_uuid5_differs():
+    prev = {normalize_name("XTB S.A."): "0b6d2f1e-3c4a-4b5d-8e6f-7a8b9c0d1e2f"}
+    firms, _ = build(_fetched(brokerage_houses=_list("brokerage_houses", _record("XTB S.A."))), previous=prev)
+    assert firms[0].id == "0b6d2f1e-3c4a-4b5d-8e6f-7a8b9c0d1e2f"
+
+
+def test_carry_over_does_not_depend_on_record_order():
+    a = _record("<span>Alpha One Ltd<br /><strike>Old Shared Ltd</strike></span>")
+    b = _record("<span>Beta Two Ltd<br /><strike>Old Shared Ltd</strike></span>")
+    prev = {normalize_name("Old Shared Ltd"): firm_id("Old Shared Ltd")}
+    one, _ = build(_fetched(no_branch=_list("no_branch", a, b)), previous=prev)
+    two, _ = build(_fetched(no_branch=_list("no_branch", b, a)), previous=prev)
+    assert {f.name: f.id for f in one} == {f.name: f.id for f in two}
+    assert sorted(f.id for f in one).count(firm_id("Old Shared Ltd")) == 1
+
+
+def test_bracketed_seat_is_not_an_alias(built):
+    firms, report = built
+    ati = _firm(firms, "A.T.I. Associstes (Cyprus) Ltd")
+    assert "Cyprus" not in ati.aliases
+    assert ("A.T.I. Associstes (Cyprus) Ltd", "Cyprus", "generic") in report.dropped_aliases
+    (f,), _ = build(_fetched(no_branch=_list("no_branch", _record("Airwallex Capital (Netherlands) B.V."))))
+    assert "Netherlands" not in f.aliases and "Airwallex Capital" in f.aliases
+
+
+def test_generic_short_core_inc_and_ambiguous_pge_dropped(built):
+    firms = built[0]
+    assert "INC" not in _firm(firms, "DOM MAKLERSKI INC S.A.").aliases
+    assert "PGE" not in _firm(firms, "PGE DOM MAKLERSKI S.A.").aliases
+    assert "PGE DOM MAKLERSKI" in _firm(firms, "PGE DOM MAKLERSKI S.A.").aliases
+
+
+def test_more_legal_suffixes_stripped():
+    (f,), _ = build(_fetched(no_branch=_list("no_branch", _record("Finax, o.c.p., a.s."),)))
+    assert "Finax" in f.aliases and not any(a.endswith(", o.c.p") for a in f.aliases)
+    (g,), _ = build(_fetched(no_branch=_list(
+        "no_branch", _record("Tradition Financial Services España, Sociedad De Valores, S.A.U."))))
+    assert "Tradition Financial Services España, Sociedad De Valores" in g.aliases
+    assert not any(a.endswith(", U") for a in g.aliases)
+
+
+def test_bank_departament_case_forms_are_clean(built):
+    handlowy = [f for f in built[0] if f.name.startswith("BANK HANDLOWY")][0]
+    assert "departamentu maklerskiego Banku Handlowego" in handlowy.aliases
+    assert not any("maklerskiego Departament" in a for a in handlowy.aliases)
+
+
+def test_supervisor_subdomain_is_never_a_firm_domain():
+    a = _record("Cy Firm Ltd", Organ_nadzoru="www.cysec.gov.cy")
+    b = _record("Odd Firm Ltd", Dodatkowe_informacje="rejestr: registry.cysec.gov.cy, www.odd.example")
+    firms, report = build(_fetched(no_branch=_list("no_branch", a, b)))
+    assert _firm(firms, "Odd Firm Ltd").domains == ["odd.example"]
+    assert ("registry.cysec.gov.cy", "supervisor") in report.dropped_domains
+
+
+def test_shared_domain_stays_with_the_polish_firm():
+    pl = _record("XTB S.A.", Dodatkowe_informacje="www.xtb.com")
+    cy = _record("XTB Ltd", Dodatkowe_informacje="www.xtb.com")
+    firms, report = build(_fetched(brokerage_houses=_list("brokerage_houses", pl), no_branch=_list("no_branch", cy)))
+    assert _firm(firms, "XTB S.A.").domains == ["xtb.com"] and _firm(firms, "XTB Ltd").domains == []
+    assert ("xtb.com", "shared") in report.dropped_domains
+
+
+def test_polish_country_name_in_brackets_is_not_an_alias():
+    (f,), _ = build(_fetched(no_branch=_list("no_branch", _record("Kappa Invest (Niemcy) GmbH"))))
+    assert "Niemcy" not in f.aliases

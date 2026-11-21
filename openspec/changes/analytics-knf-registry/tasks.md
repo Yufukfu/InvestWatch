@@ -15,7 +15,7 @@ Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip 
 
 - [x] 2.1 Failing tests (`tests/test_knf_build.py`) for "Stable firm ids", "One firm per name", "Generated aliases" and "Firm domains": same ids on reload and reordering, a list move, a rename carried over, the duplicate in one list (`GBR Capital GmbH`), the firm on two lists (`IG Europe GmbH` → `foreign_branch`), a shared core dropped from both firms, `PKO BP` and the brokerage-unit line, trade names without domains, short and stop-list aliases dropped while the full name stays, short brands kept (`XTB`, `mBANK`), `XTB` kept by the Polish firm, the translation line, `50k.trade` without the struck `50coins.com`, `cysec.gov.cy` excluded, empty domains, social and shared domains dropped (the stale manual row is group 4)
 - [x] 2.2 `knf/build.py` (normalization, uuid5 namespace constant, carry-over from the previous CSV, type precedence, alias generation and filters, `knf/stoplist.txt`, domain extraction and exclusions, the manual-domains merge); tests green
-- [x] 2.3 Mutation check; `mutations: 24 tried, 24 caught`
+- [x] 2.3 Mutation check; `mutations: 24 tried, 24 caught`; review fix: `mutations: 12 tried, 12 caught`
 
 ## 3. Matching at real scale (≈ 1.5 h)
 
