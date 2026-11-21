@@ -118,7 +118,14 @@ def _read_file(directory: Path, name: str, max_bytes: int) -> bytes:
 
 
 def _read_html(name: str, data: bytes, settings: FileSettings) -> dict:
-    parsed = parse_page(data, "text/html", settings.url)
+    # fetch hands the parser UTF-8 (the client transcodes), so valid UTF-8 is declared; anything else is left to
+    # its <meta charset>, which lxml reads when no charset is given
+    try:
+        data.decode("utf-8")
+        content_type = "text/html; charset=utf-8"
+    except UnicodeDecodeError:
+        content_type = "text/html"
+    parsed = parse_page(data, content_type, settings.url)
     return {
         "title": parsed.title,
         "canonical_url": parsed.canonical_url,

@@ -13,6 +13,10 @@ The scraper SHALL provide a command that reads every supported file of a directo
 - **WHEN** a directory holds `oferta.html` and the command runs with its source settings
 - **THEN** one `documents` row exists whose `text`, `title`, `canonical_url` and `links` equal what `parse_page` gives for that file, `html/{document_id}.html` exists in `iw-raw`, and `iw:documents` received the document id
 
+#### Scenario: HTML sample without a declared charset
+- **WHEN** an `.html` file is valid UTF-8 and has no `<meta charset>`
+- **THEN** its `text` equals what `parse_page` gives for the same bytes as a fetched page (`charset=utf-8`), so Polish letters are kept; a file that is not valid UTF-8 is decoded by its `<meta charset>`
+
 #### Scenario: Text sample
 - **WHEN** a directory holds a plain-text file (`post.txt`) or a Markdown file (extension md)
 - **THEN** one document is ingested whose `text` is the file content, with a non-blank `html` stored for it

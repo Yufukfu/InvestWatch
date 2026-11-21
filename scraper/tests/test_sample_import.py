@@ -56,6 +56,28 @@ def test_an_html_sample_gives_what_parse_page_gives(directory):
     assert author is None
 
 
+POLISH = "<html><head><title>Oferta</title></head><body><p>Zysk 20% miesięcznie, gwarancja zysku – Łódź</p></body></html>"
+
+
+def test_a_utf8_html_sample_without_a_meta_charset_keeps_its_polish_letters(directory):
+    put(directory, "oferta.html", POLISH)
+
+    page, _ = read(directory, "oferta.html")
+
+    live = parse_page(POLISH.encode(), "text/html; charset=utf-8", page["url"])  # what fetch hands the parser
+    assert page["text"] == "Zysk 20% miesięcznie, gwarancja zysku – Łódź"
+    assert page["text"] == live.text
+
+
+def test_a_windows_1250_html_sample_is_decoded_by_its_meta_charset(directory):
+    markup = POLISH.replace("<head>", '<head><meta charset="windows-1250">')
+    put(directory, "oferta.html", markup.encode("cp1250"))
+
+    page, _ = read(directory, "oferta.html")
+
+    assert page["text"] == "Zysk 20% miesięcznie, gwarancja zysku – Łódź"
+
+
 @pytest.mark.parametrize("name", ["post.txt", "post.md", "POST.TXT"])
 def test_a_text_sample_becomes_text_with_a_non_blank_html(directory, name):
     put(directory, name, "Kup teraz\n a < b")

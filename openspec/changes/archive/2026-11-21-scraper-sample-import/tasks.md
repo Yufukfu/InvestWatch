@@ -24,3 +24,7 @@
 
 - [x] 4.1 Apply the `iw-docs-update` skill: `scraper/README.md` (short: the command, flags, `samples.toml` keys, the author rule, no filler), `.docs/security-audit.md` only if a dependency changed (none expected), `scraper/CLAUDE.md` module list, `.docs/status/scraper.md`, `.docs/INDEX.md` if it routes sample loading; add the `iw-ai-log` row; `docs-check` prints `docs-check: ok`
 - [x] 4.2 Run the `iw-pr-review` skill and fix real findings
+
+## 5. Review fix
+
+- [x] 5.1 PR #56 blocking review: a UTF-8 `.html` sample without `<meta charset>` was parsed as Latin-1. Test first with Polish letters (red: mojibake), then declare `charset=utf-8` when the bytes are valid UTF-8 and leave other files to their `<meta charset>`; `mutations: 2 tried, 2 caught`
