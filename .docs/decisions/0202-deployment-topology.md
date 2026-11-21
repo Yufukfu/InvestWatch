@@ -3,6 +3,7 @@
 - Status: accepted
 - Date: 2026-11-21
 - Deciders: agent-written; accepted by Kacper via PR
+- Partly superseded by [ADR 0306](0306-object-storage-image.md) (network names): the networks are the project-scoped `data`, `edge` and `egress` (`<project>_data`, ...), not the fixed `iw-data` and `iw-edge`, so stacks from parallel worktrees never share one. Updated at Kacper's request in his review of PR #18.
 
 ## Context
 
@@ -22,14 +23,14 @@ Option 2, with a **Caddy gateway** as the only published entry (`https://localho
 
 Shared infrastructure lives in `infra/compose.yaml` (Kacper):
 
-- **Postgres 17** only on the network `iw-data`, declared `internal` (verified: no host port, no internet from the container). SCRAM authentication. Two roles: `iw_admin` for migrations and ops, and `iw_app` for services (CRUD on tables, no DDL; verified that `CREATE TABLE` is denied).
+- **Postgres 17** only on the network `data` (project-scoped `<project>_data`), declared `internal` (verified: no host port, no internet from the container). SCRAM authentication. Two roles: `iw_admin` for migrations and ops, and `iw_app` for services (CRUD on tables, no DDL; verified that `CREATE TABLE` is denied).
 - Secrets only in an untracked `.env`, generated randomly by `scripts/init-env.sh`; compose refuses to start without them (`${VAR:?}`).
 - Containers run with `no-new-privileges`, resource limits, and (where the image allows) read-only filesystems and no capabilities.
 - Images come from the official AWS ECR mirrors (`public.ecr.aws/docker/library/*`, `public.ecr.aws/nginx/*`), because Docker Hub rate-limits anonymous pulls (observed HTTP 429 during setup).
 
 ## Consequences
 
-- A new module adds its own `compose.yaml` and one line in the root `include:`; it joins `iw-edge` to be routed by the gateway and `iw-data` to reach the database.
+- A new module adds its own `compose.yaml` and one line in the root `include:`; it joins `edge` to be routed by the gateway, `data` to reach the database and `egress` for outbound internet (project-scoped names, never a fixed `name:`; joining contract in [`infra/README.md`](../../infra/README.md)).
 - Services call each other over the internal networks by service name; only the gateway is exposed. A deployment outside compose replaces the gateway routes with the platform's ingress without code changes.
 - TLS inside the stack is plain HTTP behind the gateway; mutual TLS between services is out of scope for the hackathon.
 - The local CA certificate must be trusted once per machine (`infra/README.md`), or the browser warns.

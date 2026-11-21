@@ -1,0 +1,50 @@
+# Tasks
+
+Before group 1: Damian approves ADR 0306 and the open questions in `design.md` are answered (Kacper for questions 2-3, Adam for question 4). Every check runs through `infra/tests/smoke.sh` against a throwaway project (`-p iw-smoke-$$`, `down -v` on exit).
+
+## 1. Smoke harness and project-scoped networks
+
+- [x] 1.1 Failing test: `infra/tests/smoke.sh` (throwaway env files through a new optional output-path argument of `scripts/init-env.sh`) with a "two stacks at once" check (two projects; the smoke test uses ports 18443/18080 and 18444/18081, so it never clashes with a stack already running on 8443/8080) and a "no cross-stack DNS" check; it fails today because `iw-edge`/`iw-data` are global names
+- [x] 1.2 Remove the explicit network `name:` in `infra/compose.yaml` and `web/compose.yaml`; verify `docker compose -p <p> --env-file .env -f web/compose.yaml config` still resolves; both parallel-stack scenarios and the existing gateway check from `infra/CLAUDE.md` "Done" pass
+- [x] 1.3 Mutation check (put a fixed `name:` back on one network, the parallel-stack check must fail); mutations: 2 tried, 2 caught (fixed `name:` on `data`, fixed `name:` on `edge`)
+
+## 2. Secrets and env
+
+- [x] 2.1 Failing tests: `.env.example` lists every infrastructure secret empty; a generated `.env` has every secret at 32+ characters and passes `docker compose config`; `init-env` never overwrites and resolves a relative path from the caller; a missing secret is named by `config` (helper `requires_secret`, used for `REDIS_PASSWORD` in group 3 and `MINIO_ROOT_PASSWORD`/`MINIO_SECRET_KEY` in group 4, where the services that need them are added)
+- [x] 2.2 Extend root `.env.example` (`REDIS_PASSWORD`, `REDIS_URL` template comment, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ENDPOINT=minio:9000`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET=iw-raw`, `MINIO_SECURE=false`, `OLLAMA_MODEL=gemma3:4b`, `IW_DEV_*_PORT`) and `scripts/init-env.sh` (generate the three new secrets, same length check); the three secret scenarios pass
+- [x] 2.3 Mutation check (give one secret a default in compose, its check must fail); mutations: 4 tried, 4 caught (drop `*_SECRET_KEY` from the fill pattern, disable the overwrite guard, default for `POSTGRES_APP_PASSWORD`, relative path resolved from the repo root)
+
+## 3. Redis
+
+- [x] 3.1 Failing tests: missing `REDIS_PASSWORD` is named; authenticated `PING` returns `PONG` and an unauthenticated one returns `NOAUTH`; `CONFIG GET` shows `appendonly yes` and `maxmemory-policy noeviction`; `iw:settings:thresholds` survives `docker compose restart redis`
+- [x] 3.2 Add `redis` (redis 8-alpine from the ECR mirror, pinned digest) to `infra/compose.yaml` per design decision 2: `iw-data` only, volume `redisdata`, healthcheck, limits, hardening; the three Redis scenarios pass
+- [x] 3.3 Mutation check (drop `--appendonly yes`, then drop `--requirepass`; each must be caught); mutations: 6 tried, 6 caught (no `--requirepass`, `--appendonly no`, `allkeys-lru`, default for `REDIS_PASSWORD`, redis also on `edge`, plus the group 2 review fix: no CRLF strip in `init-env`)
+
+## 4. Object storage
+
+- [x] 4.1 Failing tests: `minio-init` exits 0 and `iw-raw` exists; app credentials can put and get `html/<uuid>.html` but cannot create a bucket; anonymous get is denied; a second `up` keeps an existing object
+- [x] 4.2 Read the installed Chainguard `minio` and `minio-client` images (entrypoint, shell, health command) before writing anything; add `minio` and `minio-init` with `infra/minio/init.sh` per design decision 3 and ADR 0306 (pinned digests, volume `miniodata`, `iw-data` only); the four object-storage scenarios pass
+- [x] 4.3 Mutation check (grant the app user `s3:*`, then skip `--ignore-existing`; each must be caught); mutations: 5 tried, 5 caught (policy `s3:*` on `*`, `mb` without `--ignore-existing`, bucket set to public download, default for `MINIO_SECRET_KEY`, policy never attached). Group 3 review fix: Redis password over stdin; an argv check was tried and dropped because it cannot fail (Redis rewrites its process title, the password-in-argv mutant survived)
+
+## 5. Networks, egress and dev ports
+
+- [x] 5.1 Failing tests (probes from the test-only `infra/tests/compose.probe.yaml`; dev ports in the smoke test are 25432/26379/29000, not the defaults): in the default stack only `gateway` publishes ports; a container on `iw-data` only cannot reach a public address; with `infra/compose.dev-ports.yaml` the three data ports listen on `127.0.0.1` only
+- [x] 5.2 Add network `egress` (not internal) to `infra/compose.yaml` and the opt-in `infra/compose.dev-ports.yaml` per design decision 7; the three isolation scenarios pass
+- [x] 5.3 Mutation check (bind a dev port to `0.0.0.0`, then mark `data` non-internal; each must be caught); mutations: 4 tried, 4 caught (`data` not internal, dev port on all interfaces, redis publishing a host port while also on `egress`, plus the group 4 review fix: Redis behind a pipe is not PID 1). One more mutant, a host port on a data-only service, was equivalent: Docker publishes nothing for a container on an internal network only
+
+## 6. Local LLM profile
+
+- [x] 6.1 Failing tests (verified with `SMOKE_LLM=1`: gemma3:4b pulled and listed on `/v1/models`; an unknown model stands in for an unreachable registry): without `--profile llm` neither `ollama` nor `ollama-pull` exists and no `ollama_models` volume is created; with the profile `GET /v1/models` lists `gemma3:4b`; with egress blocked `ollama-pull` exits non-zero and the other services stay healthy (the profile test is opt-in, `SMOKE_LLM=1`, because it downloads several GB)
+- [x] 6.2 Add `ollama` and `ollama-pull` behind profile `llm` per design decision 4 (pinned tag, `iw-data` + `egress`, volume `ollama_models`, no host port); the three profile scenarios pass
+- [x] 6.3 Mutation check (remove `profiles: [llm]` from `ollama-pull`, the plain-up check must fail); mutations: 2 tried, 2 caught (no profile on `ollama-pull`, no profile on `ollama`). The first `SMOKE_LLM=1` run exposed a test bug: `up --wait` returns while the one-shot is still pulling, so the test now waits for `ollama-pull` to exit
+
+## 7. Joining contract
+
+- [x] 7.1 Failing test: a throwaway module service in a test-only compose file under `infra/tests/` (`compose.module.yaml`; it passed at once, because groups 3-4 already provide the conditions, so the red proof is the mutation check in 7.3) with the documented `depends_on` starts only after `postgres`/`redis` are healthy and `minio-init` exited 0, and is not started when `minio-init` is forced to fail
+- [x] 7.2 Write the joining contract in `infra/README.md` (networks per need, `depends_on` conditions, env names, running a module alone with `-p` and `--env-file`, parallel worktree ports, dev-ports override, `--profile llm` and pre-pulling) and the rules in `infra/CLAUDE.md`; both joining scenarios pass
+- [x] 7.3 Mutation check (change `service_completed_successfully` to `service_started`, the failure-blocks-dependants check must fail); mutations: 2 tried, 2 caught (`service_started` for `minio-init`, `minio-init` swallowing a failed `mb`). Only the `minio-init` ordering is proven; `postgres`/`redis` health comes earlier anyway (follow-up 6). Whole-branch review fixes: 5 more mutants, 5 caught (object policy on `arn:aws:s3:::*`, serving `ollama` on `egress`, constant secret generator, fixed `egress` name, `ollama` without profile under a plain `up`)
+
+## 8. Closing
+
+- [x] 8.1 Apply the iw-docs-update skill (Damian's `.docs/STATUS.md` row is left to the coordinating session, as instructed, to avoid merge conflicts): ADR 0306 final digests, `.docs/decisions/README.md` row, root `README.md` Quick Start (LLM profile), `.docs/integration-plan.md` §1 (include-based `compose.yaml`, object-store note), `.docs/INDEX.md` if a route changes, Damian's own row in `.docs/STATUS.md`; `docs-check` passes; add the iw-ai-log row
+- [x] 8.2 Run the iw-pr-review skill and fix real findings (normal and security whole-branch passes; fixed: serving `ollama` bridged `data` to the internet, over-broad-policy and egress-network test gaps, a plain-`up` check that could not fail, leaked `devhost` networks, stale docs; the rest triaged in `follow-ups.md`. After the rebase onto `main` 15afabb, a third whole-branch pass found that the cross-bucket check passed vacuously if the root write failed; it is now guarded (mutant: root write to a missing bucket, caught). It also found the smoke test's undocumented Node use (now in its header) and the archive's relative links, which are fixed in the archive commit)

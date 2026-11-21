@@ -1,0 +1,11 @@
+# Test-only (infra/tests/smoke.sh): idle probes that join the infra networks the way a module would.
+# Used as an extra -f next to infra/compose.yaml; never part of the stack.
+services:
+  probe-egress:
+    image: public.ecr.aws/docker/library/alpine:3.22
+    command: ["sleep", "3600"]
+    networks: [egress]
+  probe-data:
+    image: public.ecr.aws/docker/library/alpine:3.22
+    command: ["sleep", "3600"]
+    networks: [data]
