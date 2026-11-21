@@ -9,6 +9,7 @@ Kacper's review of PR #35 (`analytics-m1-m3`, review of 6da4f1f) found six requi
 - **Advertiser on social hosts (item 4):** a social-platform document without an author gets `advertiser.name` and `website` null; the M1 title falls back to "Nieznany autor".
 - **M3 vocabulary (item 5):** S3.2 gains `investment consulting`, `wealth advisory`, `doradztwo finansowe`, `zarządzanie majątkiem`; S3.5 gains English pricing (`per month`, `monthly`, `/month`, `subscription`, amounts in PLN/EUR/USD). Every new pattern is linear and timed in `tests/test_redos.py`.
 - **Polish-marker filter (item 6):** applies only to `foreign_no_branch`; a branch of a foreign firm is registered in Poland, so its non-Polish ad still reaches M1.
+- **Own material of a foreign firm without a branch (item 12, coordinator):** a `foreign_no_branch` firm's own page or account goes to no module (log `out_of_scope_m2_foreign_no_branch`): M2 is only for firms registered in Poland, including Polish branches, and the firm is authorized, so not M3. Third-party ads of it are still M1.
 - **Titles and notes (items 7, 8):** M3 titles say "możliwe …" while the deciding signal is `uncertain`; M1 titles say "wspomina" instead of "reklamuje" when no ad signal (S1.2, S1.3, S1.4) fired. When S3.3 is not detected, the M3 summary says that personalisation (art. 76) is unconfirmed. ADR 0308 records the S3.4 gate as a deliberate "may indicate" choice.
 - **Excerpt (item 10):** M1/M3 `content_excerpt` is a window of at most 500 characters around the first evidence in the text, not the first 500 characters of the page.
 - **Docs (items 1, 11):** a privacy line in `analytics/README.md` (evidence and `advertiser` copy scraped handles, names and links verbatim into findings and events); an M1/M3 row in `.docs/INDEX.md`; a follow-up row linking #26's fix of the `_BOUNDARY` ReDoS in `preprocessing.py` (this PR merges after #26 and gets the fix through the worker merge).
@@ -21,7 +22,7 @@ Kacper's review of PR #35 (`analytics-m1-m3`, review of 6da4f1f) found six requi
 ### Modified Capabilities
 - `m1-third-party-signals`: S1.3 labels, S1.7 filter scope, M1 finding assembly (title verb, excerpt).
 - `m3-unauthorized-advice-signals`: S3.1 wording and registry flag, S3.2 and S3.5 vocabulary, S3.8 wording, M3 finding assembly (title, notes, excerpt).
-- `document-analysis`: routing (`foreign_no_branch` only), advertiser on social hosts without an author.
+- `document-analysis`: routing (`foreign_no_branch` filter, own material of `foreign_no_branch` firms out of scope), advertiser on social hosts without an author.
 
 ## Impact
 

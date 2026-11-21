@@ -26,6 +26,12 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 - [x] 4.2 `modules/m1.py`, `modules/m3.py`, `modules/excerpt.py`; tests green
 - [x] 4.3 Mutation check; `mutations: 11 tried, 10 caught`, 1 equivalent (counting a `pass` evidence: no rule returns one today; kept for LLM `pass` verdicts with a quote); the first survivor, the earliest of two evidences, got its own test
 
+## 4b. Own material of a foreign firm without a branch (item 12, coordinator)
+
+- [x] 4b.1 Failing tests: a `foreign_no_branch` firm's own account, its page on its domain and its `firm_own` page matched by name give no finding with the reason `out_of_scope_m2_foreign_no_branch`; a third-party ad of it is M1; a `foreign_branch` own page stays M2
+- [x] 4b.2 `modules/router.py` (`OUT_OF_SCOPE_M2`, `Route.reason`), `pipeline.py`; spec delta, `design.md` resolved questions with the Opis p.1 quotes; tests green
+- [x] 4b.3 Mutation check; `mutations: 5 tried, 5 caught` (the first survivor, a `firm_own` page matched by name, got its own test)
+
 ## 5. Docs and ADR (items 1, 8, 11)
 
 - [x] 5.1 ADR 0308 (the S3.4 gate as a deliberate "may indicate" choice, personalisation unconfirmed) and its row in `.docs/decisions/README.md`; privacy line in `analytics/README.md`; M1/M3 row in `.docs/INDEX.md`; `follow-ups.md` row linking #26's `_BOUNDARY` fix; `docs-check` clean

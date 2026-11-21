@@ -6,6 +6,9 @@ By publisher identity and registry result, not by `source_kind` alone:
   for firms registered in Poland);
 - `third_party`/`unknown` mentioning a registry firm by text or link host -> M1 (the pipeline may add M3
   against the publisher); otherwise -> M3.
+- the own material of a foreign firm without a Polish branch (`foreign_no_branch`) -> no module: M2 covers firms
+  registered in Poland "w tym polskie oddziały firm zagranicznych", and the firm is authorized, so it is not M3
+  (#35 review, item 12).
 """
 
 from __future__ import annotations
@@ -17,19 +20,30 @@ from ..registry import DOMAIN_CONFIDENCE, NAME_CONFIDENCE, Firm, FirmMatch, Regi
 from .advertiser import publisher_firm
 
 
+#: The firm's own material is outside M2 (Opis p.1); third-party ads of the firm are still M1.
+OUT_OF_SCOPE_M2 = {"foreign_no_branch"}
+
+
 @dataclass(frozen=True)
 class Route:
-    module: Module
+    module: Module | None  # None: no module applies; `reason` says why
     firm_match: FirmMatch | None
+    reason: str | None = None
+
+
+def _m2(match: FirmMatch) -> Route:
+    if match.firm.type in OUT_OF_SCOPE_M2:
+        return Route(None, match, "out_of_scope_m2_foreign_no_branch")
+    return Route("M2", match)
 
 
 def route(doc: ScrapedDocument, registry: Registry) -> Route:
     publisher = publisher_firm(doc, registry)
     if publisher is not None:
-        return Route("M2", _publisher_match(doc, registry, publisher))
+        return _m2(_publisher_match(doc, registry, publisher))
     if doc.source_kind == "firm_own":
         match = registry.match(doc.text, doc.url)
-        return Route("M2", match) if match is not None else Route("M3", None)
+        return _m2(match) if match is not None else Route("M3", None)
     match = registry.match(doc.text, doc.url) or registry.match_links(doc.links)
     return Route("M1", match) if match is not None else Route("M3", None)
 

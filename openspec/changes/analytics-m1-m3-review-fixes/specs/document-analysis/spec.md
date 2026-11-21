@@ -4,6 +4,7 @@
 Analytics SHALL route by publisher identity and registry result, not by `source_kind` alone (design decisions 1-2). The publisher is a registry firm when the author's `profile_url` host or a non-social page host is one of the firm's `website_domains` (equal or subdomain), or the normalized author handle equals a normalized name, core name or alias of the firm. Analytics SHALL run:
 - M2 for the publisher firm when the publisher is a registry firm, whatever the `source_kind`;
 - M2 for a `firm_own` document that the registry matches by text or page host;
+- no module for the own material (either of the two cases above) of a foreign firm without a Polish branch (`foreign_no_branch`): M2 covers firms registered in Poland, including Polish branches of foreign firms, and such a firm is authorized, so it is not M3 either; the document SHALL produce no finding and log the reason `out_of_scope_m2_foreign_no_branch`;
 - M1 for a `third_party` or `unknown` document whose publisher is not a registry firm and that mentions a registry firm by text or link host, unless the matched firm is a foreign firm without a Polish branch (`registry_type` `foreign_no_branch`) and the document does not target Poland (S1.7 `pass`), in which case it SHALL produce no finding and log the reason `not_targeting_poland`; a firm registered in Poland (`brokerage_house`, `brokerage_bank`, `foreign_branch`) stays in M1 scope whatever the language;
 - M3 for a document whose publisher is not a registry firm and that the registry does not match, including an unmatched `firm_own` document, which SHALL never go to M2;
 - M3 in addition to M1 when the M1 document carries an S3.3 or S3.4 candidate attributed to the publisher (requirement "M3 alongside M1" in `m3-unauthorized-advice-signals`).
@@ -11,6 +12,18 @@ An M3-only document whose advisory signals S3.2, S3.3, S3.4, S3.5 and S3.8 are a
 
 #### Scenario: Firm's own page
 - **WHEN** a `firm_own` document on a registered firm's domain is analyzed
+- **THEN** exactly one M2 finding is returned
+
+#### Scenario: Own material of a foreign firm without a branch
+- **WHEN** a `firm_own` page on the domain of a `foreign_no_branch` firm, or a post by that firm's own account, is analyzed
+- **THEN** no finding is returned and the log names the reason `out_of_scope_m2_foreign_no_branch`
+
+#### Scenario: Third-party ad of a foreign firm without a branch
+- **WHEN** a Polish third-party post advertises a `foreign_no_branch` firm
+- **THEN** exactly one M1 finding is returned
+
+#### Scenario: Own page of a foreign branch
+- **WHEN** a `firm_own` page on the domain of a `foreign_branch` firm is analyzed
 - **THEN** exactly one M2 finding is returned
 
 #### Scenario: Firm's own page without a registry match

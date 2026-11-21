@@ -368,3 +368,39 @@ def test_kacpers_english_advisory_offer(registry, catalogue):
     rules = {r.rule_id: r.result for r in f.rules}
     assert f.module == "M3" and rules["S3.2"] == "fail" and rules["S3.5"] == "fail"
 
+
+
+# ---- review of #35, item 12: own material of a foreign firm without a Polish branch -----------------
+
+
+def test_foreign_no_branch_own_account_is_out_of_scope(registry, catalogue, caplog):
+    raw = make_doc(**SOCIAL, author={"handle": "@atlanticbrokers"},
+                   text="Atlantic Brokers: otwórz konto i zarabiaj 20% rocznie. Rekomendujemy kupno akcji.")
+    with caplog.at_level(logging.INFO):
+        assert run(raw, registry, catalogue) == []
+    assert "out_of_scope_m2_foreign_no_branch" in reasons(caplog)
+
+
+def test_foreign_no_branch_own_page_is_out_of_scope(registry, catalogue, caplog):
+    raw = make_doc(url="https://atlantic-brokers.example.com/pl/oferta", text="Reklama. Atlantic Brokers – konto CFD.")
+    with caplog.at_level(logging.INFO):
+        assert run(raw, registry, catalogue) == []
+    assert "out_of_scope_m2_foreign_no_branch" in reasons(caplog)
+
+
+def test_third_party_post_about_foreign_no_branch_firm_is_m1(registry, catalogue):
+    raw = make_doc(**SOCIAL, author={"handle": "@ola"}, text="Polecam Atlantic Brokers, bonus 200 zł na start.")
+    [f] = run(raw, registry, catalogue)
+    assert f.module == "M1" and f.firm.registry_type == "foreign_no_branch"
+
+
+def test_foreign_branch_own_page_stays_m2(registry, catalogue):
+    raw = make_doc(url="https://eurotrade-markets.example.com/pl", text="Reklama. EuroTrade Markets – konto.")
+    assert modules_of(run(raw, registry, catalogue)) == ["M2"]
+
+
+def test_foreign_no_branch_own_page_matched_by_name_is_out_of_scope(registry, catalogue, caplog):
+    raw = make_doc(url="https://landing.example.com/atlantic", text="Reklama. Atlantic Brokers – konto CFD w 5 minut.")
+    with caplog.at_level(logging.INFO):
+        assert run(raw, registry, catalogue) == []
+    assert "out_of_scope_m2_foreign_no_branch" in reasons(caplog)

@@ -57,6 +57,9 @@ def analyze(
     r = route(doc, registry)
     ctx = Context(doc=doc, pre=pre, firm_match=r.firm_match, registry=registry)
     findings: list[Finding] = []
+    if r.module is None:
+        _skipped(doc, r.reason)
+        return []
     if r.module == "M2":
         findings.append(m2.build_finding(ctx, catalogue, now=now, new_id=new_id))
     elif r.module == "M1":
