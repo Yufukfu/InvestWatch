@@ -33,14 +33,20 @@ def elapsed(fn, *args) -> float:
         "ok. 1 " * 8_000,
         "\n" + " " * 50_000 + "x",
     ],
-    ids=["dot-spaces", "dot-spaces-lowercase", "abbrev-chain", "abbrev-before-digit", "newline-spaces"],
+    ids=["dot-spaces", "dot-spaces-lowercase", "abbrev-chain", "abbrev-before-digit", "newline-spaces"],  # the last was already linear
 )
 def test_split_is_fast_on_hostile_input(text):
     assert elapsed(split_sentences, text) < 1.0
 
 
-@pytest.mark.parametrize("text", ["1" * 50_000, "1.2" * 15_000, "prowizja " + "9" * 50_000],
-                         ids=["digit-run", "dotted-digits", "fee-then-digits"])
+# `digit-run`, `repeated-fee-stem` and `claim-warning-pairs` were quadratic before the fix; the others pin cases
+# that were already linear, so they stay linear.
+@pytest.mark.parametrize(
+    "text",
+    ["1" * 50_000, "1.2" * 15_000, "prowizja " + "9" * 50_000, "prowizj" * 8_000,
+     "Zysk 5%. Ryzyko straty. " * 8_000],
+    ids=["digit-run", "dotted-digits", "fee-then-digits", "repeated-fee-stem", "claim-warning-pairs"],
+)
 def test_r3_patterns_are_fast_on_hostile_input(text):
     registry = Registry.from_csv(Settings.from_env({}).registry_csv)
     doc = ScrapedDocument.model_validate(make_doc(text="Reklama. " + text))
@@ -78,3 +84,21 @@ def test_r3_claim_patterns_alone_are_linear_on_a_digit_run():
     for pattern in params["claim_patterns"] + params["claim_exclude_patterns"]:
         compiled = re.compile(pattern, re.IGNORECASE)
         assert elapsed(lambda: list(compiled.finditer(digits))) < 2.0, pattern
+
+
+def test_r3_coverage_unchanged_by_bisect():
+    """Covered and uncovered claims around the +-2 sentence window, as before the bisect rewrite
+    (old and new coverage logic agreed on 200 000 random claim/warning layouts)."""
+    registry = Registry.from_csv(Settings.from_env({}).registry_csv)
+
+    def r3(text):
+        [f] = analyze(ScrapedDocument.model_validate(make_doc(text=text)), registry=registry,
+                      catalogue=Catalogue.load(), now=NOW)
+        return next(r for r in f.rules if r.rule_id == "R3")
+
+    assert r3("Reklama. Zysk 8% rocznie. A. Ryzyko utraty kapitału.").result == "pass"  # warning 2 after
+    assert r3("Reklama. Ryzyko utraty kapitału. A. Zysk 8% rocznie.").result == "pass"  # warning 2 before
+    far = r3("Reklama. Zysk 8% rocznie. A. B. Ryzyko utraty kapitału.")  # 3 sentences away
+    assert far.result == "fail" and far.evidence == "Zysk 8% rocznie."
+    two = r3("Reklama. Zysk 8% rocznie. Ryzyko utraty kapitału. A. B. C. D. Zarabiaj 9% rocznie.")
+    assert two.result == "fail" and two.evidence == "Zarabiaj 9% rocznie."  # the second claim is uncovered
