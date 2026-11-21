@@ -339,7 +339,7 @@ async def test_a_missing_database_url_fails_the_same_way(capsys, log_lines):
     assert [line["level"] for line in log_lines()] == ["ERROR"]
 
 
-@pytest.mark.parametrize("value", ["0", "-3", "abc", "1.5", "", "1_0", "+5"])
+@pytest.mark.parametrize("value", ["0", "-3", "abc", "1.5", "", "1_0", "+5", "87601", "1000000000000"])
 async def test_an_invalid_window_is_a_usage_error_before_any_connection(value, capsys, monkeypatch):
     async def refuse_to_connect(*args, **kwargs):
         raise AssertionError("connected before the arguments were checked")
@@ -356,6 +356,12 @@ async def test_an_invalid_window_is_a_usage_error_before_any_connection(value, c
 def test_the_arguments_default_to_24_hours_and_the_table():
     assert parse_args([]) == (24, False)
     assert parse_args(["--since", "6", "--json"]) == (6, True)
+
+
+def test_the_longest_window_is_ten_years_and_still_builds_a_report():
+    hours, _ = parse_args(["--since", "87600"])
+
+    assert hours == 87600 and report(hours=hours).since.year == 2016
 
 
 async def test_run_prints_the_table_or_one_json_object_for_the_given_window(pool, capsys):

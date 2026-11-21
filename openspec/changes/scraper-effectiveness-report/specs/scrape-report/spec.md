@@ -50,14 +50,14 @@ The report SHALL NOT present a success rate over past runs, because only the las
 - **THEN** it carries the window and the note that statuses are of the last run only, and no field named or described as a success rate
 
 ### Requirement: Read only, safe output
-The command SHALL run inside a read-only transaction, SHALL write its result to stdout only (diagnostics through the JSON logger), SHALL NOT include `job_errors.detail` or any URL in its output, and SHALL exit non-zero with one redacted log line when the database is unreachable. `--since` SHALL be a positive whole number of hours; anything else is a usage error that touches no database.
+The command SHALL run inside a read-only transaction, SHALL write its result to stdout only (diagnostics through the JSON logger), SHALL NOT include `job_errors.detail` or any URL in its output, and SHALL exit non-zero with one redacted log line when the database is unreachable. `--since` SHALL be a positive whole number of hours, at most 87600 (ten years); anything else is a usage error that touches no database.
 
 #### Scenario: Write attempted
 - **WHEN** a statement that modifies data is issued on the report's connection
 - **THEN** the database refuses it (read-only transaction) and no row changes
 
 #### Scenario: Invalid window
-- **WHEN** `--since 0`, `--since -3` or `--since abc` is given
+- **WHEN** `--since 0`, `--since -3`, `--since abc` or `--since 87601` is given
 - **THEN** the command exits non-zero with a usage message on stderr, writes nothing to stdout and opens no connection
 
 #### Scenario: Detail and URLs not shown

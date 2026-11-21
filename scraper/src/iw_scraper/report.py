@@ -26,6 +26,7 @@ from iw_scraper.logs import configure_logging
 log = logging.getLogger(__name__)
 
 DEFAULT_HOURS = 24
+MAX_HOURS = 24 * 365 * 10  # ten years; far larger values overflow `datetime` arithmetic
 
 NOTE = "Run statuses are of the last run only, one per source; the database keeps no run history."
 
@@ -254,8 +255,8 @@ async def collect(conn, *, hours: int, now: datetime) -> Report:
 
 
 def _hours(value: str) -> int:
-    if not (value.isascii() and value.isdigit() and int(value) > 0):
-        raise argparse.ArgumentTypeError(f"{value!r} is not a positive whole number of hours")
+    if not (value.isascii() and value.isdigit() and 0 < int(value) <= MAX_HOURS):
+        raise argparse.ArgumentTypeError(f"{value!r} is not a whole number of hours from 1 to {MAX_HOURS}")
     return int(value)
 
 

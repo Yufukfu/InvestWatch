@@ -13,7 +13,7 @@
 - [x] 2.1 Extend the tests with the `IW_TEST_PG_DSN` database: rows in the three tables give the expected report; the command writes no row (compare row counts before and after); an unreachable DSN gives an empty stdout, one JSON error line without the password and a non-zero exit; a write on the report's connection is refused; `--since 0`, `-3` and `abc` fail before any connection; a document with a NULL `source_id` and an error with a NULL `source_id` land in the totals and in no source entry; run and see them fail
 - [x] 2.2 Implement the three `SELECT`s inside a read-only transaction, `--since` and `--json` parsing (invalid or non-positive hours is a usage error before any connection), `main()` with `configure_logging()`
 - [x] 2.3 Mutation check of the grouping query, the read-only transaction and the exit code on connection failure; record `mutations: N tried, N caught`
-  - mutations: 10 tried, 10 caught (read-only transaction, error and document window boundaries, error grouping, id cast, inner join, exit code on connection failure and on missing DSN, zero and non-digit `--since`); one mutant (non-digit `--since`) survived first, `1_0` and `+5` were added to the test and it is caught.
+  - mutations: 10 tried, 10 caught (read-only transaction, error and document window boundaries, error grouping, id cast, inner join, exit code on connection failure and on missing DSN, zero and non-digit `--since`); one mutant (non-digit `--since`) survived first, `1_0` and `+5` were added to the test and it is caught. Whole-branch review follow-up: `--since` above 87600 overflowed `datetime` after the connection was open; it is now a usage error (3 mutants of the bound tried, 3 caught).
 - [x] 2.4 Commit
 
 ## 3. Closing
