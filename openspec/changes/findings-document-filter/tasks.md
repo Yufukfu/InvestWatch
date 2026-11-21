@@ -8,9 +8,9 @@
 
 ## 2. Mock server filter
 
-- [ ] 2.1 Failing tests first: `document_id` alone, with `module=`, with pagination, unknown UUID (200, empty) and malformed value (422)
-- [ ] 2.2 `iw_mock_server/app.py`: `document_id: UUID | None` on `GET /api/findings`; FastAPI version 1.1.0
-- [ ] 2.3 Mutation check. mutations: _
+- [x] 2.1 Failing tests first: `document_id` alone, with `module=`, with pagination, unknown UUID (200, empty) and malformed value (422)
+- [x] 2.2 `iw_mock_server/app.py`: `document_id: UUID | None` on `GET /api/findings`; FastAPI version 1.1.0
+- [x] 2.3 Mutation check. mutations: 3 tried, 3 caught
 
 ## 3. API filter
 
