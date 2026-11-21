@@ -18,6 +18,6 @@
 
 ## 3. Closing
 
-- [ ] 3.1 Apply the `iw-docs-update` skill: `scraper/README.md` (one short section: command, flags, what it cannot measure), `scraper/CLAUDE.md` module list, `.docs/status/scraper.md`; add the `iw-ai-log` row; `docs-check` prints `docs-check: ok`
+- [x] 3.1 Apply the `iw-docs-update` skill: `scraper/README.md` (one short section: command, flags, what it cannot measure), `scraper/CLAUDE.md` module list, `.docs/status/scraper.md`; add the `iw-ai-log` row; `docs-check` prints `docs-check: ok`
 - [ ] 3.2 Run the command once against the running stack after a real scan and put the output in the PR body (not in the repo)
 - [ ] 3.3 Run the `iw-pr-review` skill and fix real findings

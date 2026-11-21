@@ -8,11 +8,12 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
 - `scraper-v1` (fetch, parse, politeness, guards) is merged (PR #19).
 - `scraper-ingest` (database sink, `documents`, `iw:documents`, republish sweep) is implemented against Damian's `0001_initial`, in review (PR #22) and archived in that PR.
 - `scraper-orchestration` (queue, run lock, concurrency cap, events, scan requests, scheduler, health, `run_source`, the `worker` and `scheduler` commands) is implemented and tested end to end on real Redis, PostgreSQL and MinIO; the opt-in live KNF smoke run passed once (2026-11-21). The PR is next.
+- `scraper-effectiveness-report` is implemented and reviewed (`python -m iw_scraper.report`, a read-only summary of collected documents and job errors from the shared tables; no success rate, because only the last run per source is stored). The PR is next; a REST route or dashboard widget for it is a follow-up for Damian and Kacper.
 - ADRs 0101 and 0102 are accepted (PR #19); ADR 0104 (ingest order, republish sweep) takes effect when PR #22 merges; 0103 criteria only.
 
 ## Active OpenSpec changes
 
-- `scraper-orchestration` (PR pending); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
+- `scraper-effectiveness-report` (PR pending); `scraper-orchestration` (PR pending); `scraper-author-provenance` for issue 36 is archived in its own PR (#41)
 
 ## Blockers and open decisions
 
