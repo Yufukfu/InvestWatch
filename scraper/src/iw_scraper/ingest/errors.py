@@ -11,9 +11,11 @@ log = logging.getLogger("iw_scraper.ingest")
 
 _MAX_DETAIL = 300
 # Redaction runs on text that page or proxy content can influence, so its input is bounded first. The bound is
-# far above _MAX_DETAIL: whatever lies past it is dropped anyway, so a half-cut secret at the bound cannot reach
-# the stored text. Every pattern below is at worst quadratic in this length.
+# far above _MAX_DETAIL. A secret cut in half by the bound would lose the marker that identifies it (the "@" or
+# the name), so the trailing partial token is dropped with the cut. Every pattern below is at worst quadratic in
+# this length.
 _MAX_REDACT_INPUT = 2000
+_MAX_SOURCE_ID_IN_DETAIL = 80
 
 # credentials as userinfo (`user:pass@host`, with or without a scheme; greedy to the LAST "@" of the token so a
 # password containing "@" or "/" is covered), bearer tokens, auth headers (the rest of the line), and
@@ -23,7 +25,7 @@ _BARE_USERINFO = re.compile(r"\b[^\s/:@]+:\S*@(?=[\w.-]+)")
 _BEARER = re.compile(r"(?i)\bbearer\s+\S+")
 _AUTH_HEADER = re.compile(r"(?i)\b(authorization|proxy-authorization|cookie|set-cookie)(\s*:\s*).*")
 _PAIR = re.compile(r"([\w-]+[\"']?)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)")
-_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential")
+_SECRET_NAME_PARTS = ("password", "passwd", "pwd", "token", "secret", "key", "signature", "session", "sess", "credential", "passphrase")
 
 
 def _mask_secret_pairs(text: str) -> str:
@@ -54,7 +56,10 @@ def redact(detail: str) -> str:
     recoverable (`password=a b c` keeps ` b c`), which is why callers must not put credentials in a detail.
     The result is capped, because driver messages can be long.
     """
-    detail = detail[:_MAX_REDACT_INPUT]
+    if len(detail) > _MAX_REDACT_INPUT:
+        detail = detail[:_MAX_REDACT_INPUT]
+        head, space, _partial = detail.rpartition(" ")
+        detail = head if space else detail
     detail = _BARE_USERINFO.sub("***@", detail)
     detail = _BEARER.sub("Bearer ***", detail)
     detail = _AUTH_HEADER.sub(r"\1\2***", detail)
@@ -72,7 +77,7 @@ def _source_uuid(source_id: str | None) -> tuple[uuid.UUID | None, str]:
     try:
         return uuid.UUID(source_id), ""
     except ValueError:
-        return None, f"(source_id={source_id}) "
+        return None, f"(source_id={source_id[:_MAX_SOURCE_ID_IN_DETAIL]}) "
 
 
 async def record_error(pool: asyncpg.Pool, error: JobError) -> None:
@@ -80,7 +85,7 @@ async def record_error(pool: asyncpg.Pool, error: JobError) -> None:
     source_uuid, prefix = _source_uuid(error.source_id)
     detail = redact(prefix + error.detail)
     log.warning(
-        json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": redact(str(error.source_id)), "detail": detail})
+        json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": None if error.source_id is None else redact(error.source_id[:_MAX_SOURCE_ID_IN_DETAIL]), "detail": detail})
     )
     async with pool.acquire() as conn:
         await conn.execute(

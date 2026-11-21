@@ -88,6 +88,7 @@ def test_redaction_stays_fast_on_hostile_input(hostile):
         ("sent Bearer abc123xyz to proxy", "abc123xyz"),
         ("sess_id=sid-31337 expired", "sid-31337"),
         ("credential=cred-8080 rejected", "cred-8080"),
+        ("passphrase=correct-horse rejected", "correct-horse"),
         ("proxy http://:hunter2@10.0.0.1:8080 refused", "hunter2"),
     ],
 )
@@ -128,3 +129,25 @@ async def test_log_line_does_not_carry_a_secret_source_id(pool, caplog):
 )
 def test_a_secret_nested_after_a_harmless_pair_is_still_redacted(detail, secret):
     assert secret not in redact(detail)
+
+
+def test_a_secret_cut_by_the_input_bound_does_not_survive_as_a_fragment():
+    # the '@' that would mark the credential lies past the bound; the half-cut token must not be stored
+    detail = "token=" + "x" * 1970 + " https://user:sup3rsecret@host.example"
+    assert "sup3r" not in redact(detail)
+
+
+def test_text_before_a_cut_token_is_kept():
+    assert redact("status 503 " + "y" * 3000) == "status 503"
+
+
+async def test_log_line_has_a_null_source_id_when_there_is_none(pool, caplog):
+    with caplog.at_level("WARNING", logger="iw_scraper.ingest"):
+        await record_error(pool, JobError(Reason.INVALID_REQUEST, "no source", None))
+    assert '"source_id": null' in caplog.text
+
+
+async def test_a_huge_non_uuid_source_id_does_not_push_the_detail_out(pool):
+    await record_error(pool, JobError(Reason.INVALID_REQUEST, "real-detail-text", "s" * 1000))
+    stored = (await rows(pool))[0]
+    assert "real-detail-text" in stored["detail"]
