@@ -25,6 +25,8 @@ function setup(props: Partial<TrendChartProps> = {}) {
 }
 
 describe('TrendChart (props only, no store)', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('draws one series per module with a legend naming them', () => {
     setup();
     const legend = screen.getByRole('list', { name: 'Legenda' });
