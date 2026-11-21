@@ -1,8 +1,8 @@
 # 0301. Confirmation of data contracts v1
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-21
-- Deciders: C (proposal; A and B to review in PR #3)
+- Deciders: agent-written from C's choices; accepted by A, B and C via PR #3
 
 ## Context
 

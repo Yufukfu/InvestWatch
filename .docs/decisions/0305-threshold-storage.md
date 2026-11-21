@@ -1,8 +1,8 @@
 # 0305. Where module thresholds live and who emits `finding.high_risk`
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-21
-- Deciders: C (proposal; A and B to review in PR #3)
+- Deciders: agent-written from C's choices; accepted by A, B and C via PR #3
 
 ## Context
 
@@ -27,6 +27,6 @@ Why (C):
 ## Consequences
 
 - No extra table and fast reads; consistent with §6 of [integration-plan.md](../integration-plan.md), which lists `finding.high_risk` among the events analytics publishes on `iw:events`.
-- Contradicts [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) ("the threshold is applied in `api`, never here"); that file must be changed if this ADR is accepted. `risk_level` is still derived by the API for REST responses ([0301](0301-contracts-v1.md)), so the threshold logic lives in two services and both must read the same key.
+- Contradicts [`analytics/CLAUDE.md`](../../analytics/CLAUDE.md) ("the threshold is applied in `api`, never here"); that file must be changed right after this ADR takes effect (PR #3 merges). `risk_level` is still derived by the API for REST responses ([0301](0301-contracts-v1.md)), so the threshold logic lives in two services and both must read the same key.
 - A threshold change from the calibration panel affects only findings analysed after analytics re-reads the key; findings already published are not re-evaluated for `finding.high_risk`.
 - Redis must be persistent (AOF or RDB in `docker compose`), otherwise thresholds are lost on restart; the API needs a default when the key is missing.
