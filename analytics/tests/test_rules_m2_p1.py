@@ -260,6 +260,18 @@ def test_r15_fee_word_does_not_hide_the_forecast(text, registry, catalogue):
     assert r.evidence == text
 
 
+@pytest.mark.parametrize(
+    "text",
+    ["Opłata za zarządzanie: będzie wynosić 2%.",
+     "Podatek od zysków kapitałowych (19%) będzie pobierany automatycznie.",
+     "Opłata za zarządzanie w 2027 roku będzie wynosić 2%."],
+    ids=["punctuation", "tax-in-brackets", "five-words"],
+)
+def test_r15_fee_or_tax_percentage_is_not_a_forecast(text, registry, catalogue):
+    # Group 4 review: the fee exclude must not depend on whole words between the fee word and the figure.
+    assert run(text, registry, catalogue, **FETCHED_2026)["R15"].result == "not_applicable"
+
+
 def test_r15_year_after_fetch_year_is_a_strong_marker(registry, catalogue):
     text = "W 2028 roku wyniki funduszu wzrosną."
     assert run(text, registry, catalogue, **FETCHED_2026)["R15"].result == "fail"
