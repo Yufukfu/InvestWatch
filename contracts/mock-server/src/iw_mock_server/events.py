@@ -111,13 +111,34 @@ class EventHub:
         await self.emit("scan.finished", {"source_id": source_id, "documents": documents, "status": "ok"})
 
 
+def origin_check(allowed: tuple[str, ...]):
+    """Socket.IO origin rule: the listed origins plus same-origin.
+
+    python-socketio checks `Origin` even for same-origin requests, and with an explicit list it drops
+    its own same-origin default. Behind the HTTPS gateway the dashboard's origin is the gateway's
+    (`https://localhost:8443`), which no static list can know, so same-origin is added back here,
+    using the forwarded host and scheme like engineio's default does.
+    """
+    if "*" in allowed:
+        return "*"
+
+    def check(origin: str, environ: dict) -> bool:
+        if origin in allowed:
+            return True
+        host = environ.get("HTTP_X_FORWARDED_HOST", environ.get("HTTP_HOST", "")).split(",")[0].strip()
+        scheme = environ.get("HTTP_X_FORWARDED_PROTO", environ.get("wsgi.url_scheme", "http")).split(",")[0].strip()
+        return bool(host) and origin == f"{scheme}://{host}"
+
+    return check
+
+
 def create_asgi_app(settings: Settings | None = None, store: Store | None = None):
     """FastAPI (REST under /api) + Socket.IO (/socket.io, namespace /events) as one ASGI app."""
     settings = settings or Settings()
     store = store or Store(load_mock_data(settings.contracts_dir))
     api = create_app(settings, store)
 
-    sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=list(settings.cors_origins))
+    sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=origin_check(settings.cors_origins))
     hub = EventHub(sio, store, settings)
     api.state.notify = hub.notify
     api.state.start_scan = hub.start_scan
