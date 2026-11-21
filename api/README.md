@@ -57,6 +57,8 @@ WHERE stream_published_at IS NULL AND created_at < now() - interval '1 minute'  
 ORDER BY created_at, id LIMIT 100;
 ```
 
+The sweep takes no row lock, so two sweepers, or a sweeper and a publisher retrying, can announce the same document twice: consumers of `iw:documents` must be idempotent on `document.id` (the analytics upsert on `(document_id, module)` already is).
+
 Job errors: `INSERT INTO job_errors (id, source_id, url, reason, detail) VALUES (...)`. `detail` never holds credentials, proxy URLs or headers.
 
 Analytics, upsert one finding per document and module. A re-scan replaces the analysis and keeps the analyst's `status` and `note`, the original `id` and `detected_at`:

@@ -9,7 +9,7 @@ Kacper's review of PR #15 (`api-db-schema`, at 73680fa) asked for changes. Three
 - Root `compose.yaml` includes `api/compose.yaml`. `api/compose.yaml` no longer redeclares the data network, and joins `infra/compose.yaml`'s `postgres` the way `web/compose.yaml` joins the gateway's network.
 - `redact()` masks the userinfo up to the last `@` of a URL token.
 - Tests: `firm IS NULL` after a `None` insert; EXPLAIN on the statements from `sql.py`; the mock round-trip keeps explicit nulls; one test compares the contract enums in `contracts/schemas/*.json` with the CHECK definitions in `pg_constraint`; tests that only compared `tables.py` with itself are dropped or renamed.
-- Docs: Damian's `.docs/STATUS.md` row, the duplicate `ai-workflow.md` row removed, `api/README.md` compose note, follow-ups for review items 7, 12 and 13.
+- Docs: Damian's `.docs/STATUS.md` row, the duplicate `.docs/ai-workflow.md` row removed, `api/README.md` compose note, follow-ups for review items 7, 12 and 13.
 
 ## Capabilities
 
