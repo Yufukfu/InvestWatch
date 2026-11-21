@@ -16,3 +16,4 @@
 | R10 | review group 2, PLAUSIBLE | gzip response could inflate past the size cap inside one chunk | `fix-here`: `Accept-Encoding: identity` |
 | R11 | review group 2 | the guard fires on send, not on build | `fix-here`: spec wording matches the guard (any request to a non-stub host fails the test); the shared conftest guard is analytics-llm-p0's |
 | R12 | review group 2, uncovered | no test pins `CONNECT_TIMEOUT_S` or `trust_env=False` | `wont-fix` for now: mirrors the LLM client, which has the same gap |
+| R13 | group 3 | `analytics-llm-p0` has no breaker yet (its group 10), so `embeddings/breaker.py` is a minimal one of our own | `new-item` after llm-p0 group 10: merge into one generic breaker if its class is shareable |

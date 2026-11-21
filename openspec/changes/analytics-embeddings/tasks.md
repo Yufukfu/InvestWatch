@@ -16,9 +16,9 @@ Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is
 
 ## 3. Embedding cache and breaker (~45 min)
 
-- [ ] 3.1 Failing tests: "Embedding cache in Redis" scenarios with `fakeredis` (re-scan makes no second request, model swap misses, corrupt 512-float entry is a miss and is overwritten, Redis raising on read and write is not fatal, rejected vectors not cached, value readable through a `decode_responses=True` client, TTL set); "Embeddings circuit breaker" scenarios with an injected clock (opens after 3, malformed does not count, half-open success and failure). First check whether `analytics-llm-p0`'s breaker is generic and record the answer in `follow-ups.md`
-- [ ] 3.2 `embeddings/cache.py` (key `iw:emb:v1:{variant}:{content_hash}`, base64 float32, separate client with 1 s socket timeout), breaker reused or `embeddings/breaker.py`; `embeddings.build_embedder(settings, redis=None)` returns `None` when disabled; tests green
-- [ ] 3.3 Mutation check; `mutations: N tried, N caught`
+- [x] 3.1 Failing tests: "Embedding cache in Redis" scenarios with `fakeredis` (re-scan makes no second request, model swap misses, corrupt 512-float entry is a miss and is overwritten, Redis raising on read and write is not fatal, rejected vectors not cached, value readable through a `decode_responses=True` client, TTL set); "Embeddings circuit breaker" scenarios with an injected clock (opens after 3, malformed does not count, half-open success and failure). First check whether `analytics-llm-p0`'s breaker is generic (answer: it does not exist yet, it is that change's group 10; this change has its own minimal `embeddings/breaker.py`, see follow-ups R13)
+- [x] 3.2 `embeddings/cache.py` (key `iw:emb:v1:{variant}:{content_hash}`, base64 float32, on the Redis client it is given; the worker's separate client with a 1 s socket timeout comes with group 9), breaker reused or `embeddings/breaker.py`; `embeddings.build_embedder(settings, redis=None)` returns `None` when disabled; tests green
+- [x] 3.3 Mutation check; `mutations: 22 tried, 22 caught` (first run 20 of 23: three survivors were redundant guards (cache length check and strict base64 both covered by `validate_vector`; the half-open check in `failure()` implied by the streak), removed)
 
 ## 4. Topic gate, dictionary part (~45 min)
 
