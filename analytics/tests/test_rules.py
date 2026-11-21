@@ -426,3 +426,28 @@ def test_bad_rule_params_fail_at_load(tmp_path, old, new, key):
 def test_catalogue_root_must_be_a_mapping(tmp_path):
     with pytest.raises(CatalogueError, match="mapping"):
         Catalogue.load(_write(tmp_path, "- id: R1\n"))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Zysk 10% rocznie, bez opłat ryzyko utraty kapitału.",
+        "Zysk 10% rocznie. Bez opłat, ale ryzyko utraty kapitału istnieje.",
+        "Zysk 10% rocznie. Nie pobieramy opłat ryzyko straty ponosisz Ty.",
+    ],
+)
+def test_r3_denial_word_does_not_swallow_a_following_warning(text, registry, catalogue):
+    assert results(text, registry, catalogue)["R3"].result == "pass"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "To nie tylko reklama – to Twoja szansa.",
+        "To nie jest tylko reklama.",
+        "Not just an advertisement.",
+        "To nie jedynie materiał reklamowy.",
+    ],
+)
+def test_r2_not_only_does_not_negate(text, registry, catalogue):
+    assert results(text, registry, catalogue)["R2"].result == "pass"

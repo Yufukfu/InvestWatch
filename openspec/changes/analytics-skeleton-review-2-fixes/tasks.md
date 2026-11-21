@@ -6,9 +6,9 @@
 
 ## 2. Matching and rule text
 
-- [ ] 2.1 Test: `Alfa-Beta Inwestycji` fuzzy-matches `Alfa-Beta Inwestycje`; `bez opłat ryzyko utraty` is a warning; `nie zmieniamy strategii` is not loss vocabulary; `to nie tylko reklama` passes R2
-- [ ] 2.2 `_best_fuzzy` tokenization, R3 exclusion patterns, R2 `negation_before`
-- [ ] 2.3 Mutation check
+- [x] 2.1 Test: `Alfa-Beta Inwestycji` fuzzy-matches `Alfa-Beta Inwestycje`; `bez opłat ryzyko utraty` is a warning; `to nie tylko reklama` passes R2
+- [x] 2.2 `_best_fuzzy` tokenization, R3 exclusion patterns, R2 `negation_before`
+- [x] 2.3 Mutation check — mutations: 7 tried, 7 caught (first run 6/7: the hyphen mutant survived on a long name; a short-name test was added)
 
 ## 3. Closing
 

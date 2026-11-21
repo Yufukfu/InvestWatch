@@ -226,3 +226,26 @@ def test_earliest_mention_counts_not_where_the_longest_form_is(registry):
 def test_unreadable_registry_tells_to_set_registry_csv(tmp_path):
     with pytest.raises(RegistryError, match="REGISTRY_CSV"):
         Registry.from_csv(tmp_path / "nope.csv")
+
+
+def test_fuzzy_match_on_hyphenated_name(tmp_path):
+    csv = tmp_path / "r.csv"
+    csv.write_text(
+        "id,name,aliases,type,country,website_domains,source_url\n"
+        f"{ALFA_ID},Alfa-Beta Inwestycje S.A.,,brokerage_house,PL,,\n",
+        encoding="utf-8",
+    )
+    m = Registry.from_csv(csv).match("Klienci Alfa-Beta Inwestycji są zadowoleni.", "https://x.example.org/")
+    assert m is not None and m.firm.id == ALFA_ID and m.method == "fuzzy"
+
+
+def test_fuzzy_short_hyphenated_name_compares_tokens(tmp_path):
+    # Tokenized, "alfa beta" vs "alfa bety" is ~89 (match); with the hyphen kept it is ~78 (no match).
+    csv = tmp_path / "r.csv"
+    csv.write_text(
+        "id,name,aliases,type,country,website_domains,source_url\n"
+        f"{ALFA_ID},Alfa-Beta S.A.,,brokerage_house,PL,,\n",
+        encoding="utf-8",
+    )
+    m = Registry.from_csv(csv).match("Klienci Alfa-Bety są zadowoleni.", "https://x.example.org/")
+    assert m is not None and m.firm.id == ALFA_ID and m.method == "fuzzy"

@@ -30,7 +30,8 @@ rules:
       prominent_sentences: 2
       # Text right before a label that negates it ("to nie jest reklama", "not an advertisement").
       # Same line only (headlines often lack punctuation); a hashtag label is never negated.
-      negation_before: '(?:\bnie|\bnot|\bno)[ \t]+(?:\w+[ \t]+){0,2}$'
+      # "nie tylko", "nie jest jedynie", "not just" do not negate: the label is still there.
+      negation_before: '(?:\bnie|\bnot|\bno)[ \t]+(?:(?!(?:tylko|jedynie|wyłącznie|only|just)\b)\w+[ \t]+){0,2}$'
 
   - id: R3
     name: Informacja o ryzyku
@@ -74,8 +75,11 @@ rules:
         # Affirmed exclusion of loss ("wykluczamy straty", "gwarantujemy brak straty") is a denial.
         - '\bwyklucz\w*\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\bgwarant\w*\s+(?:\w+\s+){0,2}(?:brak\w*|unikni\w*)\s+(?:\w+\s+)?(?:stra|utrat)\w*'
-        - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:\w+\s+){0,2}ryzyk\w*(?:\s+(?:utrat|strat)\w*)?'
-        - '\b(?:nie|bez|żadn\w*)\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'
+        # A denial word governs the genitive ("bez ryzyka", "brak ryzyka"); a nominative "ryzyko" after
+        # it starts a new phrase ("bez opłat ryzyko utraty kapitału" is a warning), as does any risk
+        # word between the denial word and the loss word.
+        - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}ryzyka\b(?:\s+(?:utrat|strat)\w*)?'
+        - '\b(?:nie|bez|żadn\w*)\s+(?:(?!ryzyk|risk)\w+\s+){0,2}(?:stra|utrat)\w*'
         - '\b(?:minimaln|nisk|znikom)\w*\s+ryzyk\w*'
         - '\bryzyk\w*\s*\?'
         - '\bwoln\w* od ryzyka\b'
