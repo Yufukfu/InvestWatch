@@ -1,17 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Investment topic gate
-After preprocessing and before routing, analytics SHALL decide whether a document is investment-related (`.docs/analytics-plan.md` §2 step 2). The gate SHALL combine two signals:
-- **Dictionary hits:** matches of the investment vocabulary in `gate_terms.yaml` against the normalized text, lowercased and with diacritics stripped. Terms are stems or phrases matched on word boundaries, so `zyski`, `zysków` and `zyskow` all match `zysk*`. A registry firm match also counts as a hit.
-- **Similarity:** the highest cosine similarity between the document vector and the positive class centroids, when a vector is available. Centroids are the normalized means of the seed phrases in `gate_terms.yaml`, embedded at start-up through the same client and cache.
+After preprocessing and before routing, analytics SHALL decide whether a document is investment-related (`.docs/analytics-plan.md` §2 step 2).
 
-The gate SHALL drop a document only when the dictionary has no hit **and** either no vector is available or the similarity is below `GATE_SIM_THRESHOLD` (default 0.45). The gate SHALL let every other document through.
+The core signal is **dictionary hits**: matches of the investment vocabulary in `gate_terms.yaml` against the normalized text, lowercased and with diacritics stripped. Terms are stems or phrases matched on word boundaries, so `zyski`, `zysków` and `zyskow` all match `zysk*`. A registry firm match also counts as a hit.
 
-Documents with `source_kind` `firm_own` SHALL bypass the gate. `GATE_ENABLED=false` SHALL let every document through.
+The gate SHALL drop a document only when it has no dictionary hit and the similarity rescue (a separate requirement, stretch) does not apply. Without that rescue, a document with no hit is dropped.
 
-A dropped document SHALL produce no finding. It SHALL log `document skipped` with reason `off_topic` and the figures `dict_hits`, `similarity` (or null) and `embedder` (model or null), without document text. It SHALL increment `dropped` in the Redis hash `iw:stats:gate`, and a passed document SHALL increment `passed`. A Redis error on the counter SHALL be logged and never raised.
+Documents with `source_kind` `firm_own` SHALL bypass the gate, because M2 covers only material that firms publish themselves. `third_party` and `unknown` documents SHALL be gated, and those that pass SHALL flow to routing (M1/M3) unchanged. `GATE_ENABLED=false` SHALL let every document through.
 
-If the centroids cannot be built at start-up (embedder down), the gate SHALL run on the dictionary only and retry the centroids on a later document, after the breaker allows a call.
+A dropped document SHALL produce no finding. It SHALL log `document skipped` with reason `off_topic` and the figures `dict_hits`, `similarity` (null without the rescue) and `embedder` (the model, or null), without document text. Its `documents` row SHALL stay untouched, so it can be re-analyzed.
 
 #### Scenario: Investment post passes on the dictionary
 - **WHEN** a `third_party` post says `Zainwestuj w CFD na forex, zyski 20% miesięcznie`
@@ -22,16 +20,12 @@ If the centroids cannot be built at start-up (embedder down), the gate SHALL run
 - **THEN** the gate passes it on the dictionary
 
 #### Scenario: Off-topic post dropped with a reason
-- **WHEN** a `third_party` post about a recipe has no dictionary hit and the stub embedder gives similarity 0.20
-- **THEN** no finding is returned, the log line has reason `off_topic`, `dict_hits` 0, `similarity` 0.2 and `embedder` `bge-m3`, and `iw:stats:gate` `dropped` is incremented
+- **WHEN** a `third_party` post about a recipe has no dictionary hit
+- **THEN** no finding is returned, and the log line has reason `off_topic`, `dict_hits` 0 and `similarity` null
 
-#### Scenario: Embedding rescues a post without vocabulary
-- **WHEN** a post has no dictionary hit but the stub embedder gives similarity 0.60 to the investment-offer centroid
-- **THEN** the gate passes it
-
-#### Scenario: Embedder down, no vocabulary
-- **WHEN** the embedder is unavailable and a post has no dictionary hit
-- **THEN** the post is dropped with `off_topic`, `similarity` null and `embedder` null
+#### Scenario: Unknown source kind is gated
+- **WHEN** an `unknown` document about a football match has no dictionary hit
+- **THEN** it is dropped with `off_topic`, while an `unknown` document mentioning `sygnały forex` passes and is routed
 
 #### Scenario: Embedder down, investment vocabulary
 - **WHEN** the embedder is unavailable and a post mentions `obligacje skarbowe`
@@ -45,13 +39,39 @@ If the centroids cannot be built at start-up (embedder down), the gate SHALL run
 - **WHEN** `GATE_ENABLED=false` and an off-topic post is analyzed
 - **THEN** the gate drops nothing
 
+#### Scenario: Term inside another word
+- **WHEN** a post contains `ketfon` but no investment term
+- **THEN** `ETF` does not match and the post is dropped
+
+#### Scenario: Gate terms file invalid
+- **WHEN** `gate_terms.yaml` has an empty term list
+- **THEN** loading fails at start-up with an error naming the file and the key
+
+### Requirement: Gate counters
+The gate SHALL increment `passed`, `dropped` or `bypassed` in the Redis hash `iw:stats:gate` for each decision when a Redis client is available. A Redis error on the counter SHALL be logged and never raised.
+
+#### Scenario: Drop counted
+- **WHEN** an off-topic post is dropped in the worker
+- **THEN** `iw:stats:gate` `dropped` is incremented by 1
+
 #### Scenario: Counter on a Redis outage
 - **WHEN** the Redis client raises on `HINCRBY iw:stats:gate`
 - **THEN** the gate decision and the analysis are unchanged
 
-#### Scenario: Gate terms file invalid
-- **WHEN** `gate_terms.yaml` has an empty term list or a centroid class without seed phrases
-- **THEN** loading fails at start-up with an error naming the file and the key
+### Requirement: Similarity rescue in the topic gate (stretch)
+When a document vector is available, a document with no dictionary hit SHALL still pass if its highest cosine similarity to the positive class centroids is at or above `GATE_SIM_THRESHOLD` (default 0.45, to be calibrated on the gold set). Centroids SHALL be the normalized means of the seed phrases in `gate_terms.yaml`. They are embedded lazily through the same client and cache, and rebuilt on the first successful call after an outage. The similarity SHALL never drop a document that the dictionary kept. This requirement is a stretch item: if it is cut, it is removed from this delta before archive.
+
+#### Scenario: Embedding rescues a post without vocabulary
+- **WHEN** a post has no dictionary hit and the stub embedder gives similarity 0.60 to the investment-offer centroid
+- **THEN** the gate passes it
+
+#### Scenario: Low similarity still dropped
+- **WHEN** a recipe post has no dictionary hit and similarity 0.20
+- **THEN** it is dropped, and the log has `similarity` 0.2 and `embedder` `bge-m3`
+
+#### Scenario: Centroid class without seeds
+- **WHEN** `gate_terms.yaml` has a centroid class with an empty seed list
+- **THEN** loading fails at start-up with an error naming the class
 
 ### Requirement: Near-duplicate detection and grouping
 Analytics SHALL detect near-duplicates among analyzed documents with MinHash (`datasketch`, `NEARDUP_NUM_PERM` permutations, default 128) over word 5-shingles of the normalized, lowercased text, cut to its first `NEARDUP_MAX_CHARS` characters (default 50000). An LSH index in Redis SHALL hold `NEARDUP_BANDS` bands (default 32, of 4 rows each).
@@ -63,11 +83,11 @@ A near-duplicate SHALL still be analyzed and SHALL still get its own findings. I
 - `iw:neardup:v1:group:{group_id}` is the set of member ids;
 - the band buckets and signatures carry TTL `NEARDUP_TTL_S` (default 30 days).
 
-The group SHALL be logged (`neardup`, with group id, best similarity and member count, without text). Each finding of a document with at least one other member SHALL carry one Polish sentence in its `summary` naming the number of near-identical analyzed materials. A Redis error SHALL skip detection for that document, be logged and never be raised. Without a near-dup index (CLI), detection is off. Exact duplicates by `content_hash` within one source remain the scraper's concern (document-ingest).
+The index SHALL also store each member's `url` (`iw:neardup:v1:meta:{document_id}`, the same TTL). The group SHALL be logged (`neardup`, with group id, best similarity and member count, without text). Each finding of a document that is not the group's original SHALL carry one Polish sentence in its `summary` naming the original's URL and the number of other near-identical analyzed materials. The finding's own `url` SHALL stay the near-duplicate's URL. How `finding.high_risk` is handled for near-duplicates is specified in finding-events. A Redis error SHALL skip detection for that document, be logged and never be raised. Without a near-dup index (CLI), detection is off. Exact duplicates by `content_hash` within one source remain the scraper's concern (document-ingest).
 
 #### Scenario: Repost with a changed handle
 - **WHEN** two `third_party` posts share the same 300-word text except for the author handle and one emoji
-- **THEN** the second post joins the group of the first, both are analyzed, and the second's findings' summary says one near-identical material was found
+- **THEN** the second post joins the group of the first, both are analyzed, the second's findings keep the second post's `url`, and their summary names the first post's URL
 
 #### Scenario: Different texts
 - **WHEN** two posts about different offers share fewer than half of their shingles

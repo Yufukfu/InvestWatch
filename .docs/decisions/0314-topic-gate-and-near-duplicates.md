@@ -43,7 +43,7 @@ What a near-dup does:
 - **Near-dup: options 4 and 8.**
   - MinHash with 128 permutations over word 5-shingles and 32 bands × 4 rows, with candidates verified at Jaccard ≥ 0.8.
   - The group id is the earliest member's `document_id`, under `iw:neardup:v1:*` with a 30-day TTL.
-  - A near-dup is still analyzed and gets its own findings. Its summary names the number of near-identical materials.
+  - A near-dup is still analyzed and gets its own findings. Its summary names the original's URL, and its own `url` stays on the finding.
 
 Rationale from the evidence above:
 - Option 2 is the only gate that matches the plan's "prefer to let content through" and still works with the embedder off.
@@ -56,4 +56,5 @@ Rationale from the evidence above:
 - `datasketch` adds `numpy` and `scipy` to the image. Our own numpy MinHash is the fallback if that is a problem.
 - Near-dup groups do not merge transitively. A document joins its best-matching group, which is an accepted error.
 - Exposing groups in the API or UI is a follow-up (issue #33, the URL-level grouping item). A nullable `group_id` in a later contract version is one path.
-- Whether a near-dup fires `finding.high_risk` again stays as it is today (yes). Suppressing repeat alerts would modify `finding-events` and is left to Damian.
+- A near-dup does not fire a second `finding.high_risk` for the same group and module (Damian's decision). The first alert claims `iw:neardup:v1:alerted:{group}:{module}` with `SET NX`, and a Redis error fails open. The challenge asks for "usuwanie duplikatów" and real-time high-risk alerts, and a repeat alert per copy would spam the live demo. `finding.created` and the copy's own URL stay. This modifies the `finding-events` spec.
+- The embedding similarity in the gate is a stretch item in the first implementation. Until it lands, the gate is dictionary-only, which is option 1 with option 2's interface.

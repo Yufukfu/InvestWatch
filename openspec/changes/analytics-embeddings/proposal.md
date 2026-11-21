@@ -4,7 +4,15 @@
 
 Stage 3 (etap 3) of analytics. The challenge document (`doc/Opis Wyzwania HackNation UKNF 19.11.pdf`, p.2) asks for preprocessing with tokens, embeddings and deduplication, and the jury gives 20% of the score to fit with the specification. Today `preprocessing.py` computes only an exact `content_hash`, and the pipeline has no topic gate: every non-empty document goes straight to routing. Step 2 of the pipeline in `.docs/analytics-plan.md` §2 (the "is this investment-related content?" gate) does not exist yet. The near-dup part of step 1 is missing too, and so are the embeddings listed in §7. The mock findings already show `model.embedder: bge-m3`, but every real finding says `null`.
 
-This change adds those three pieces. Each has an honest fallback, so the demo never depends on an embeddings model being up.
+This change adds those three pieces. Each has an honest fallback, so the demo never depends on an embeddings model being up. The required wording is (Opis p.2) "Usuwanie tagów HTML, normalizacja tekstu, usuwanie duplikatów" and "Reprezentacja wektorowa w postaci tokenów i embeddingów", so the minimum is real embeddings plus deduplication.
+
+**Scope as approved by Damian (trimmed, about 5.5 h; fourth in stage-3 priority):**
+- the embeddings client with its cache and breaker;
+- the dictionary topic gate;
+- MinHash near-dup, with repeat-alert suppression;
+- the wiring.
+
+Centroid similarity in the gate is a **stretch item**, the first thing cut. Implementation starts only on the coordinator's go, after `analytics-llm-p0` groups 5-12.
 
 **Order.** This change lands **after `analytics-llm-p0`**, because both edit `preprocessing.py` and `pipeline.py` (`analyze` gains the `judge` argument there, and gains `embedder` and `neardup` here). The branch `analytics/analytics-embeddings` is cut from `analytics/analytics-llm-p0` (which itself sits on `analytics-worker`, PR #26). It will be **rebased onto `main` once its parents merge**. Apply does not start before `analytics-llm-p0` group 8 (engine seam and `analyze` signature) and group 10 (the breaker it mirrors) are done. `analytics-m1-m3` also edits `pipeline.py`. Its dispatch change is independent of the gate, but whichever lands second rebases.
 
@@ -18,14 +26,16 @@ This change adds those three pieces. Each has an honest fallback, so the demo ne
 - **Embedding cache in Redis**, keyed by `content_hash` + model (+ input length), storing float32 vectors with a TTL. A Redis error is a miss and never fails the document.
 - **Degradation.** If the embedder is disabled, down, slow, malformed or breaker-open, the pipeline continues with `model.embedder = null` and the gate uses only the dictionary. `model.embedder` is set to `EMBED_MODEL` only when a vector was actually used.
 - **Topic gate** (plan §2 step 2), between preprocessing and routing:
-  - Signals: an investment-vocabulary dictionary (YAML, diacritic-insensitive stems such as `inwest*`, `zysk*`, `stopa zwrotu`, `CFD`, `forex`, `krypto*`, `obligacj*`, `ETF`, `makler*`) plus cosine similarity to class centroids built from seed phrases.
-  - The threshold is low and asymmetric: a document is dropped only when the dictionary finds nothing **and** the similarity (if available) is below `GATE_SIM_THRESHOLD`.
-  - `firm_own` documents bypass the gate, because M2 must judge every firm page.
+  - Core signal: an investment-vocabulary dictionary (YAML, diacritic-insensitive stems such as `inwest*`, `zysk*`, `stopa zwrotu`, `CFD`, `forex`, `krypto*`, `obligacj*`, `ETF`, `makler*`), plus a registry firm match.
+  - Stretch: cosine similarity to class centroids built from seed phrases, which can only rescue a document with no hit (`GATE_SIM_THRESHOLD` 0.45 until gold-set calibration).
+  - A document is dropped only when nothing says it is investment-related.
+  - `firm_own` documents bypass the gate, because M2 covers only material "publikowanych bezpośrednio przez" firms and must judge every firm page. `third_party` and `unknown` are gated, and what passes flows to M1/M3.
   - A dropped document is logged with reason `off_topic` and its gate figures, and is counted in Redis. It is never a silent loss.
 - **Near-duplicate detection** (plan §2 step 1):
   - MinHash with `datasketch` over word 5-shingles of the normalized text, plus our own LSH banding in Redis (ADR 0314).
   - A near-dup is **still analyzed and still gets its own finding**: each publication is separate evidence for UKNF, and the `Finding` contract cannot change.
-  - The group is recorded in Redis (`iw:neardup:v1:…`: a document maps to its group, the group to its members), is logged, and is named in one Polish sentence of the finding `summary`.
+  - The group is recorded in Redis (`iw:neardup:v1:…`: a document maps to its group, the group to its members and URLs), is logged, and the finding `summary` gets one Polish sentence that names the original's URL. The near-dup's own `url` stays on its finding (M1 needs "dokładną lokalizację (URL)").
+  - **No repeat alert:** a near-dup still publishes `finding.created`, but not a second `finding.high_risk` for the same group and module. The first alert claims the group with an atomic Redis `SET NX`, and a Redis error fails open. This modifies `finding-events` ("Which events per stored finding"): the documents ask for "usuwanie duplikatów" and real-time high-risk alerts, and repeat alerts would spam the live demo.
   - This prepares the URL-level grouping follow-up from Kacper's #26 review and issue #33, without changing a contract.
 - **Wiring.** `analyze(..., judge=None, embedder=None, neardup=None)` stays pure apart from the injected objects. The worker builds both from env with its Redis client. The CLI builds the embedder without a cache and has no near-dup index, and `--no-embed` forces embeddings off. `analytics/compose.yaml` passes `EMBED_*` and `GATE_*`.
 - **Dependencies:** `datasketch` (MIT, pulls `numpy` and `scipy`). `httpx` already comes with `analytics-llm-p0`. Both are scanned with `pip-audit`.
@@ -53,22 +63,25 @@ Until the asks land, `bge-m3` can be pulled by hand (`docker compose exec ollama
 ### Modified Capabilities
 - `document-analysis`: ADDED requirements only:
   - the investment topic gate;
+  - gate counters;
+  - similarity rescue (stretch);
   - near-duplicate detection and grouping;
   - the embedder recorded on findings.
 
   `Preprocessing` and `M2 finding assembly`, which `analytics-llm-p0` modifies, are not touched. The new behaviour sits in separate requirements so that the two changes archive without a merge.
+- `finding-events`: MODIFIED "Which events per stored finding", to suppress a repeat `finding.high_risk` for a near-dup group. No other in-flight change modifies `finding-events`.
 
 ## Impact
 
 - **Module owner:** Damian (`analytics/`). No `api/`, `web/`, `scraper/` or `infra/` file changes. The infra items are asks.
-- **Contracts:** none changed. `model.embedder` (string or null) already exists in `finding.schema.json` v1. A near-dup sentence in `summary` is free text. No REST route and no event changes. A gated-out document publishes nothing, the same as an `empty_text` skip today. `contracts/mocks` stay untouched.
+- **Contracts:** none changed. `model.embedder` (string or null) already exists in `finding.schema.json` v1. A near-dup sentence in `summary` is free text. No REST route changes. The event schema is unchanged, but **when** `finding.high_risk` is sent changes for near-dups (the `finding-events` delta). A gated-out document publishes nothing, the same as an `empty_text` skip today. The document vector lives only in the TTL-bound Redis cache, never in Postgres, findings or events. `contracts/mocks` stay untouched.
 - **Redis keys (analytics-internal, new):**
   - `iw:emb:v1:*` (vector cache, TTL);
-  - `iw:neardup:v1:*` (band buckets, signatures, group map, TTL);
+  - `iw:neardup:v1:*` (band buckets, signatures and URLs, group map, alert claims, TTL);
   - `iw:stats:gate` (passed and dropped counters).
 
   They are documented in `analytics/README.md` and `.docs/integration-plan.md` §7 conventions, if Redis keys are listed there.
-- **Code:** `embeddings/` (new), `gate.py` and `gate_terms.yaml` (new), `neardup.py` (new), `pipeline.py`, `modules/m2.py` summary (and M1/M3 builders if `analytics-m1-m3` has landed), `config.py`, `worker.py`, `cli.py`, `analytics/compose.yaml`, `analytics/.env.example`, `requirements*.txt`, `pyproject.toml`.
+- **Code:** `embeddings/` (new), `gate.py` and `gate_terms.yaml` (new), `neardup.py` (new), `events.py` (alert claim), `pipeline.py`, `modules/m2.py` summary (and M1/M3 builders if `analytics-m1-m3` has landed), `config.py`, `worker.py`, `cli.py`, `analytics/compose.yaml`, `analytics/.env.example`, `requirements*.txt`, `pyproject.toml`.
 - **Behaviour change:** `third_party` and `unknown` documents with no investment signal are no longer analyzed. Today that is a no-op for them (`module_not_implemented`). With `analytics-m1-m3` it would cut false M1/M3 findings on off-topic posts.
 
 ## Out of scope

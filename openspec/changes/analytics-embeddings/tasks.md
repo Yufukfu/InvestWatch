@@ -1,64 +1,65 @@
 # Tasks
 
-Stage 3. Apply starts after `analytics-llm-p0` groups 8 and 10 are done (the `analyze(..., judge=None)` signature, the client and breaker this change mirrors). The branch is rebased onto `main` once `analytics-worker` and `analytics-llm-p0` merge. Estimates are for one agent session with tests. If time runs short, cut in the order of `design.md` "Cut plan". No test calls a real model: use the `stub_embed` fixture (stdlib `ThreadingHTTPServer` on `127.0.0.1:0`) or `FakeEmbedder`, with `fakeredis` for Redis. Every group starts with its failing test and ends with a mutation check (iw-commit-cycle step 3).
+Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is a stretch item). Apply starts only on the coordinator's go, after `analytics-llm-p0` groups 5-12 are done (shared `preprocessing.py` and `pipeline.py`; the client, breaker and stub server this change mirrors). The branch is rebased onto `main` once `analytics-worker` and `analytics-llm-p0` merge. Estimates are for one agent session with tests. If time runs short, cut in the order of `design.md` "Cut plan". No test calls a real model: use the `stub_embed` fixture (stdlib `ThreadingHTTPServer` on `127.0.0.1:0`) or `FakeEmbedder`, with `fakeredis` for Redis. Every group starts with its failing test and ends with a mutation check (iw-commit-cycle step 3).
 
-## 1. Embeddings, gate and near-dup config (~45 min)
+## 1. Embeddings, gate and near-dup config (~30 min)
 
 - [ ] 1.1 Failing tests: the "Env-only embeddings configuration" scenarios (disabled by default, empty `EMBED_MODEL` → `ConfigError` naming it and worker exit 2, `EMBED_DIM=abc` / `EMBED_TIMEOUT_S=0` rejected, key never in the error text); `GATE_ENABLED`, `GATE_SIM_THRESHOLD` in (0, 1], `NEARDUP_*` positive ints with `NEARDUP_NUM_PERM` divisible by `NEARDUP_BANDS`; `(LLM_DOC_BUDGET_S + EMBED_TIMEOUT_S) * 1000 < CLAIM_MIN_IDLE_MS` rejected otherwise
 - [ ] 1.2 `EmbedSettings`, `GateSettings`, `NearDupSettings` in `config.py` (reuse `_positive_int`, add a float helper); tests green
 - [ ] 1.3 Mutation check; `mutations: N tried, N caught`
 
-## 2. Embeddings client, validation, stub server (~1.25 h)
+## 2. Embeddings client, validation, stub server (~1 h)
 
 - [ ] 2.1 Failing tests: `stub_embed` fixture (scripted queue: valid, wrong size, NaN, zeros, non-JSON, `{"error":…}`, 404, 429, 401, 500, sleep, closed connection; records requests); request shape (`/v1/embeddings`, `model`, one-item `input`, cut to `EMBED_MAX_CHARS`, no `Authorization` without a key); every "Vector validation" scenario; error classes `EmbedUnavailable` (incl. 404 and timeout within timeout + 1 s) vs `EmbedMalformed`; no text, vector or key in logs; the loopback guard fails a test building `http://ollama:11434/v1`
 - [ ] 2.2 `embeddings/client.py` (`httpx`, connect 3 s / read `EMBED_TIMEOUT_S`), `embeddings/types.py` (`Embedder` protocol, `EmbedOutcome`), L2-normalized `numpy.float32`; reuse `analytics-llm-p0`'s stub server if it is route-generic, otherwise a sibling fixture; `numpy` pinned; tests green
 - [ ] 2.3 Mutation check; `mutations: N tried, N caught`
 
-## 3. Embedding cache and breaker (~1 h)
+## 3. Embedding cache and breaker (~45 min)
 
 - [ ] 3.1 Failing tests: "Embedding cache in Redis" scenarios with `fakeredis` (re-scan makes no second request, model swap misses, corrupt 512-float entry is a miss and is overwritten, Redis raising on read and write is not fatal, rejected vectors not cached, value readable through a `decode_responses=True` client, TTL set); "Embeddings circuit breaker" scenarios with an injected clock (opens after 3, malformed does not count, half-open success and failure). First check whether `analytics-llm-p0`'s breaker is generic and record the answer in `follow-ups.md`
 - [ ] 3.2 `embeddings/cache.py` (key `iw:emb:v1:{variant}:{content_hash}`, base64 float32, separate client with 1 s socket timeout), breaker reused or `embeddings/breaker.py`; `embeddings.build_embedder(settings, redis=None)` returns `None` when disabled; tests green
 - [ ] 3.3 Mutation check; `mutations: N tried, N caught`
 
-## 4. Topic gate, dictionary part (~1 h)
+## 4. Topic gate, dictionary part (~45 min)
 
-- [ ] 4.1 Failing tests: gate scenarios that need no vector (CFD/forex post passes with `dict_hits >= 3`, no-diacritics post passes, recipe post dropped with `off_topic` and `similarity` null, embedder-down + `obligacje skarbowe` passes, `firm_own` bypasses, `GATE_ENABLED=false` drops nothing, registry firm match counts as a hit, invalid `gate_terms.yaml` fails at load naming the key); stem and prefix matching table test (`zysków`, `zyskow`, `zainwestuj` match; a term inside another word, such as `ETF` in `ketfon`, does not); add 6 off-topic negatives and 4 vocabulary-free positives to the gate test fixtures (not to `contracts/mocks`)
+- [ ] 4.1 Failing tests: gate scenarios that need no vector (CFD/forex post passes with `dict_hits >= 3`, no-diacritics post passes, recipe post dropped with `off_topic` and `similarity` null, `unknown` source kind gated like `third_party` and a passing `unknown` document still routed, embedder-down + `obligacje skarbowe` passes, `firm_own` bypasses, `GATE_ENABLED=false` drops nothing, registry firm match counts as a hit, invalid `gate_terms.yaml` fails at load naming the key); stem and prefix matching table test (`zysków`, `zyskow`, `zainwestuj` match; a term inside another word, such as `ETF` in `ketfon`, does not); add 6 off-topic negatives and 4 vocabulary-free positives to the gate test fixtures (not to `contracts/mocks`)
 - [ ] 4.2 `gate_terms.yaml` (Polish + English terms, prefixes, centroid seed phrases), `gate.py` (`strip_diacritics`, compiled matcher, `GateDecision(passed, reason, dict_hits, similarity, embedder)`), package data in `pyproject.toml`; tests green
 - [ ] 4.3 Mutation check; `mutations: N tried, N caught`
 
-## 5. Topic gate, centroid similarity (~1 h)
+## 5. STRETCH: topic gate, centroid similarity (~1 h; cut first, start only after group 9)
 
 - [ ] 5.1 Failing tests: with `FakeEmbedder`, a vocabulary-free post at similarity 0.60 passes, a recipe at 0.20 is dropped with `similarity` 0.2 and `embedder` `bge-m3`, exactly at threshold passes; centroids are built lazily once, not rebuilt per document, rebuilt after an outage on the first successful call; seed vectors go through the cache (second worker start makes no seed requests); embedding never drops a document the dictionary kept
 - [ ] 5.2 Centroid builder in `gate.py` (normalized class means, max cosine over classes); tests green
 - [ ] 5.3 Mutation check; `mutations: N tried, N caught`
+- [ ] 5.4 If this group is cut: remove the requirement "Similarity rescue in the topic gate (stretch)" from `specs/document-analysis/spec.md`, drop the centroid seeds from `gate_terms.yaml`, and say so in `follow-ups.md`
 
-## 6. Near-duplicate detection (~1.5 h)
+## 6. Near-duplicate detection (~1.25 h)
 
-- [ ] 6.1 Failing tests (`fakeredis`): repost with changed handle and emoji joins the original's group; different texts (< 0.5 shared shingles) do not; changed page version gets the same group with two `document_id`s; redelivery of one id is not its own duplicate; four-word text writes no key; Redis raising gives `neardup_unavailable` and no exception; a document matching two groups joins the higher-Jaccard one; keys carry `NEARDUP_TTL_S`; works with `EMBED_BASE_URL` unset; a 2 MB input finishes in under 1 s (cut at `NEARDUP_MAX_CHARS`)
-- [ ] 6.2 `neardup.py`: `datasketch.MinHash` over word 5-shingles of diacritic-stripped lowercase text, own banding (32 × 4) in Redis, signature store, Jaccard verification, group map; `NearDupIndex` protocol and `build_index(settings, redis)`; `datasketch` pinned in `requirements.txt` and `pyproject.toml`, `pip-audit` clean; tests green
+- [ ] 6.1 Failing tests (`fakeredis`): repost with changed handle and emoji joins the original's group; different texts (< 0.5 shared shingles) do not; changed page version gets the same group with two `document_id`s; redelivery of one id is not its own duplicate; four-word text writes no key; Redis raising gives `neardup_unavailable` and no exception; a document matching two groups joins the higher-Jaccard one; keys carry `NEARDUP_TTL_S`; each member's `url` stored in `iw:neardup:v1:meta:{id}`; works with `EMBED_BASE_URL` unset; a 2 MB input finishes in under 1 s (cut at `NEARDUP_MAX_CHARS`)
+- [ ] 6.2 `neardup.py`: `datasketch.MinHash` over word 5-shingles of diacritic-stripped lowercase text, own banding (32 × 4) in Redis, signature and URL store, Jaccard verification, group map; `NearDupIndex` protocol and `build_index(settings, redis)`; `datasketch` pinned in `requirements.txt` and `pyproject.toml` only if `pip-audit` is clean, otherwise our own numpy MinHash (Damian's condition); tests green
 - [ ] 6.3 Mutation check; `mutations: N tried, N caught`
 
-## 7. Pipeline wiring and `model.embedder` (~1 h)
+## 7. Pipeline wiring and `model.embedder` (~45 min)
 
 - [ ] 7.1 Failing tests: `analyze(..., embedder=None, neardup=None)` behaves exactly as before (existing pipeline tests unchanged); order empty → embed → gate → near-dup → route; "Embedder recorded on findings" scenarios (used, cached counts as used, wrong size → null) with findings valid against `contracts/validate.py finding`; embedder down → dictionary-only gate and `model.embedder = null`; empty text makes no embeddings request; off-topic third-party post returns `[]` with the `off_topic` log; `firm_own` still embedded (for `model.embedder`) but not gated
 - [ ] 7.2 `pipeline.py` and `Context` extra (embedder model, near-dup result), M2 builder sets `model.embedder` (M1/M3 builders too if `analytics-m1-m3` has landed); tests green
 - [ ] 7.3 Mutation check; `mutations: N tried, N caught`
 
-## 8. Gate counter and near-dup summary sentence (~45 min)
+## 8. Near-dup alert suppression, summary sentence, gate counter (~45 min)
 
-- [ ] 8.1 Failing tests: `iw:stats:gate` `passed` / `dropped` / `bypassed` increments, Redis raising on `HINCRBY` changes nothing; the summary of a near-dup finding has exactly one Polish sentence with the right plural form for n = 1, 2, 5, and no sentence for a single-member group or with the index off
-- [ ] 8.2 Counter in `gate.py` (optional Redis), sentence helper shared by the finding builders; tests green
+- [ ] 8.1 Failing tests: every `finding-events` delta scenario (unchanged low score, equal threshold and update cases; near-dup of an alerted document publishes only `finding.created` and logs `high_risk_suppressed`; a low-score original does not block its copy; M1 claim does not suppress M3; `SET NX` raising fails open; no index = old behaviour) with `fakeredis` and `NoopPublisher`; the summary of a non-original member names the original's URL with the right plural form for n = 2, 3, 6, the finding keeps its own `url`, and there is no sentence for the original, a single-member group or with the index off; `iw:stats:gate` `passed` / `dropped` / `bypassed` increments, and Redis raising on `HINCRBY` changes nothing
+- [ ] 8.2 `events.py` `publish_findings(saved, groups=None)` with the alert claim, the worker passes the groups from the pipeline result, the sentence helper shared by the finding builders, the counter in `gate.py` (optional Redis); tests green
 - [ ] 8.3 Mutation check; `mutations: N tried, N caught`
 
-## 9. Wiring: worker, CLI, compose (~1 h)
+## 9. Wiring: worker, CLI, compose (~45 min)
 
 - [ ] 9.1 Failing tests: the worker builds embedder and near-dup index from env with its Redis client and passes them to `analyze`; `embed_mode` logged (`local` for `ollama` or loopback host, `remote` otherwise, `disabled`); the CLI uses the embedder when `EMBED_BASE_URL` is set (stub) and `--no-embed` forces it off; CLI output on `contracts/mocks/documents.json` still passes `contracts/validate.py finding` in both modes
 - [ ] 9.2 `worker.py`, `cli.py`; `analytics/compose.yaml` passes `EMBED_*`, `GATE_*`, `NEARDUP_*`; `analytics/.env.example` documents them (empty `EMBED_BASE_URL` = off; local values `http://ollama:11434/v1`, `bge-m3`; no hosted embeddings example); tests green; `docker compose config` valid with and without `--profile llm`
 - [ ] 9.3 Mutation check; `mutations: N tried, N caught`
-- [ ] 9.4 Manual, outside pytest: with `--profile llm` and `bge-m3` pulled by hand, run the CLI on the mock documents and the gate fixtures; record latency per document, the similarity of each fixture and whether 0.45 separates them, in the AI log and as input for the gold-set calibration, never in a test
+- [ ] 9.4 Manual, outside pytest: with `--profile llm` and `bge-m3` pulled by hand, run the CLI on the mock documents and the gate fixtures; record latency per document (and, if group 5 was done, the similarity of each fixture and whether 0.45 separates them), in the AI log and as input for the gold-set calibration, never in a test
 
 ## 10. Closing
 
-- [ ] 10.0 Run the CLI on `contracts/mocks/documents.json` with and without the stub embedder; add to `follow-ups.md` every difference from `contracts/mocks/findings.json` (`model.embedder`, summary text); `git diff --exit-code contracts/mocks contracts/mock-server web infra` is empty; file the infra asks from the proposal as an issue for Kacper (`bge-m3` in `ollama-pull`, `OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE`, infra spec scenario) and link it with #32, and the near-dup exposure follow-up with #33
-- [ ] 10.1 Apply the iw-docs-update skill (docs, your own domain file in `.docs/status/`, ADRs) and add the iw-ai-log row: `.docs/analytics-plan.md` §2 (gate rule, `firm_own` bypass, near-dup technique and "analyzed, grouped, not dropped"), §7 (embeddings model, serving, cache); `analytics/CLAUDE.md` (embeddings are local only, degrade to `model.embedder = null`); `analytics/README.md` (env, Redis keys, pulling `bge-m3` by hand); ADRs 0313 and 0314 listed in `.docs/decisions/README.md`; `docs-check` clean
+- [ ] 10.0 Run the CLI on `contracts/mocks/documents.json` with and without the stub embedder; add to `follow-ups.md` every difference from `contracts/mocks/findings.json` (`model.embedder`, summary text); `git diff --exit-code contracts/mocks contracts/mock-server web infra` is empty; check that the coordinator filed the infra issue for Kacper (`bge-m3` in `ollama-pull`, `OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE`, infra spec scenario; linked with #32) and record its number in `follow-ups.md`, plus the near-dup exposure follow-up linked with #33
+- [ ] 10.1 Apply the iw-docs-update skill (docs, your own domain file in `.docs/status/`, ADRs) and add the iw-ai-log row: `.docs/analytics-plan.md` §2 (gate rule, `firm_own` bypass, near-dup technique, "analyzed, grouped, not dropped" and no repeat `finding.high_risk`); `.docs/integration-plan.md` §6 (repeat high-risk alerts are suppressed for near-dup groups), §7 (embeddings model, serving, cache); `analytics/CLAUDE.md` (embeddings are local only, degrade to `model.embedder = null`); `analytics/README.md` (env, Redis keys, pulling `bge-m3` by hand); ADRs 0313 and 0314 listed in `.docs/decisions/README.md`; `docs-check` clean
 - [ ] 10.2 Run the iw-pr-review skill (normal pass plus a `focus: security` pass on scraped text sent to the embedder, Redis key growth, new `datasketch`/`numpy`/`scipy` dependencies) and fix real findings

@@ -112,11 +112,13 @@ Matching runs on `strip_diacritics(pre.normalized.lower())`. Social posts often 
 - The embedding can only rescue a document. It never drops one the dictionary kept. That is the "low threshold, let content through" rule from plan §2.
 - With no embedder, the gate is the dictionary alone.
 
+**Similarity rescue is a stretch item** (task group 5, the first cut). Without it, the gate is dictionary-only and `similarity` is null in the log. The embeddings still fill `model.embedder` and the cache, which meets the "Reprezentacja wektorowa … embeddingów" requirement.
+
 `GATE_SIM_THRESHOLD` is 0.45 by default. `bge-m3` cosine scores between unrelated Polish texts usually sit around 0.3-0.4, so 0.45 lets near-topic text through. That number is unmeasured, and it is calibrated on the gold set (plan §8) during Integration #3. The env makes it adjustable without a release.
 
 **Centroids** are the normalized means of each class's seed vectors. They are built lazily on the first document when the embedder is up, and rebuilt on the first successful call after an outage. With no centroids there is no similarity, so the gate uses the dictionary only for that document. No negative class: a "non-financial" centroid would make the gate drop by comparison, which is the opposite of the recall bias.
 
-**`firm_own` bypasses the gate.** M2 must check every page of a registered firm (a "kontakt" page still needs R1). The scraper only labels `firm_own` for sources UKNF configured. The gate applies to `third_party` and `unknown`.
+**`firm_own` bypasses the gate.** M2 covers only material "publikowanych bezpośrednio przez" firms and must check every page of one (a "kontakt" page still needs R1). The scraper only labels `firm_own` for sources UKNF configured. The gate applies to `third_party` and `unknown`, and documents that pass flow to routing (M1/M3) unchanged. Damian confirmed this.
 
 **Not a silent loss.** Each drop is one INFO log line, `document skipped` with reason `off_topic`, `dict_hits`, `similarity`, `embedder` and `document_id`. The Redis hash `iw:stats:gate` counts `passed`, `dropped` and `bypassed`. The worker acks the message as it does for `empty_text`, and the `documents` row stays in Postgres, so a drop can be re-analyzed after a threshold change. `GATE_ENABLED=false` turns the gate off for a demo or for an evaluation run.
 
@@ -140,8 +142,15 @@ Why not embedding similarity for dedup: it needs a vector index (Redis 8 without
    - `iw:neardup:v1:doc:{id}` → group id;
    - `SADD iw:neardup:v1:group:{gid} id`;
    - all keys with TTL `NEARDUP_TTL_S`, 30 days.
-2. Log `neardup` with the group id, the best Jaccard and the member count.
-3. Each finding's Polish `summary` gets one sentence: "Treść niemal identyczna z {n} innym(i) przeanalizowanym(i) materiałem(ami) (grupa {gid[:8]})." Plural forms are picked by `n`. The summary is free text, so the contract is unchanged.
+2. The member's `url` is stored in `iw:neardup:v1:meta:{id}` (a hash with `sig` and `url`).
+3. Log `neardup` with the group id, the best Jaccard and the member count.
+4. Each finding of a non-original member gets one Polish sentence in its `summary`: "Treść niemal identyczna z materiałem {original_url} (łącznie {n} podobnych materiałów)." Plural forms are picked by `n`. The finding's own `url` stays the near-dup's URL, because M1 needs "dokładną lokalizację (URL)". The summary is free text, so the contract is unchanged.
+5. **No repeat alert** (Damian, answer 1). The worker passes each saved finding's group id to the publisher. Before sending `finding.high_risk`, the publisher runs `SET iw:neardup:v1:alerted:{gid}:{module} 1 NX EX NEARDUP_TTL_S`:
+   - success → send;
+   - the key already exists → skip, and log `high_risk_suppressed` with reason `neardup`;
+   - a Redis error → send (fail open).
+
+   `finding.created` is always sent. The claim is per module and is taken only when an alert is about to be sent, so a low-score original does not block a high-score copy. The claim comes before the PUBLISH, so a PUBLISH failure right after it loses that group's alert. This matches the existing at-most-once rule ("Publishing failure does not lose findings"). The change sits in `events.py` (`publish_findings(saved, groups=None)`) and is a MODIFIED requirement in `finding-events`.
 
 Groups are not merged transitively. A document that matches two groups joins the one with the higher Jaccard. That keeps the writes O(1), and it is an accepted error.
 
@@ -200,22 +209,25 @@ Groups are not merged transitively. A document that matches two groups joins the
 
 ## Cut plan
 
-The total is about 9 h of agent work plus closing. Cut in this order, cheapest loss first:
+The approved scope is groups 1-4 and 6-9, about 5.5 h of agent work plus closing. Group 5 is a stretch item. Cut in this order, cheapest loss first:
 
-1. **Group 8 (gate counter `iw:stats:gate` and the near-dup sentence in the summary).** The logs still carry the decision.
-2. **Centroid similarity (part of group 5).** A dictionary-only gate. The embeddings still fill `model.embedder` and the cache. Note that this leaves the embedding with no consumer other than `model.embedder`, which weakens the spec-fit story.
-3. **Group 3 (cache and breaker).** Keep `EMBED_TIMEOUT_S` at 2 without the breaker.
-4. **`datasketch` → own numpy MinHash** if the image size or `pip-audit` objects.
-5. **Group 6 (near-dup)** as a whole. The proposal then says "dedup = exact `content_hash`", which is the weakest spec-fit.
+0. **Group 5 (centroid similarity), stretch.** It is not started unless time is left after group 9. If it is cut, its requirement "Similarity rescue in the topic gate (stretch)" is removed from the `document-analysis` delta before archive.
+1. **The gate counter and the near-dup summary sentence (part of group 8; the alert suppression in group 8 stays).** The logs still carry the decision.
+2. **Group 3 (cache and breaker).** Keep `EMBED_TIMEOUT_S` at 2 without the breaker.
+3. **`datasketch` → own numpy MinHash** if `pip-audit` is not clean (Damian's condition) or the image size objects.
 
-Never cut: degradation to `model.embedder = null`, the `off_topic` log reason, the `firm_own` bypass and the loopback guard.
+Never cut: real embeddings (groups 2 and 7) and near-dup (group 6), which together are the minimum the challenge text asks for ("usuwanie duplikatów", "embeddingów"); degradation to `model.embedder = null`; the `off_topic` log reason; the `firm_own` bypass; the alert suppression; and the loopback guard.
+
+## Resolved questions
+
+Answered by the coordinating session on Damian's approval, checked against `doc/Opis Wyzwania HackNation UKNF 19.11.pdf` (2026-11-21):
+
+1. **Near-dup and alerts.** A near-dup still gets its finding and `finding.created`, but no second `finding.high_risk` for the same group and module. Its summary names the original, and its own URL stays on the finding. Reason: the documents ask for "usuwanie duplikatów" and real-time high-risk alerts, and repeat alerts would spam the live demo. This is the `finding-events` delta and decision 5.5.
+2. **`unknown` source kind** is gated like `third_party`. Documents that pass flow to M1/M3. M2 covers only material "publikowanych bezpośrednio przez" firms.
+3. **Near-dup sentence in `summary`:** on.
+4. **`datasketch`:** kept if `pip-audit` is clean, otherwise our own numpy MinHash (cut plan 3).
+5. **Gate threshold 0.45:** kept until the gold set from `analytics-eval-calibration` is calibrated. It applies only to the stretch similarity rescue.
 
 ## Open Questions
 
-For Damian. Each has a default, and apply proceeds with it unless overridden:
-
-1. **Near-dup and alerts.** Should a near-dup of a document that already fired `finding.high_risk` fire it again? Default: **yes**, because each publication is separate and no alert is lost. The alternative suppresses the repeat and modifies `finding-events`.
-2. **Gate on `unknown` source kind.** Default: gated like `third_party`. The alternative bypasses it like `firm_own`.
-3. **Near-dup sentence in `summary`.** Default: on. It is visible in the demo, but it changes the summary text that the mock comparisons read.
-4. **`datasketch` (+scipy) vs own MinHash.** Default: `datasketch`, as the plan names it.
-5. **Gate threshold 0.45.** Default kept until gold-set calibration.
+None.
