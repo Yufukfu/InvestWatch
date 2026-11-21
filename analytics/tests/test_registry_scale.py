@@ -195,3 +195,10 @@ def test_turkish_dotted_capital_i_is_not_lost_by_the_prefilter():
 ])
 def test_more_knf_legal_forms(name, core):
     assert core_name(name) == core
+
+
+def test_brand_casing_with_an_inner_capital_matches():
+    # KNF writes "Etoro (Europe) Ltd"; ads write "eToro". A plain lower-case word still never matches.
+    reg = _reg(("Etoro (Europe) Ltd", "foreign_no_branch", ("Etoro",)))
+    assert reg.match("Platforma eToro dla początkujących", URL).evidence == "eToro"
+    assert reg.match("platforma etoro", URL) is None
