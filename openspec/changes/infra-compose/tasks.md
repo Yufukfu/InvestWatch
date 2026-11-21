@@ -28,9 +28,9 @@ Before group 1: Damian approves ADR 0306 and the open questions in `design.md` a
 
 ## 5. Networks, egress and dev ports
 
-- [ ] 5.1 Failing tests: in the default stack only `gateway` publishes ports; a container on `iw-data` only cannot reach a public address; with `infra/compose.dev-ports.yaml` the three data ports listen on `127.0.0.1` only
-- [ ] 5.2 Add network `egress` (not internal) to `infra/compose.yaml` and the opt-in `infra/compose.dev-ports.yaml` per design decision 7; the three isolation scenarios pass
-- [ ] 5.3 Mutation check (bind a dev port to `0.0.0.0`, then mark `data` non-internal; each must be caught); record `mutations: N tried, N caught`
+- [x] 5.1 Failing tests (probes from the test-only `infra/tests/compose.probe.yaml`; dev ports in the smoke test are 25432/26379/29000, not the defaults): in the default stack only `gateway` publishes ports; a container on `iw-data` only cannot reach a public address; with `infra/compose.dev-ports.yaml` the three data ports listen on `127.0.0.1` only
+- [x] 5.2 Add network `egress` (not internal) to `infra/compose.yaml` and the opt-in `infra/compose.dev-ports.yaml` per design decision 7; the three isolation scenarios pass
+- [x] 5.3 Mutation check (bind a dev port to `0.0.0.0`, then mark `data` non-internal; each must be caught); mutations: 4 tried, 4 caught (`data` not internal, dev port on all interfaces, redis publishing a host port, plus the group 4 review fix: Redis behind a pipe is not PID 1). One more mutant, a host port on a data-only service, was equivalent: Docker publishes nothing for a container on an internal network only
 
 ## 6. Local LLM profile
 

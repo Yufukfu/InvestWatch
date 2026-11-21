@@ -160,6 +160,9 @@ redis_persists() {
   dc "$1" restart redis >/dev/null 2>&1 && dc "$1" up -d --wait --wait-timeout 60 redis >/dev/null 2>&1
   got=$(rcli "$1" get iw:settings:thresholds); echo "after restart: $got"; [ "$got" = "$v" ]
 }
+redis_is_pid1() { # redis-server must be PID 1, or `docker stop` SIGKILLs it after 10 s without a clean shutdown
+  local comm; comm=$(dc "$1" exec -T redis cat /proc/1/comm); echo "pid 1: $comm"; [ "$comm" = redis-server ]
+}
 only_on_data() { # only_on_data <project> <service>
   local nets; nets=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(dc "$1" ps -q "$2")")
   echo "$2 networks: $nets"; [ "$nets" = "$1_data " ]
@@ -171,6 +174,7 @@ group_redis() {
   check "redis starts healthy" up "$p" 18445 18082 redis
   check "authenticated PING is PONG, unauthenticated is NOAUTH" redis_auth "$p"
   check "AOF on and noeviction" redis_config "$p"
+  check "redis-server is PID 1 (gets SIGTERM)" redis_is_pid1 "$p"
   check "iw:settings:thresholds survives a restart" redis_persists "$p"
   check "redis is only on the internal data network" only_on_data "$p" redis
 }
@@ -225,9 +229,60 @@ group_minio() {
   check "minio is only on the internal data network" only_on_data "$p" minio
 }
 
+PROBE_FILE="$ROOT/infra/tests/compose.probe.yaml"
+DEV_FILE="$ROOT/infra/compose.dev-ports.yaml"
+# dcx <project> <extra -f file> [compose args...]
+dcx() { local p=$1 x=$2; shift 2; docker compose -p "$p" --env-file "$TMP/$p.env" -f "$INFRA" -f "$x" "$@"; }
+upx() { # upx <project> <https> <http> <extra file> [services...]
+  local p=$1 x=$4; PROJECTS+=("$p"); new_env "$p" "$2" "$3" >/dev/null; shift 4
+  dcx "$p" "$x" up -d --wait --wait-timeout 180 "$@"
+}
+only_gateway_published() {
+  local ports; ports=$(docker ps --filter "label=com.docker.compose.project=$1" --format '{{.Label "com.docker.compose.service"}}={{.Ports}}')
+  echo "$ports"
+  echo "$ports" | awk -F= '$2 ~ /->/ && $1 != "gateway" {bad=1} END {exit bad}'
+}
+internet_from() { dcx "$1" "$PROBE_FILE" exec -T "$2" wget -q -T 8 -O /dev/null http://example.com/; }
+data_has_no_internet() {
+  internet_from "$1" probe-egress || { echo "control failed: no internet from egress either"; return 1; }
+  if internet_from "$1" probe-data; then echo "data network reached the internet"; return 1; fi
+}
+dev_ports_loopback() {
+  local p=$1 c line ok=0
+  for s in postgres redis minio; do
+    c=$(dcx "$p" "$DEV_FILE" ps -q "$s")
+    line=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Ports}}{{range $v}}{{$k}}@{{.HostIp}}:{{.HostPort}} {{end}}{{end}}' "$c")
+    echo "$s: $line"
+    [ -n "$line" ] || { echo "$s publishes nothing"; ok=1; }
+    for b in $line; do case $b in *@127.0.0.1:*) ;; *) echo "$s binds $b"; ok=1 ;; esac; done
+  done
+  return $ok
+}
+DEV_PORTS=(25432 26379 29000) # not the defaults, so a developer's own dev-ports stack can keep running
+up_dev() {
+  local p=$1; PROJECTS+=("$p"); new_env "$p" 18448 18085 >/dev/null
+  sed -i -e "s|^IW_DEV_PG_PORT=.*|IW_DEV_PG_PORT=${DEV_PORTS[0]}|" -e "s|^IW_DEV_REDIS_PORT=.*|IW_DEV_REDIS_PORT=${DEV_PORTS[1]}|"     -e "s|^IW_DEV_MINIO_PORT=.*|IW_DEV_MINIO_PORT=${DEV_PORTS[2]}|" "$TMP/$p.env"
+  dcx "$p" "$DEV_FILE" up -d --wait --wait-timeout 180 postgres redis minio minio-init
+}
+dev_ports_reachable() { # TCP connect from the host to each dev port on 127.0.0.1
+  local port; for port in "${DEV_PORTS[@]}"; do
+    timeout 5 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null || { echo "127.0.0.1:$port refused"; return 1; }
+  done
+}
+
+group_networks() {
+  local p="iw-smoke-n-$RUN_ID" d="iw-smoke-d-$RUN_ID"
+  check "default infra starts healthy" upx "$p" 18447 18084 "$PROBE_FILE" postgres redis minio minio-init gateway probe-egress probe-data
+  check "only the gateway publishes host ports" only_gateway_published "$p"
+  check "egress reaches the internet, data does not" data_has_no_internet "$p"
+  check "dev-ports override starts healthy" up_dev "$d"
+  check "dev ports bind to 127.0.0.1 only" dev_ports_loopback "$d"
+  check "dev ports answer on loopback" dev_ports_reachable
+}
+
 # ---------------------------------------------------------------- main
 
-GROUPS_ALL=(parallel env redis minio)
+GROUPS_ALL=(parallel env redis minio networks)
 [ $# -gt 0 ] && SELECTED=("$@") || SELECTED=("${GROUPS_ALL[@]}")
 docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1 || docker pull -q "$PROBE_IMAGE" >/dev/null
 for g in "${SELECTED[@]}"; do log "== $g"; "group_$g"; done

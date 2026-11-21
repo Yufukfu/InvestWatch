@@ -43,12 +43,13 @@ services:
       - sh
       - -c
       # Password over stdin (`-` reads config from it), so it never appears in the process arguments.
+      # A heredoc, not a pipe: `exec` must replace PID 1 so redis-server gets SIGTERM and shuts down cleanly.
       # maxmemory at half the container limit leaves room for the AOF-rewrite fork (copy-on-write).
-      - >-
-        umask 0077;
-        printf 'requirepass %s\n' "$$REDIS_PASSWORD" |
-        exec redis-server - --appendonly yes --appendfsync everysec
-        --maxmemory 128mb --maxmemory-policy noeviction
+      - |
+        umask 0077
+        exec redis-server - --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction <<EOF
+        requirepass $$REDIS_PASSWORD
+        EOF
     volumes:
       - redisdata:/data
     networks: [data]
@@ -157,6 +158,9 @@ volumes:
 # (different COMPOSE_PROJECT_NAME) never share a network or a service DNS name.
 networks:
   edge: {}
-  # No route outside; only services that need the database join it (api, scraper, analytics).
+  # No route outside: Postgres, Redis, object storage and Ollama, plus the modules that use them.
   data:
     internal: true
+  # Outbound internet for the services that need it (scraper, analytics' hosted LLM, the Ollama model pull).
+  # Separate from edge, so "who can reach the internet" is visible from the network list.
+  egress: {}
