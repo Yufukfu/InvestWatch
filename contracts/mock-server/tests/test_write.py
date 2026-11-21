@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+
+from conftest import assert_valid
+from iw_mock_server.app import create_app
+from iw_mock_server.settings import Settings
+from openapi_check import assert_response_matches
+
+NEW_SOURCE = {"name": "Nowe źródło", "platform": "web", "url": "https://new-source.example.com/",
+              "source_kind": "unknown", "target_modules": ["M3"], "schedule_cron": None, "active": True}
+
+
+@pytest.fixture
+def client(contracts_dir):
+    settings = Settings(contracts_dir=contracts_dir, replay_interval_s=0, scan_delay_s=0)
+    with TestClient(create_app(settings)) as c:
+        yield c
+
+
+def a_finding(client, **filters) -> dict:
+    query = "&".join(f"{k}={v}" for k, v in filters.items())
+    return client.get(f"/api/findings?{query}").json()["items"][0]
+
+
+def test_patch_status_is_persisted_and_bumps_updated_at(client):
+    f = a_finding(client, status="new")
+
+    r = client.patch(f"/api/findings/{f['id']}", json={"status": "confirmed", "note": "sprawdzone"})
+
+    assert r.status_code == 200
+    assert_response_matches("/findings/{id}", "patch", r)
+    assert r.json()["status"] == "confirmed" and r.json()["note"] == "sprawdzone"
+    assert r.json()["updated_at"] > f["updated_at"]
+    assert client.get(f"/api/findings/{f['id']}").json()["status"] == "confirmed"
+
+
+@pytest.mark.parametrize("body", [{"status": "approved"}, {}, {"unknown": 1}])
+def test_patch_rejects_invalid_body_and_keeps_the_finding(client, body):
+    f = a_finding(client)
+
+    r = client.patch(f"/api/findings/{f['id']}", json=body)
+
+    assert r.status_code == 422
+    assert client.get(f"/api/findings/{f['id']}").json()["status"] == f["status"]
+
+
+def test_patch_unknown_finding_is_404(client):
+    assert client.patch(f"/api/findings/{uuid.uuid4()}", json={"status": "closed"}).status_code == 404
+
+
+def test_threshold_change_recomputes_risk_level_and_calibration(client):
+    r = client.put("/api/settings/thresholds", json={"M1": 0.6, "M2": 0.9, "M3": 0.7})
+
+    assert r.status_code == 200
+    assert_response_matches("/settings/thresholds", "put", r)
+    for item in client.get("/api/findings?module=M2").json()["items"]:
+        expected = "high" if item["score"] >= 0.9 else "medium" if item["score"] >= 0.7 else "low"
+        assert item["risk_level"] == expected
+    assert client.get("/api/calibration?module=M2").json()["current_threshold"] == 0.9
+
+
+@pytest.mark.parametrize("body", [{"M1": 0.6, "M2": 1.5, "M3": 0.7}, {"M1": 0.6, "M3": 0.7},
+                                  {"M1": 0.6, "M2": 0.5, "M3": 0.7, "M4": 0.1}])
+def test_invalid_thresholds_are_rejected_and_unchanged(client, body):
+    before = client.get("/api/settings/thresholds").json()
+
+    assert client.put("/api/settings/thresholds", json=body).status_code == 422
+    assert client.get("/api/settings/thresholds").json() == before
+
+
+def test_add_and_edit_source(client):
+    r = client.post("/api/sources", json=NEW_SOURCE)
+
+    assert r.status_code == 201
+    created = r.json()
+    assert_valid("source", created)
+    assert uuid.UUID(created["id"]).version == 4
+    assert created["id"] in {s["id"] for s in client.get("/api/sources").json()["items"]}
+
+    r = client.patch(f"/api/sources/{created['id']}", json={"active": False})
+
+    assert r.status_code == 200
+    assert r.json()["active"] is False
+    assert_valid("source", r.json())
+
+
+@pytest.mark.parametrize("body", [{**NEW_SOURCE, "platform": "myspace"}, {"name": "brak reszty"},
+                                  {**NEW_SOURCE, "target_modules": []}])
+def test_invalid_source_is_422(client, body):
+    assert client.post("/api/sources", json=body).status_code == 422
+
+
+def test_patch_unknown_source_is_404(client):
+    assert client.patch(f"/api/sources/{uuid.uuid4()}", json={"active": False}).status_code == 404
+
+
+def test_scan_existing_source_is_accepted(client):
+    source_id = client.get("/api/sources").json()["items"][0]["id"]
+
+    r = client.post("/api/scans", json={"source_id": source_id})
+
+    assert r.status_code == 202
+    assert r.json() == {"queued": True, "source_id": source_id}
+
+
+def test_scan_unknown_source_is_404(client):
+    assert client.post("/api/scans", json={"source_id": str(uuid.uuid4())}).status_code == 404
+
+
+def test_reset_restores_original_data(client):
+    f = a_finding(client, status="new")
+    client.patch(f"/api/findings/{f['id']}", json={"status": "closed"})
+    client.put("/api/settings/thresholds", json={"M1": 0.1, "M2": 0.1, "M3": 0.1})
+    client.post("/api/sources", json=NEW_SOURCE)
+
+    assert client.post("/__mock/reset").status_code == 200
+
+    assert client.get(f"/api/findings/{f['id']}").json()["status"] == "new"
+    assert client.get("/api/settings/thresholds").json() == {"M1": 0.6, "M2": 0.5, "M3": 0.7}
+    assert len(client.get("/api/sources").json()["items"]) == 4

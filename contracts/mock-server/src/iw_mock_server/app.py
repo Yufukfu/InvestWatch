@@ -12,7 +12,11 @@ from datetime import datetime, timezone
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Query, Request
+import uuid
+from datetime import timedelta
+
+from fastapi import Body, FastAPI, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -28,6 +32,74 @@ Module = Literal["M1", "M2", "M3"]
 RiskLevel = Literal["high", "medium", "low"]
 Viewport = Literal["desktop", "tablet", "mobile"]
 STATUSES = ("new", "in_review", "confirmed", "false_positive", "closed")
+
+
+Platform = Literal["web", "facebook", "instagram", "tiktok", "youtube", "x", "forum", "other"]
+SourceKind = Literal["firm_own", "third_party", "unknown"]
+Status = Literal["new", "in_review", "confirmed", "false_positive", "closed"]
+
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class FindingPatch(_Strict):
+    status: Status | None = None
+    note: str | None = None
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if not self.model_fields_set:
+            raise ValueError("at least one of status, note is required")
+        return self
+
+
+class Thresholds(_Strict):
+    M1: float = Field(ge=0, le=1)
+    M2: float = Field(ge=0, le=1)
+    M3: float = Field(ge=0, le=1)
+
+
+class SourceCreate(_Strict):
+    name: str = Field(min_length=1)
+    platform: Platform
+    url: HttpUrl
+    source_kind: SourceKind
+    target_modules: list[Module] = Field(min_length=1)
+    schedule_cron: str | None = None
+    active: bool = True
+
+
+class SourcePatch(_Strict):
+    name: str | None = Field(default=None, min_length=1)
+    platform: Platform | None = None
+    url: HttpUrl | None = None
+    source_kind: SourceKind | None = None
+    target_modules: list[Module] | None = Field(default=None, min_length=1)
+    schedule_cron: str | None = None
+    active: bool | None = None
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if not self.model_fields_set:
+            raise ValueError("at least one field is required")
+        return self
+
+
+class ScanRequest(_Strict):
+    source_id: UUID
+
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def bumped_timestamp(previous: str | None) -> str:
+    """Now, but never earlier than (previous + 1 s): mock timestamps may lie in the future."""
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    if previous:
+        now = max(now, parse_ts(previous) + timedelta(seconds=1))
+    return iso(now)
 
 
 def parse_ts(value: str) -> datetime:
@@ -140,6 +212,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                                    for vp, key in shots.items() if key}
         return view
 
+    @api.patch("/api/findings/{finding_id}")
+    def patch_finding(finding_id: UUID, patch: Annotated[FindingPatch, Body()]):
+        finding = get_finding_or_404(finding_id)
+        for key, value in patch.model_dump(exclude_unset=True).items():
+            if key == "status" and value is None:
+                raise RequestValidationError([{"loc": ["body", "status"], "msg": "status cannot be null"}])
+            finding[key] = value
+        finding["updated_at"] = bumped_timestamp(finding.get("updated_at"))
+        api.state.notify("finding.updated", {"id": finding["id"], "status": finding["status"]})
+        return store.finding_view(finding)
+
     # --- stats ----------------------------------------------------------------------------
 
     @api.get("/api/stats/summary")
@@ -206,11 +289,43 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def get_thresholds():
         return dict(store.thresholds)
 
-    # --- sources, documents, health -------------------------------------------------------
+    @api.put("/api/settings/thresholds")
+    def put_thresholds(thresholds: Thresholds):
+        store.thresholds.update(thresholds.model_dump())
+        return dict(store.thresholds)
+
+    # --- sources, scans, documents, health ------------------------------------------------
 
     @api.get("/api/sources")
     def list_sources():
         return {"items": list(store.sources.values())}
+
+    @api.post("/api/sources", status_code=201)
+    def create_source(body: SourceCreate):
+        source = body.model_dump(mode="json")
+        source.update(id=str(uuid.uuid4()), last_run_at=None, last_run_status=None, documents_count=0)
+        store.sources[source["id"]] = source
+        return source
+
+    @api.patch("/api/sources/{source_id}")
+    def patch_source(source_id: UUID, patch: SourcePatch):
+        source = store.sources.get(str(source_id))
+        if source is None:
+            raise HTTPException(404, f"source {source_id} not found")
+        changes = patch.model_dump(mode="json", exclude_unset=True)
+        nulls = [k for k, v in changes.items() if v is None and k != "schedule_cron"]
+        if nulls:
+            raise RequestValidationError([{"loc": ["body", k], "msg": "cannot be null"} for k in nulls])
+        source.update(changes)
+        return source
+
+    @api.post("/api/scans", status_code=202)
+    def request_scan(body: ScanRequest):
+        source_id = str(body.source_id)
+        if source_id not in store.sources:
+            raise HTTPException(404, f"source {source_id} not found")
+        api.state.start_scan(source_id)
+        return {"queued": True, "source_id": source_id}
 
     @api.get("/api/documents/{document_id}/screenshot/{viewport}")
     def screenshot(document_id: UUID, viewport: Viewport):
@@ -222,5 +337,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @api.get("/api/health")
     def health():
         return store.health
+
+    # --- mock-only helpers (not part of the contract) -------------------------------------
+
+    @api.post("/__mock/reset")
+    def mock_reset():
+        store.reset()
+        return {"reset": True}
+
+    # Event hooks; replaced with Socket.IO emitters when the app is mounted (events.py).
+    api.state.notify = lambda event_type, data: None
+    api.state.start_scan = lambda source_id: None
 
     return api

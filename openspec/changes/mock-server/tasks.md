@@ -15,8 +15,8 @@
 
 ## 3. Write endpoints
 
-- [ ] 3.1 Write failing tests: `PATCH /api/findings/{id}` (valid status, invalid status, empty body), `PUT /api/settings/thresholds` (recomputed `risk_level` and `current_threshold`, out-of-range rejected), `POST`/`PATCH /api/sources`, `POST /api/scans` (202 and 404), `POST /__mock/reset`
-- [ ] 3.2 Implement the write endpoints against the in-memory store, bumping `updated_at`, and `/__mock/reset`
+- [x] 3.1 Write failing tests: `PATCH /api/findings/{id}` (valid status, invalid status, empty body), `PUT /api/settings/thresholds` (recomputed `risk_level` and `current_threshold`, out-of-range rejected), `POST`/`PATCH /api/sources`, `POST /api/scans` (202 and 404), `POST /__mock/reset`
+- [x] 3.2 Implement the write endpoints against the in-memory store, bumping `updated_at`, and `/__mock/reset`
 
 ## 4. Socket.IO events
 
