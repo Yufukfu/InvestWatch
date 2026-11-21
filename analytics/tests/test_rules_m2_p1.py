@@ -294,3 +294,102 @@ def test_r15_next_year_alone_is_a_strong_marker(registry, catalogue):
 def test_r15_imperative_is_not_result_vocabulary(registry, catalogue):
     # Without the imperative exclude, `zarabiaj` + `będzie` would be an uncertain forecast candidate.
     assert run("Zarabiaj z nami – będzie łatwiej.", registry, catalogue)["R15"].result == "not_applicable"
+
+
+# ---- R12a period and scope ----------------------------------------------------------------------
+
+FIVE_YEARS = "W latach 2021–2025 fundusz wypracował średnio 7% rocznie."
+SOURCE = "Źródło: dane własne TFI."
+FIVE_Y, REF, SRC = "5 lat / 12 mies.", "okres referencyjny", "źródło"
+
+
+def test_r12a_catalogue_entry(catalogue):
+    spec = catalogue.get("R12a")
+    assert spec.implemented
+    assert spec.legal_basis == "art. 44 ust. 4 rozp. del. 2017/565"
+
+
+def test_r12a_eurotrade_one_year_without_source_fails(mock_documents, registry, catalogue):
+    r = run_mock(mock_documents, EUROTRADE_ID, registry, catalogue)["R12a"]
+    assert r.result == "fail"
+    assert r.evidence == "Nasi klienci zarobili średnio 34% w 2025 roku."
+    assert FIVE_Y in r.explanation and SRC in r.explanation
+    assert REF not in r.explanation
+    assert r.explanation.index(FIVE_Y) < r.explanation.index(SRC)  # fixed order
+
+
+def test_r12a_five_years_with_source_passes(registry, catalogue):
+    r = run(f"{FIVE_YEARS} {SOURCE}", registry, catalogue)["R12a"]
+    assert r.result == "pass"
+    assert r.evidence == FIVE_YEARS
+
+
+@pytest.mark.parametrize(
+    "short",
+    ["Od początku roku fundusz zyskał 9%.", "W 3 miesiące fundusz zyskał 4%.", "W III kwartale fundusz zyskał 4%.",
+     "W ostatnim miesiącu fundusz zyskał 2%.", "Wynik YTD: fundusz zyskał 5%."],
+    ids=["since-start-of-year", "three-months", "quarter", "last-month", "ytd"],
+)
+def test_r12a_period_shorter_than_twelve_months_fails(short, registry, catalogue):
+    r = run(f"{FIVE_YEARS} {short} {SOURCE}", registry, catalogue)["R12a"]
+    assert r.result == "fail"
+    assert r.evidence == short
+    assert FIVE_Y in r.explanation and REF not in r.explanation and SRC not in r.explanation
+
+
+@pytest.mark.parametrize("full", ["W ostatnich 12 miesiącach fundusz zyskał 9%.", "Przez 24 miesiące fundusz zyskał 15%."])
+def test_r12a_multiple_of_twelve_months_is_a_full_period(full, registry, catalogue):
+    assert run(f"{full} {FIVE_YEARS} {SOURCE}", registry, catalogue)["R12a"].result == "pass"
+
+
+def test_r12a_no_reference_period_fails(registry, catalogue):
+    r = run(f"Nasi klienci zarobili 34%. {SOURCE}", registry, catalogue)["R12a"]
+    assert r.result == "fail"
+    assert REF in r.explanation
+
+
+def test_r12a_since_inception_without_date_fails_reference_period(registry, catalogue):
+    text = f"Od początku działalności fundusz zarobił 18%. {SOURCE}"
+    r = run(text, registry, catalogue)["R12a"]
+    assert r.result == "fail"
+    assert f"{REF}: niespełniony" in r.explanation
+    assert f"{FIVE_Y}: do weryfikacji" in r.explanation
+    assert r.explanation.index(FIVE_Y) < r.explanation.index(REF)
+
+
+def test_r12a_since_inception_with_start_year_is_uncertain(registry, catalogue):
+    inception = "Od uruchomienia w 2023 r. fundusz zarobił 18%."
+    r = run(f"{inception} {SOURCE}", registry, catalogue)["R12a"]
+    assert r.result == "uncertain"
+    assert r.evidence == inception
+    assert FIVE_Y in r.explanation and REF not in r.explanation and SRC not in r.explanation
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["W ciągu ostatnich 10 lat fundusz zarobił średnio 6% rocznie.",
+     "Wyniki funduszu: 5% w 2021 r., 7% w 2022 r., -3% w 2023 r., 9% w 2024 r., 6% w 2025 r.",
+     "Pięcioletnia stopa zwrotu funduszu za 2025 rok wyniosła 31%."],
+    ids=["last-10-years", "five-distinct-years", "five-year-word"],
+)
+def test_r12a_five_year_coverage(text, registry, catalogue):
+    assert run(f"{text} {SOURCE}", registry, catalogue)["R12a"].result == "pass"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["W latach 2022–2025 fundusz wypracował średnio 7% rocznie.",
+     "Wyniki funduszu: 7% w 2022 r., -3% w 2023 r., 9% w 2024 r., 6% w 2025 r.",
+     "W ciągu ostatnich 4 lat fundusz zarobił średnio 6% rocznie."],
+    ids=["four-year-range", "four-distinct-years", "last-4-years"],
+)
+def test_r12a_less_than_five_years_fails(text, registry, catalogue):
+    r = run(f"{text} {SOURCE}", registry, catalogue)["R12a"]
+    assert r.result == "fail"
+    assert FIVE_Y in r.explanation and REF not in r.explanation
+
+
+def test_r12a_alfa_not_applicable(mock_documents, registry, catalogue):
+    r = run_mock(mock_documents, ALFA_ID, registry, catalogue)["R12a"]
+    assert r.result == "not_applicable"
+    assert r.evidence is None

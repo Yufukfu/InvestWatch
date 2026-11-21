@@ -67,6 +67,7 @@ ADVERSARIAL = {
     "niz": "niż " * 5_000,
     "one-word": "a" * 20_000,
     "digit-space": "1 " * 10_000,
+    "digit-then-spaces": "1" + " " * 20_000,
 }
 
 

@@ -57,7 +57,7 @@ The same sentence may be evidence in several rules, for example a past-performan
 
 **Shared trigger.** R12a, R12b and R14 use one detector:
 - R14's `_is_past_performance` moves into a `_PastPerformance` base class.
-- Its parameter lists are YAML anchors on R14 (`&pp_figure`, `&pp_past`, `&pp_future` and the rest), aliased in R12a and R12b.
+- Its parameter lists are YAML anchors in the catalogue's `shared:` section (`&pp_figure`, `&pp_past`, `&pp_future` and the rest), aliased by R12a, R12b and R14. They started on R14, but YAML cannot alias forward and R12a comes first in the catalogue.
 - R14's tests stay green unchanged.
 
 This means the three rules can never disagree on whether the material presents past performance.

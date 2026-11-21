@@ -43,11 +43,11 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - the imperatives `zarabiaj` and `zyskaj` are never forecast markers;
   - a fee percentage with `będzie` is not a forecast.
 - [x] 3.2 Write the R15 class. Add `forecast_patterns`, `forecast_verb_patterns`, `forecast_exclude_patterns` (the imperatives), `forecast_weak_patterns`, `performance_patterns` and `forecast_disclaimer_patterns` (`&forecast_disclaimers`), reusing `*return_figure_exclude`, and set `implemented: true`. Tests green.
-- [x] 3.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 16 tried, 16 caught` (the excludes, the result-vocabulary gate, the future-year boundary and marker, the future-tense verb with and without a figure, both weak-marker branches, the candidate tier, warnings kept out of the trigger, the compliant pass quoting the forecast and starting `Wykryto prognozę`, the R14 disclaimer not counting, the imperative exclude, `w przyszłym roku`). Three survivors on the first run got their own tests (fetch-year boundary, `w przyszłym roku` alone, the imperative as vocabulary).
+- [x] 3.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 16 tried, 16 caught` (the excludes, the result-vocabulary gate, the future-year boundary and marker, the future-tense verb with and without a figure, both weak-marker branches, the candidate tier, warnings kept out of the trigger, the compliant pass quoting the forecast and starting `Wykryto prognozę`, the R14 disclaimer not counting, the imperative exclude, `w przyszłym roku`). Three survivors on the first run got their own tests (fetch-year boundary, `w przyszłym roku` alone, the imperative as vocabulary). Review fix (R16: generic tax words such as `opodatkowanie`, `podatkowe`, `taxation` never make a disclaimer sentence a reference; R15: the fee-percentage exclude no longer blanks a return verb): `mutations: 5 tried, 5 caught`.
 
 ## 4. R12a period and scope (~1.25 h)
 
-- [ ] 4.1 Write the failing tests for the R12a scenarios:
+- [x] 4.1 Write the failing tests for the R12a scenarios:
   - `eurotrade` gives `fail`, naming the sub-checks `5 lat / 12 mies.` and `źródło`, and not `okres referencyjny`;
   - 2021–2025 with a source gives `pass`;
   - `od początku roku` gives `fail`, quoting that sentence;
@@ -61,8 +61,8 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - `m2-alfa-landing` gives `not_applicable`;
   - the explanation names the sub-checks that are not `pass`, with their status, in a fixed order;
   - shared trigger: R12a, R12b and R14 are `not_applicable` together on `m2-bank-ok`.
-- [ ] 4.2 Write the R12a class on `_PastPerformance`, with the three named sub-checks as a `SubCheck` list and the result taken as the worst of them. Add `short_period_patterns`, `five_year_patterns`, `inception_patterns` and `source_patterns` (`&source_markers`), the N-month and year-range checks in code (ReDoS-tested in group 1's timing test), the legal basis art. 44 ust. 4, and `implemented: true`. Tests green.
-- [ ] 4.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 4.2 Write the R12a class on `_PastPerformance`, with the three named sub-checks as a `SubCheck` list and the result taken as the worst of them. Add `short_period_patterns`, `five_year_patterns`, `inception_patterns` and `source_patterns` (`&source_markers`), the N-month and year-range checks in code (ReDoS-tested in group 1's timing test), the legal basis art. 44 ust. 4, and `implemented: true`. Tests green.
+- [x] 4.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 18 tried, 18 caught` (N months and the multiple of 12, the short-period list and its precedence, the 5-year boundaries for `ostatnich N lat`, a year range and distinct years, the 5-year words, since inception as `uncertain`, each reference-period source, the source check, worst-of, only non-pass sub-checks listed, their fixed order, the decisive sentence as evidence, the legal basis). YAML cannot alias forward and R12a precedes R14, so the `pp_*` lists and `source_markers` now live in the catalogue's `shared:` section, aliased by R12a, R12b and R14 (R14's rules are unchanged, asserted when moving). The months regex uses bounded spaces (`\s{0,3}`), and the timing test gained a digit followed by 20 000 spaces. The two shared-trigger scenarios move to group 5, because they need R12b.
 
 ## 5. R12b currency and costs (~45 min)
 

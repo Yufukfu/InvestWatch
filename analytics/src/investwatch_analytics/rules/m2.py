@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from bisect import bisect_left
+from dataclasses import dataclass
 from functools import cached_property
 
 from ..models import Block, EvidenceLocator, RuleResult
@@ -685,3 +686,112 @@ class R15Forecasts(Rule):
             "Zdanie może zapowiadać przyszłe wyniki (bez liczby), a materiał nie zawiera ostrzeżenia dotyczącego "
             "prognoz – do weryfikacji.",
         )
+
+
+# ---- past performance: period and scope (R12a), currency and costs (R12b) ----------------------
+
+# N months: sub-annual unless N is a multiple of 12 ("12 miesięcy", "24 miesiące" are full periods).
+_MONTHS = re.compile(r"(?<!\d)(\d{1,3})\s{0,3}-?\s{0,3}miesi\w*", re.IGNORECASE)
+_YEAR_RANGE = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*[-–—]\s*((?:19|20)\d{2})(?!\d)")
+_LAST_N_YEARS = re.compile(r"\b(?:ostatni|minion|poprzedni)\w*\s+(\d{1,2})\s+lat\w*|\blast\s+(\d{1,2})\s+years\b", re.IGNORECASE)
+_LAST_N = re.compile(r"\b(?:ostatni|minion|poprzedni)\w*\s+\d{1,3}\s+(?:lat|miesi|rok|kwarta)\w*|\blast\s+\d{1,3}\s+(?:years|months)\b", re.IGNORECASE)
+_DATE = re.compile(r"(?<!\d)\d{1,2}[./]\d{1,2}[./](?:19|20)\d{2}(?!\d)")
+
+_SUB_STATUS = {"fail": "niespełniony", "uncertain": "do weryfikacji"}
+_WORST = {"fail": 2, "uncertain": 1, "pass": 0}
+
+
+@dataclass(frozen=True)
+class SubCheck:
+    name: str
+    status: str  # pass | fail | uncertain
+    detail: str
+    sentence: str | None = None  # the sentence that decided a fail or uncertain, if any
+
+
+@register
+class R12aPeriodAndScope(_PastPerformance):
+    """ZASÓB R12a (art. 44 ust. 4): the last 5 years, full 12-month periods, a reference period and a source.
+
+    Three named sub-checks; the result is the worst one and the explanation names every sub-check that is not
+    `pass`, in a fixed order (design §4). The source markers are shared with R11 (`&source_markers`).
+    """
+
+    rule_id = "R12a"
+    FIVE_YEARS, REFERENCE, SOURCE = "5 lat / 12 mies.", "okres referencyjny", "źródło"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "short": compile_patterns(p.get("short_period_patterns", [])),
+            "five": compile_patterns(p.get("five_year_patterns", [])),
+            "inception": compile_patterns(p.get("inception_patterns", [])),
+            "source": compile_patterns(p.get("source_patterns", [])),
+        }
+
+    def _short(self, text: str) -> bool:
+        if any(s.search(text) for s in self._p["short"]):
+            return True
+        return any(int(n) % 12 for n in _MONTHS.findall(text))
+
+    def _five_years(self, claims: list[str], fetch_year: int) -> bool:
+        years: set[int] = set()
+        for text in claims:
+            if any(f.search(text) for f in self._p["five"]):
+                return True
+            if any(int(a or b) >= 5 for a, b in _LAST_N_YEARS.findall(text)):
+                return True
+            for start, end in _YEAR_RANGE.findall(text):
+                if int(end) - int(start) + 1 >= 5:
+                    return True
+            years |= {int(a or b) for a, b in _YEAR.findall(text) if int(a or b) <= fetch_year}
+        return len(years) >= 5
+
+    @staticmethod
+    def _dated(text: str) -> bool:
+        return bool(_YEAR.search(text) or _YEAR_RANGE.search(text) or _DATE.search(text) or _LAST_N.search(text))
+
+    def sub_checks(self, ctx: Context, claims: list[str]) -> list[SubCheck]:
+        p = self._p
+        fetch_year = ctx.doc.fetched_at.year
+        short = next((t for t in claims if self._short(t)), None)
+        inception = next((t for t in claims if any(i.search(t) for i in p["inception"])), None)
+        if short is not None:
+            five = SubCheck(self.FIVE_YEARS, "fail", "wynik za okres krótszy niż pełne 12 miesięcy", short)
+        elif self._five_years(claims, fetch_year):
+            five = SubCheck(self.FIVE_YEARS, "pass", "")
+        elif inception is not None:
+            five = SubCheck(
+                self.FIVE_YEARS, "uncertain",
+                "wyniki od początku działalności – dopuszczalne tylko dla produktu istniejącego krócej niż 5 lat "
+                "(art. 44 ust. 4 lit. b)", inception,
+            )
+        else:
+            five = SubCheck(self.FIVE_YEARS, "fail", "brak wyników za ostatnie 5 lat w pełnych okresach 12-miesięcznych")
+        if any(self._dated(t) for t in claims):
+            reference = SubCheck(self.REFERENCE, "pass", "")
+        else:
+            reference = SubCheck(self.REFERENCE, "fail", "nie wskazano okresu, którego dotyczą wyniki")
+        if any(s.search(ctx.doc.text) for s in p["source"]):
+            source = SubCheck(self.SOURCE, "pass", "")
+        else:
+            source = SubCheck(self.SOURCE, "fail", "nie wskazano źródła danych o wynikach")
+        return [five, reference, source]
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        claims = [s.text for s in self.past_performance(ctx)]
+        if not claims:
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
+        checks = self.sub_checks(ctx, claims)
+        worst = max(checks, key=lambda c: _WORST[c.status]).status
+        if worst == "pass":
+            return self.result(
+                "pass", claims[0],
+                "Wyniki historyczne za ostatnie 5 lat w pełnych okresach 12-miesięcznych, ze wskazanym okresem "
+                "referencyjnym i źródłem.",
+            )
+        open_checks = [c for c in checks if c.status != "pass"]
+        decisive = next((c.sentence for c in open_checks if c.status == worst and c.sentence), None)
+        listed = "; ".join(f"{c.name}: {_SUB_STATUS[c.status]} ({c.detail})" for c in open_checks)
+        return self.result(worst, decisive or claims[0], f"Wyniki historyczne – {listed}.")
