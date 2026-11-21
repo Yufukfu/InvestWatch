@@ -189,7 +189,11 @@ The spec requirements stay under the OpenSpec 2.1.1 limit of 500 characters, so 
 - **R11 excludes (`comparison_exclude_patterns`):** `niż rok temu`, `niż wcześniej`, `niż kiedykolwiek`, `niż inflacja`, `w porównaniu z inflacją`.
 - **R11 superlatives (`superlative_patterns`):** `najlepsz…`, `najtańsz…`, `najwyższ… oprocentowanie`, `nr 1`, `numer 1`, `best`, `cheapest`.
 - **Source (`&source_markers`, shared by R11 and R12a):** `źródło`, `według danych`, `wg danych`, `na podstawie danych`, `dane z/za`, `source`, `data from`.
-- **R11 assumptions (`assumption_patterns`):** `przy założeniu`, `zakładając`, `założeni…`, `dla kwoty`, `w okresie`, `na dzień`, `stan na`, `assuming`, `as of`.
+- **R11 assumptions (`assumption_patterns`):** `przy założeniu`, `zakładając`, `założeni…`, `dla kwoty`, `w okresie`, `na dzień`, `stan na`, `assuming`, `as of`, a date, and an order or deposit size (`zlecenie 10 000 zł`).
+- **Source, comparison method:** `opublikowan… na stronach / przez / w raporcie`, `porównanie tabel / cenników / ofert` (gold `m2-r11-comparison-with-source`).
+- **R11 number after `niż`:** stripped (`w mniej niż 5 minut`, `niższa niż 0,1%`): a number is not a product.
+- **Shared detector, year tables:** `2021: 2,1%` dates its figure like `w 2021 r.` (`_YEAR_TABLE`, years up to the fetch year only); R12a counts those years and treats them as a reference period (gold `m2-r12-past-performance-compliant`).
+- **R16, tax inclusion:** `nie uwzględniają podatku`, `przed opodatkowaniem` describe the results, not tax treatment, and are excluded.
 - **R12a sub-12-month periods (`short_period_patterns`):** `w ostatnim miesiącu`, `N miesięcy` with N not a multiple of 12 (checked in code), `od początku roku`, `YTD`, `w I…IV kwartale`, a month name, `tygodni…`, `dzienn…`.
 - **R12a 5-year coverage (`five_year_patterns`):** `ostatnich/minionych N lat` with N ≥ 5, `5-letn…`, `pięcioletn…`, `5-year`. In code: a year range of 5 or more calendar years, or 5 or more distinct past years.
 - **R12a since inception (`inception_patterns`):** `od początku działalności`, `od uruchomienia`, `od powstania`, `since inception`.

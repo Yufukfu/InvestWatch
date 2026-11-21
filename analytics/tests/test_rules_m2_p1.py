@@ -522,3 +522,125 @@ def test_r12b_foreign_currency_outside_the_results_needs_no_warning(registry, ca
     r = run("Bonus 50 USD na start. Fundusz zarobił 8% w 2025 roku. Wyniki po potrąceniu opłat.", registry, catalogue)["R12b"]
     assert r.result == "pass"
     assert "niewymagane – wyniki w PLN" in r.explanation
+
+
+# ---- R11 product comparisons --------------------------------------------------------------------
+
+LOKATA = "Nasze konto daje 3 razy więcej niż lokata w banku."
+FUND_VS_AVG = "Fundusz A przyniósł więcej niż średnia funduszy akcji."
+SOURCE_AND_DATE = "Źródło: dane Analizy.pl, stan na 30.09.2026."
+
+
+def test_r11_catalogue_entry(catalogue):
+    spec = catalogue.get("R11")
+    assert spec.implemented
+    assert spec.legal_basis == "art. 44 ust. 3 rozp. del. 2017/565"
+
+
+def test_r11_comparison_without_source_fails(registry, catalogue):
+    r = run(LOKATA, registry, catalogue)["R11"]
+    assert r.result == "fail"
+    assert r.evidence == LOKATA
+    assert "źródła" in r.explanation
+
+
+def test_r11_comparison_with_source_and_assumptions_is_a_plain_pass(registry, catalogue):
+    r = run(f"{FUND_VS_AVG} {SOURCE_AND_DATE}", registry, catalogue)["R11"]
+    assert r.result == "pass"
+    assert r.evidence == FUND_VS_AVG
+    assert not r.explanation.startswith("Wykryto")
+
+
+def test_r11_source_without_assumptions_is_uncertain(registry, catalogue):
+    r = run(f"{FUND_VS_AVG} Źródło: opracowanie własne.", registry, catalogue)["R11"]
+    assert r.result == "uncertain"
+    assert r.evidence == FUND_VS_AVG
+    assert "założe" in r.explanation
+
+
+def test_r11_source_in_a_footnote_counts(registry, catalogue):
+    text = f"Nasze konto daje 3 razy więcej niż lokata w banku.* Otwórz konto. * {SOURCE_AND_DATE}"
+    assert run(text, registry, catalogue)["R11"].result == "pass"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Prowizje niższe niż w innych biurach maklerskich.", "Fundusz pobił WIG20 o 5 pkt proc.",
+     "Nasz fundusz jest lepszy niż benchmark.", "Oprocentowanie wyższe niż w innych bankach.",
+     "Our fees are lower than at other brokers."],
+    ids=["rival-provider", "beat-index", "better-than-benchmark", "other-banks", "english"],
+)
+def test_r11_unsourced_comparison_fails(text, registry, catalogue):
+    r = run(text, registry, catalogue)["R11"]
+    assert r.result == "fail"
+    assert r.evidence == text
+
+
+def test_r11_superlative_only_is_uncertain_naming_the_missing_source(registry, catalogue):
+    text = "Najlepsze konto maklerskie na rynku!"
+    r = run(text, registry, catalogue)["R11"]
+    assert r.result == "uncertain"
+    assert r.evidence == text
+    assert "źródła" in r.explanation
+
+
+def test_r11_explicit_comparison_wins_over_a_superlative(registry, catalogue):
+    r = run(f"Najlepsze konto na rynku! {LOKATA}", registry, catalogue)["R11"]
+    assert r.result == "fail"
+    assert r.evidence == LOKATA
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Zyski są wyższe niż rok temu.", "Zysk wyższy niż inflacja.", "Zysk w porównaniu z inflacją był wysoki.",
+     "Wyniki lepsze niż kiedykolwiek.", "Otwórz konto w mniej niż 5 minut.", "Prowizja niższa niż 0,1% wartości.",
+     "", "Bez kropki"],
+    ids=["year-ago", "inflation", "compared-with-inflation", "ever", "minutes", "number-after-niz", "empty",
+         "unsegmentable"],
+)
+def test_r11_not_applicable(text, registry, catalogue):
+    r = run(text, registry, catalogue)["R11"]
+    assert r.result == "not_applicable"
+    assert r.evidence is None
+
+
+def test_r11_bank_ok_not_applicable(mock_documents, registry, catalogue):
+    r = run_mock(mock_documents, BANK_OK_ID, registry, catalogue)["R11"]
+    assert r.result == "not_applicable"
+    assert r.evidence is None
+
+
+# ---- gold-set calibration (analytics/eval/gold.jsonl, ADR 0312) ----------------------------------
+
+YEAR_TABLE = "Stopa zwrotu w latach: 2021: 2,1%, 2022: -4,3%, 2023: 7,8%, 2024: 5,2%, 2025: 4,6% (źródło: sprawozdania funduszu)."
+
+
+def test_year_table_is_past_performance(registry, catalogue):
+    # m2-r12-past-performance-compliant: "year: figure" lists are past results for R12a, R12b and R14 alike.
+    results = run(YEAR_TABLE, registry, catalogue, **FETCHED_2026)
+    assert results["R14"].result == "fail"  # past performance, no disclaimer
+    assert results["R14"].evidence == YEAR_TABLE
+    assert results["R12a"].result == "pass"  # five distinct years, a reference period and a source
+
+
+def test_year_table_after_the_fetch_year_is_not_past_performance(registry, catalogue):
+    results = run("Portfel modelowy: 2027: 5%, 2028: 6%.", registry, catalogue, **FETCHED_2026)
+    assert {results[r].result for r in ("R12a", "R12b", "R14")} == {"not_applicable"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Wyniki nie uwzględniają podatku i opłaty dystrybucyjnej do 1%.", "Stopy zwrotu podano przed opodatkowaniem."],
+    ids=["results-exclude-tax", "before-tax"],
+)
+def test_r16_whether_results_include_tax_is_not_tax_treatment(text, registry, catalogue):
+    assert run(text, registry, catalogue)["R16"].result == "not_applicable"
+
+
+def test_r11_gold_comparison_with_source_passes(registry, catalogue):
+    # m2-r11-comparison-with-source: the method of comparison is the source; a date and an order size are assumptions.
+    text = ("Najniższe prowizje za akcje zagraniczne wśród pięciu największych domów maklerskich w Polsce "
+            "(porównanie tabel opłat opublikowanych 1.10.2026 na stronach firm, zlecenie 10 000 zł).")
+    r = run(text, registry, catalogue)["R11"]
+    assert r.result == "pass"
+    assert r.evidence == text

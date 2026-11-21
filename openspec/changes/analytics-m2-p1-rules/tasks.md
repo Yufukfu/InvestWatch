@@ -77,11 +77,11 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - `m2-bank-ok` gives `not_applicable`;
   - the "missing disclaimer fails only R14" scenario passes.
 - [x] 5.2 Write the R12b class on `_PastPerformance`. Add `fee_patterns`, `foreign_currency_patterns` and `currency_warning_patterns`, and set `implemented: true`. Tests green.
-- [x] 5.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (the fee statement, the currency part both ways, the warning, the denominated product and its currency conjunct, lit. e cited for PLN, the PLN note on a fail, the foreign sentence as evidence, the shared trigger, `uwzględniają opłat`, the currency code, the legal basis). One survivor on the first run (a foreign currency outside the results, such as a USD bonus) got its own test. The USD scenario uses `w 2025 roku`, because the sentence splitter keeps `2025 r. Wyniki…` as one sentence.
+- [x] 5.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 13 tried, 13 caught` (the fee statement, the currency part both ways, the warning, the denominated product and its currency conjunct, lit. e cited for PLN, the PLN note on a fail, the foreign sentence as evidence, the shared trigger, `uwzględniają opłat`, the currency code, the legal basis). One survivor on the first run (a foreign currency outside the results, such as a USD bonus) got its own test. The USD scenario uses `w 2025 roku`, because the sentence splitter keeps `2025 r. Wyniki…` as one sentence. Review fix (R15's fee exclude was quadratic on a fee word followed by a digit run, `\w*` after the stem, now letters only, plus a timing input; it also stops at the noun `zysk` again, not `zysków`; an R12b explanation always cites lit. e): `mutations: 5 tried, 5 caught`.
 
 ## 6. R11 product comparisons (~1 h)
 
-- [ ] 6.1 Write the failing tests for the R11 scenarios:
+- [x] 6.1 Write the failing tests for the R11 scenarios:
   - `3 razy więcej niż lokata` with no source gives `fail`;
   - a source and assumptions give a plain `pass`: it quotes the comparison, and the explanation does not start with `Wykryto`;
   - a source without assumptions gives `uncertain`;
@@ -92,8 +92,8 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - `m2-bank-ok` gives `not_applicable`;
   - empty text gives `not_applicable` without raising;
   - a source in a footnote counts.
-- [ ] 6.2 Write the R11 class. Add `comparison_patterns`, `comparison_exclude_patterns`, `benchmark_patterns` (the extension, in its own list), `superlative_patterns`, `source_patterns: *source_markers` and `assumption_patterns`, set the legal basis to art. 44 ust. 3, and set `implemented: true`. Tests green.
-- [ ] 6.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 6.2 Write the R11 class. Add `comparison_patterns`, `comparison_exclude_patterns`, `benchmark_patterns` (the extension, in its own list), `superlative_patterns`, `source_patterns: *source_markers` and `assumption_patterns`, set the legal basis to art. 44 ust. 3, and set `implemented: true`. Tests green.
+- [x] 6.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 19 tried, 19 caught` (R11: the excludes, the benchmark extension, superlatives, source and assumptions, an explicit comparison over a superlative, the missing source named, fail vs uncertain, the plain pass, a number after `niż`, inflation, the legal basis; gold calibration: the year table as a past marker and its fetch-year bound, table years for the 5-year check, the two R16 tax-inclusion excludes, the comparison-method source and the date and amount assumptions). Gold-set calibration (`analytics/eval/gold.jsonl`, ADR 0312): R11 alone moved the measured M2 default 0.1 -> 0.2 (`test_eval_thresholds`), because the gold sample `m2-r11-comparison-with-source` names its source as a comparison method and its assumptions as a date and an order size. The same pass found that the shared detector missed `2021: 2,1%` year tables (R12a, R12b and R14 `not_applicable` on three gold samples), and that R16 read `nie uwzględniają podatku` as tax treatment. With those fixed, 17 of the 18 gold expectations for R11, R12a, R12b, R14, R15 and R16 hold, and the measured M2 default is 0.1 again. The one left, R14 on `m2-r13-past-performance-dominates`, is a `blocks`-based sample (F1).
 
 ## 7. Catalogue scenarios and `llm:` blocks (~45 min, needs `analytics-llm-p0` group 8)
 

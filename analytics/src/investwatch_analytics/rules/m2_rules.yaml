@@ -69,6 +69,9 @@ shared:
     - '\bdane\s+(?:z|ze|za)\b'
     - '\bsource\b'
     - '\bdata\s+from\b'
+    # The method of a comparison names its source too (gold m2-r11-comparison-with-source).
+    - '\bopublikowan\w*\s+(?:\S+\s+){0,4}(?:na\s+stronach|przez|w\s+raport|w\s+sprawozdani)\w*'
+    - '\bporównani\w*\s+(?:\w+\s+){0,2}(?:tabel|cennik|taryf|ofert)\w*'
 
 rules:
   - id: R1
@@ -207,8 +210,58 @@ rules:
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
   - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
   - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
-  # R11 (P2): ZASÓB "Flaguje w raporcie" – report a detected comparison even when it is compliant.
-  - {id: R11, name: Porównania produktów, severity: medium, legal_basis: null, implemented: false}
+  # ZASÓB R11 (art. 44 ust. 3): "Wykrywa porównania produktów i usług, weryfikuje źródło informacji, przyjęte
+  # założenia i flaguje naruszenia w raporcie" – violations only: a compliant comparison is a plain pass that quotes
+  # the comparison (Damian, ADR 0315). The core is other products, services and providers; index and benchmark
+  # comparisons are an extension (`benchmark_patterns`, cut alone if needed); inflation and time comparisons are out.
+  # A superlative without a comparator is an implicit market comparison: uncertain rules-only, naming the source.
+  - id: R11
+    name: Porównania produktów
+    severity: medium
+    legal_basis: art. 44 ust. 3 rozp. del. 2017/565
+    implemented: true
+    params:
+      comparison_patterns:
+        - '\b(?:lepsz|wyższ|niższ|tańsz|droższ|korzystniejsz|większ|mniejsz|szybsz|bezpieczniejsz|atrakcyjniejsz)\w*\s+(?:\w+\s+){0,3}niż\b'
+        - '\b(?:więcej|mniej)\s+(?:\w+\s+){0,3}niż\b'
+        - '\bw\s+porównaniu\s+(?:z|ze|do)\b'
+        - '\b(?:vs|versus)\b'
+        - '\bbij\w*\s+(?:\w+\s+){0,2}(?:lokat|konkurencj|rynek|bank)\w*'
+        - '\boutperform\w*'
+        - '\b(?:better|higher|lower|cheaper)\s+than\b'
+        - '\bcompared\s+(?:to|with)\b'
+      # The extension: an index or a benchmark, kept apart so it can be cut alone.
+      benchmark_patterns:
+        - '\b(?:pobi|pokona|przebi|wyprzedzi)\w*\s+(?:\w+\s+){0,2}(?:[ms]?WIG\w*|indeks\w*|benchmark\w*|rynek|S&P|DAX|Nasdaq\w*)'
+        - '\b(?:niż|od)\s+(?:\w+\s+)?(?:[ms]?WIG\w*|indeks\w*|benchmark\w*)'
+      # Stripped first: time and inflation comparisons, and a number after `niż` ("w mniej niż 5 minut").
+      comparison_exclude_patterns:
+        - '\bniż\s+(?:\w+\s+)?(?:rok|miesiąc|kwartał|tydzień)\s+temu\b'
+        - '\bniż\s+(?:wcześniej|kiedykolwiek|dotychczas|zwykle|przedtem|poprzednio)\b'
+        - '\bniż\s+w\s+(?:zeszłym|ubiegłym|poprzednim)\s+\w+'
+        - '\bniż\s+(?:\w+\s+)?inflacj\w*'
+        - '\bw\s+porównaniu\s+(?:z|ze|do)\s+(?:\w+\s+)?inflacj\w*'
+        - '\bniż\s+(?:\d[\d.,]*|kilk\w*|pół\w*)'
+      superlative_patterns:
+        - '\bnajlepsz\w*'
+        - '\bnajtańsz\w*'
+        - '\bnajwyższ\w*\s+(?:\w+\s+)?(?:oprocentowani|zysk|stop|zwrot)\w*'
+        - '\bnajniższ\w*\s+(?:\w+\s+)?(?:prowizj|opłat|koszt|spread)\w*'
+        - '\b(?:nr|numer)\s*1\b'
+        - '\blider\w*\s+rynku\b'
+        - '\b(?:best|cheapest)\b'
+      source_patterns: *source_markers
+      assumption_patterns:
+        - '\bprzy\s+założeni\w*'
+        - '\bzakładając\b'
+        - '\bzałożeni\w*'
+        - '\b(?:dla|przy)\s+(?:kwot|wpłat|inwestycj)\w*'
+        - '\bw\s+okresie\b'
+        - '\b(?:na\s+dzień|stan\s+na)\b'
+        # A date and an order or deposit size are assumptions of a comparison (gold m2-r11-comparison-with-source).
+        - '(?<!\d)\d{1,2}[./]\d{1,2}[./](?:19|20)\d{2}(?!\d)'
+        - '\b(?:zleceni|kwot|wpłat|transakcj|saldo)\w*\s+(?:\w+\s+)?\d'
+        - '\b(?:assuming|as\s+of)\b'
   # ZASÓB R12a (art. 44 ust. 4): "okres ostatnich 5 lat … pełne okresy 12-miesięczne; oraz czy wskazano okres
   # referencyjny i źródło". Three named sub-checks (5 lat / 12 mies., okres referencyjny, źródło); the worst one is
   # the result. Same past-performance trigger as R12b and R14 (shared pp_* lists, ADR 0315). N months, year ranges,
@@ -379,6 +432,9 @@ rules:
       tax_exclude_patterns:
         - '\b(?:podat\w*\s+)?VAT\b'
         - '\bpodat\w*\s+od\s+towarów\s+i\s+usług\b'
+        # Whether the results include tax is a performance statement, not tax treatment (gold m2-r12 compliant).
+        - '\buwzględnia\w*\s+(?:\w+\s+){0,3}podat\w*'
+        - '\b(?:przed|po)\s+(?:opodatkowani|potrąceni\w*\s+podatk|odliczeni\w*\s+podatk)\w*'
       tax_individual_patterns:
         - '\b(?:zależ|uzależnion)\w*\s+(?:\w+\s+){0,2}od\s+(?:\w+\s+)?(?:indywidualn|osobist)\w*\s+sytuacj\w*(?:\s+(?:\w+\s+)?(?:klient|inwestor|podatnik)\w*)?'
         - '\b(?:indywidualn|osobist)\w*\s+sytuacj\w*\s+(?:\w+\s+){0,2}(?:klient|inwestor|podatnik)\w*'

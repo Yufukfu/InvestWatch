@@ -179,6 +179,8 @@ _YEAR = re.compile(
 )
 
 
+# "year: figure" lists ("2021: 2,1%, 2022: -4,3%") date each figure as well (gold m2-r12-past-performance-compliant).
+_YEAR_TABLE = re.compile(r"(?<![\d.,])((?:19|20)\d{2})\s?:\s?[-+−]?\d")
 NO_PAST_PERFORMANCE = "Materiał nie prezentuje wyników historycznych."
 
 
@@ -212,7 +214,8 @@ class _PastPerformance(Rule):
         elif any(f.search(sentence) for f in p["future"]):
             return False
         else:
-            past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence))
+            past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence)) or any(
+                int(y) <= fetch_year for y in _YEAR_TABLE.findall(sentence))
         if not past:
             return False
         if _hits_fast(sentence, p["figure"], p["figure_x"]):
@@ -746,11 +749,13 @@ class R12aPeriodAndScope(_PastPerformance):
                 if int(end) - int(start) + 1 >= 5:
                     return True
             years |= {int(a or b) for a, b in _YEAR.findall(text) if int(a or b) <= fetch_year}
+            years |= {int(y) for y in _YEAR_TABLE.findall(text) if int(y) <= fetch_year}
         return len(years) >= 5
 
     @staticmethod
     def _dated(text: str) -> bool:
-        return bool(_YEAR.search(text) or _YEAR_RANGE.search(text) or _DATE.search(text) or _LAST_N.search(text))
+        return bool(_YEAR.search(text) or _YEAR_TABLE.search(text) or _YEAR_RANGE.search(text) or _DATE.search(text)
+                    or _LAST_N.search(text))
 
     def sub_checks(self, ctx: Context, claims: list[str]) -> list[SubCheck]:
         p = self._p
@@ -849,3 +854,57 @@ class R12bCurrencyAndCosts(_PastPerformance):
         # Every explanation cites lit. e (spec): unless the missing currency warning already does, add the status.
         note = "" if foreign is not None and not warned else f"; {currency}"
         return self.result("fail", quote, f"Wyniki historyczne bez {' ani '.join(missing)}{note}.")
+
+
+# ---- product comparisons (R11, analytics-m2-p1-rules) -------------------------------------------
+
+
+@register
+class R11ProductComparisons(Rule):
+    """ZASÓB R11 (art. 44 ust. 3): a comparison needs its source and its assumptions; only violations are flagged.
+
+    A compliant comparison is a plain pass that quotes it (ADR 0315). The source and the assumptions may stand
+    anywhere, footnotes included (ZASÓB asks whether they are given, not where; placement is R6's). A superlative
+    without a comparator is an implicit comparison that the rules cannot confirm: uncertain, for the LLM (design §3).
+    """
+
+    rule_id = "R11"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "comparison": compile_patterns(p.get("comparison_patterns", []) + p.get("benchmark_patterns", [])),
+            "exclude": compile_patterns(p.get("comparison_exclude_patterns", [])),
+            "superlative": compile_patterns(p.get("superlative_patterns", [])),
+            "source": compile_patterns(p.get("source_patterns", [])),
+            "assumption": compile_patterns(p.get("assumption_patterns", [])),
+        }
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        texts = [s.text for s in ctx.pre.sentences]
+        comparisons = [t for t in texts if R3RiskNextToReturns._hits(t, p["comparison"], p["exclude"])]
+        superlatives = [t for t in texts if any(s.search(t) for s in p["superlative"])]
+        if not comparisons and not superlatives:
+            return self.result("not_applicable", None, "Materiał nie zawiera porównań produktów ani usług.")
+        text = ctx.doc.text
+        source = any(s.search(text) for s in p["source"])
+        assumptions = any(a.search(text) for a in p["assumption"])
+        if not comparisons:
+            if source and assumptions:
+                return self.result("pass", superlatives[0], "Określenie przewagi nad rynkiem ze wskazanym źródłem i założeniami.")
+            return self.result(
+                "uncertain", superlatives[0],
+                "Określenie przewagi nad rynkiem (porównanie domyślne) "
+                + ("bez przyjętych założeń" if source else "bez wskazania źródła informacji") + " – do weryfikacji.",
+            )
+        quote = comparisons[0]
+        if not source:
+            return self.result("fail", quote, "Porównanie z innymi produktami lub usługami bez wskazania źródła informacji.")
+        if not assumptions:
+            return self.result(
+                "uncertain", quote,
+                "Porównanie ze wskazanym źródłem, ale bez przyjętych założeń (okres, kwota, stan na dzień) – do weryfikacji.",
+            )
+        return self.result("pass", quote, "Porównanie ze wskazanym źródłem informacji i przyjętymi założeniami.")

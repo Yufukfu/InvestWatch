@@ -5,7 +5,7 @@ The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a
 
 #### Scenario: Catalogue is complete
 - **WHEN** the catalogue is loaded
-- **THEN** it holds 19 entries whose ids match the contract `rule_id` pattern, and exactly R1, R2, R3, R4, R6, R10, R11, R12a, R12b, R14, R15, R16, R17 and R18 are implemented
+- **THEN** it holds 19 entries whose ids match the contract `rule_id` pattern, and exactly R1, R2, R3, R4, R6, R11, R12a, R12b, R14, R15, R16, R17 and R18 are implemented
 
 #### Scenario: LLM-refined rules declare it
 - **WHEN** the catalogue is loaded
@@ -22,6 +22,10 @@ The rule engine SHALL load the catalogue of all 18 UKNF rules (R1-R18, with R12a
 #### Scenario: Bad rule parameter
 - **WHEN** `negation_before` is not a valid regex, or `prominent_sentences` is not an integer, or `min_ratio` is 0 or above 1, or the root is a list
 - **THEN** loading fails with a catalogue error naming the rule or the file
+
+#### Scenario: Shared dictionaries
+- **WHEN** a dictionary is written once with a YAML anchor (for example the risk-warning patterns of R3, or the past-performance lists of R12a, R12b and R14 under `shared:`) and reused by other rules through an alias
+- **THEN** every rule that uses the alias sees the same list, and a top-level key other than `rules` (such as `shared:`) is never read as a rule
 
 ## ADDED Requirements
 
