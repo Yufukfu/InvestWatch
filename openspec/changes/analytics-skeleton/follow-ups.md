@@ -21,5 +21,5 @@ Out-of-scope reviewer findings and "declined to judge" items, one disposition ea
 | 16 | review group 5 | Summary says "Sprawdzono reguły R1, R2, R3" even when a rule was `not_applicable` | `wont-fix` for now: cosmetic |
 | 17 | review group 5 | `content_excerpt` comes from the NFKC-normalized text, not the original | `wont-fix`: the contract does not say; normalized text reads better in the dashboard |
 | 18 | review group 5 | `FirmRef.authorized=True` is hard-coded for every registry match | `new-item`: revisit with the real KNF loader (warning list, revoked licences) |
-| 19 | review group 5 | The loss-denial exclusion also swallows `nie wykluczamy straty` / `bez względu na ryzyko` (a real warning) | `wont-fix` for now: rare; the LLM layer decides borderline R3 cases |
+| 19 | review group 5, final review | Denial exclusions swallowed real warnings with a double negative | `fix-here` for the common disclaimers (`nie są wolne od ryzyka`, `nie ma inwestycji bez ryzyka`, `no investment is risk-free`, `not risk-free`) via `risk_override_patterns`; `wont-fix` for now for rarer ones (`nie wykluczamy straty`, `bez względu na ryzyko`), left to the LLM layer |
 | 9 | review group 2 | Initials like `J. Kowalski` split into two sentences | `wont-fix` for now: rare in marketing copy, only lengthens or shortens a quote |

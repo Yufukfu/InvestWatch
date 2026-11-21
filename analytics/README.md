@@ -13,7 +13,7 @@ Python 3.12+.
 cd analytics
 python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt -e .   # Linux/macOS: .venv/bin/python
 .venv/Scripts/python -m investwatch_analytics.cli ../contracts/mocks/documents.json > findings.json
-python ../contracts/validate.py finding findings.json
+.venv/Scripts/python ../contracts/validate.py finding findings.json
 ```
 
 The CLI reads one `ScrapedDocument` or a list of them and writes `Finding`s as a JSON list to stdout. JSON logs go to stderr. Exit code 2 means bad input or bad configuration.

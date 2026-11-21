@@ -57,6 +57,7 @@ class R3RiskNextToReturns(Rule):
             "claim_x": compile_patterns(p.get("claim_exclude_patterns", [])),
             "risk": compile_patterns(p.get("risk_patterns", [])),
             "risk_x": compile_patterns(p.get("risk_exclude_patterns", [])),
+            "risk_ok": compile_patterns(p.get("risk_override_patterns", [])),
             "window": int(p.get("window", 2)),
             "footnote": tuple(p.get("footnote_markers", [])),
         }
@@ -73,7 +74,10 @@ class R3RiskNextToReturns(Rule):
         claims = [i for i, s in enumerate(sentences) if self._hits(s.text, p["claim"], p["claim_x"])]
         if not claims:
             return self.result("not_applicable", None, "Materiał nie zawiera obietnic zysku ani stóp zwrotu.")
-        warnings = [i for i, s in enumerate(sentences) if self._hits(s.text, p["risk"], p["risk_x"])]
+        warnings = [
+            i for i, s in enumerate(sentences)
+            if any(o.search(s.text) for o in p["risk_ok"]) or self._hits(s.text, p["risk"], p["risk_x"])
+        ]
         near = [i for i in warnings if not sentences[i].text.lstrip("( ").startswith(p["footnote"])]
         uncovered = [c for c in claims if not any(abs(c - w) <= p["window"] for w in near)]
         if not uncovered:

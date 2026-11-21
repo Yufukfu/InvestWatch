@@ -39,4 +39,4 @@
 ## 7. Closing
 
 - [x] 7.1 Apply the iw-docs-update skill (`analytics/README.md` with how to run, analytics row of `.docs/STATUS.md`, `docs-check` clean) and add the iw-ai-log row
-- [ ] 7.2 Run the iw-pr-review skill and fix real findings
+- [x] 7.2 Run the iw-pr-review skill and fix real findings

@@ -32,15 +32,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("file", type=Path, help="JSON file with one ScrapedDocument or a list of them")
     args = parser.parse_args(argv)
     settings = Settings.from_env()
-    logging_setup.configure(settings.log_level, stream=sys.stderr)
+    try:
+        logging_setup.configure(settings.log_level, stream=sys.stderr)
+    except ValueError as exc:
+        logging_setup.configure("INFO", stream=sys.stderr)
+        log.error("invalid configuration", extra={"error": f"LOG_LEVEL: {exc}"})
+        return 2
 
     try:
         registry = Registry.from_csv(settings.registry_csv)
         catalogue = Catalogue.load()
-        raw = json.loads(args.file.read_text(encoding="utf-8"))
+        raw = json.loads(args.file.read_text(encoding="utf-8-sig"))
         items = raw if isinstance(raw, list) else [raw]
         docs = [ScrapedDocument.model_validate(item) for item in items]
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         log.error("cannot read input", extra={"file": str(args.file), "error": str(exc)})
         return 2
     except ValidationError as exc:

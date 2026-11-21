@@ -46,6 +46,28 @@ def test_cli_invalid_document_exits_2(tmp_path, capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_cli_reads_utf8_bom(tmp_path, capsys):
+    path = tmp_path / "bom.json"
+    path.write_text(json.dumps([make_doc()]), encoding="utf-8-sig")
+    assert cli.main([str(path)]) == 0
+    assert json.loads(capsys.readouterr().out)
+
+
+def test_cli_utf16_file_exits_2(tmp_path, capsys):
+    path = tmp_path / "ps.json"
+    path.write_text(json.dumps([make_doc()]), encoding="utf-16")
+    assert cli.main([str(path)]) == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_cli_bad_log_level_exits_2(tmp_path, capsys, monkeypatch):
+    path = tmp_path / "doc.json"
+    path.write_text(json.dumps(make_doc()), encoding="utf-8")
+    monkeypatch.setenv("LOG_LEVEL", "LOUD")
+    assert cli.main([str(path)]) == 2
+    assert capsys.readouterr().out == ""
+
+
 def test_cli_missing_file_exits_2(tmp_path, capsys):
     assert cli.main([str(tmp_path / "nope.json")]) == 2
     assert capsys.readouterr().out == ""

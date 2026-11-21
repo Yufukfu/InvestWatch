@@ -55,6 +55,11 @@ rules:
         - '\butrat\w*'
         - '\brisk\w*'
         - '\blos(?:s|ing|e)\b'
+      # Double negatives ("nie są wolne od ryzyka") are warnings even though they contain a denial phrase.
+      risk_override_patterns:
+        - '\bnie\s+(?:ma|są|jest)\s+(?:\w+\s+){0,2}(?:bez\s+|woln\w*\s+od\s+)ryzyk\w*'
+        - '\bno\s+\w+\s+is\s+risk[- ]free'
+        - '\bnot\s+risk[- ]free'
       risk_exclude_patterns:
         - '\b(?:bez|brak\w*|zero|nie ponosi\w*)\s+(?:\w+\s+){0,2}ryzyk\w*(?:\s+(?:utrat|strat)\w*)?'
         - '\b(?:nie|bez|żadn\w*)\s+(?:\w+\s+){0,2}(?:stra|utrat)\w*'

@@ -286,6 +286,20 @@ def test_r3_loss_verbs_are_warnings(registry, catalogue):
     assert results(text, registry, catalogue)["R3"].result == "fail"
 
 
+@pytest.mark.parametrize(
+    "warning",
+    [
+        "Inwestycje nie są wolne od ryzyka.",
+        "Pamiętaj, że nie ma inwestycji bez ryzyka.",
+        "No investment is risk-free.",
+        "This product is not risk-free.",
+    ],
+)
+def test_r3_double_negative_disclaimer_is_a_warning(warning, registry, catalogue):
+    r = results(f"Zarabiaj 8% rocznie. {warning}", registry, catalogue)["R3"]
+    assert r.result == "pass" and r.evidence == warning
+
+
 def test_r3_english_warning_counts(registry, catalogue):
     text = "Nasi klienci zarobili średnio 34% w 2025 roku. Risk warning: you may lose money."
     assert results(text, registry, catalogue)["R3"].result == "pass"

@@ -26,7 +26,7 @@
 6. **Score:** plan §5 formula with `uncertain` = 0.5. Unimplemented rules are omitted from `rules[]`, not reported as `pass`, so the dashboard never shows a check that never ran.
 7. **R3 window:** the claim and warning dictionaries and `window: 2` live in YAML. Footnote-marked warnings (leading `*`, `¹`, `²`, `³`) don't count. This is the regex version, and the LLM decides borderline cases later (plan §5).
 8. **Ids and time:** `Finding.id` is uuid4 and `detected_at = updated_at = now` (UTC, injected). Turning a re-scan into an update instead of a duplicate is a storage concern for the next change.
-9. **Logging:** stdlib `logging` with a JSON formatter to stdout, no `print` (root `CLAUDE.md`). The CLI writes findings to stdout through `sys.stdout.write`, which is output, not logging.
+9. **Logging:** stdlib `logging` with a JSON formatter, no `print` (root `CLAUDE.md`). Services log to stdout (the `logging_setup.configure` default); the CLI logs to stderr so its stdout carries only the findings JSON, written with `sys.stdout.write` (output, not logging). Bad input or configuration in the CLI (unreadable or non-UTF-8 file, invalid document, registry or catalogue, `LOG_LEVEL`) exits with code 2.
 
 No ADR: none of these choices is hard to reverse. They are local to `analytics/` and follow the accepted plan and ADRs.
 
