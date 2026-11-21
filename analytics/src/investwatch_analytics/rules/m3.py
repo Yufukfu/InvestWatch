@@ -17,6 +17,14 @@ from .engine import Context, Rule, compile_patterns, register
 from .m1 import MetadataRule, SignalRule, first_hit, poland_marker
 
 
+def not_found_text(registry) -> str:
+    """A "not found" never states a fact about the KNF register: it names the registry that was loaded."""
+    return "Podmiotu nie znaleziono w załadowanym rejestrze firm" + (" (dane demonstracyjne)" if registry.demo else "")
+
+
+CRYPTO_NOTE = "kryptoaktywa nie są wymienione w katalogu z art. 2 u.o.i.f. (załącznik do tematu 3)"
+
+
 class PhraseRule(SignalRule):
     """`fail` (or `uncertain` for a candidate) on the first phrase of `phrase_patterns`, else `pass`."""
 
@@ -71,7 +79,7 @@ class S31NotInRegistry(MetadataRule):
     rule_id = "S3.1"
 
     def evaluate(self, ctx: Context) -> RuleResult:
-        why = "Podmiot nie występuje w rejestrze firm inwestycyjnych KNF"
+        why = not_found_text(ctx.registry)
         author = ctx.doc.author
         if author is not None and (author.handle or "").strip():
             return self.result("fail", author.handle.strip(), f"{why} (autor).")
@@ -141,7 +149,6 @@ class S38CryptoOutsideArt2(WindowRule):
             if self._near(ctx, i, self._p["crypto"]) and not self._near(ctx, i, self._p["instrument"]):
                 return self.result(
                     "fail", ctx.pre.sentences[i].text,
-                    "Rekomendacje kupna lub sprzedaży kryptoaktywów – poza art. 2 ustawy o obrocie "
-                    "instrumentami finansowymi (poza art. 2).",
+                    f"Rekomendacje kupna lub sprzedaży kryptoaktywów, poza art. 2: {CRYPTO_NOTE}.",
                 )
         return self.result("pass", None, "Brak rekomendacji dotyczących wyłącznie kryptoaktywów.")

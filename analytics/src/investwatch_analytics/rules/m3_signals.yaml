@@ -8,9 +8,9 @@
 bias: -3.0
 rules:
   - id: S3.1
-    name: Podmiot spoza rejestru
+    name: Podmiot nieznaleziony w rejestrze
     severity: high
-    legal_basis: art. 69 ust. 1 u.o.i.f.
+    legal_basis: null
     weight: 0.5
     implemented: true
 
@@ -33,7 +33,7 @@ rules:
   - id: S3.3
     name: Personalizacja
     severity: high
-    legal_basis: art. 76 u.o.i.f.
+    legal_basis: art. 76 u.o.i.f. (załącznik do tematu 3)
     weight: 1.5
     implemented: true
     params:
@@ -54,7 +54,7 @@ rules:
   - id: S3.4
     name: Rekomendacja konkretnych instrumentów
     severity: high
-    legal_basis: art. 76 u.o.i.f.
+    legal_basis: art. 76 u.o.i.f. (załącznik do tematu 3)
     weight: 3.0
     implemented: true
     params:
@@ -137,7 +137,7 @@ rules:
   - id: S3.8
     name: Rekomendacje kryptoaktywów (poza art. 2)
     severity: low
-    legal_basis: null
+    legal_basis: art. 2 u.o.i.f. (załącznik do tematu 3)
     weight: 0.5
     implemented: true
     params:

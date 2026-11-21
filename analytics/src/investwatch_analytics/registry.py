@@ -84,6 +84,9 @@ class FirmMatch:
 class Registry:
     def __init__(self, firms: list[Firm]):
         self.firms = tuple(firms)
+        # Demonstration data (the bundled seed) carries no source; the real KNF loader sets `source_url`
+        # per firm. Findings say so, so a "not found" never reads as a statement about the KNF register.
+        self.demo = not any(f.source_url for f in self.firms)
         self._by_id = {f.id: f for f in firms}
         # Longest alias first, so the quote is the fullest form present in the text.
         self._patterns = {

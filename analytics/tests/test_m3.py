@@ -199,7 +199,7 @@ def test_s38_crypto_group(registry, cat):
     s = {r.rule_id: r for r in f.rules}
     assert s["S3.8"].result == "fail" and s["S3.8"].evidence == "Kupuj bitcoina teraz, sprzedaj na szczycie."
     assert "poza art. 2" in s["S3.8"].explanation and s["S3.4"].result == "pass"
-    assert f.score <= 0.4 and "nie są instrumentami finansowymi z art. 2" in f.summary
+    assert f.score <= 0.4 and "nie są wymienione w katalogu z art. 2 u.o.i.f. (załącznik do tematu 3)" in f.summary
 
 
 def test_s38_derivative_is_not_crypto(registry, cat):
@@ -376,3 +376,41 @@ def test_attribution_checks_every_candidate(registry, cat):
 
 def test_broker_onboarding_is_not_the_publishers_offer(registry, cat):
     assert not _attr("Otwórz konto w EuroTrade Markets. Wypełnij ankietę i zacznij.", registry, cat)
+
+
+# ---- review of #35, items 2 and 9: registry wording and legal bases ------------------------------------
+
+
+def _real_registry(tmp_path) -> Registry:
+    rows = SEED.read_text(encoding="utf-8").splitlines()
+    out = [rows[0]] + [r.rstrip(",") + ",https://www.knf.gov.pl/podmioty" for r in rows[1:]]
+    p = tmp_path / "knf.csv"
+    p.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return Registry.from_csv(p)
+
+
+def test_registry_demo_flag(registry, tmp_path):
+    assert registry.demo is True and _real_registry(tmp_path).demo is False
+
+
+def test_demo_registry_wording(mock, registry, cat):
+    f = finding(mock(GOLD), registry, cat)
+    s31 = {r.rule_id: r for r in f.rules}["S3.1"]
+    for text in (s31.explanation, f.summary):
+        assert "nie znaleziono w załadowanym rejestrze firm" in text and "(dane demonstracyjne)" in text
+        assert "nie występuje" not in text and "KNF" not in text
+    assert "spoza rejestru" not in f.title.lower()
+
+
+def test_real_registry_wording(mock, tmp_path, cat):
+    real = _real_registry(tmp_path)
+    f = finding(mock(GOLD), real, cat)
+    s31 = {r.rule_id: r for r in f.rules}["S3.1"]
+    for text in (s31.explanation, f.summary):
+        assert "nie znaleziono w załadowanym rejestrze firm" in text and "dane demonstracyjne" not in text
+
+
+def test_legal_bases_are_sourced(cat):
+    assert cat.get("S3.1").legal_basis is None
+    assert cat.get("S3.3").legal_basis == cat.get("S3.4").legal_basis == "art. 76 u.o.i.f. (załącznik do tematu 3)"
+    assert cat.get("S3.8").legal_basis == "art. 2 u.o.i.f. (załącznik do tematu 3)"

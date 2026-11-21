@@ -4,9 +4,9 @@ Kacper's review of PR #35 (6da4f1f). Branch `analytics/analytics-m1-m3` (pushed:
 
 ## 1. Registry wording and legal bases (items 2, 9)
 
-- [ ] 1.1 Failing tests: `Registry.demo` true for the bundled seed and false when firms have a `source_url`; the S3.1 explanation and the M3 summary say `nie znaleziono w załadowanym rejestrze firm`, with `(dane demonstracyjne)` only for the demo registry; the M3 title never says "spoza rejestru"; S3.1 has no legal basis; S3.3/S3.4 cite art. 76 and S3.8 art. 2 (Topic 3 annex); the crypto note reads "kryptoaktywa nie są wymienione w katalogu z art. 2 u.o.i.f. (załącznik do tematu 3)"
-- [ ] 1.2 `registry.py` (`demo`), `rules/m3.py`, `modules/m3.py`, `rules/m3_signals.yaml`, `analytics/registry/README.md`; tests green
-- [ ] 1.3 Mutation check; `mutations: N tried, N caught`
+- [x] 1.1 Failing tests: `Registry.demo` true for the bundled seed and false when firms have a `source_url`; the S3.1 explanation and the M3 summary say `nie znaleziono w załadowanym rejestrze firm`, with `(dane demonstracyjne)` only for the demo registry; the M3 title never says "spoza rejestru"; S3.1 has no legal basis; S3.3/S3.4 cite art. 76 and S3.8 art. 2 (Topic 3 annex); the crypto note reads "kryptoaktywa nie są wymienione w katalogu z art. 2 u.o.i.f. (załącznik do tematu 3)"
+- [x] 1.2 `registry.py` (`demo`), `rules/m3.py`, `modules/m3.py`, `rules/m3_signals.yaml`, `analytics/registry/README.md`; tests green
+- [x] 1.3 Mutation check; `mutations: 7 tried, 7 caught`
 
 ## 2. S1.3 labels and the advertiser on social hosts (items 3, 4)
 

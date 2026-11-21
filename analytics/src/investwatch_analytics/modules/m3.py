@@ -13,6 +13,7 @@ from ..config import PIPELINE_VERSION
 from ..models import AdvertiserRef, Finding, ModelInfo, RuleResult
 from ..rules import engine
 from ..rules.engine import Catalogue, Context, run_rules
+from ..rules.m3 import CRYPTO_NOTE, not_found_text
 from ..rules.scoring import capped, sigmoid_score
 
 EXCERPT_MAX = 500
@@ -69,7 +70,7 @@ def build_finding(
 ) -> Finding:
     rules = run_rules(catalogue, ctx) if rules is None else rules
     value, was_capped = score(rules, catalogue)
-    title, summary = _texts(rules, advertiser, was_capped)
+    title, summary = _texts(rules, advertiser, was_capped, not_found_text(ctx.registry))
     return Finding(
         id=new_id(),
         document_id=ctx.doc.id,
@@ -90,7 +91,7 @@ def build_finding(
     )
 
 
-def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool) -> tuple[str, str]:
+def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool, not_found: str) -> tuple[str, str]:
     by_id = {r.rule_id: r for r in rules}
     who = advertiser.handle or advertiser.name or "nieznany podmiot"
 
@@ -107,10 +108,10 @@ def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool)
         what = "płatna oferta inwestycyjna"
     else:
         what = "słownictwo usług doradczych"
-    title = f"Podmiot spoza rejestru {who}: {what}"
+    title = f"{who}: {what}"
     found = [r for r in rules if r.result == "fail"]
     unsure = [r for r in rules if r.result == "uncertain"]
-    parts = [f"Podmiot {who} nie występuje w rejestrze firm inwestycyjnych KNF."]
+    parts = [f"{who}: {not_found[0].lower()}{not_found[1:]}."]
     if found:
         parts.append("Wykryte sygnały: " + "; ".join(f"{r.rule_id} {r.name}" for r in found) + ".")
     if unsure:
@@ -118,6 +119,6 @@ def _texts(rules: list[RuleResult], advertiser: AdvertiserRef, was_capped: bool)
     if was_capped:
         parts.append("Wynik ograniczony do 0,4: brak rekomendacji konkretnych instrumentów finansowych (art. 76).")
     if present("S3.8"):
-        parts.append("Kryptoaktywa nie są instrumentami finansowymi z art. 2 ustawy o obrocie instrumentami finansowymi.")
+        parts.append(f"{CRYPTO_NOTE[0].upper()}{CRYPTO_NOTE[1:]}.")
     parts.append("Tryb regułowy (bez modelu językowego).")
     return title, " ".join(parts)
