@@ -10,6 +10,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0102](0102-scraper-job-queue.md) | Scraper job queue and scheduler | accepted (agent-written; effective on merge) |
 | [0103](0103-first-social-platform.md) | First social platform | proposed (criteria only, no research; decided in `scraper-v2`) |
 | [0104](0104-ingest-order-and-republish-sweep.md) | Ingest order, at-least-once delivery and the republish sweep | accepted (agent-written; effective on merge) |
+| [0108](0108-source-discovery-candidates.md) | Source discovery: inactive candidate sources mined from stored links, approved by a human | accepted (agent-written; effective on merge) |
 | [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted; dev mocks superseded by [0206](0206-dashboard-data-from-backend.md) |
 | [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted |
 | [0203](0203-dashboard-charts-recharts.md) | Dashboard charts: Recharts (the only chart library in `web/`) | accepted (takes effect when PR merges) |
