@@ -49,10 +49,15 @@ describe('useStatusChange', () => {
     await waitFor(() => expect(result.current.error).toEqual({ message: 'brak połączenia z serwerem.', detail: undefined }));
   });
 
-  it('a successful change refetches the findings list and the summary', async () => {
+  it('a successful change refetches the findings list, the summary and the calibration', async () => {
     let listCalls = 0;
     let summaryCalls = 0;
+    let calibrationCalls = 0;
     server.use(
+      http.get('http://localhost/api/calibration', () => {
+        calibrationCalls += 1;
+        return HttpResponse.json({ module: 'M2', current_threshold: 0.5, labeled_samples: 0, points: [] });
+      }),
       http.get('http://localhost/api/findings', () => {
         listCalls += 1;
         return HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 });
@@ -69,14 +74,18 @@ describe('useStatusChange', () => {
         const { useGetFindingsQuery, useGetStatsSummaryQuery } = generated;
         useGetFindingsQuery({});
         useGetStatsSummaryQuery();
+        generated.useGetCalibrationQuery({ module: 'M2' });
         return useStatusChange(detail.id);
       },
       { wrapper },
     );
     await waitFor(() => expect(listCalls).toBe(1));
     await waitFor(() => expect(summaryCalls).toBe(1));
+    await waitFor(() => expect(calibrationCalls).toBe(1));
     act(() => result.current.save({ status: 'closed' }));
     await waitFor(() => expect(listCalls).toBe(2));
     await waitFor(() => expect(summaryCalls).toBe(2));
+    // Analyst labels feed the calibration curve (integration-plan §5).
+    await waitFor(() => expect(calibrationCalls).toBe(2));
   });
 });

@@ -83,4 +83,55 @@ describe('CalibrationPage', () => {
     });
     await waitFor(() => expect(screen.getByRole('slider', { name: 'Próg dla M2' })).toHaveValue(idx(0.6)));
   });
+
+  it('a save confirmation or error does not follow to another module', async () => {
+    server.use(http.put('http://localhost/api/settings/thresholds', () => HttpResponse.json({ error: 'x' }, { status: 422 })));
+    render(<CalibrationPage chartSize={{ width: 500, height: 240 }} />, { wrapper: storeWrapper() });
+    const slider = await screen.findByRole('slider', { name: 'Próg dla M2' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zapisz próg' })).toBeDisabled());
+    fireEvent.change(slider, { target: { value: idx(0.7) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz próg' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'M1 · Finfluencerzy' }));
+    await screen.findByRole('slider', { name: 'Próg dla M1' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('keeps the selected threshold, not a position, when the curve changes shape', async () => {
+    let points = calM2.points;
+    server.use(http.get('http://localhost/api/calibration', () => HttpResponse.json({ ...calM2, points })));
+    const store = makeStore();
+    render(
+      <Provider store={store}>
+        <CalibrationPage chartSize={{ width: 500, height: 240 }} />
+      </Provider>,
+    );
+    const slider = await screen.findByRole('slider', { name: 'Próg dla M2' });
+    fireEvent.change(slider, { target: { value: idx(0.9) } });
+    points = calM2.points.filter((p) => p.threshold >= 0.3);
+    act(() => {
+      store.dispatch(investWatchApi.util.invalidateTags(['calibration']));
+    });
+    await waitFor(() => expect(screen.getByRole('slider', { name: 'Próg dla M2' })).toHaveAttribute('max', String(points.length - 1)));
+    expect(screen.getByRole('slider', { name: 'Próg dla M2' })).toHaveAttribute('aria-valuetext', 'próg 0.90');
+  });
+
+  it('falls back to the current point when the picked threshold is no longer on the curve', async () => {
+    let points = calM2.points;
+    server.use(http.get('http://localhost/api/calibration', () => HttpResponse.json({ ...calM2, points })));
+    const store = makeStore();
+    render(
+      <Provider store={store}>
+        <CalibrationPage chartSize={{ width: 500, height: 240 }} />
+      </Provider>,
+    );
+    const slider = await screen.findByRole('slider', { name: 'Próg dla M2' });
+    fireEvent.change(slider, { target: { value: idx(0.1) } });
+    points = calM2.points.filter((p) => p.threshold >= 0.3);
+    act(() => {
+      store.dispatch(investWatchApi.util.invalidateTags(['calibration']));
+    });
+    await waitFor(() => expect(screen.getByRole('slider', { name: 'Próg dla M2' })).toHaveAttribute('aria-valuetext', 'próg 0.50'));
+  });
 });

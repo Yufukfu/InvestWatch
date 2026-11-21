@@ -86,7 +86,12 @@ function Body({
 }: CalibrationPanelProps & { view: CalibrationView; sliderId: string }) {
   const selected = view.points[index];
   const current = view.points[currentIndex] ?? selected;
-  const changed = selected.threshold !== view.currentThreshold;
+  // Changed means the user moved off the current point; a saved threshold off the curve is compared
+  // with its nearest point, and the comparison says so.
+  const changed = index !== currentIndex;
+  const exact = current.threshold === view.currentThreshold;
+  const beforeLabel = exact ? 'obecnie' : `najbliższy punkt (${current.threshold.toFixed(2)}):`;
+  const warningId = `${sliderId}-warning`;
 
   return (
     <>
@@ -119,7 +124,11 @@ function Body({
             <div key={m.label} className="metric" role="group" aria-label={m.label}>
               <div className="metric-label">{m.label}</div>
               <div className="metric-value">{show(v, m.percent)}</div>
-              {before !== undefined && <div className="metric-before">obecnie {show(before, m.percent)}</div>}
+              {before !== undefined && (
+                <div className="metric-before">
+                  {beforeLabel} {show(before, m.percent)}
+                </div>
+              )}
             </div>
           );
         })}
@@ -153,7 +162,7 @@ function Body({
       </details>
 
       <div className="calibration-save">
-        <p className="warning">
+        <p className="warning" id={warningId}>
           Zapisanie progu zmienia poziom ryzyka wszystkich zgłoszeń modułu {module} i próg alertów wysokiego ryzyka.
         </p>
         <div className="status-actions">
@@ -161,6 +170,7 @@ function Body({
             type="button"
             className="btn btn-primary"
             disabled={!changed || !canSave || isSaving}
+            aria-describedby={warningId}
             onClick={() => onSave(selected.threshold)}
           >
             {isSaving ? 'Zapisywanie…' : 'Zapisz próg'}

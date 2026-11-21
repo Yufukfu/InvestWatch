@@ -14,6 +14,6 @@
 
 ## 3. Closing
 
-- [x] 3.1 Run against the contract mock server in headless Chrome: move M2 0.5 to 0.7, save, the risk levels in the list change; console clean in the production build; 375 px without page overflow.
+- [x] 3.1 Run against the contract mock server in headless Chrome: move M2 by keyboard, save, the risk levels in the list change (0.7 changes none on the mock scores, so checked with 0.90: "Wysokie ryzyko" 6 to 4, rows recomputed; restored 0.50); console clean in the production build; 375 px without page overflow.
 - [x] 3.2 Apply the `iw-docs-update` skill (`.docs/status/dashboard.md`, `web/README.md`, `docs-check` clean) and add the `iw-ai-log` row.
-- [ ] 3.3 Run the `iw-pr-review` skill and fix real findings.
+- [x] 3.3 Run the `iw-pr-review` skill and fix real findings (all 6 fixed; review fixes mutations: 8 tried, 8 caught, one survivor closed with a picked-threshold-gone case).

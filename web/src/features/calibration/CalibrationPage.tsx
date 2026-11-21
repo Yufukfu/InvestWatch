@@ -9,35 +9,46 @@ export function CalibrationPage({ chartSize }: Props) {
   const [module, setModule] = useState<CalibrationModule>('M2');
   const { view, isLoading, isError } = useCalibration(module);
   const thresholds = useThresholds();
-  const currentIndex = view ? nearestIndex(view.points, view.currentThreshold) : -1;
+  const points = view?.points ?? [];
+  const currentIndex = view ? nearestIndex(points, view.currentThreshold) : -1;
   // A new module or a saved threshold starts the slider again at the current point.
   const key = `${module}|${view?.currentThreshold ?? ''}`;
   return (
-    <Selection key={key} currentIndex={currentIndex}>
-      {(index, setIndex) => (
-        <CalibrationPanel
-          module={module}
-          onModule={setModule}
-          view={view}
-          isLoading={isLoading}
-          isError={isError}
-          index={index}
-          currentIndex={currentIndex}
-          onIndex={setIndex}
-          canSave={thresholds.canSave}
-          onSave={(t) => thresholds.save(module, t)}
-          isSaving={thresholds.isSaving}
-          saved={thresholds.saved}
-          error={thresholds.error}
-          chartSize={chartSize}
-        />
-      )}
+    <Selection key={key}>
+      {(picked, pick) => {
+        // The selection is a threshold, not a position: a refetched curve with other points keeps it,
+        // or falls back to the current point when that threshold is gone.
+        const at = picked === undefined ? -1 : points.findIndex((p) => p.threshold === picked);
+        const index = at >= 0 ? at : currentIndex;
+        return (
+          <CalibrationPanel
+            module={module}
+            onModule={(m) => {
+              // Save feedback belongs to the module it was for.
+              thresholds.reset();
+              setModule(m);
+            }}
+            view={view}
+            isLoading={isLoading}
+            isError={isError}
+            index={index}
+            currentIndex={currentIndex}
+            onIndex={(i) => pick(points[i]?.threshold)}
+            canSave={thresholds.canSave}
+            onSave={(t) => thresholds.save(module, t)}
+            isSaving={thresholds.isSaving}
+            saved={thresholds.saved}
+            error={thresholds.error}
+            chartSize={chartSize}
+          />
+        );
+      }}
     </Selection>
   );
 }
 
-// Holds the slider position; remounted (by key) when the module or the saved threshold changes.
-function Selection({ currentIndex, children }: { currentIndex: number; children: (i: number, set: (i: number) => void) => ReactNode }) {
+// Holds the picked threshold; remounted (by key) when the module or the saved threshold changes.
+function Selection({ children }: { children: (picked: number | undefined, pick: (t: number | undefined) => void) => ReactNode }) {
   const [picked, setPicked] = useState<number | undefined>(undefined);
-  return <>{children(picked ?? currentIndex, setPicked)}</>;
+  return <>{children(picked, setPicked)}</>;
 }

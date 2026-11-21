@@ -117,7 +117,8 @@ export function useRealtime(): RealtimeState {
             draft.status = status;
           }),
         );
-        d(investWatchApi.util.invalidateTags(['stats']));
+        // Counts move, and analyst labels feed the calibration curve.
+        d(investWatchApi.util.invalidateTags(['stats', 'calibration']));
       });
     };
 

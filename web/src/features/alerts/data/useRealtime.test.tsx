@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGetFindingsByIdQuery, useGetFindingsQuery, useGetStatsSummaryQuery } from '../../../api/generated';
+import { useGetCalibrationQuery, useGetFindingsByIdQuery, useGetFindingsQuery, useGetStatsSummaryQuery } from '../../../api/generated';
 import detail from '../../../test/fixtures/finding-detail.json';
 import findings from '../../../test/fixtures/findings.json';
 import summary from '../../../test/fixtures/summary.json';
@@ -43,8 +43,12 @@ vi.mock('socket.io-client', () => ({
 }));
 
 function countRequests() {
-  const n = { list: 0, summary: 0 };
+  const n = { list: 0, summary: 0, calibration: 0 };
   server.use(
+    http.get('http://localhost/api/calibration', () => {
+      n.calibration += 1;
+      return HttpResponse.json({ module: 'M2', current_threshold: 0.5, labeled_samples: 0, points: [] });
+    }),
     http.get('http://localhost/api/findings', () => {
       n.list += 1;
       return HttpResponse.json(findings);
@@ -64,6 +68,7 @@ function renderWithQueries() {
       list: useGetFindingsQuery({ page: 1, pageSize: 25 }),
       detail: useGetFindingsByIdQuery({ id: detail.id }),
       summary: useGetStatsSummaryQuery(),
+      calibration: useGetCalibrationQuery({ module: 'M2' }),
     }),
     { wrapper: storeWrapper() },
   );
@@ -130,6 +135,7 @@ describe('useRealtime', () => {
     await waitFor(() => expect(result.current.list.data?.items.find((i) => i.id === detail.id)?.status).toBe('closed'));
     expect(result.current.detail.data?.status).toBe('closed');
     await waitFor(() => expect(n.summary).toBe(2));
+    await waitFor(() => expect(n.calibration).toBe(2));
     expect(n.list).toBe(1);
   });
 

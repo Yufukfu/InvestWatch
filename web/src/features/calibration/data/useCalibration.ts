@@ -33,6 +33,7 @@ export type ThresholdsState = {
   isSaving: boolean;
   saved: boolean;
   error: string | undefined;
+  reset: () => void;
 };
 
 // The PUT body is the saved thresholds with one module replaced: the panel never invents the others.
@@ -40,7 +41,7 @@ export type ThresholdsState = {
 // invalidate findings, stats and calibration as well as settings.
 export function useThresholds(): ThresholdsState {
   const { data } = useGetSettingsThresholdsQuery();
-  const [put, { isLoading, isSuccess, isError, error }] = usePutSettingsThresholdsMutation();
+  const [put, { isLoading, isSuccess, isError, error, reset }] = usePutSettingsThresholdsMutation();
   const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
   return {
     thresholds: data,
@@ -53,5 +54,6 @@ export function useThresholds(): ThresholdsState {
     error: isError
       ? `Nie zapisano progu: ${status === 'FETCH_ERROR' ? 'brak połączenia z serwerem.' : status === 422 || status === 400 ? 'serwer odrzucił wartość.' : 'błąd serwera.'}`
       : undefined,
+    reset,
   };
 }
