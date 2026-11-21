@@ -36,7 +36,9 @@ def test_env_overrides(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize(("var", "value"), [("MOCK_PORT", "abc"), ("MOCK_REPLAY_INTERVAL_S", "-1"),
-                                            ("MOCK_SCAN_DELAY_S", "soon")])
+                                            ("MOCK_SCAN_DELAY_S", "soon"), ("MOCK_PORT", "65536"),
+                                            ("MOCK_SCAN_DELAY_S", "inf"), ("MOCK_REPLAY_INTERVAL_S", "nan"),
+                                            ("LOG_LEVEL", "verbose")])
 def test_bad_env_value_names_the_variable(monkeypatch, var, value):
     monkeypatch.setenv(var, value)
 
@@ -54,3 +56,24 @@ def test_json_formatter_emits_one_json_object():
     assert entry["level"] == "INFO"
     assert entry["path"] == "/api/findings"
     assert entry["ts"].endswith("Z")
+
+
+def test_highest_port_and_lowercase_log_level_are_accepted(monkeypatch):
+    monkeypatch.setenv("MOCK_PORT", "65535")
+    monkeypatch.setenv("LOG_LEVEL", "debug")
+
+    s = Settings()
+
+    assert s.port == 65535
+    assert s.log_level == "DEBUG"
+
+
+def test_main_exits_2_on_a_bad_log_level(monkeypatch):
+    from iw_mock_server.__main__ import main
+
+    monkeypatch.setenv("LOG_LEVEL", "verbose")
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", list(root.handlers))  # main() replaces the root handlers
+    monkeypatch.setattr(root, "level", root.level)
+
+    assert main() == 2
