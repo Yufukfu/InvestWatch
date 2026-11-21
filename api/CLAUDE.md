@@ -13,6 +13,7 @@ REST API and Socket.IO gateway for the dashboard, and the owner of the shared Po
 - `risk_level` is derived on read from `score` and Redis `iw:settings:thresholds` (`high >= t`, `medium >= t - 0.2`, else `low`); it is never stored. The API writes that key; analytics only reads it.
 - The relay forwards `iw:events` to Socket.IO `/events` unchanged; it applies no threshold logic. Drop messages that fail the events schema.
 - Screenshot object keys come from the `documents` row, never from the request.
+- Keep the mocks: the mock server (`contracts/mock-server/`) and the mocks (`contracts/mocks/`) stay as a test double for `web/` now that the real `api/` exists; removing or replacing them needs Damian's OK. Where the real API diverges (for example `/calibration`), record a follow-up instead of changing the mock.
 - All routes `async def`; config from env only; JSON logs to stdout through the logger, no `print`; never log connection strings or keys.
 
 ## Stack and done
