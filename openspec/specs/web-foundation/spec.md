@@ -47,7 +47,7 @@ Dashboard feature components SHALL render only from their props, with no store, 
 - **THEN** it shows an alert reading "Nie udało się pobrać zgłoszeń." and no table
 
 #### Scenario: Data hook against the API
-- **WHEN** a feature's data hook runs against the mock handlers
+- **WHEN** a feature's data hook runs in a test against the Vitest network fake
 - **THEN** it returns the rows or values the component needs, taken from the contract mock for that endpoint
 
 #### Scenario: Data hook when the API is unreachable
@@ -85,8 +85,12 @@ The running dashboard SHALL get all data from the backend at `VITE_API_BASE_URL`
 - **THEN** the findings table shows those titles as plain text
 
 #### Scenario: No fake backend in app code
-- **WHEN** the sources under `web/src/` outside `src/test/` and test files are checked
-- **THEN** none imports `msw` or registers a service worker, and `web/public/` has no `mockServiceWorker.js`
+- **WHEN** the shipped files are checked: sources under `web/src/` outside `src/test/` and test files, `web/public/`, the root `*.html`, `*.js`, `*.mjs`, `*.cjs` and `.env*` files
+- **THEN** none imports `msw`, imports from `src/test/`, registers a service worker or mentions `useMocks` or `VITE_USE_MOCKS`, and `web/public/` has no `mockServiceWorker.js`
+
+#### Scenario: No browser worker anywhere in src
+- **WHEN** every file under `web/src/`, tests and test support included, is checked
+- **THEN** none references `msw/browser` or `setupWorker`
 
 #### Scenario: API down
 - **WHEN** the API is unreachable
