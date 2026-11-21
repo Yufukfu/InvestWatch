@@ -10,9 +10,9 @@ Stage 3, approved in a trimmed form (about 5.5 h: groups 1-4 and 6-9; group 5 is
 
 ## 2. Embeddings client, validation, stub server (~1 h)
 
-- [ ] 2.1 Failing tests: `stub_embed` fixture (scripted queue: valid, wrong size, NaN, zeros, non-JSON, `{"error":…}`, 404, 429, 401, 500, sleep, closed connection; records requests); request shape (`/v1/embeddings`, `model`, one-item `input`, cut to `EMBED_MAX_CHARS`, no `Authorization` without a key); every "Vector validation" scenario; error classes `EmbedUnavailable` (incl. 404 and timeout within timeout + 1 s) vs `EmbedMalformed`; no text, vector or key in logs; the loopback guard fails a test building `http://ollama:11434/v1`
-- [ ] 2.2 `embeddings/client.py` (`httpx`, connect 3 s / read `EMBED_TIMEOUT_S`), `embeddings/types.py` (`Embedder` protocol, `EmbedOutcome`), L2-normalized `numpy.float32`; reuse `analytics-llm-p0`'s stub server if it is route-generic, otherwise a sibling fixture; `numpy` pinned; tests green
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Failing tests: `stub_embed` fixture (scripted queue: valid, wrong size, NaN, zeros, non-JSON, `{"error":…}`, 404, 429, 401, 500, sleep, closed connection; records requests); request shape (`/v1/embeddings`, `model`, one-item `input`, cut to `EMBED_MAX_CHARS`, no `Authorization` without a key); every "Vector validation" scenario; error classes `EmbedUnavailable` (incl. 404 and timeout within timeout + 1 s) vs `EmbedMalformed`; no text, vector or key in logs; the loopback guard fails a test building `http://ollama:11434/v1`
+- [x] 2.2 `embeddings/client.py` (`httpx`, connect 3 s / read `EMBED_TIMEOUT_S`), (the `Embedder` protocol and `EmbedOutcome` land with the never-raising embedder in group 3), L2-normalized `numpy.float32`; `analytics-llm-p0`'s `StubLLM` is reused unchanged (raw `Reply.body`), plus a small custom-handler server in the test for trickle and redirect cases; `numpy` pinned; tests green
+- [x] 2.3 Mutation check; `mutations: 19 tried, 19 caught` (first run 13 of 19: four missing tests added (padded oversize body, trickled body, redirect with `Location`, a number instead of a list); two redundant guards removed (NaN at parse time and per-value `isfinite`, both already covered by the non-finite norm check))
 
 ## 3. Embedding cache and breaker (~45 min)
 
