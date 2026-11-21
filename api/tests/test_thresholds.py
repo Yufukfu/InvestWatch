@@ -92,5 +92,45 @@ def test_store_uses_defaults_if_never_read():
     assert asyncio.run(ThresholdStore(redis).current()) == DEFAULTS
 
 
+def test_out_of_range_value_falls_back():
+    assert asyncio.run(ThresholdStore(_FlakyRedis('{"M1": 2, "M2": 0.5, "M3": 0.7}')).current()) == DEFAULTS
+
+
+class _CountingRedis(_FlakyRedis):
+    def __init__(self, value):
+        super().__init__(value)
+        self.calls = 0
+
+    async def get(self, key):
+        self.calls += 1
+        return await super().get(key)
+
+
+def test_redis_is_skipped_for_five_seconds_after_a_failure():
+    clock = [100.0]
+    redis = _CountingRedis(json.dumps({"M1": 0.1, "M2": 0.2, "M3": 0.3}))
+    store = ThresholdStore(redis, clock=lambda: clock[0])
+    assert asyncio.run(store.current())["M2"] == 0.2 and redis.calls == 1
+    redis.down = True
+    assert asyncio.run(store.current())["M2"] == 0.2 and redis.calls == 2   # fails, starts the skip window
+    clock[0] += 4.9
+    assert asyncio.run(store.current())["M2"] == 0.2 and redis.calls == 2   # within 5 s: no Redis call
+    redis.down = False
+    redis.value = json.dumps({"M1": 0.1, "M2": 0.4, "M3": 0.3})
+    clock[0] += 0.2
+    assert asyncio.run(store.current())["M2"] == 0.4 and redis.calls == 3   # after 5 s: Redis again
+
+
+def test_successful_replace_ends_the_skip_window():
+    clock = [0.0]
+    redis = _CountingRedis(None)
+    redis.down = True
+    store = ThresholdStore(redis, clock=lambda: clock[0])
+    asyncio.run(store.current())
+    redis.down = False
+    asyncio.run(store.replace({"M1": 0.3, "M2": 0.3, "M3": 0.3}))
+    assert asyncio.run(store.current()) == {"M1": 0.3, "M2": 0.3, "M3": 0.3} and redis.calls == 2
+
+
 def test_malformed_key_falls_back():
     assert asyncio.run(ThresholdStore(_FlakyRedis('{"M1": 2}')).current()) == DEFAULTS

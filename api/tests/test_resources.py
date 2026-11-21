@@ -91,6 +91,17 @@ def test_day_buckets_start_at_midnight_utc(client):
     assert [p["t"] for p in r.json()["points"]] == ["2026-11-20T00:00:00Z", "2026-11-21T00:00:00Z"]
 
 
+def test_whole_first_bucket(client, migrated_db):
+    doc = document_row()
+    _insert(migrated_db.app_url, documents, [doc])
+    t = datetime(2026, 11, 21, 10, 10, tzinfo=timezone.utc)
+    _insert(migrated_db.app_url, findings, [finding_row(doc["id"], module="M3", detected_at=t, updated_at=t)])
+    points = client.get("/api/stats/trend", params={"bucket": "hour", "date_from": "2026-11-21T10:30:00Z",
+                                                    "date_to": "2026-11-21T11:30:00Z"}).json()["points"]
+    assert points == [{"t": "2026-11-21T10:00:00Z", "M1": 0, "M2": 0, "M3": 1},
+                      {"t": "2026-11-21T11:00:00Z", "M1": 0, "M2": 0, "M3": 0}]
+
+
 def test_hour_buckets_default_to_the_last_24_hours(client):
     points = client.get("/api/stats/trend").json()["points"]
     assert len(points) in (24, 25) and all(p["t"].endswith(":00:00Z") for p in points)
@@ -235,9 +246,25 @@ def test_create_with_missing_field(client, migrated_db, missing):
 
 @pytest.mark.parametrize("over", [{"target_modules": ["M1", "M1"]}, {"url": "not a url"}, {"platform": "myspace"},
                                   {"extra": 1}, {"url": "https://user:pw@alfa.example/"}, {"name": "x" * 201},
-                                  {"schedule_cron": "*" * 101}, {"url": "ftp://alfa.example/"}])
+                                  {"schedule_cron": "*" * 101}, {"url": "ftp://alfa.example/"},
+                                  {"name": "Alfa\x00"}, {"schedule_cron": "0 * * * *\x00"}])
 def test_create_with_invalid_value(client, over):
     assert client.post("/api/sources", json={**NEW_SOURCE, **over}).status_code == 422
+
+
+def test_url_kept_as_sent(client):
+    r = client.post("/api/sources", json={**NEW_SOURCE, "url": "https://Alfa.example"})
+    assert r.status_code == 201 and r.json()["url"] == "https://Alfa.example"
+    assert client.get("/api/sources").json()["items"][0]["url"] == "https://Alfa.example"
+    patched = client.patch(f"/api/sources/{r.json()['id']}", json={"url": "https://beta.example/a?x=1"}).json()
+    assert patched["url"] == "https://beta.example/a?x=1"
+
+
+@pytest.mark.parametrize("body", [{"name": "x\x00"}, {"schedule_cron": "\x00"}, {"url": "not a url"}])
+def test_nul_or_bad_url_in_patch(client, body):
+    created = client.post("/api/sources", json=NEW_SOURCE).json()
+    assert client.patch(f"/api/sources/{created['id']}", json=body).status_code == 422
+    assert client.get("/api/sources").json()["items"] == [created]
 
 
 def test_list_sources_with_counts(client, seeded):

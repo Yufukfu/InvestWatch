@@ -16,9 +16,9 @@ Merge order: PR #18 (`chore/infra-compose-v2`) first, then PR #21. This branch m
 
 ## 3. Filter, trend, input and threshold fixes (review items 7, 8, 9, 10)
 
-- [ ] 3.1 Failing tests: "Whole first bucket", "Empty status list", NUL and length cases of "Invalid bodies", "URL kept as sent", "NUL in a text field", "Out-of-range value in the key", "No Redis round trip right after a failure"
-- [ ] 3.2 Fixes in `routes/stats.py`, `routes/findings.py`, `models.py`, `thresholds.py`; the 3.1 tests and the full suite pass
-- [ ] 3.3 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 3.1 Failing tests: "Whole first bucket", "Empty status list", NUL and length cases of "Invalid bodies", "URL kept as sent", "NUL in a text field", "Out-of-range value in the key", "No Redis round trip right after a failure"
+- [x] 3.2 Fixes in `routes/stats.py`, `routes/findings.py`, `models.py`, `thresholds.py`; the 3.1 tests and the full suite pass
+- [x] 3.3 Mutation check; mutations: 12 tried, 12 caught
 
 ## 4. Docs (review items 4, 6, 11, 12)
 

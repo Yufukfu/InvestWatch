@@ -261,7 +261,9 @@ def test_clearing_a_note(client, migrated_db):
     assert _stored(migrated_db, f["id"])["note"] is None
 
 
-@pytest.mark.parametrize("body", [{}, {"status": None}, {"status": "archived"}, {"score": 1}])
+@pytest.mark.parametrize("body", [{}, {"status": None}, {"status": "archived"}, {"score": 1},
+                                  {"note": "a\x00b"}, {"note": "x" * 10_001}],
+                         ids=["empty", "null-status", "bad-status", "extra-key", "nul-note", "long-note"])
 def test_invalid_bodies(client, migrated_db, redis_clean, body):
     f = _one(migrated_db)
     with Events(redis_clean) as events:
@@ -293,3 +295,14 @@ def test_database_down_gives_the_error_shape(redis_clean):
     with TestClient(app, raise_server_exceptions=False) as c:
         r = c.get("/api/findings")
     assert r.status_code == 500 and r.json() == {"error": "internal error"}
+
+
+@pytest.mark.parametrize("raw", ["", ",", " , "])
+def test_empty_status_list(client, raw):
+    r = client.get("/api/findings", params={"status": raw})
+    assert r.status_code == 422 and r.json()["details"][0]["loc"] == ["query", "status"]
+
+
+def test_longest_note_is_accepted(client, migrated_db):
+    f = _one(migrated_db)
+    assert client.patch(f"/api/findings/{f['id']}", json={"note": "x" * 10_000}).status_code == 200

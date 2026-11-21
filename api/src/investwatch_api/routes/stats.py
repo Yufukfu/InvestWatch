@@ -67,7 +67,8 @@ async def trend(request: Request, module: Module | None = None, bucket: Literal[
         raise validation_error(["query", "date_from"], f"range has more than {MAX_POINTS} buckets")
 
     slot = func.date_trunc(bucket, func.timezone("UTC", findings.c.detected_at)).label("slot")
-    conditions = [findings.c.detected_at >= start, findings.c.detected_at <= end]
+    # From the floored start: the first point covers its whole hour or day, like the mock server.
+    conditions = [findings.c.detected_at >= first, findings.c.detected_at <= end]
     if module:
         conditions.append(findings.c.module == module)
     if risk_level:

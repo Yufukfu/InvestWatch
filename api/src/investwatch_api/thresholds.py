@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from collections.abc import Callable
 
 from redis.exceptions import RedisError
 
@@ -17,6 +19,7 @@ KEY = "iw:settings:thresholds"
 DEFAULTS = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
 MODULES = ("M1", "M2", "M3")
 MEDIUM_BAND = 0.2  # medium = within 0.2 below the threshold (integration-plan §4)
+RETRY_AFTER_S = 5.0  # after a failed read, use the last known values without contacting Redis
 
 log = logging.getLogger("investwatch_api.thresholds")
 
@@ -41,17 +44,22 @@ def _parse(raw) -> dict[str, float] | None:
 class ThresholdStore:
     """Reads the key on every call while Redis answers; falls back to the last good value (else defaults)."""
 
-    def __init__(self, redis):
+    def __init__(self, redis, clock: Callable[[], float] = time.monotonic):
         self._redis = redis
+        self._clock = clock
         self._last: dict[str, float] = dict(DEFAULTS)
+        self._skip_until = 0.0
 
     async def current(self) -> dict[str, float]:
+        if self._clock() < self._skip_until:
+            return dict(self._last)
         try:
             raw = await self._redis.get(KEY)
             if raw is None:
                 await self._redis.set(KEY, json.dumps(DEFAULTS), nx=True)
                 raw = await self._redis.get(KEY)
         except (RedisError, OSError) as exc:
+            self._skip_until = self._clock() + RETRY_AFTER_S
             log.warning("thresholds read failed, using last known values", extra={"reason": type(exc).__name__})
             return dict(self._last)
         parsed = _parse(raw)
@@ -68,4 +76,5 @@ class ThresholdStore:
         except (RedisError, OSError):
             raise ServiceUnavailable("redis") from None
         self._last = new
+        self._skip_until = 0.0
         return dict(new)

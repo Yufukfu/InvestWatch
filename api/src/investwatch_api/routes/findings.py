@@ -39,13 +39,15 @@ def _view(row) -> dict:
 
 
 def _statuses(raw: str | None) -> set[str] | None:
-    if not raw:
+    if raw is None:
         return None
     wanted = {s.strip() for s in raw.split(",") if s.strip()}
+    if not wanted:
+        raise validation_error(["query", "status"], "status names no status")
     unknown = wanted - set(STATUSES)
     if unknown:
         raise validation_error(["query", "status"], f"unknown status {sorted(unknown)}")
-    return wanted or None
+    return wanted
 
 
 def _aware(dt: datetime) -> datetime:
