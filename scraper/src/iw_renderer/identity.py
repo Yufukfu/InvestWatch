@@ -1,7 +1,7 @@
 """Make the identity a request names true for the browser that actually runs it.
 
 The scraper draws one identity per run for a Chrome version (`CHROME_VERSION`). Playwright's Chromium may be a
-different major (ADR 0105), and it sends its own TLS handshake, so a user agent that claims another version
+different major (ADR 0107), and it sends its own TLS handshake, so a user agent that claims another version
 would be a false claim. The renderer therefore rewrites the version in the user agent and client hints to its
 browser's and keeps everything else (platform, mobile flag, `accept-language`).
 """

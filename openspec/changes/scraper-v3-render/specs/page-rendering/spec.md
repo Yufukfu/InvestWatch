@@ -60,7 +60,7 @@ The scraper SHALL call the renderer once per viewport, in the order `desktop`, `
 - **THEN** the pairing check rejects it (the test suite runs the check on the variant of every table entry)
 
 #### Scenario: Identity is adapted to the browser
-- **WHEN** a request names a Chrome major that differs from the renderer's browser (the pinned Chromium has no build for `CHROME_VERSION`, ADR 0105)
+- **WHEN** a request names a Chrome major that differs from the renderer's browser (the pinned Chromium has no build for `CHROME_VERSION`, ADR 0107)
 - **THEN** the renderer sends a user agent and client hints with the browser's own major and keeps the platform, mobile flag and `Accept-Language` of the request
 
 #### Scenario: Identity is not Chrome
@@ -80,7 +80,7 @@ The scraper SHALL call the renderer once per viewport, in the order `desktop`, `
 - **THEN** the `mobile` blocks reflect the mobile layout, not the desktop markup scaled down
 
 ### Requirement: The browser is confined
-Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host's site SHALL be refused without replacing the page. Chromium follows redirects without asking the interceptor (measured, ADR 0105), so every hop of the first navigation's redirect chain SHALL be checked after the load, and a render whose chain left the site or reached a non-public address SHALL fail and keep nothing of the page it landed on. Downloads, new pages, service workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
+Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host's site SHALL be refused without replacing the page. Chromium follows redirects without asking the interceptor (measured, ADR 0107), so every hop of the first navigation's redirect chain SHALL be checked after the load, and a render whose chain left the site or reached a non-public address SHALL fail and keep nothing of the page it landed on. Downloads, new pages, service workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
 
 #### Scenario: Private address from the page
 - **WHEN** the page's script or stylesheet references `http://169.254.169.254/` or a name that resolves to a private range

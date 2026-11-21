@@ -44,7 +44,7 @@ RUN pip install -r scraper/requirements-dev.txt
 WORKDIR /app/scraper
 CMD ["pytest", "-q"]
 
-# The renderer is its own image (ADR 0105): the browser runs hostile page code, so it never shares an image
+# The renderer is its own image (ADR 0107): the browser runs hostile page code, so it never shares an image
 # with the scraper's credentials. Build: docker build -f scraper/Dockerfile --target renderer-test .
 FROM python:3.12-slim-bookworm AS renderer-base
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PLAYWRIGHT_BROWSERS_PATH=/opt/pw

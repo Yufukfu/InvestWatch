@@ -1,6 +1,6 @@
 """What a block looks like: the statuses and challenge-page markers that end a run as `blocked`.
 
-No dependency on the fetch client, so the renderer image can carry this module next to `addresses` (ADR 0105).
+No dependency on the fetch client, so the renderer image can carry this module next to `addresses` (ADR 0107).
 """
 
 BLOCK_STATUSES = frozenset({403, 429})

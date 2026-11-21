@@ -1,4 +1,4 @@
-# 0105. Playwright renderer as a separate, hardened service
+# 0107. Playwright renderer as a separate, hardened service
 
 - Status: accepted
 - Date: 2026-11-21

@@ -1,6 +1,6 @@
 """Which addresses a request may reach: resolve a host, refuse every internal answer, return the one checked.
 
-No dependency on the fetch client, so the renderer image can carry this one module (ADR 0105). `AddressRefused`
+No dependency on the fetch client, so the renderer image can carry this one module (ADR 0107). `AddressRefused`
 says why; `targets.AddressGuard` maps it to `FetchFailure` for the scraper and the renderer maps it to an aborted
 browser request.
 """

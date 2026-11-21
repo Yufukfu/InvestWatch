@@ -113,7 +113,7 @@ async def _refuse_redirect_away(request: Request, policy: RequestPolicy) -> None
     """Fail the render when any hop of the navigation's redirect chain left the source site or is internal.
 
     Chromium follows redirects inside its network stack, so the route handler sees only the first request (measured,
-    ADR 0105). The hop may already have been requested; what the render keeps is decided here, so nothing the
+    ADR 0107). The hop may already have been requested; what the render keeps is decided here, so nothing the
     redirect led to is ever screenshotted or stored.
     """
     hop: Request | None = request

@@ -3,7 +3,7 @@
 `RequestPolicy` decides, for each request the browser makes, whether it may leave the machine. `confined_page` attaches
 that decision to a Playwright context together with the browser-side switches (websockets, popups; Playwright
 dismisses dialogs itself when nobody listens).
-The checks cannot pin the address Chromium finally connects to, so DNS rebinding stays a residual risk (ADR 0105).
+The checks cannot pin the address Chromium finally connects to, so DNS rebinding stays a residual risk (ADR 0107).
 """
 
 import asyncio
@@ -32,7 +32,7 @@ NO_REALTIME_NETWORK = """
 })();
 """
 LAUNCH_ARGS = (
-    "--no-sandbox",  # ADR 0105: the sandbox does not start under Docker's default seccomp profile
+    "--no-sandbox",  # ADR 0107: the sandbox does not start under Docker's default seccomp profile
     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
     "--disable-quic",
 )
