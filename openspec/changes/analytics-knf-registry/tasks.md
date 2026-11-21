@@ -2,7 +2,7 @@
 
 Rules for every group: `contracts/mocks/`, `contracts/mock-server/` and `registry/seed.csv` are a test double and stay untouched. Tests name `seed.csv` explicitly where they need the fictional firms. Unit tests never touch the network: fetching goes through a `fetcher` the tests replace with saved snapshots in `tests/fixtures/knf/`. The only live check is `pytest -m live`, skipped by default and on CI.
 
-Prerequisite: PR #26 `analytics-worker` and its review fixes are merged, and this branch is rebased on `main` (proposal, Dependencies). If `analytics-m1-m3` landed first, the rebase keeps its `registry.py` methods, and group 3 also applies the short-core guard to its handle identity (design decision 9).
+Base: `origin/analytics/analytics-worker` (PR #26), rebased onto each newer tip the coordinator sends; merged only after PR #26 (proposal, Dependencies). If `analytics-m1-m3` landed first, the rebase keeps its `registry.py` methods, and group 3 also applies the short-core guard to its handle identity (design decision 9).
 
 ## 1. Snapshots, fetching and parsing (≈ 1.5 h)
 
@@ -23,11 +23,11 @@ Prerequisite: PR #26 `analytics-worker` and its review fixes are merged, and thi
 - [ ] 3.2 `registry.py`: longer `_LEGAL_FORMS`, one combined alternation per registry with an alias-to-firm map (same ranking), the short-core guard for bare-word and fuzzy matching, and fuzzy skipped for firms with an exact hit. If `analytics-m1-m3` is on `main`, apply the guard to `_firm_by_handle` and keep its tests green; tests green
 - [ ] 3.3 Mutation check; `mutations: N tried, N caught`
 
-## 4. Optional: curated domains for domestic firms (≈ 0.5 h, only if Damian answers yes to open question 1)
+## 4. Curated domains for domestic firms (≈ 1 h)
 
-- [ ] 4.1 Failing test: every row of `registry/knf_domains_manual.csv` names a firm in `knf.csv`, has `checked_by` and `checked_at`, and its domains are valid hosts that are not social or supervisor hosts
-- [ ] 4.2 Damian fills the rows (main site of each brokerage house and bank brokerage unit); the loader merges them; tests green
-- [ ] 4.3 Mutation check; `mutations: N tried, N caught` (or `mutations: n/a, data only` if 4.1 is the only code)
+- [ ] 4.1 Failing tests: the manual CSV has the columns `name, website_domains, source_url, verified_by_human`; `verified_by_human` is `true` or `false`; `source_url` is an https URL on one of the row's domains; domains are valid hosts that are not social or supervisor hosts; the merge puts them on the firm, and the meta file counts curated (and unverified) domains apart from KNF ones; a row naming no registry firm fails
+- [ ] 4.2 Merge in `knf/build.py`; draft the rows for the 38 domestic firms from official sites checked by hand (the site names the firm and its brokerage activity), all with `verified_by_human` `false`, leaving out a firm whose site cannot be verified; tests green
+- [ ] 4.3 Mutation check; `mutations: N tried, N caught`
 
 ## 5. CLI, safe write and the committed registry (≈ 1.25 h)
 
@@ -36,13 +36,13 @@ Prerequisite: PR #26 `analytics-worker` and its review fixes are merged, and thi
 - [ ] 5.3 Run the loader once against knf.gov.pl by hand (not in tests), review the summary, commit `registry/knf.csv` and `registry/knf.meta.json`; add the `live` marker test
 - [ ] 5.4 Mutation check; `mutations: N tried, N caught`
 
-## 6. Default registry and start-up provenance (≈ 1 h)
+## 6. Default registry, start-up provenance and R1 official name (≈ 1.5 h)
 
-- [ ] 6.1 Failing tests (`tests/test_worker_config.py`, `tests/test_worker.py`) for "Default registry and provenance at start-up": the default path is `registry/knf.csv` (`test_default_registry_path_is_seed` becomes `…_is_knf`), `registry_loaded` with count and `fetched_at`, `registry_seed` only for the seed, `registry_stale` at 45 days with an injected clock, `registry_unverified` without a meta file, and none of them stopping the worker
-- [ ] 6.2 `config.py` default, `worker.py` start-up log, `analytics/Dockerfile` and `analytics/compose.yaml` default `REGISTRY_CSV`, `analytics/.env.example`; check the image still loads the registry (`docker compose run analytics …` or the image's health check); tests green
+- [ ] 6.1 Failing tests (`tests/test_worker_config.py`, `tests/test_worker.py`, `tests/test_rules.py`, `tests/test_registry.py`) for "Default registry and provenance at start-up" and "R1 firm identification": the default path is `registry/knf.csv` (`test_default_registry_path_is_seed` becomes `…_is_knf`), `registry_loaded` with count and snapshot date, no age warning at 45 days, `registry_seed` only for the seed, `registry_unverified` without a meta file, none of them stopping the worker; `find_official_name` on name, name lines and cores only; R1 `uncertain` on an alias-only mention (EFIX/CERES), `pass` when the official form is also present, `pass` on a bank's brokerage-unit line
+- [ ] 6.2 `config.py` default, `worker.py` start-up log, `Registry.find_official_name` and R1 in `rules/m2.py`, `analytics/Dockerfile` and `analytics/compose.yaml` default `REGISTRY_CSV`, `analytics/.env.example`; check the image still loads the registry (`docker compose run analytics …` or the image's health check); tests green
 - [ ] 6.3 Mutation check; `mutations: N tried, N caught`
 
 ## 7. Closing
 
-- [ ] 7.1 Apply the iw-docs-update skill: `analytics/registry/README.md` (both files, KNF attribution and link, refresh command), `analytics/README.md` (`REGISTRY_CSV` default), `.docs/analytics-plan.md` §3 (CSV instead of a table, the seed as fixture), ADR 0311 linked from the code comments, your own domain file in `.docs/status/` only if the coordinator asks; add the iw-ai-log row; run docs-check
+- [ ] 7.1 Apply the iw-docs-update skill: `analytics/registry/README.md` (the three files, KNF attribution and link, the snapshot date, curated domains and `verified_by_human`, refresh command), `analytics/README.md` (`REGISTRY_CSV` default), `.docs/analytics-plan.md` §3 (CSV instead of a table, the seed as fixture), ADR 0311 linked from the code comments, your own domain file in `.docs/status/` only if the coordinator asks; add the iw-ai-log row; run docs-check
 - [ ] 7.2 Run the iw-pr-review skill and fix real findings

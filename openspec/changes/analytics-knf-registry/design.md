@@ -40,7 +40,7 @@ The options were (a) commit `knf.csv`, (b) generate it in the Docker build, or (
 - Options (b) and (c) make `docker compose up` depend on knf.gov.pl being reachable and unchanged. That breaks the on-premise and offline demo, and makes builds non-reproducible. It also puts the worker on the network for a fetch it does not otherwise need. A layout change on KNF's side would then stop the build or the worker instead of failing one manual refresh.
 - A committed file gives deterministic evaluation (plan §8) and reviewable diffs on refresh.
 
-Refresh: `python -m investwatch_analytics.knf --out registry/knf.csv` by hand, then review and commit. The command prints a summary (counts per list, added, removed, renamed, dropped aliases). Staleness is visible: `knf.meta.json` holds `fetched_at`, and the worker warns when it is older than 30 days.
+Refresh: `python -m investwatch_analytics.knf --out registry/knf.csv` by hand, then review and commit. The command prints a summary (counts per list, added, removed, renamed, dropped aliases). The snapshot is frozen at implementation time. `knf.meta.json` holds `fetched_at`, which the worker logs at start-up and `analytics/registry/README.md` states, so the UI can show it later. No age warning: the challenge requires periodic refresh of M1 output, not of the registry.
 
 ### 3. Firm id = uuid5(namespace, normalized current name), carried over on rename
 
@@ -73,7 +73,7 @@ Filters, applied after all firms are built: an alias needs at least 4 letters, a
 
 - No-branch list: host-like tokens in `Dodatkowe informacje` (`www.x.tld`, `x.tld/path`, `https://…`), normalized with the registry's `_normalize_domain`. Excluded are hosts that appear in any record's `Organ nadzoru` cell (the supervisors' sites), the m1-m3 social hosts, and hosts shared by two firms (dropped from both, reported).
 - Other lists: no domains on KNF, so empty.
-- Optional supplement `registry/knf_domains_manual.csv` (`name,website_domains,checked_by,checked_at`), keyed by normalized name and merged by the loader. A row whose name is not in the fetched register fails the run, so a renamed firm is noticed. Whether to curate it (about 38 domestic firms) is open question 1.
+- Curated supplement `registry/knf_domains_manual.csv` (`name,website_domains,source_url,verified_by_human`) for the 38 domestic firms, keyed by normalized name and merged by the loader. These domains are an InvestWatch attribution aid, not KNF data. The agent drafts them only from official sites it can verify (the site names the firm's legal name and its brokerage activity, checked once by hand and never in tests). `source_url` is the page where that was seen, and every drafted row has `verified_by_human` `false` until Damian checks it. The meta file counts curated domains apart from KNF ones. A row whose name is not in the fetched register fails the run, so a renamed firm is noticed.
 
 ### 7. Failure handling: fail closed, never overwrite
 
@@ -90,7 +90,7 @@ A country name missing from the Polish-to-ISO map leaves `country` empty and is 
 
 - `config._DEFAULT_REGISTRY` becomes `registry/knf.csv`. The image already copies `registry/` next to `src/` (PR #26), and the compose default for `REGISTRY_CSV` becomes that path.
 - `uses_seed_registry` and its `registry_seed` warning stay. Tests that need the fictional firms pass `SEED` explicitly, as `test_registry.py`, `test_pipeline.py` and `test_rules.py` already do. `test_default_registry_path_is_seed` becomes `…_is_knf`.
-- At start-up the worker logs `registry_loaded` with the path, firm count and, when `knf.meta.json` sits next to the CSV, `fetched_at`. It warns `registry_stale` when that is older than 30 days, and `registry_unverified` when the CSV is not the seed and has no meta file (a hand-made registry). None of these stop the worker. A missing or malformed CSV still exits 2, as today.
+- At start-up the worker logs `registry_loaded` with the path, firm count and, when `knf.meta.json` sits next to the CSV, `fetched_at`. It warns `registry_unverified` when the CSV is not the seed and has no meta file (a hand-made registry). There is no age warning. None of these stop the worker. A missing or malformed CSV still exits 2, as today.
 
 ### 9. Matching at real scale
 
@@ -100,17 +100,22 @@ With about 750 firms and 2-6 aliases each, `Registry.match` compiles about 3,000
 - **Budget:** a test builds a registry from the saved fixtures (about 70 firms) replicated to 1,000 synthetic firms and matches a 20,000-character text. It must finish in under 1 s on CI, a loose bound that catches a quadratic regression without being flaky.
 - Domain matching is unchanged: firms without domains never match by domain.
 
-### 10. Tests never touch the network
+### 10. R1 checks the official name
+
+ZASÓB R1 asks for "oficjalną nazwę firmy inwestycyjnej". Since the registry now holds former and trade names as aliases, a name match is no longer proof of the official name. `Registry.find_official_name(firm, text)` searches only the official forms: `name`, each ` – `-separated line of it, and their cores without legal forms. R1 passes on that. It is `uncertain` when only `find_name` (any alias) hits, explaining `W materiale użyto nazwy nieoficjalnej/dawnej: „<quote>”; oficjalna nazwa: <name>.` The CSV gains no column: every entry of `aliases` is unofficial by definition, and the official forms are derived from `name`. `find_name` and `match` keep their signatures for `analytics-m1-m3`.
+
+### 11. Tests never touch the network
 
 `fetch.py` exposes `fetch(url) -> str`, and the CLI takes a `fetcher` parameter. Unit tests pass a fake that serves saved snapshots from `tests/fixtures/knf/`. These are trimmed copies of real pages: page 1 of each list, the last no-branch page, the no-branch `?page=99` clamp case, and the summary page. The trimmed copies keep `#entityTable` and the pagination links verbatim and drop the navigation chrome. A failing-path fixture set is derived from them: a renamed label, a missing `entityTable`, an empty list, and a summary without one link. One optional live check (`pytest -m live`, skipped by default and on CI) fetches page 1 of each list and only asserts that the labels are still there.
 
 ## Risks / Trade-offs
 
 - [KNF changes the markup] → decision 7 fails closed and keeps the committed CSV, and the optional live check shows it before a refresh.
-- [Firms with no domain are matched by name only] → name matching covers firm pages and ads that name the firm. Link-host M1 detection (`analytics-m1-m3`) needs domains, which the supplement (open question 1) gives for the domestic firms most often advertised.
+- [Firms with no domain are matched by name only] → name matching covers firm pages and ads that name the firm. Link-host M1 detection (`analytics-m1-m3`) needs domains, which the curated supplement gives the domestic firms.
+- [A drafted curated domain is wrong] → `verified_by_human` `false` and `source_url` on every row, so Damian checks them before relying on them. A wrong domain only routes a page to the wrong firm, and the finding shows the match method and confidence.
 - [Generic aliases cause false M1/M2 routing] → the alias filters (decision 5) and the fuzzy guard (decision 9). The match confidence stays on the finding, so a reviewer sees weak matches. The gold set (plan §8) measures the rest.
 - [A rename without a struck name changes the id] → the refresh summary lists it. Old findings keep their old `registry_id` and the firm name, and no foreign key exists to break.
-- [The committed data goes stale] → `fetched_at` in the meta file, the 30-day `registry_stale` warning, and the refresh command in `analytics/registry/README.md`.
+- [The committed data goes stale] → the snapshot date in the meta file, the start-up log and `analytics/registry/README.md`, and the refresh command there.
 - [~750 firms slow every document] → decision 9 and its budget test.
 - [Conflicts with `analytics-m1-m3` in `registry.py`] → its edits are additive (new methods), while this change edits `_LEGAL_FORMS`, `__init__` and `match`. The second to land rebases, and both test suites run on the result.
 
@@ -120,9 +125,12 @@ With about 750 firms and 2-6 aliases each, `Registry.match` compiles about 3,000
 2. The worker picks up `registry/knf.csv` by default, and no env change is needed. Rollback: set `REGISTRY_CSV=registry/seed.csv`, or revert the commit.
 3. Existing findings keep their seed `registry_id`s. Re-scans produce findings with real ids, and the upsert on `(document_id, module)` replaces them.
 
-## Open Questions
+## Resolved Questions
 
-1. **Curated domains for domestic firms (task group 4):** should Damian hand-curate `knf_domains_manual.csv` for the 38 domestic firms (brokerage houses and banks' brokerage units, for example the broker's main site)? Recommended: yes, because without it link-host M1 detection and domain-based M2 matching never fire for any Polish firm. It is about 30 minutes of work, and every row needs a human check.
-2. **Former names as aliases:** a page still using a firm's old name is most likely that firm, but an old name may now belong to someone else. Keep former names as aliases (recommended), or keep them only for id carry-over?
-3. **Stale threshold:** 30 days for `registry_stale`, or no warning at all for the hackathon?
-4. **Refresh before hand-in:** run the loader once more on Sun morning before 10:30 and commit, or freeze the CSV at implementation time?
+Answered by Damian on 2026-11-21, checked against the challenge documents:
+
+1. **Curated domains for domestic firms:** yes, as `knf_domains_manual.csv` drafted by the agent from verifiable official sites, each row with `verified_by_human` `false` until Damian checks it (decision 6).
+2. **Former names:** kept as aliases for matching. R1 passes only on the official name; an alias-only mention is `uncertain` with "w materiale użyto nazwy nieoficjalnej/dawnej" (decision 10).
+3. **Stale warning:** none. The Opis only requires periodic refresh of M1 output (decision 8).
+4. **Refresh before hand-in:** no. The snapshot is frozen at implementation time, and its date is in the start-up log and the README.
+5. **Scope of types:** `type` stays faithful to the KNF list. M2 covers firms registered in Poland, including Polish branches of foreign firms, and foreign firms without a branch are M1 (Opis p.1). The annex definition of "zagraniczna firma inwestycyjna" includes foreign credit institutions, which stay on the foreign lists with their list's type.

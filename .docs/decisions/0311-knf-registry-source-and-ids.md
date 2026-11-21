@@ -28,7 +28,7 @@ Option 1 for the source and option 1 for the id. The loader (`python -m investwa
 
 ## Consequences
 
-- The default registry is real with no network at build or run time. Staleness is handled by the refresh command, `fetched_at` in the meta file and a start-up warning after 30 days.
+- The default registry is real with no network at build or run time. The snapshot is frozen at implementation time; its date (`fetched_at` in the meta file) is logged at start-up and stated in the registry README, and a refresh is a manual loader run.
 - A KNF rename without a struck former name yields a new id. Old findings keep the old id and the firm name. The refresh summary lists such cases.
 - A KNF markup change breaks only the manual refresh, never the running system. The parser then needs an update.
 - Domestic firms have no domain on KNF, so domain matching for them needs the optional hand-curated supplement (`knf_domains_manual.csv`).

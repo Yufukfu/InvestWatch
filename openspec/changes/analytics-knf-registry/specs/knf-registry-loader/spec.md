@@ -92,7 +92,7 @@ The loader SHALL generate aliases from each name line: the line itself, its core
 - **THEN** that alias is dropped and counted, and the firm keeps its full name
 
 ### Requirement: Firm domains
-The loader SHALL take a firm's `website_domains` from host-like tokens in its `Dodatkowe informacje`, normalized like `Registry` does. It SHALL exclude hosts that appear in any record's `Organ nadzoru` cell, social-platform hosts, and hosts that two firms share. A firm without domains SHALL have an empty `website_domains`. When `registry/knf_domains_manual.csv` exists, its domains SHALL be merged by normalized name. A manual row whose name is not in the register SHALL fail the run.
+The loader SHALL take a firm's `website_domains` from host-like tokens in its `Dodatkowe informacje`, normalized like `Registry` does. It SHALL exclude hosts that appear in any record's `Organ nadzoru` cell, social-platform hosts, and hosts that two firms share. A firm without domains SHALL have an empty `website_domains`. Domains from `registry/knf_domains_manual.csv` (columns `name, website_domains, source_url, verified_by_human`) SHALL be merged by normalized name. They are curated by the team, not published by KNF, so each row SHALL name the firm's official page it was checked on and SHALL carry `verified_by_human` `true` or `false`, and the meta file SHALL count curated domains apart from KNF ones. A manual row whose name is not in the register SHALL fail the run.
 
 #### Scenario: Domains from trade-name notes
 - **WHEN** `Dodatkowe informacje` lists `www.50k.trade [od 10.05.2024] www.50coins.com`
@@ -105,6 +105,10 @@ The loader SHALL take a firm's `website_domains` from host-like tokens in its `D
 #### Scenario: Empty domains
 - **WHEN** a brokerage house has no notes and no manual row
 - **THEN** its `website_domains` cell is empty, and `Registry.from_csv` loads it with no domains
+
+#### Scenario: Curated domain marked unverified
+- **WHEN** a manual row for `mBANK S.A. – Biuro Maklerskie mBank` lists `mbank.pl` with `verified_by_human` `false`
+- **THEN** the firm's `website_domains` holds `mbank.pl`, and `knf.meta.json` counts it as a curated, unverified domain
 
 #### Scenario: Stale manual row
 - **WHEN** `knf_domains_manual.csv` names a firm that is not in the fetched register
@@ -126,16 +130,20 @@ The loader SHALL write `knf.csv` with exactly the columns `id, name, aliases, ty
 - **THEN** the old `knf.csv` is still complete and loadable
 
 ### Requirement: Default registry and provenance at start-up
-The default `REGISTRY_CSV`, in code and in the container, SHALL be `registry/knf.csv`. `registry/seed.csv` SHALL stay the fictional fixture whose ids match `contracts/mocks`, and the loader SHALL never write it. At start-up the worker SHALL log the registry path, the firm count and, when `knf.meta.json` is present, `fetched_at`. It SHALL warn `registry_seed` when the seed is in use, `registry_stale` when `fetched_at` is older than 30 days, and `registry_unverified` when a non-seed CSV has no meta file. None of these warnings SHALL stop the worker.
+The default `REGISTRY_CSV`, in code and in the container, SHALL be `registry/knf.csv`, a snapshot frozen at implementation time and refreshed only by running the loader by hand. `registry/seed.csv` SHALL stay the fictional fixture whose ids match `contracts/mocks`, and the loader SHALL never write it. At start-up the worker SHALL log `registry_loaded` with the registry path, the firm count and, when `knf.meta.json` sits next to the CSV, its `fetched_at` as the snapshot date, so that it can be shown to users later. It SHALL warn `registry_seed` when the seed is in use, and `registry_unverified` when a non-seed CSV has no meta file. It SHALL NOT warn about the snapshot's age. None of these warnings SHALL stop the worker.
 
 #### Scenario: Default is the real registry
 - **WHEN** the worker starts without `REGISTRY_CSV`
-- **THEN** it loads `registry/knf.csv` and logs `registry_loaded` with its firm count and `fetched_at`, and does not log `registry_seed`
+- **THEN** it loads `registry/knf.csv` and logs `registry_loaded` with its firm count and snapshot date, and does not log `registry_seed`
 
 #### Scenario: Seed chosen explicitly
 - **WHEN** `REGISTRY_CSV` points to `registry/seed.csv`
 - **THEN** the worker starts and logs the `registry_seed` warning
 
-#### Scenario: Stale registry
+#### Scenario: Old snapshot
 - **WHEN** `knf.meta.json` says `fetched_at` is 45 days before now
-- **THEN** the worker starts and logs `registry_stale` with the age in days
+- **THEN** the worker starts, logs `registry_loaded` with that date, and logs no warning about its age
+
+#### Scenario: Hand-made registry without provenance
+- **WHEN** `REGISTRY_CSV` points to a CSV that is not the seed and has no `knf.meta.json` next to it
+- **THEN** the worker starts and logs `registry_unverified`
