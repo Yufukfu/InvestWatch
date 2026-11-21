@@ -39,10 +39,17 @@ class Ingestor:
         self.pool, self.storage, self.redis, self.stream = pool, storage, redis, stream
 
     async def ingest(
-        self, page: dict, source: Source, *, fetched_at: datetime, duration_ms: int, proxy: str | None
+        self,
+        page: dict,
+        source: Source,
+        *,
+        fetched_at: datetime,
+        duration_ms: int,
+        proxy: str | None,
+        author: dict | None = None,
     ) -> IngestResult:
         try:
-            doc = build_document(page, source, fetched_at=fetched_at, duration_ms=duration_ms, proxy=proxy)
+            doc = build_document(page, source, fetched_at=fetched_at, duration_ms=duration_ms, proxy=proxy, author=author)
         except UnicodeError:  # e.g. a lone surrogate in the text: it cannot be hashed or stored
             return await self._fail(JobError(Reason.SCHEMA_INVALID, "text is not valid unicode", source.id))
         invalid = check_document(doc)

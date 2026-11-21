@@ -1,7 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import type { ReactNode } from 'react';
 import { Provider } from 'react-redux';
-import { investWatchApi } from '../api/generated';
+import { api as investWatchApi } from '../api/enhanced';
 
 // A fresh store per call so RTK Query cache does not leak between tests.
 export function makeStore() {

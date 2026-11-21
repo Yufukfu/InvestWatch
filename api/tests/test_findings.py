@@ -138,6 +138,8 @@ def test_sort_by_score(client, seeded):
 
 
 def test_risk_filter_uses_the_same_rule(client, migrated_db):
+    # the rule, not the defaults (ADR 0316 moved M2's default): pin M2 at 0.5
+    client.put("/api/settings/thresholds", json={"M1": 0.6, "M2": 0.5, "M3": 0.7})
     docs = [document_row() for _ in range(4)]
     _insert(migrated_db.app_url, docs, [finding_row(d["id"], module="M2", score=s)
                                         for d, s in zip(docs, (0.5, 0.49, 0.3, 0.29))])

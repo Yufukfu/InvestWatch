@@ -4,7 +4,7 @@ Dashboard: findings with filters, trend charts, real-time alerts, threshold cali
 
 - **Owner:** Kacper
 - **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), Vitest with MSW as the test-only network fake.
-- **Status:** foundation (app shell, generated client, container), data from the backend only and the trend chart (Recharts, hourly or daily buckets). Other features come next.
+- **Status:** foundation (app shell, generated client, container), data from the backend only, the trend chart (Recharts, hourly or daily buckets) and the findings workspace: filters, sort and paging in the URL (shareable links), a detail panel with the failed rules and their legal basis, and status change. Alerts and the calibration panel come next.
 
 ## Run
 

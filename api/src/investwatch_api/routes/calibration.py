@@ -1,8 +1,9 @@
 """GET /calibration?module= : precision/recall per threshold for the calibration panel.
 
-Computed from analyst labels on the module's findings (`confirmed` = positive, `false_positive` = negative,
-integration-plan §5). Without labels, the latest run stored in `calibration_points` (analytics eval, gold set)
-is returned instead.
+Analyst labels on the module's findings (`confirmed` = positive, `false_positive` = negative, integration-plan
+§5) plus the latest run stored in `calibration_points` (analytics gold-set evaluation, ADR 0312): their counts are
+summed per threshold and the ratios recomputed, so one or two labels never replace the gold curve. With only one
+source, that source is returned as it is.
 """
 
 from __future__ import annotations
@@ -20,14 +21,16 @@ GRID = tuple(round(0.05 * i, 2) for i in range(1, 20))  # 0.05 .. 0.95, as in co
 LABELS = {"confirmed": True, "false_positive": False}
 
 
-def curve(labeled: list[tuple[float, bool]]) -> list[dict]:
-    """One point per threshold; `labeled` is (score, is_positive)."""
+def curve(labeled: list[tuple[float, bool]], base: dict[float, tuple[int, int, int, int]] | None = None) -> list[dict]:
+    """One point per threshold; `labeled` is (score, is_positive); `base` adds stored (tp, fp, fn, tn) per threshold."""
+    base = base or {}
     points = []
     for t in GRID:
-        tp = sum(1 for s, pos in labeled if pos and s >= t)
-        fp = sum(1 for s, pos in labeled if not pos and s >= t)
-        fn = sum(1 for s, pos in labeled if pos and s < t)
-        tn = sum(1 for s, pos in labeled if not pos and s < t)
+        btp, bfp, bfn, btn = base.get(t, (0, 0, 0, 0))
+        tp = btp + sum(1 for s, pos in labeled if pos and s >= t)
+        fp = bfp + sum(1 for s, pos in labeled if not pos and s >= t)
+        fn = bfn + sum(1 for s, pos in labeled if pos and s < t)
+        tn = btn + sum(1 for s, pos in labeled if not pos and s < t)
         precision = tp / (tp + fp) if tp + fp else 1.0  # nothing predicted positive: no false alarms
         recall = tp / (tp + fn) if tp + fn else 0.0
         f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
@@ -44,9 +47,12 @@ async def calibration(module: Module, request: Request):
         rows = await conn.execute(select(findings.c.score, findings.c.status)
                                   .where(findings.c.module == module, findings.c.status.in_(sorted(LABELS))))
         labeled = [(score, LABELS[status]) for score, status in rows]
-        stored = [] if labeled else (await conn.execute(latest_calibration_run(module))).mappings().all()
+        stored = (await conn.execute(latest_calibration_run(module))).mappings().all()
     if labeled:
-        points, samples = curve(labeled), len(labeled)
+        # Keyed by threshold: curve() reads only grid thresholds, so a stored point off the grid is ignored.
+        base = {r["threshold"]: (r["tp"], r["fp"], r["fn"], r["tn"]) for r in stored}
+        points = curve(labeled, base)
+        samples = len(labeled) + (stored[0]["labeled_samples"] if stored else 0)
     else:
         points = []
         for r in stored:
