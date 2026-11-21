@@ -4,9 +4,9 @@ Layout: `.claude/skills/iw-watch/` with `SKILL.md`, `scripts/watch.mjs`, `script
 
 ## 1. CODEOWNERS and owner resolution
 
-- [ ] 1.1 Write the failing test `codeowners.test.mjs`: last match wins, directory and glob patterns, no match, missing file, unknown syntax fails closed; run it and confirm it fails because the module does not exist
-- [ ] 1.2 Add `.github/CODEOWNERS` (`scraper/` hen68, `web/` and `infra/` kacpermalczyk, `analytics/` `api/` `contracts/` Yufukfu) and `lib/codeowners.mjs`; verify the test passes and `node -e` resolves `infra/compose.yaml` to `kacpermalczyk`
-- [ ] 1.3 Mutation check for this group: last-match order, directory prefix boundary (`web/` vs `web-old/`), fail-closed branch. Write the result on this line: `mutations: _ tried, _ caught`
+- [x] 1.1 Write the failing test `codeowners.test.mjs`: last match wins, directory and glob patterns, no match, missing file, unknown syntax fails closed; run it and confirm it fails because the module does not exist
+- [x] 1.2 Add `.github/CODEOWNERS` (`scraper/` hen68, `web/` and `infra/` kacpermalczyk, `analytics/` `api/` `contracts/` Yufukfu) and `lib/codeowners.mjs`; verify the test passes and `node -e` resolves `infra/compose.yaml` to `kacpermalczyk`
+- [x] 1.3 Mutation check for this group: last-match order, directory prefix boundary (`web/` vs `web-old/`), fail-closed branch. Write the result on this line: `mutations: 9 tried, 9 caught`
 
 ## 2. State, lock and round count
 
