@@ -63,7 +63,7 @@ Signals (each with a weight and evidence in `rules`):
 | S1.6 | author ≠ firm (handle/domain does not belong to the firm) | comparison with the registry |
 
 `score = σ(w·x)` with hand-tuned weights, calibrated on the gold set.
-Output matches the UKNF requirement: **firm, advertiser, content, URL** + periodic refresh (a document from the same URL ⇒ the finding is updated, not duplicated).
+Output matches the UKNF requirement: **firm, advertiser, content, URL** + periodic refresh: a re-analysis of the same document updates its finding; a changed page is a new document and gets a new finding (key `(document_id, module)`, `api-db-schema`). Grouping a URL's findings is a follow-up for the API or UI.
 Note: a missing ad label on promotional content is also a failure of rule R2 – M1 can share rules with M2.
 
 ## 5. Module M2 – risk information compliance (18 UKNF rules)

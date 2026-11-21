@@ -14,10 +14,10 @@
 
 ## 3. Compose, docs and follow-ups
 
-- [ ] 3.1 `analytics/compose.yaml`: `networks: [data]`, a commented `REGISTRY_CSV` slot; README and `.env.example` registry note
-- [ ] 3.2 `.docs/analytics-plan.md` §4 dedup line, `.docs/security-audit.md` worker entry and fresh `pip-audit`, `.docs/status/platform.md` (stale line, registry note), `.docs/INDEX.md` router row
-- [ ] 3.3 `follow-ups.md` with every review item and its disposition (KNF loader, URL grouping, threshold crossing on re-analysis, clean pages at score 0, schema drift automation)
-- [ ] 3.4 Mutation check; `mutations: n/a, docs and config only`
+- [x] 3.1 `analytics/compose.yaml`: `networks: [data]`, a commented `REGISTRY_CSV` slot; README and `.env.example` registry note
+- [x] 3.2 `.docs/analytics-plan.md` §4 dedup line, `.docs/security-audit.md` worker entry and fresh `pip-audit`, `.docs/status/platform.md` (stale line, registry note), `.docs/INDEX.md` router row
+- [x] 3.3 `follow-ups.md` with every review item and its disposition (KNF loader, URL grouping, threshold crossing on re-analysis, clean pages at score 0, schema drift automation)
+- [x] 3.4 Mutation check; `mutations: n/a, docs and config only`
 
 ## 4. Closing
 
