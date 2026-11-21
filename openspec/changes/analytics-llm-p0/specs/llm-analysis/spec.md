@@ -1,11 +1,12 @@
 ## ADDED Requirements
 
 ### Requirement: Env-only LLM configuration
-Analytics SHALL configure the LLM only from environment variables: `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_S`, `LLM_DOC_BUDGET_S`, `LLM_CHUNK_CHARS`, `LLM_MAX_CHUNKS`, `LLM_CACHE_TTL_S`, `LLM_BREAKER_FAILURES` and `LLM_BREAKER_COOLDOWN_S`. With `LLM_BASE_URL` empty or unset the LLM SHALL be disabled and analysis SHALL run rules-only. A set `LLM_BASE_URL` with an empty `LLM_MODEL`, a non-numeric or non-positive limit, or a `LLM_DOC_BUDGET_S` whose milliseconds are not below the worker's `CLAIM_MIN_IDLE_MS` SHALL be a configuration error that names the variable. The API key SHALL never appear in logs or error messages.
+Analytics SHALL configure the LLM only from environment variables (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` and the limits below). With `LLM_BASE_URL` empty or unset the LLM SHALL be disabled and analysis SHALL run rules-only. A bad value SHALL be a configuration error that names the variable, and the API key SHALL never appear in logs or error messages.
 
 #### Scenario: LLM disabled by default
 - **WHEN** `LLM_BASE_URL` is unset and a document is analyzed
 - **THEN** no HTTP request is made and every finding has `model.llm = null`
+- **AND** the limits SHALL be `LLM_TIMEOUT_S`, `LLM_DOC_BUDGET_S`, `LLM_CHUNK_CHARS`, `LLM_MAX_CHUNKS`, `LLM_CACHE_TTL_S`, `LLM_BREAKER_FAILURES` and `LLM_BREAKER_COOLDOWN_S`, each a positive number
 
 #### Scenario: Model missing
 - **WHEN** `LLM_BASE_URL` is set and `LLM_MODEL` is empty
@@ -14,6 +15,7 @@ Analytics SHALL configure the LLM only from environment variables: `LLM_BASE_URL
 #### Scenario: Budget longer than the claim idle time
 - **WHEN** `LLM_DOC_BUDGET_S=90` and `CLAIM_MIN_IDLE_MS=60000`
 - **THEN** startup fails with an error naming `LLM_DOC_BUDGET_S`
+- **AND** `LLM_DOC_BUDGET_S` in milliseconds SHALL be below the worker's `CLAIM_MIN_IDLE_MS`
 
 #### Scenario: Key never logged
 - **WHEN** a request with `LLM_API_KEY=sk-test-123` fails with HTTP 401
@@ -61,11 +63,12 @@ The engine SHALL ask the LLM only about checks whose catalogue entry has an `llm
 - **THEN** the R17 verdict is merged and the R2 item is ignored
 
 ### Requirement: Validated response with verified quotes
-The response content SHALL be a JSON object `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}` validated per item with Pydantic. An item is invalid when `result` is outside the check's allowed results, `explanation` is not a string of at most 500 characters, or `evidence_quote` is neither null nor a string of at most 400 characters. An invalid item SHALL be dropped and that check SHALL keep its rules-only result. An `evidence_quote` SHALL be accepted only when it is at least 8 characters long and occurs verbatim in the chunk sent (or whitespace-insensitively, mapped back to the exact original span). A `fail` or `uncertain` verdict without an accepted quote, or any verdict whose given quote is not accepted, SHALL become `uncertain` with `evidence: null` and a Polish explanation that the quote could not be confirmed. Accepted evidence SHALL be a verbatim substring of the document `text`.
+The response content SHALL be a JSON object `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}` validated per item with Pydantic; an invalid item SHALL be dropped and its check keeps the rules-only result. An `evidence_quote` SHALL be accepted only when it is at least 8 characters long and occurs in the chunk sent; otherwise the verdict SHALL become `uncertain` with `evidence: null`. Accepted evidence SHALL be a verbatim substring of the document `text`.
 
 #### Scenario: Hallucinated quote
 - **WHEN** the stub answers R17 `fail` with `evidence_quote` `Produkt zatwierdzony przez KNF`, which is not in the document
 - **THEN** R17 is `uncertain` with `evidence: null` and an explanation that the quote was not confirmed
+- **AND** the explanation SHALL be in Polish
 
 #### Scenario: Trivial quote
 - **WHEN** the stub answers R17 `fail` with `evidence_quote` `KNF`
@@ -74,21 +77,25 @@ The response content SHALL be a JSON object `{"results": [{"rule_id", "result", 
 #### Scenario: Valid verdict
 - **WHEN** the stub answers R17 `fail` with a quote that occurs in the document
 - **THEN** R17 is `fail`, `evidence` is that exact substring, and `method` is `hybrid`
+- **AND** a quote that differs only in whitespace SHALL be mapped back to the exact original span
 
 #### Scenario: Result outside the allowed set
 - **WHEN** the stub answers `{"rule_id": "R17", "result": "maybe", …}`
 - **THEN** that item is dropped and R17 keeps its rules-only result
+- **AND** an item SHALL also be invalid when `explanation` is not a string of at most 500 characters or `evidence_quote` is neither null nor a string of at most 400 characters
 
 #### Scenario: Pass without quote
 - **WHEN** the stub answers R18 `pass` with `evidence_quote: null` for a deferred R18
 - **THEN** R18 is `pass` with `evidence: null` and `method: hybrid`
+- **AND** a `fail` or `uncertain` verdict without an accepted quote, or any verdict whose given quote is not accepted, SHALL become `uncertain`
 
 ### Requirement: Degrade to rules-only on any LLM failure
-A connection error, a timeout after `LLM_TIMEOUT_S`, an HTTP status of 429, 401, 403 or 5xx, a body that is not chat-completions JSON, content that is not a JSON object, a missing `results` list, or an exhausted `LLM_DOC_BUDGET_S` SHALL NOT fail the document. The affected module's checks SHALL keep their rules-only results, the finding SHALL be produced and saved as usual, and a log line SHALL name the reason (`llm_unavailable`, `llm_timeout`, `llm_malformed`, `llm_budget_exhausted`) without document text. When any chunk of a module's call fails, all of that module's verdicts SHALL be dropped.
+No LLM failure SHALL fail the document: the affected module's checks SHALL keep their rules-only results, the finding SHALL be produced and saved as usual, and a log line SHALL name the reason (`llm_unavailable`, `llm_timeout`, `llm_malformed`, `llm_budget_exhausted`) without document text. When any chunk of a module's call fails, all of that module's verdicts SHALL be dropped.
 
 #### Scenario: LLM down
 - **WHEN** `LLM_BASE_URL` points to a closed port and `m2-alfa-landing` is analyzed
 - **THEN** the M2 finding is produced with the rules-only results, `model.llm = null`, and the log reason `llm_unavailable`
+- **AND** a failure SHALL be a connection error, a timeout after `LLM_TIMEOUT_S`, HTTP 429, 401, 403 or 5xx, a body that is not chat-completions JSON, content that is not a JSON object, a missing `results` list, or an exhausted `LLM_DOC_BUDGET_S`
 
 #### Scenario: Timeout
 - **WHEN** the stub sleeps longer than `LLM_TIMEOUT_S` before answering
@@ -122,30 +129,34 @@ After `LLM_BREAKER_FAILURES` consecutive unavailable outcomes (connection error,
 - **THEN** later documents call the endpoint again
 
 ### Requirement: Chunking with worst chunk wins
-Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into chunks of at most that many characters, consecutive chunks overlapping by four sentences (R3 `window` plus `borderline_margin`); a single longer sentence SHALL be cut at the limit. At most `LLM_MAX_CHUNKS` chunks SHALL be sent; the rest SHALL be logged as `llm_truncated` and judged by the rules only. Each chunk is one request. Per check the merged verdict SHALL be the worst across chunks (`fail` > `uncertain` > `pass` > `not_applicable`), with its evidence and explanation from that chunk and ties going to the earliest chunk.
+Text longer than `LLM_CHUNK_CHARS` SHALL be split on sentence boundaries into chunks of at most that many characters, consecutive chunks overlapping by four sentences (R3 `window` plus `borderline_margin`). At most `LLM_MAX_CHUNKS` chunks SHALL be sent, one request each. Per check the merged verdict SHALL be the worst across chunks (`fail` > `uncertain` > `pass` > `not_applicable`), with its evidence and explanation from that chunk.
 
 #### Scenario: Worst chunk wins
 - **WHEN** chunk 1 answers R17 `pass` and chunk 2 answers R17 `fail` with a verified quote from chunk 2
 - **THEN** R17 is `fail` with chunk 2's quote
+- **AND** ties SHALL go to the earliest chunk
 
 #### Scenario: Claim and warning on a chunk border
 - **WHEN** a return claim is the last sentence of chunk 1 and its warning is the next sentence
 - **THEN** chunk 2 starts with the last four sentences of chunk 1, so both appear in one request
+- **AND** a single sentence longer than `LLM_CHUNK_CHARS` SHALL be cut at the limit
 
 #### Scenario: Too long
 - **WHEN** the text needs six chunks and `LLM_MAX_CHUNKS=4`
 - **THEN** four requests are sent and the log says `llm_truncated`
+- **AND** the text beyond the cap SHALL be judged by the rules only
 
 #### Scenario: Short text
 - **WHEN** the text is shorter than `LLM_CHUNK_CHARS`
 - **THEN** exactly one request per module is sent
 
 ### Requirement: Response cache in Redis
-The judge SHALL cache each fully valid chunk response in Redis under a key derived from `(content_hash, prompt_version, model)` plus module, chunk index, chunk count and the sorted requested rule ids, with TTL `LLM_CACHE_TTL_S`. `content_hash` SHALL be analytics' own preprocessing hash; `prompt_version` SHALL be derived from a hash of the rendered system prompt. A cache hit SHALL make no HTTP request and SHALL re-run quote verification. Errors and malformed answers SHALL NOT be cached. A Redis error SHALL be treated as a cache miss (or a skipped write), logged and never raised. Without a Redis client (CLI) no cache is used.
+The judge SHALL cache each fully valid chunk response in Redis under a key derived from `(content_hash, prompt_version, model)` plus module, chunk index, chunk count and the sorted requested rule ids, with TTL `LLM_CACHE_TTL_S`. A cache hit SHALL make no HTTP request and SHALL re-run quote verification. Errors and malformed answers SHALL NOT be cached, and a Redis error SHALL never fail the document.
 
 #### Scenario: Re-scan is free
 - **WHEN** the same document is analyzed twice with the same model and catalogue
 - **THEN** the stub receives requests only during the first analysis and both findings have the same rule results
+- **AND** `content_hash` SHALL be analytics' own preprocessing hash
 
 #### Scenario: Model swap misses the cache
 - **WHEN** a document is analyzed with `LLM_MODEL=gpt-4o-mini`, then with `LLM_MODEL=gemma3:4b`
@@ -154,6 +165,7 @@ The judge SHALL cache each fully valid chunk response in Redis under a key deriv
 #### Scenario: Question edited
 - **WHEN** an `llm.question` in the catalogue changes between two analyses of the same document
 - **THEN** the prompt version differs and the second analysis sends new requests
+- **AND** `prompt_version` SHALL be derived from a hash of the rendered system prompt
 
 #### Scenario: Malformed answer not cached
 - **WHEN** the first analysis gets a malformed answer and the second a valid one
@@ -162,21 +174,26 @@ The judge SHALL cache each fully valid chunk response in Redis under a key deriv
 #### Scenario: Redis down
 - **WHEN** the Redis client raises a connection error on cache read and write
 - **THEN** the LLM is called, the verdicts are used and the document is not failed
+- **AND** a Redis error SHALL be treated as a cache miss (or a skipped write) and logged; without a Redis client (CLI) no cache is used
 
 ### Requirement: LLM seam for any module's catalogue
-Any catalogue entry (M1, M2 or M3) SHALL be able to declare `llm: {question: <non-empty string>, when: always | uncertain}` (`when` defaults to `uncertain`); loading SHALL reject an empty question or another `when`. `run_rules(catalogue, ctx, judge=None, module=…, module_context=…)` SHALL collect deferred checks (`when: always` → whenever the rule applies; `uncertain` → when the rules-only result is `uncertain`; a rule class MAY override this decision), make at most one judge call per module (one request per chunk), and merge verdicts by replacing result, evidence and explanation and setting `method` to `hybrid` when the rules-only result had evidence, else `llm`. Calling `run_rules` without a judge SHALL behave exactly as rules-only. The judge interface (`SemanticCheck`, `LlmVerdict`, `JudgeOutcome`, `LlmJudge`) SHALL live in one module that M1/M3 code imports, so adding LLM refinement to an M1/M3 signal needs only a YAML `llm:` block and passing the judge, not a change to the signal's rule class.
+Any catalogue entry (M1, M2 or M3) SHALL be able to declare `llm: {question, when}`. `run_rules(catalogue, ctx, judge=None, module=…, module_context=…)` SHALL collect the deferred checks, make at most one judge call per module (one request per chunk) and merge the verdicts; without a judge it SHALL behave exactly as rules-only. Adding LLM refinement to an M1/M3 signal SHALL need only a YAML `llm:` block and passing the judge, not a change to its rule class.
 
 #### Scenario: Signal refined by YAML only
 - **WHEN** a test catalogue for module M3 has an entry `S3.3` with a rule class that returns `uncertain` and an `llm:` block with `when: uncertain`, and a fake judge answers `fail` with a verified quote
 - **THEN** S3.3 is `fail` with that quote and `method: llm`, and the rule class was not modified
+- **AND** the merge SHALL replace result, evidence and explanation, setting `method` to `hybrid` when the rules-only result had evidence and `llm` otherwise
+- **AND** the judge interface (`SemanticCheck`, `LlmVerdict`, `JudgeOutcome`, `LlmJudge`) SHALL live in one module that M1/M3 code imports
 
 #### Scenario: Always-asked signal
 - **WHEN** an entry has `when: always` and its rule returns `pass`
 - **THEN** the check is sent to the judge
+- **AND** `when: always` SHALL defer whenever the rule applies and `when: uncertain` (the default) when the rules-only result is `uncertain`; a rule class MAY override this decision
 
 #### Scenario: Bad llm block
 - **WHEN** an entry has `llm: {question: "", when: sometimes}`
 - **THEN** loading fails with a catalogue error naming the entry
+- **AND** loading SHALL reject an empty question, another `when`, a non-mapping block and unknown keys
 
 #### Scenario: No judge
 - **WHEN** `run_rules` is called without a judge on a catalogue with `llm:` blocks

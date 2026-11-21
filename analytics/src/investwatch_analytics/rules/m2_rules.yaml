@@ -5,8 +5,14 @@
 # A pattern that starts with `\d+` gets `(?<!\d)` so it is tried once per number, not once per digit
 # (quadratic on a long digit run otherwise; see tests/test_rules_m2_p0.py, adversarial input).
 # Dictionaries shared by several rules (YAML anchors); the loader reads only `rules`.
-# A pattern that starts with `\d+` gets `(?<!\d)` so it is tried once per number, not once per digit
-# (quadratic on a long digit run otherwise; see tests/test_rules_m2_p0.py, adversarial input).
+shared:
+  past_performance_disclaimers: &past_performance_disclaimers
+    - '\bwynik\w*\s+(?:historyczn\w*|osiągnięt\w*\s+w\s+przeszłości|z\s+przeszłości)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+    - '\bhistoryczn\w*\s+(?:wynik\w*|stop\w*\s+zwrotu)\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+    - '\b(?:past|historical)\s+(?:performance|results?|returns?)\b.{0,60}?\b(?:is not|are not|does not|do not|isn.t|aren.t|not a|no guarantee)\b'
+    - '\b(?:osiągnięt\w*\s+w\s+przeszłości|historyczn\w*|przeszł\w*)\s+wynik\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
+    - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
+
 rules:
   - id: R1
     name: Identyfikacja firmy
@@ -63,7 +69,8 @@ rules:
         - '\b(?:prowizj|opłat|podat|marż)\w*\s+\d+(?:[.,]\d+)?\s?%'
         - '\b100\s?%\s+(?:online|bezpieczn\w*|za darmo|darmow\w*)'
         - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s*(?:prowizj\w*|opłat\w*|marż\w*|podatk\w*|commission|fees?)'
-      risk_patterns: &risk_patterns        - '\bstra(?:t[aęyo]|ci|ć)\w*'
+      risk_patterns: &risk_patterns
+        - '\bstra(?:t[aęyo]|ci|ć)\w*'
         - '\bryzyk\w*'
         - '\butrat\w*'
         - '\brisk\w*'
