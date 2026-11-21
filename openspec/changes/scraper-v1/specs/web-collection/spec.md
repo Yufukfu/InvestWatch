@@ -1,20 +1,16 @@
 # Spec Delta
 
 ## Purpose
-Turn an active registered web source into the parsed fields of a `ScrapedDocument` (`.docs/integration-plan.md` §3, `contracts/schemas/scraped-document.schema.json`), or into a recorded job error when the page cannot be trusted. Terms: a *job* is one enqueued unit of work for a source; an *attempt* is one execution of a job by the queue (the queue may make several); a *run* is the fetching done by one attempt, and a *session* is the state of one run. In v1 a run fetches exactly one URL per source (plus its redirects and `robots.txt`); crawling further pages is a later change.
+Turn an active registered web source into the parsed fields of a `ScrapedDocument` (`.docs/integration-plan.md` §3, `contracts/schemas/scraped-document.schema.json`), or into a recorded job error when the page cannot be trusted. Terms: a *job* is one enqueued unit of work for a source; an *attempt* is one execution of a job by the queue (the queue may make several; the queue itself is `scraper-orchestration`); a *run* is the fetching done by one attempt, and a *session* is the state of one run. In v1 a run fetches exactly one URL per source (plus its redirects and `robots.txt`); crawling further pages is a later change.
 
 ## ADDED Requirements
 
 ### Requirement: Collect active sources only
-The scraper SHALL collect a source only when its `sources` row has `active = true` and `platform = web`, checked again when the run starts. A source with `schedule_cron = null` is manual only: it runs on a scan request and never by the scheduler.
+A source SHALL be collectable only when its record has `active = true` and `platform = web`. Selection is a pure function over source records (reading them from PostgreSQL and re-checking at job start belong to `scraper-orchestration`). A source with `schedule_cron = null` is manual only: it is never selected for scheduled runs.
 
 #### Scenario: Inactive source is skipped
 - **WHEN** a run starts and the source has `active = false`
 - **THEN** no request is made to that source's URL
-
-#### Scenario: Source deactivated after enqueue
-- **WHEN** a job was enqueued for an active source and the source is deactivated before the job starts
-- **THEN** the job makes no request
 
 #### Scenario: Non-web source is skipped
 - **WHEN** a run starts for an active source with a `platform` other than `web`
@@ -22,7 +18,7 @@ The scraper SHALL collect a source only when its `sources` row has `active = tru
 
 #### Scenario: Manual-only source is not scheduled
 - **WHEN** the scheduler plans runs and an active web source has `schedule_cron = null`
-- **THEN** it is not scheduled
+- **THEN** it is not selected for scheduled runs
 
 ### Requirement: Parse a fetched page into contract fields
 For a successful fetch the scraper SHALL produce the contract fields `url`, `canonical_url`, `fetched_at` (UTC), `http_status`, `title`, `text`, `links`, `platform`, `source_kind` and `scrape_meta`. `source_kind` SHALL be copied from the `sources` row, never inferred from the page.
@@ -100,7 +96,7 @@ The scraper SHALL record a job error with a reason from the closed set below ins
 - **THEN** a job error with reason `empty_text` is recorded and no document is produced
 
 ### Requirement: Fetch makes one attempt
-`fetch()` SHALL make one attempt per request and never retry; retries belong to the job queue (`scan-orchestration`), and a job error is recorded once, for the final outcome.
+`fetch()` SHALL make one attempt per request and never retry; retries belong to the job queue (`scraper-orchestration`), and a job error is recorded once, for the final outcome.
 
 #### Scenario: No retry inside fetch
 - **WHEN** a stub server answers 503 on every call
@@ -124,9 +120,9 @@ A session is one run (one attempt of one source): it covers the page request, it
 - **WHEN** a run starts
 - **THEN** an identity is drawn from the identity table for that run only
 
-#### Scenario: Retry gets a fresh session
-- **WHEN** the queue retries a job after a timeout
-- **THEN** the second attempt sends no cookie from the first and draws its own identity
+#### Scenario: Second run gets a fresh session
+- **WHEN** a second run starts for the same source after the first ended in a timeout
+- **THEN** the second run sends no cookie from the first and draws its own identity
 
 ### Requirement: Send headers in the order of the user agent's browser
 An identity is a user agent, an ordered header set and a TLS profile of one browser family, taken from the identity table, which lists every header to send (headers not listed are appended by the client in its own order) and carries only current browser versions. The scraper SHALL send the profile's headers with the profile's values in the profile's order on every request of the session, and a custom header SHALL NOT reorder or replace profile headers.
@@ -164,7 +160,7 @@ With `PROXY_ROTATION=per_request` (default) the scraper SHALL pick the proxy for
 
 #### Scenario: Every proxy cooling down
 - **WHEN** every proxy in the list is cooling down
-- **THEN** the attempt is deferred until the earliest cooldown ends (no job error, no retry consumed, no request made)
+- **THEN** the run reports a deferral until the earliest cooldown ends, makes no request and records no job error
 
 #### Scenario: Per-session mode
 - **WHEN** `PROXY_ROTATION=per_session` and a run makes three requests
@@ -201,7 +197,7 @@ The scraper SHALL honour `robots.txt` and apply a per-domain rate limit that is 
 - **THEN** the two requests start at least 5 seconds apart
 
 ### Requirement: Honour Retry-After
-The scraper SHALL read `Retry-After` as seconds or as an HTTP-date, cap it at a configurable maximum (default 300 s) and defer the whole domain for all workers until the wait has passed. The deferral state is held in Redis. A job that meets an active deferral is requeued with a delay until it ends; this is not a failure and consumes no retry.
+The scraper SHALL read `Retry-After` as seconds or as an HTTP-date, cap it at a configurable maximum (default 300 s) and defer the whole domain for all workers until the wait has passed. The deferral state is held in Redis. A run that meets an active deferral does not fetch and reports a deferral until the time it ends; this is not a failure (the queue requeues it, see `scraper-orchestration`).
 
 #### Scenario: Retry-After is honoured
 - **WHEN** a source answers 429 with `Retry-After: 30`
@@ -216,14 +212,14 @@ The scraper SHALL read `Retry-After` as seconds or as an HTTP-date, cap it at a 
 - **THEN** the domain is deferred until that time
 
 ### Requirement: Pause a domain that keeps failing
-After a configurable number of consecutive failed jobs for a domain (default 5; a job counts once, at its final outcome, not per attempt), the scraper SHALL pause the domain for a cooldown (default 10 minutes) for all workers; during the pause jobs for it are requeued with a delay until it ends, and a success resets the count.
+After a configurable number of consecutive failure outcomes recorded for a domain (default 5; the queue records one outcome per job, never per attempt), the scraper SHALL pause the domain for a cooldown (default 10 minutes) for all workers; during the pause a run reports a deferral until it ends, and a recorded success resets the count.
 
 #### Scenario: Domain paused
-- **WHEN** a domain has failed 5 jobs in a row
-- **THEN** the next job for it is requeued and does not start until the cooldown has passed
+- **WHEN** 5 failure outcomes are recorded for a domain in a row
+- **THEN** the next run for it reports a deferral and does not fetch until the cooldown has passed
 
 #### Scenario: Success resets the count
-- **WHEN** a job succeeds after 4 failures
+- **WHEN** a success outcome is recorded after 4 failures
 - **THEN** the failure count is zero
 
 ### Requirement: Fetch only http(s) URLs and allow-listed redirect hosts
