@@ -149,6 +149,63 @@ def test_no_run_yet(client):
     assert body == {"module": "M3", "current_threshold": 0.65, "labeled_samples": 0, "points": []}
 
 
+def _labeled(url, rows, module="M2"):
+    """rows: (score, status) pairs, one finding each, on fresh documents."""
+    docs = [document_row() for _ in rows]
+    _insert(url, documents, docs)
+    _insert(url, findings, [finding_row(d["id"], module=module, score=s, status=st) for d, (s, st) in zip(docs, rows)])
+
+
+GRID = [round(0.05 * i, 2) for i in range(1, 20)]
+
+
+def test_curve_from_analyst_labels(client, migrated_db):
+    _labeled(migrated_db.app_url, [(0.9, "confirmed"), (0.4, "confirmed"), (0.6, "false_positive"),
+                                   (0.2, "false_positive")])
+    r = client.get("/api/calibration", params={"module": "M2"})
+    assert_response_matches("/calibration", "get", r)
+    body = r.json()
+    assert body["labeled_samples"] == 4 and body["current_threshold"] == DEFAULTS["M2"]
+    assert [p["threshold"] for p in body["points"]] == GRID
+    at = {p["threshold"]: p for p in body["points"]}
+    assert at[0.5] == {"threshold": 0.5, "tp": 1, "fp": 1, "fn": 1, "tn": 1, "precision": 0.5, "recall": 0.5,
+                       "f1": 0.5}
+    assert (at[0.05]["tp"], at[0.05]["fp"], at[0.05]["fn"], at[0.05]["tn"]) == (2, 2, 0, 0)
+    assert (at[0.4]["tp"], at[0.4]["fn"]) == (2, 0)          # score 0.4 counts as predicted positive at t=0.4
+    assert at[0.65] == {"threshold": 0.65, "tp": 1, "fp": 0, "fn": 1, "tn": 2, "precision": 1.0, "recall": 0.5,
+                        "f1": 0.667}
+
+
+def test_unlabeled_findings_do_not_count(client, migrated_db):
+    _labeled(migrated_db.app_url, [(0.9, "confirmed"), (0.2, "false_positive"), (0.95, "new"), (0.1, "in_review"),
+                                   (0.7, "closed")])
+    _labeled(migrated_db.app_url, [(0.9, "false_positive")], module="M1")   # other module
+    body = client.get("/api/calibration", params={"module": "M2"}).json()
+    assert body["labeled_samples"] == 2
+    at = {p["threshold"]: p for p in body["points"]}
+    assert (at[0.5]["tp"], at[0.5]["fp"], at[0.5]["fn"], at[0.5]["tn"]) == (1, 0, 0, 1)
+
+
+def test_nothing_predicted_positive(client, migrated_db):
+    _labeled(migrated_db.app_url, [(0.3, "confirmed"), (0.1, "false_positive")])
+    at = {p["threshold"]: p for p in client.get("/api/calibration", params={"module": "M2"}).json()["points"]}
+    assert (at[0.95]["tp"], at[0.95]["fp"], at[0.95]["precision"], at[0.95]["recall"], at[0.95]["f1"]) == (
+        0, 0, 1.0, 0.0, 0.0)
+
+
+def test_only_negatives_give_zero_recall(client, migrated_db):
+    _labeled(migrated_db.app_url, [(0.8, "false_positive")])
+    at = {p["threshold"]: p for p in client.get("/api/calibration", params={"module": "M2"}).json()["points"]}
+    assert (at[0.5]["fp"], at[0.5]["precision"], at[0.5]["recall"], at[0.5]["f1"]) == (1, 0.0, 0.0, 0.0)
+
+
+def test_labels_win_over_a_stored_run(client, migrated_db):
+    _insert(migrated_db.app_url, calibration_points, [_point(uuid.uuid4(), 0.5, datetime.now(timezone.utc))])
+    _labeled(migrated_db.app_url, [(0.9, "confirmed")])
+    body = client.get("/api/calibration", params={"module": "M2"}).json()
+    assert body["labeled_samples"] == 1 and len(body["points"]) == 19
+
+
 @pytest.mark.parametrize("params", [{}, {"module": "M4"}])
 def test_module_missing_or_unknown(client, params):
     assert client.get("/api/calibration", params=params).status_code == 422

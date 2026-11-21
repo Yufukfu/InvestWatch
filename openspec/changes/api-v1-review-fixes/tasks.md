@@ -10,9 +10,9 @@ Merge order: PR #18 (`chore/infra-compose-v2`) first, then PR #21. This branch m
 
 ## 2. Calibration from analyst labels (review item 5)
 
-- [ ] 2.1 Failing tests for every "Calibration curve" scenario
-- [ ] 2.2 `GET /api/calibration` computes the curve from `confirmed`/`false_positive` findings and falls back to the latest stored run; the 2.1 tests and the contract response check pass
-- [ ] 2.3 Mutation check; line reads `mutations: N tried, N caught`
+- [x] 2.1 Failing tests for every "Calibration curve" scenario
+- [x] 2.2 `GET /api/calibration` computes the curve from `confirmed`/`false_positive` findings and falls back to the latest stored run; the 2.1 tests and the contract response check pass
+- [x] 2.3 Mutation check; mutations: 11 tried, 10 caught, 1 equivalent (reading the stored run even when labels exist changes no response, only adds a query)
 
 ## 3. Filter, trend, input and threshold fixes (review items 7, 8, 9, 10)
 
