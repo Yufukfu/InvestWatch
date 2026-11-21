@@ -29,6 +29,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0308](0308-m3-s34-gate.md) | M3 gate: a recommendation of instruments alone lifts the 0.4 cap ("may indicate" advice, personalisation unconfirmed) | accepted (takes effect when PR #35 merges) |
 | [0311](0311-knf-registry-source-and-ids.md) | KNF registry: HTML lists parsed by a manual loader, committed `registry/knf.csv`, uuid5 firm ids | accepted (takes effect when the `analytics-knf-registry` PR merges) |
 | [0312](0312-gold-set-evaluation.md) | Gold-set evaluation feeds the calibration panel: fictional eval registry, strict/review readings, idempotent default-stack run, labels plus gold in the API | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
+| [0315](0315-m2-art44-element-ownership.md) | M2: one owner rule per art. 44 element (count once); a compliant comparison or forecast is a `pass` that quotes the detection | accepted (takes effect when the `analytics-m2-p1-rules` PR merges) |
 | [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)

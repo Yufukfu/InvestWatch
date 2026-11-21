@@ -1,0 +1,116 @@
+# Tasks
+
+Stage 3. The work starts on `analytics/analytics-llm-p0`, and the branch is rebased onto `main` once `analytics-worker` and `analytics-llm-p0` merge. Groups 1-6 need only the stage-2 rule engine and R14, which are already on the base branch. Group 7 needs `analytics-llm-p0` task group 8 (the judge seam). The estimates are for one agent session, tests included. If time runs short, cut in the order of the "Cut plan" in `design.md`. Tests read `contracts/mocks/*.json` but never edit them. Every new pattern uses bounded gaps only (design decision 8).
+
+## 1. ReDoS guard and the shared past-performance detector (~1 h)
+
+- [ ] 1.1 Write the failing tests. In `tests/test_regex_safety.py`:
+  - The loader rejects `(\w+\s*)+niż`, `(?:a*)*` and `(.+)+` in a `*_patterns` list and in `negation_before`, and the error names the rule and the key.
+  - The loader accepts `(?:\w+\s+){0,3}` and `.{0,80}?`.
+  - A parser-shape test fails loudly if `re._parser` and `sre_parse` are both missing.
+  - Timing: every catalogue pattern and every module-level regex in `rules/m2.py` is searched over five 20 000-character adversarial inputs, and each search takes at most 0.2 s.
+
+  In addition, the R14 tests run unchanged against a `_PastPerformance` base.
+- [ ] 1.2 Add the nested-unbounded-repeat lint to `_check_params` in `rules/engine.py`. Move R14's detector into `_PastPerformance` in `rules/m2.py`, and anchor R14's detector lists in `m2_rules.yaml` (`&pp_figure`, `&pp_amount`, `&pp_amount_return`, `&pp_figure_exclude`, `&pp_past`, `&pp_future`). If an existing pattern is rejected, fix it and log it in `follow-ups.md`. Tests green.
+- [ ] 1.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 2. R16 tax information (~45 min)
+
+- [ ] 2.1 Write the failing tests for the R16 scenarios:
+  - `m2-bank-ok` gives `pass`, with the disclaimer as evidence;
+  - `bez podatku Belki w IKZE` gives `fail`;
+  - only the individual part gives `fail`, naming the missing change part;
+  - `Oferta może ulec zmianie` does not count, and gives `fail`;
+  - VAT only gives `not_applicable`;
+  - a lone disclaimer sentence gives `not_applicable`;
+  - `eurotrade` gives `not_applicable`;
+  - empty text gives `not_applicable`.
+- [ ] 2.2 Write the R16 class. Add `tax_patterns`, `tax_exclude_patterns`, `tax_individual_patterns`, `tax_change_patterns` and `tax_context_patterns` (new `KNOWN_PARAMS`), set the legal basis to art. 44 ust. 7, and set `implemented: true`. Tests green.
+- [ ] 2.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 3. R15 forecasts (~1 h)
+
+- [ ] 3.1 Write the failing tests for the R15 scenarios:
+  - `eurotrade` gives `fail`, with the forecast as evidence;
+  - a forecast with the warning gives `pass`, quoting the forecast, with the explanation starting `Wykryto prognozę`;
+  - a weak marker with a figure gives `fail`;
+  - a weak marker without a figure gives `uncertain`;
+  - the R14 disclaimer alone gives `fail`;
+  - `m2-alfa-landing` gives `not_applicable`;
+  - a lone warning sentence gives `not_applicable`;
+  - a year after `fetched_at` is a strong marker;
+  - a fee percentage with `będzie` is not a forecast.
+- [ ] 3.2 Write the R15 class. Add `forecast_patterns`, `forecast_weak_patterns`, `performance_patterns` and `forecast_disclaimer_patterns` (`&forecast_disclaimers`), reusing `*return_figure_exclude`, and set `implemented: true`. Tests green.
+- [ ] 3.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 4. R12a period and scope (~1.25 h)
+
+- [ ] 4.1 Write the failing tests for the R12a scenarios:
+  - `eurotrade` gives `fail`, naming 5 years and the source;
+  - 2021–2025 with a source gives `pass`;
+  - `od początku roku` gives `fail`, quoting that sentence;
+  - `ostatnich 12 miesiącach` is a full period;
+  - `w 3 miesiące` is sub-annual;
+  - no reference period gives `fail`;
+  - since inception gives `uncertain`;
+  - `ostatnich 10 lat` covers 5 years;
+  - five distinct past years cover 5 years;
+  - `m2-alfa-landing` gives `not_applicable`;
+  - the explanation lists the missing elements in a fixed order;
+  - shared trigger: R12a, R12b and R14 are `not_applicable` together on `m2-bank-ok`.
+- [ ] 4.2 Write the R12a class on `_PastPerformance`. Add `short_period_patterns`, `five_year_patterns`, `inception_patterns` and `source_patterns` (`&source_markers`), the N-month and year-range checks in code (ReDoS-tested in group 1's timing test), the legal basis art. 44 ust. 4, and `implemented: true`. Tests green.
+- [ ] 4.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 5. R12b currency and costs (~45 min)
+
+- [ ] 5.1 Write the failing tests for the R12b scenarios:
+  - `eurotrade` gives `fail`, naming fees only;
+  - a fee statement with PLN figures gives `pass`;
+  - `nie uwzględniają opłat` counts as a fee statement;
+  - USD without a warning gives `fail`, quoting the USD sentence;
+  - USD with a warning gives `pass`;
+  - `denominowany w EUR` triggers the currency part;
+  - `m2-bank-ok` gives `not_applicable`;
+  - the "missing disclaimer fails only R14" scenario passes.
+- [ ] 5.2 Write the R12b class on `_PastPerformance`. Add `fee_patterns`, `foreign_currency_patterns` and `currency_warning_patterns`, and set `implemented: true`. Tests green.
+- [ ] 5.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 6. R11 product comparisons (~1 h)
+
+- [ ] 6.1 Write the failing tests for the R11 scenarios:
+  - `3 razy więcej niż lokata` with no source gives `fail`;
+  - a source and assumptions give `pass`, quoting the comparison, with the explanation starting `Wykryto porównanie`;
+  - a source without assumptions gives `uncertain`;
+  - `niż rok temu` and `niż inflacja` give `not_applicable`;
+  - a superlative only gives `uncertain`;
+  - `m2-bank-ok` gives `not_applicable`;
+  - empty text gives `not_applicable` without raising;
+  - a source in a footnote counts.
+- [ ] 6.2 Write the R11 class. Add `comparison_patterns`, `comparison_exclude_patterns`, `superlative_patterns`, `source_patterns: *source_markers` and `assumption_patterns`, set the legal basis to art. 44 ust. 3, and set `implemented: true`. Tests green.
+- [ ] 6.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 7. Catalogue scenarios and `llm:` blocks (~45 min, needs `analytics-llm-p0` group 8)
+
+- [ ] 7.1 Write the failing tests:
+  - catalogue complete: R1, R2, R3, R4, R6, R10, R11, R12a, R12b, R14, R15, R16, R17 and R18 are implemented;
+  - `llm:` blocks only on R3, R11, R12a, R15, R17 and R18;
+  - every entry has a legal basis;
+  - `FakeJudge`: an R15 weak-marker `uncertain` is deferred and its verdict merged as `hybrid`; R15's strong `fail` is never deferred; an R11 superlative is deferred; an R12a since-inception case is deferred; R12b and R16 never send a check;
+  - the evidence check over all mocks holds, rules-only and with the stub judge.
+- [ ] 7.2 Write the `llm:` blocks with Polish questions on R11, R12a and R15 (`when: uncertain`). Set the legal bases for R9 and R13, and add the catalogue comments on R9 (LLM-first) and R13 (visual, #29). Tests green.
+- [ ] 7.3 Mutation check; record `mutations: N tried, N caught`.
+
+## 8. Mock run (~30 min)
+
+- [ ] 8.1 Run the CLI on `contracts/mocks/documents.json`, rules-only. The output must pass `contracts/validate.py finding`. Update `follow-ups.md` rows M1-M7 with the real results and add any new rows. `git diff --exit-code contracts/mocks contracts/mock-server web` must be empty.
+
+## 9. Closing
+
+- [ ] 9.1 Apply the iw-docs-update skill:
+  - `.docs/analytics-plan.md` §5: the status of R11, R12a, R12b, R15 and R16; R13 marked visual (#29); R9 marked LLM-first;
+  - `analytics/README.md`: the rule list;
+  - list ADR 0315 and check that it is listed in `.docs/decisions/README.md`;
+  - your own domain file in `.docs/status/` only if the coordinator has not taken it;
+  - add the iw-ai-log row;
+  - `docs-check` clean.
+- [ ] 9.2 Run the iw-pr-review skill, including iw-reviewer with a regex-safety focus over the new patterns, and fix real findings.
