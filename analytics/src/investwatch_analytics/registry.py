@@ -26,6 +26,7 @@ REQUIRED_COLUMNS = ("id", "name", "type")
 
 NAME_CONFIDENCE = 0.95
 DOMAIN_CONFIDENCE = 0.9
+LINK_CONFIDENCE = 0.9  # a link to a firm domain in third-party content (change analytics-m1-m3)
 FUZZY_FACTOR = 0.85
 FUZZY_MIN_RATIO = 88
 
@@ -71,7 +72,7 @@ class Firm:
 class FirmMatch:
     firm: Firm
     confidence: float
-    method: Literal["name", "domain", "fuzzy"]
+    method: Literal["name", "domain", "fuzzy", "link"]
     evidence: str | None
 
 
@@ -126,6 +127,27 @@ class Registry:
                 return m
         return None
 
+    def firm_on_host(self, host: str) -> Firm | None:
+        """The firm whose `website_domains` hold `host` (equal or a subdomain), or None."""
+        host = _normalize_domain(host)
+        if not host:
+            return None
+        for firm in self.firms:
+            if any(host == d or host.endswith("." + d) for d in firm.domains):
+                return firm
+        return None
+
+    def match_links(self, links) -> FirmMatch | None:
+        """Third-party content only: the first link whose host is a firm domain, quoting its href.
+
+        Malformed and non-http(s) hrefs are skipped, never raised.
+        """
+        for link in links:
+            host = http_host(link.href)
+            if host and (firm := self.firm_on_host(host)) is not None:
+                return FirmMatch(firm, LINK_CONFIDENCE, "link", link.href)
+        return None
+
     def match(self, text: str, url: str) -> FirmMatch | None:
         # (rank key, match); the smallest key wins: own domain, confidence, earliest, longest quote.
         candidates: list[tuple[tuple, FirmMatch]] = []
@@ -157,6 +179,18 @@ def _best_fuzzy(core: str, words: list[str]) -> float:
     target = " ".join(target_words)
     grams = (" ".join(words[i:i + n]) for i in range(len(words) - n + 1))
     return max((fuzz.ratio(target, g) for g in grams), default=0.0)
+
+
+def http_host(url: str) -> str | None:
+    """Host of an absolute http(s) URL, or None for anything else (malformed, other schemes)."""
+    try:
+        parts = urlsplit(url.strip())
+        host = parts.hostname
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not host:
+        return None
+    return host
 
 
 def _normalize_domain(value: str) -> str:

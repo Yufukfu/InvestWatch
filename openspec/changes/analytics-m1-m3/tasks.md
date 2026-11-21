@@ -12,9 +12,9 @@ Prerequisite: `analytics-worker` is merged and this branch is rebased on `main` 
 
 ## 2. Link-host registry match, publisher identity and advertiser (≈ 1.25 h)
 
-- [ ] 2.1 Failing tests (`tests/test_registry.py`, `tests/test_advertiser.py`): referral link to a firm domain matches with 0.9 and the href as quote; malformed and non-http hrefs are skipped; a social page host never matches; `firm_own` ignores link hosts; publisher identity by profile host, non-social page host and normalized handle (`@alfainwestycje` yes, `@alfa_inwestycje_fan` no, social host never); advertiser from author, from page host (`website` set), malformed `profile_url` → null, 5000-character name cut to 200, `in_registry` equal to publisher identity, `on_warning_list` null
-- [ ] 2.2 Link-host matching in `registry.py` (used only for `third_party`/`unknown`); `modules/advertiser.py` (advertiser and publisher identity); tests green
-- [ ] 2.3 Mutation check; `mutations: N tried, N caught`
+- [x] 2.1 Failing tests (`tests/test_registry.py`, `tests/test_advertiser.py`): referral link to a firm domain matches with 0.9 and the href as quote; malformed and non-http hrefs are skipped; a social page host never matches; `firm_own` ignores link hosts; publisher identity by profile host, non-social page host and normalized handle (`@alfainwestycje` yes, `@alfa_inwestycje_fan` no, social host never); advertiser from author, from page host (`website` set), malformed `profile_url` → null, 5000-character name cut to 200, `in_registry` equal to publisher identity, `on_warning_list` null
+- [x] 2.2 Link-host matching in `registry.py` (used only for `third_party`/`unknown`); `modules/advertiser.py` (advertiser and publisher identity); tests green
+- [x] 2.3 Mutation check; `mutations: 22 tried, 22 caught` (two first survivors, an empty normalized handle and a firm listing a social domain, got their own test cases)
 
 ## 3. M1 signals and finding (≈ 1.5 h)
 
