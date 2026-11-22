@@ -6,7 +6,7 @@ Each group is one commit, and its first task is the failing test. No test calls 
 
 - [x] 1.1 Failing tests: the KNF warnings page (`third_party`, `www.knf.gov.pl`, names EuroTrade and an unregistered adviser) gives no finding, logs `official_source`, and makes no judge call; `uknf.gov.pl`, `sub.gov.pl`, a `firm_own` page and an `unknown` page on `gov.pl` give no module; look-alikes `knf.gov.pl.example.com` and `fakeknf-gov.pl` are routed as usual; an author `profile_url` on `knf.gov.pl` is official; a link to `knf.gov.pl` from a finfluencer post is not; `OFFICIAL_SOURCE_DOMAINS` replaces the default, and a bad entry raises `ConfigError` naming the variable
 - [x] 1.2 `config.official_source_domains()`, the check in `route()`, and `.env.example`; tests green
-- [x] 1.3 Mutation check; `mutations: 14 tried, 14 caught`
+- [x] 1.3 Mutation check; `mutations: 14 tried, 14 caught`; review fixes (bad `OFFICIAL_SOURCE_DOMAINS` stops worker/CLI startup, `www.` entries match): `mutations: 3 tried, 3 caught`
 
 ## 2. M3 needs an offer signal (~30 min)
 

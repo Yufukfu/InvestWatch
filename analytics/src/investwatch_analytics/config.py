@@ -72,6 +72,7 @@ def official_source_domains(env: Mapping[str, str] | None = None) -> tuple[str, 
     out = []
     for item in raw.split(","):
         domain = item.strip().lower().rstrip(".")
+        domain = domain[4:] if domain.startswith("www.") else domain  # hosts are compared without www. too
         if not _DOMAIN.fullmatch(domain):
             raise ConfigError(f"OFFICIAL_SOURCE_DOMAINS entries must be bare domains like knf.gov.pl, got {item.strip()!r}")
         out.append(domain)

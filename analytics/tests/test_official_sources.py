@@ -128,3 +128,40 @@ def test_explicit_argument_wins(registry):
 def test_bad_entry_is_a_config_error(bad):
     with pytest.raises(ConfigError, match="OFFICIAL_SOURCE_DOMAINS"):
         official_source_domains({"OFFICIAL_SOURCE_DOMAINS": f"gov.pl,{bad}"})
+
+
+# ---- group 1 review: a bad value stops startup, not every document; www. entries ----------------------------------
+
+
+def test_www_entry_matches_its_host(registry):
+    assert official_source_domains({"OFFICIAL_SOURCE_DOMAINS": "WWW.esma.europa.eu"}) == ("esma.europa.eu",)
+    assert route(doc("https://www.esma.europa.eu/x"), registry,
+                 official_domains=official_source_domains({"OFFICIAL_SOURCE_DOMAINS": "www.esma.europa.eu"})
+                 ).reason == "official_source"
+
+
+def test_cli_bad_official_domains_exits_2(tmp_path, capsys, monkeypatch):
+    import json
+
+    from investwatch_analytics import cli
+
+    path = tmp_path / "doc.json"
+    path.write_text(json.dumps(make_doc()), encoding="utf-8")
+    monkeypatch.setenv("OFFICIAL_SOURCE_DOMAINS", "https://knf.gov.pl")
+    assert cli.main([str(path)]) == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_worker_bad_official_domains_exits_2(capsys, monkeypatch):
+    from investwatch_analytics import storage
+    from investwatch_analytics.worker import main
+
+    def no_store(*a, **kw):
+        raise AssertionError("startup went past the config check")
+
+    monkeypatch.setattr(storage, "PostgresStore", no_store)
+
+    env = {"DATABASE_URL": "postgresql://u@127.0.0.1:1/db", "REDIS_URL": "redis://127.0.0.1:1/0",
+           "OFFICIAL_SOURCE_DOMAINS": "knf.gov.pl;gov.pl"}
+    assert main(env) == 2
+    assert "OFFICIAL_SOURCE_DOMAINS" in capsys.readouterr().out
