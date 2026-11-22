@@ -33,9 +33,9 @@
 
 ## 5. Transcripts (cut with group 4)
 
-- [ ] 5.1 Test first (`scraper/tests/test_social_transcript.py`, injected transcript function): text joined after title and description; Polish track preferred over English; no track or disabled is `none`; no proxy means no call, a "transcripts are off" log line and `none`; a block marks that video `failed`, stops transcripts for the run and the later videos are `none`; another error marks `failed` and the next video is still requested; the proxy URL is absent from every log and error
-- [ ] 5.2 `social/transcript.py` adapter over `youtube-transcript-api==1.2.5` (check the installed signature first; `GenericProxyConfig`, run in `asyncio.to_thread`, all exceptions mapped, `from None`) and its use in the YouTube flow
-- [ ] 5.3 Mutation check — mutations: N tried, N caught
+- [x] 5.1 Test first (`scraper/tests/test_social_transcript.py`, injected transcript function): text joined after title and description; Polish track preferred over English; no track or disabled is `none`; no proxy means no call, a "transcripts are off" log line and `none`; a block marks that video `failed`, stops transcripts for the run and the later videos are `none`; another error marks `failed` and the next video is still requested; the proxy URL is absent from every log and error
+- [x] 5.2 `social/transcript.py` adapter over `youtube-transcript-api==1.2.5` (check the installed signature first; `GenericProxyConfig`, run in `asyncio.to_thread`, all exceptions mapped, `from None`) and its use in the YouTube flow
+- [x] 5.3 Mutation check — mutations: 19 tried, 19 caught
 
 ## 6. Seeds and end to end
 
