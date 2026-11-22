@@ -97,6 +97,8 @@ Rule engine: each rule is a class with `applies(doc) → bool` and `evaluate(doc
 | R17 Implying supervisory approval | text + LLM | mention of KNF/ESMA/"supervised" → LLM: does it suggest product approval | **P0** |
 | R18 Supervision as a safety argument | text + LLM | as above + safety words ("bezpieczna", "gwarantowana", "pewna") in the same sentence | **P0** |
 
+Built (2026-11-22): R1-R4, R6, R11, R12a, R12b, R14-R18 (R11, R12a, R12b, R15, R16 in change `analytics-m2-p1-rules`: rules-first, R11, R12a and R15 with an `llm:` block for their uncertain case). One owner rule per art. 44 element, R15 reports every forecast and R11 only violations ([ADR 0315](decisions/0315-m2-art44-element-ownership.md)). Not built: R13 is visual and needs `blocks` (#29), like R5, R7 and R8; R9 has no cheap rules signal and waits for an LLM-first change; R10 was not built in `analytics-llm-p0`.
+
 Where `blocks` come from (scraper, ADR 0107): a `firm_own` source with `M2` in `target_modules` is rendered at desktop 1440, mobile 390 and tablet 820 px when `SCRAPER_RENDER_ENABLED` is on; `blocks` holds one entry per text block per viewport (`region` is always set, `legal` by placement words such as `footer .legal`, `nota-prawna`, never by content words like `risk`), and `scrape_meta.render` carries `browser_version`, `truncated` or `skipped` (`budget`, `paused`). A document without `blocks` (render off, skipped or failed) means the visual rules return `not_applicable`, never a fabricated block.
 
 For social media content (no `blocks`) the visual rules return `not_applicable`; for images in a post – OCR (`tesseract` / `easyocr`) as P2.
@@ -118,6 +120,8 @@ For social media content (no `blocks`) the visual rules return `not_applicable`;
 | S3.7 | entity on the KNF public warnings list | registry (bonus) |
 
 Hard gate: no S3.4 ⇒ `score` capped at 0.4 (financial "education" or personalization alone is not advice; Art. 76 needs a recommendation concerning instruments). Changed from "no S3.4 and no S3.3" by `analytics-m1-m3`. Plain crypto-assets are outside Art. 2 (signal S3.8, capped). The LLM gets the definition from annex 3 in the system prompt and must return a quote of the recommendation.
+No offer, no finding: an M3-only document needs S3.3, S3.4, S3.5 or S3.8; S3.1, S3.2 and S3.6 only weigh in the score of an offer (`analytics-post-integration-fixes`, after EY's family-office page scored 0.269 on vocabulary alone). Pages of the supervisor and official registers (`knf.gov.pl`, `gov.pl`) are never M1 advertisers or M3 publishers (reason `official_source`).
+
 Output matches the UKNF requirement: **entity data, offer content, URL**.
 
 ## 7. LLM layer
