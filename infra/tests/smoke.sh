@@ -44,7 +44,7 @@ cleanup() {
   for p in "${SCALE_PROJECTS[@]:-}"; do
     [ -n "$p" ] || continue
     docker compose -p "$p" --env-file "$TMP/$p.env" -f "$ROOT/compose.yaml" --profile llm down -v --remove-orphans >/dev/null 2>&1 || true
-    for svc in web api analytics scraper renderer; do docker rmi "investwatch/$svc:$p" >/dev/null 2>&1 || true; done
+    for svc in web api api-migrate analytics scraper renderer; do docker rmi "investwatch/$svc:$p" >/dev/null 2>&1 || true; done
   done
   for p in "${PROJECTS[@]:-}"; do
     [ -n "$p" ] || continue

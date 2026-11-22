@@ -17,8 +17,9 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       HEALTH_PORT: "8001"
-      # LLM (ADR 0304, 0317), from the root .env; empty LLM_BASE_URL = rules-only (model.llm = null). Default: hosted
-      # Gemma 4 on the Gemini API (OpenAI-compatible endpoint, mentor exception); local swap target: LLM_BASE_URL=http://ollama:11434/v1,
+      # LLM (ADR 0304, 0318), from the root .env; empty LLM_BASE_URL = rules-only (model.llm = null). Default: hosted
+      # DeepSeek Flash (OpenAI-compatible endpoint, mentor exception; Gemma 4 on the Gemini API is the documented
+      # alternative, ADR 0317); local swap target: LLM_BASE_URL=http://ollama:11434/v1,
       # LLM_MODEL=gemma3:4b, LLM_API_KEY=ollama with --profile llm. Limits: analytics/.env.example.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-}
@@ -43,14 +44,15 @@ services:
       EMBED_BREAKER_COOLDOWN_S: ${EMBED_BREAKER_COOLDOWN_S:-}
       # Topic gate and near-duplicates (ADR 0314); defaults in analytics/.env.example.
       GATE_ENABLED: ${GATE_ENABLED:-}
-      GATE_SIM_THRESHOLD: ${GATE_SIM_THRESHOLD:-}
+      GATE_EMBED_MIN_MARGIN: ${GATE_EMBED_MIN_MARGIN:-}
+      GATE_EMBED_MIN_CHARS: ${GATE_EMBED_MIN_CHARS:-}
       NEARDUP_NUM_PERM: ${NEARDUP_NUM_PERM:-}
       NEARDUP_BANDS: ${NEARDUP_BANDS:-}
       NEARDUP_THRESHOLD: ${NEARDUP_THRESHOLD:-}
       NEARDUP_MAX_CHARS: ${NEARDUP_MAX_CHARS:-}
       NEARDUP_TTL_S: ${NEARDUP_TTL_S:-}
       # Must stay above (LLM_DOC_BUDGET_S + 3 s + EMBED_TIMEOUT_S) * 1000 (the worker refuses to start otherwise);
-      # 90000 for hosted Gemma.
+      # 120000 for hosted DeepSeek Flash (ADR 0318), 90000 for hosted Gemma.
       CLAIM_MIN_IDLE_MS: ${CLAIM_MIN_IDLE_MS:-}
       # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
       # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).
@@ -82,7 +84,7 @@ services:
   # calibration panel has a curve after a plain `docker compose up`. Rules-only and deterministic; it writes a module's
   # run only when the gold set, the pipeline version or the results changed, so restarts add nothing.
   # Manual re-run: docker compose run --rm analytics-eval  (or: python analytics/eval/run.py --db).
-  # No `build:` here: `analytics` builds the shared image (like api-migrate/api). Two services building one tag run
+  # No `build:` here: `analytics` builds the shared image (like the scraper's worker). Two services building one tag run
   # two parallel exports, and with the containerd image store one fails "image ... already exists", aborting `up --build`.
   analytics-eval:
     image: investwatch/analytics:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}

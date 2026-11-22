@@ -61,6 +61,13 @@ class PgSourceStore:
         records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active")
         return [source for source in map(_source, records) if source.collectable]
 
+    async def never_run_scheduled(self) -> Sequence[Source]:
+        """Collectable (so active) sources with a cron that no job has ended for yet (`last_run_at` is set by a failed job too)."""
+        records = await self._pool.fetch(
+            f"SELECT {_COLUMNS} FROM sources WHERE schedule_cron IS NOT NULL AND last_run_at IS NULL ORDER BY name, id"
+        )
+        return [source for source in map(_source, records) if source.collectable]
+
     async def schedulable(self) -> Sequence[Source]:
         records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active AND schedule_cron IS NOT NULL")
         return [source for source in map(_source, records) if source.collectable]

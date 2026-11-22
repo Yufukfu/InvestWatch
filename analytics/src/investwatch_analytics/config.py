@@ -260,6 +260,20 @@ def _unit_interval(env: Mapping[str, str], key: str, default: float) -> float:
     return value
 
 
+def _closed_unit(env: Mapping[str, str], key: str, default: float) -> float:
+    """A number in [0, 1]."""
+    raw = env.get(key)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ConfigError(f"{key} must be a number, got {raw!r}") from None
+    if not 0 <= value <= 1:  # also rejects nan
+        raise ConfigError(f"{key} must be in [0, 1], got {raw!r}")
+    return value
+
+
 _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off"}
 
@@ -335,16 +349,19 @@ class EmbedSettings:
 
 @dataclass(frozen=True)
 class GateSettings:
-    """Investment topic gate (ADR 0314). `sim_threshold` is used only by the stretch similarity rescue."""
+    """Investment topic gate (ADR 0314). The embedding rescue (analytics-embedding-gate) passes a no-hit document of
+    at least `embed_min_chars` characters when its on-topic minus off-topic cosine is at least `embed_min_margin`."""
 
     enabled: bool = True
-    sim_threshold: float = 0.45
+    embed_min_margin: float = 0.03  # measured on eval/gate_check.jsonl with bge-m3 (design §4)
+    embed_min_chars: int = 40
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "GateSettings":
         env = os.environ if env is None else env
         return cls(enabled=_flag(env, "GATE_ENABLED", True),
-                   sim_threshold=_unit_interval(env, "GATE_SIM_THRESHOLD", 0.45))
+                   embed_min_margin=_closed_unit(env, "GATE_EMBED_MIN_MARGIN", 0.03),
+                   embed_min_chars=_positive_int(env, "GATE_EMBED_MIN_CHARS", 40))
 
 
 @dataclass(frozen=True)

@@ -27,7 +27,7 @@ from ..registry import Registry
 from ..rules.engine import Catalogue
 from .gold import GoldItem, rule_status
 from .known_ids import MODULES, Catalogues
-from .metrics import curve, f1_plateau, recommended_threshold, rule_metrics
+from .metrics import PLATEAU_F1, curve, f1_plateau, recommended_threshold, rule_metrics
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +40,13 @@ THRESHOLDS_FILE = EVAL_DIR / "thresholds.json"
 #: capped finding (no recommendation of instruments) never raises finding.high_risk by default. Rules-only, S3.4 is
 #: never `fail`; re-evaluate when the LLM layer scores S3.4.
 THRESHOLD_FLOORS = {"M3": GATE_CAP}
+#: A committed gold run with the LLM judge (`run.py --llm`, ADR 0318). The modules in LLM_MEASURED_DEFAULTS take
+#: their default from this run's curve instead of the rules-only one, because the hosted LLM is on by default.
+LLM_RUN_FILE = EVAL_DIR / "llm-run-deepseek-flash.json"
+#: Damian's choice on the recorded run's F1 plateau (0.75-0.8 for M1, F1 1.0 at both; ADR 0318). It must stay on
+#: that plateau: `llm_measured_defaults` refuses a value off it.
+LLM_MEASURED_DEFAULTS = {"M1": 0.75}
+LLM_MEASURED_MODULES = tuple(LLM_MEASURED_DEFAULTS)
 #: ADR 0305's original defaults, reported next to the recommendation for comparison (ADR 0316).
 ADR_0305_DEFAULTS = {"M1": 0.6, "M2": 0.5, "M3": 0.7}
 #: Namespace of the deterministic run id (design decision 7); never change it, or every stored run is "new".
@@ -199,8 +206,28 @@ def _rules(module: str, labeled: list[GoldItem], found: dict[str, dict[str, Find
     return out
 
 
-def write_thresholds(path: Path, report: dict) -> dict[str, float]:
-    """Write each evaluated module's default threshold; a module without one keeps its value in the file."""
+def llm_measured_defaults(path: Path = LLM_RUN_FILE) -> dict[str, float]:
+    """LLM_MEASURED_DEFAULTS, checked against the recorded LLM run (ADR 0318).
+
+    Each value must lie on that run's F1 plateau (within 0.02 of its best F1) and at or above the module floor;
+    otherwise ValueError, so a stale run file or a hand-edited value cannot become a default unnoticed.
+    """
+    run = json.loads(Path(path).read_text(encoding="utf-8"))
+    for module, value in LLM_MEASURED_DEFAULTS.items():
+        points = run["modules"][module]["points"]
+        best = max((p["f1"] for p in points), default=0.0)
+        at = next((p["f1"] for p in points if p["threshold"] == value), None)
+        if best <= 0 or at is None or at < round(best - PLATEAU_F1, 3) or value < THRESHOLD_FLOORS.get(module, 0.0):
+            raise ValueError(f"{path}: {module} default {value} is not on the recorded run's F1 plateau "
+                             f"{f1_plateau(points)}")
+    return dict(LLM_MEASURED_DEFAULTS)
+
+
+def write_thresholds(path: Path, report: dict, overrides: dict[str, float] | None = None) -> dict[str, float]:
+    """Write each evaluated module's default threshold; a module without one keeps its value in the file.
+
+    `overrides` (the CLI passes `llm_measured_defaults()`) wins over the rules-only run for its modules.
+    """
     try:
         current = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -210,6 +237,7 @@ def write_thresholds(path: Path, report: dict) -> dict[str, float]:
     for module, entry in report["modules"].items():
         if entry["status"] == "evaluated" and entry.get("default_threshold") is not None:
             current[module] = entry["default_threshold"]
+    current.update(overrides or {})
     missing = [m for m in MODULES if m not in current]
     if missing:
         raise ValueError(f"no threshold for {', '.join(missing)}: evaluate those modules or keep a previous file")
