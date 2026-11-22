@@ -8,5 +8,5 @@
 
 ## 2. Closing
 
-- [ ] 2.1 Apply the iw-docs-update skill (`docs-check: ok`; `.docs/status/scraper.md` row) and add the iw-ai-log row
+- [x] 2.1 Apply the iw-docs-update skill (`docs-check: ok`; `.docs/status/scraper.md` row) and add the iw-ai-log row
 - [ ] 2.2 Run the iw-pr-review skill and fix real findings
