@@ -62,6 +62,7 @@ describe('App (against contract mocks)', () => {
     renderApp();
     expect(screen.getByText('NARZĘDZIE NADZORCZE')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'InvestWatch' })).toBeInTheDocument();
+    expect(document.querySelector('img.brand-mark')).toHaveAttribute('alt', '');
     const nav = screen.getByRole('navigation', { name: 'Sekcje' });
     const links = within(nav).getAllByRole('link');
     expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
@@ -245,7 +246,7 @@ describe('App (against contract mocks)', () => {
     );
     renderApp('zgloszenia');
     expect(await screen.findByText(payload)).toBeInTheDocument();
-    expect(document.querySelector('img')).toBeNull();
+    expect(document.querySelector('img:not(.brand-mark)')).toBeNull();
   });
 
   it('tells "system down" apart from "API unreachable"', async () => {

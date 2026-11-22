@@ -112,7 +112,10 @@ export function App() {
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand">
-            <h1>InvestWatch</h1>
+            <div className="brand-name">
+              <img className="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />
+              <h1>InvestWatch</h1>
+            </div>
             <span className="brand-tagline">NARZĘDZIE NADZORCZE</span>
           </div>
           <nav id={navId} className={menuOpen ? 'app-nav app-nav-open' : 'app-nav'} aria-label="Sekcje">
