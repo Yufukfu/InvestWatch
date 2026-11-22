@@ -83,6 +83,27 @@ describe('FindingsFilters', () => {
     screen.getByLabelText('Moduł'); // rendered
   });
 
+  it('offers a Filtry disclosure that names the active count, starts closed and controls the filter form', () => {
+    setup({ module: 'M1', status: ['new'] });
+    const toggle = screen.getByRole('button', { name: 'Filtry 2' });
+    const form = screen.getByRole('search', { name: 'Filtry zgłoszeń' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', form.id);
+    expect(form.id).not.toBe('');
+    expect(form).not.toHaveClass('filters-open');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(form).toHaveClass('filters-open');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(form).not.toHaveClass('filters-open');
+  });
+
+  it('names the disclosure without a number when no filter is active', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'Filtry' })).toBeInTheDocument();
+  });
+
   it('clears all filters', () => {
     const { onReset } = setup({ module: 'M1', status: ['new', 'closed'] });
     const btn = screen.getByRole('button', { name: 'Wyczyść filtry (3)' });

@@ -25,7 +25,7 @@ function SortHeader({ label, field, sort, onSort }: { label: string; field: Sort
   // First click sorts descending (newest, highest); a second click flips the direction.
   const next: FindingSort = active && descending ? field : `-${field}`;
   return (
-    <th scope="col" aria-sort={active ? (descending ? 'descending' : 'ascending') : 'none'}>
+    <th scope="col" role="columnheader" className={`col-${field === 'score' ? 'score' : 'date'}`} aria-sort={active ? (descending ? 'descending' : 'ascending') : 'none'}>
       <button type="button" className="sort" onClick={() => onSort(next)}>
         {label}
         <span aria-hidden="true" className="sort-arrow">
@@ -63,47 +63,53 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
     <>
       <p className="findings-count">{findingsCount(total ?? rows.length)}</p>
       <div className="table-scroll" aria-busy={isFetching}>
-        <table className="findings">
+        {/* Roles are explicit: the card layout on a phone sets display on table parts, which drops their implicit roles. */}
+        <table className="findings" role="table">
           <thead>
-            <tr>
-              <th scope="col">Ryzyko</th>
-              <th scope="col">Tytuł</th>
-              <th scope="col">Moduł</th>
-              <th scope="col">Platforma</th>
+            <tr role="row">
+              <th scope="col" role="columnheader" className="col-risk">Ryzyko</th>
+              <th scope="col" role="columnheader" className="col-title">Tytuł</th>
+              <th scope="col" role="columnheader" className="col-module">Moduł</th>
+              <th scope="col" role="columnheader" className="col-platform">Platforma</th>
               <SortHeader label="Wynik" field="score" sort={sort} onSort={onSort} />
-              <th scope="col">Status</th>
+              <th scope="col" role="columnheader" className="col-status">Status</th>
               <SortHeader label="Wykryto" field="detected_at" sort={sort} onSort={onSort} />
             </tr>
           </thead>
           <tbody>
             {rows.map((f) => (
-              <tr key={f.id} aria-current={f.id === selectedId ? 'true' : undefined} className={f.id === selectedId ? 'selected' : undefined}>
-                <td>
+              <tr
+                key={f.id}
+                role="row"
+                aria-current={f.id === selectedId ? 'true' : undefined}
+                className={[f.id === selectedId && 'selected', f.riskLevel === 'high' && 'row-high'].filter(Boolean).join(' ') || undefined}
+              >
+                <td role="cell" className="col-risk">
                   <RiskBadge level={f.riskLevel} />
                 </td>
-                <td className="col-title">
+                <td role="cell" className="col-title">
                   <button type="button" className="link" onClick={() => onSelect(f.id)}>
                     {f.title}
                   </button>
                 </td>
-                <td>
+                <td role="cell" className="col-module">
                   <span className="module" title={MODULE_LABEL[f.module]}>
                     {f.module}
                   </span>
                 </td>
-                <td>{platformLabel(f.platform)}</td>
-                <td>
-                  <span className="score">
+                <td role="cell" className="col-platform">{platformLabel(f.platform)}</td>
+                <td role="cell" className="col-score">
+                  <span className="score mono">
                     <span className="score-bar" aria-hidden="true">
                       <span style={{ width: `${Math.round(Math.min(1, Math.max(0, f.score)) * 100)}%` }} />
                     </span>
                     <span>{formatScore(f.score)}</span>
                   </span>
                 </td>
-                <td>
+                <td role="cell" className="col-status">
                   <span className={`status status-${f.status}`}>{STATUS_LABEL[f.status] ?? f.status}</span>
                 </td>
-                <td className="col-date">{formatUtc(f.detectedAt)}</td>
+                <td role="cell" className="col-date mono">{formatUtc(f.detectedAt)}</td>
               </tr>
             ))}
           </tbody>

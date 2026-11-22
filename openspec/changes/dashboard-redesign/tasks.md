@@ -16,11 +16,11 @@
 
 ## 3. Trend and findings table, filters and phone cards
 
-- [ ] 3.1 Update tests first: high-risk rows carry the tint class and the text label `Wysoki`, scores and dates render in the mono class, M3 series colour is not the high-risk red and series still differ by dash pattern, the phone filter button has `aria-expanded`, controls the filter region and shows the active-filter count
-- [ ] 3.2 Restyle the trend (colours, legend, bucket switch at 44px) and the filters (labels, chips, 44px controls, "Filtry" disclosure with count below 600px)
-- [ ] 3.3 Restyle the findings table: tinted high-risk rows, mono scores and dates, tablet layout with platform, status and time under the title, phone layout as cards from the same markup with table roles kept
-- [ ] 3.4 Run the web suite; confirm no horizontal overflow of the page at 320, 375, 768 and 1024px against the mock server
-- [ ] 3.5 mutations: N tried, N caught
+- [x] 3.1 Update tests first: high-risk rows carry the tint class and the text label `Wysoki`, scores and dates render in the mono class, M3 series colour is not the high-risk red and series still differ by dash pattern, the phone filter button has `aria-expanded`, controls the filter region and shows the active-filter count
+- [x] 3.2 Restyle the trend (colours, legend, bucket switch at 44px) and the filters (labels, chips, 44px controls, "Filtry" disclosure with count below 600px)
+- [x] 3.3 Restyle the findings table: tinted high-risk rows, mono scores and dates, tablet layout with platform, status and time under the title, phone layout as cards from the same markup with table roles kept
+- [x] 3.4 Run the web suite; confirm no horizontal overflow of the page at 320, 375, 768 and 1024px against the mock server
+- [x] 3.5 mutations: 14 tried, 14 caught
 
 ## 4. Detail drawer, alert toast and status editor
 

@@ -22,6 +22,8 @@ export function FindingsFilters({ filters, onChange, onReset }: Props) {
   const id = useId();
   const [text, setText] = useState(filters.q ?? '');
   const [seenQ, setSeenQ] = useState(filters.q);
+  // Only meaningful below 600px, where the CSS hides the form until it is opened.
+  const [open, setOpen] = useState(false);
 
   // An external change of q (back button, shared link) replaces what is typed; adjusted during render.
   // Our own settled search comes back trimmed, so only resync when it really differs from the box,
@@ -50,7 +52,29 @@ export function FindingsFilters({ filters, onChange, onReset }: Props) {
   const active = activeCount(filters);
 
   return (
-    <form className="filters" role="search" aria-label="Filtry zgłoszeń" onSubmit={(e) => e.preventDefault()}>
+    <>
+      <button
+        type="button"
+        className="btn filters-toggle"
+        aria-expanded={open}
+        aria-controls={`${id}-form`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        Filtry
+        {active > 0 && (
+          <>
+            {' '}
+            <span className="filters-toggle-count">{active}</span>
+          </>
+        )}
+      </button>
+    <form
+      id={`${id}-form`}
+      className={open ? 'filters filters-open' : 'filters'}
+      role="search"
+      aria-label="Filtry zgłoszeń"
+      onSubmit={(e) => e.preventDefault()}
+    >
       <div className="field field-search">
         <label htmlFor={`${id}-q`}>Szukaj</label>
         <input
@@ -164,5 +188,6 @@ export function FindingsFilters({ filters, onChange, onReset }: Props) {
         </div>
       )}
     </form>
+    </>
   );
 }

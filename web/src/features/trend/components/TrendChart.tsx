@@ -15,9 +15,9 @@ export type TrendChartProps = {
 
 // Series differ by colour and by dash pattern, and the legend names them: never colour alone.
 const SERIES = [
-  { key: 'M1', color: '#1d4ed8', dash: undefined },
-  { key: 'M2', color: '#b45309', dash: '6 3' },
-  { key: 'M3', color: '#047857', dash: '2 3' },
+  { key: 'M1', color: 'var(--accent)', dash: undefined },
+  { key: 'M2', color: 'var(--amber)', dash: '6 3' },
+  { key: 'M3', color: 'var(--m3)', dash: '2 3' },
 ] as const;
 
 const BUCKETS: { value: TrendBucket; label: string }[] = [
@@ -55,7 +55,7 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
       accessibilityLayer={false}
       margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
     >
-      <CartesianGrid stroke="#e5e7eb" vertical={false} />
+      <CartesianGrid stroke="var(--border)" vertical={false} />
       <XAxis dataKey="t" tickFormatter={(t: string) => formatTick(t, bucket)} minTickGap={24} />
       <YAxis allowDecimals={false} width={32} />
       <Tooltip isAnimationActive={false} defaultIndex={tooltipIndex} labelFormatter={(t) => formatFull(String(t), bucket)} />

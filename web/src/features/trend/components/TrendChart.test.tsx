@@ -41,6 +41,15 @@ describe('TrendChart (props only, no store)', () => {
     expect(linePaths()).toHaveLength(3);
   });
 
+  it('colours the series from tokens and keeps the risk red away from every module', () => {
+    setup();
+    const strokes = linePaths().map((el) => el.getAttribute('stroke'));
+    expect(strokes).toEqual(['var(--accent)', 'var(--amber)', 'var(--m3)']);
+    for (const stroke of strokes) {
+      expect(stroke).not.toMatch(/risk-high|sev-high|#/);
+    }
+  });
+
   it('tells series apart by dash pattern on the lines and the legend swatches, not colour alone', () => {
     setup();
     const swatches = Array.from(document.querySelectorAll('.trend-legend line'));

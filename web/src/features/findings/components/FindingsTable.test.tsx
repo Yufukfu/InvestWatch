@@ -180,6 +180,39 @@ describe('FindingsTable', () => {
     expect(screen.queryByText('Ładowanie…')).toBeNull();
   });
 
+  it('tints a high-risk row and still names the risk in text', () => {
+    render(
+      <FindingsTable
+        {...props}
+        rows={[row({ id: 'h', title: 'Wysokie', riskLevel: 'high' }), row({ id: 'm', title: 'Średnie', riskLevel: 'medium' })]}
+      />,
+    );
+    const high = screen.getByText('Wysokie').closest('tr')!;
+    const medium = screen.getByText('Średnie').closest('tr')!;
+    expect(high).toHaveClass('row-high');
+    expect(within(high).getByText('Wysoki')).toBeInTheDocument();
+    expect(medium).not.toHaveClass('row-high');
+  });
+
+  it('renders the score and the detection time in the monospace class', () => {
+    render(<FindingsTable {...props} rows={[row({ score: 0.93 })]} />);
+    expect(screen.getByText('0,93').closest('.score')).toHaveClass('mono');
+    expect(screen.getByText(/2026/).closest('td')).toHaveClass('mono');
+  });
+
+  it('keeps table roles explicit, so the card layout on a phone is still a table for assistive technology', () => {
+    render(<FindingsTable {...props} rows={[row()]} />);
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('role', 'table');
+    for (const tr of Array.from(table.querySelectorAll('tr'))) expect(tr).toHaveAttribute('role', 'row');
+    expect(Array.from(table.querySelectorAll('thead th')).map((th) => th.getAttribute('role'))).toEqual(
+      Array(7).fill('columnheader'),
+    );
+    expect(Array.from(table.querySelectorAll('tbody td')).map((td) => td.getAttribute('role'))).toEqual(
+      Array(7).fill('cell'),
+    );
+  });
+
   it.each([
     [11, '11 zgłoszeń'],
     [14, '14 zgłoszeń'],
