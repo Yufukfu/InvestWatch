@@ -113,6 +113,8 @@ depends_on:
 
 Images: `api` and `api-migrate` build the same `api/Dockerfile`, each under its own tag (`investwatch/api:<project>` and `investwatch/api-migrate:<project>`), so naming either one rebuilds it: `docker compose up -d --build --no-deps api` rebuilds and restarts the API alone, without a migration run (issue #157). Before that change only `api-migrate` built, and a targeted `up --build api` kept the old image. They cannot share one tag: two services building one tag race on the image store and abort `up --build` ("image ... already exists").
 
+Build context: `api/` itself. The image also needs `contracts/schemas` and `contracts/openapi.yaml`; they come in as the named context `contracts` (`additional_contexts` in `api/compose.yaml`), the only input from outside this folder ([ADR 0215](../.docs/decisions/0215-module-build-contexts.md)). By hand, from the repository root: `docker build --build-context contracts=contracts -t investwatch/api api`.
+
 Locally, from `api/`:
 
 ```bash
