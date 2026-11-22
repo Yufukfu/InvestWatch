@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useGetFindingsQuery, type Finding } from '../../../api/generated';
 import type { FindingFilters, FindingRow } from '../model';
-import { parseFilters, parseSelected, serializeUrl, toQueryArg, withFilter } from './findingsUrl';
+import { hasTriageFlag, parseFilters, parseSelected, serializeUrl, toQueryArg, triageUrl, withFilter } from './findingsUrl';
 import { useUrlSearch } from '../../../url/useUrlSearch';
 
 // The generated DTO stops here. `module` and `status` are assigned from the generated unions, so a
@@ -38,7 +38,21 @@ export function useFindings(): FindingsState {
   const selectedId = useMemo(() => parseSelected(search), [search]);
   // While the next page or filter loads, the last result stays (marked busy by the table), so the
   // sort header or pager button that had focus is not unmounted. A failed request clears it.
-  const { data, isLoading, isFetching, isError } = useGetFindingsQuery(toQueryArg(filters));
+  const { data, currentData, isLoading, isFetching, isError } = useGetFindingsQuery(toQueryArg(filters));
+
+  // Triage is a one-shot: once the list for the triage filters has arrived, open its first row (none when
+  // it is empty or failed) and rewrite the URL without the flag. currentData belongs to the current
+  // arguments only, so the previous list is never mistaken for the triage result.
+  const triage = hasTriageFlag(search);
+  useEffect(() => {
+    if (!triage) return;
+    if (isError) {
+      push(serializeUrl(filters, undefined), { replace: true });
+      return;
+    }
+    if (!currentData) return;
+    push(serializeUrl(filters, currentData.items[0]?.id), { replace: true });
+  }, [triage, isError, currentData, filters, push]);
 
   const setFilters = useCallback(
     (patch: Partial<FindingFilters>) => {
@@ -65,4 +79,10 @@ export function useFindings(): FindingsState {
     isFetching,
     isError,
   };
+}
+
+// The summary's triage action: show the new high-risk findings and open the first one (see the effect above).
+export function useStartTriage(): () => void {
+  const [, push] = useUrlSearch();
+  return useCallback(() => push(triageUrl()), [push]);
 }

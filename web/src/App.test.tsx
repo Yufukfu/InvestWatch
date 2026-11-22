@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it, vi } from 'vitest';
@@ -71,6 +71,77 @@ describe('App (against contract mocks)', () => {
     const findingsTable = document.querySelector('table.findings');
     expect(findingsTable).not.toBeNull();
     expect(findingsTable!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  describe('triage', () => {
+    // Records every GET /findings the page sends and answers with the fixture (or what `answer` says).
+    function recordFindings(answer?: (p: URLSearchParams) => Response) {
+      const seen: URLSearchParams[] = [];
+      server.use(
+        http.get('http://localhost/api/findings', ({ request }) => {
+          const p = new URL(request.url).searchParams;
+          seen.push(p);
+          return answer?.(p) ?? HttpResponse.json(findings);
+        }),
+      );
+      return seen;
+    }
+
+    it('clears the other filters, asks for new high-risk findings and opens the first one', async () => {
+      window.history.replaceState(null, '', '/?page=3&module=M2&q=zysk&date_from=2026-11-01&date_to=2026-11-20');
+      const seen = recordFindings();
+      renderApp();
+      fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      const last = seen.at(-1)!;
+      expect(last.get('status')).toBe('new');
+      expect(last.get('risk_level')).toBe('high');
+      expect(last.get('page')).toBe('1');
+      for (const gone of ['module', 'q', 'date_from', 'date_to']) expect(last.has(gone), gone).toBe(false);
+      // Newest first is the default sort and stays out of the URL; the one-shot flag does not stay either.
+      expect(window.location.search).toBe(`?status=new&risk_level=high&finding=${findings.items[0].id}`);
+    });
+
+    it('opens no detail when the triage list is empty, and leaves no flag behind', async () => {
+      const seen = recordFindings((p) =>
+        p.get('risk_level') === 'high' ? HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 }) : HttpResponse.json(findings),
+      );
+      renderApp();
+      fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
+      expect(await screen.findByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeInTheDocument();
+      expect(seen.at(-1)!.get('risk_level')).toBe('high');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(window.location.search).toBe('?status=new&risk_level=high');
+    });
+
+    it('opens no detail when the triage request fails, and leaves no flag behind', async () => {
+      recordFindings((p) => (p.get('risk_level') === 'high' ? HttpResponse.error() : HttpResponse.json(findings)));
+      renderApp();
+      fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
+      expect(await screen.findByText('Nie udało się pobrać zgłoszeń.')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(window.location.search).toBe('?status=new&risk_level=high');
+    });
+
+    it('does not reopen a detail the user closed', async () => {
+      recordFindings();
+      renderApp();
+      fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Zamknij' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(window.location.search).toBe('?status=new&risk_level=high');
+    });
+
+    it('is absent when the summary reports no high-risk findings', async () => {
+      server.use(
+        http.get('http://localhost/api/stats/summary', () =>
+          HttpResponse.json({ ...summary, by_risk_level: { ...summary.by_risk_level, high: 0 } }),
+        ),
+      );
+      renderApp();
+      await screen.findByRole('region', { name: 'Podsumowanie' });
+      expect(screen.queryByRole('button', { name: /triage/i })).toBeNull();
+    });
   });
 
   it('renders markup in scraped text literally, never as HTML', async () => {

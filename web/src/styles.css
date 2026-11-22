@@ -123,6 +123,7 @@ main > [id] { scroll-margin-top: var(--space-4); }
 .hero-value { font-family: var(--font-display); font-size: 36px; font-weight: 700; line-height: 1; }
 .hero-risk .hero-value { color: var(--risk-high); }
 .hero-label { color: var(--muted); font-size: 18px; }
+.hero-triage { justify-self: start; }
 .hero-new { margin: 0; color: var(--muted); }
 .hero-new-value { font-family: var(--font-mono); font-weight: 600; color: var(--text); }
 .hero-modules { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }

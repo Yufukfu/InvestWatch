@@ -36,9 +36,9 @@
 
 ## 6. Triage entry
 
-- [ ] 6.1 Write the failing tests first: with 10 high-risk findings the hero button reads `Rozpocznij triage: 10 do oceny`, activating it from page 3 with a module, text and date filter set clears those, sets `status=new` and `risk_level=high`, and opens the first returned finding; the button shows no count; with 0 high-risk findings the button is absent; an empty or failed list opens no detail and clears the one-shot flag
-- [ ] 6.2 Implement the button and the URL update through the existing `findingsUrl` helpers and the summary hook
-- [ ] 6.3 mutations: N tried, N caught
+- [x] 6.1 Write the failing tests first: with 10 high-risk findings the hero shows a button named exactly `Rozpocznij triage` (no count, because the summary count spans every status), activating it from page 3 with a module, text and date filter set clears those, sets `status=new` and `risk_level=high`, and opens the first returned finding; with 0 high-risk findings the button is absent; an empty or failed list opens no detail and clears the one-shot flag
+- [x] 6.2 Implement the button and the URL update through the existing `findingsUrl` helpers and the summary hook
+- [x] 6.3 mutations: 13 tried, 12 caught, 1 equivalent (an `isFetching` guard that `currentData` already covers; removed as dead code)
 
 ## 7. Keyboard shortcuts
 
