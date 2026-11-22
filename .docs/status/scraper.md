@@ -26,6 +26,7 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-22 (Sun).
 - `scraper-stack` (PR #52); `scraper-orchestration`, `scraper-author-provenance`, `scraper-v2-sources` and `content-hash-definition` are merged (PRs #38, #49, #41, #43, #44)
 - `scraper-effectiveness-report` (PR #57)
 - `scraper-sample-import` (PR #56)
+- `scraper-audit-in-pr-body` (issue #66): spec-only delta so `scraper-deployment` says the `pip-audit` result goes in the PR body (ADR 0209); no code or doc edit.
 
 ## Blockers and open decisions
 
