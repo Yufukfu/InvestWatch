@@ -28,7 +28,7 @@ const MODULE = `(?<![\\w/-])\`?(?:${MODULE_WORDS.join('|')})/?\`?`;
 const OWNERSHIP_PATTERNS = [
   new RegExp(`\\b(?:owners?|owned by)\\b[\\s:*(]*${NAME}`, 'i'), // owner Damian, **Owner:** Damian, owned by Kacper
   new RegExp(`\\b${NAME}'s module`), // Adam's module
-  new RegExp(`${MODULE}(?: [a-z]+)?\\s*\\((?:owner )?${NAME}`), // scraper (Adam), web/ dashboard (Kacper)
+  new RegExp(`${MODULE}\\s*\\(${NAME}`), // scraper (Adam), web/ dashboard (Kacper)
   new RegExp(`\`(?:${MODULE_WORDS.join('|')})/\` ${NAME}`), // `scraper/` Adam
   /^\s*\|.*\|\s*Owners?\s*\|/i, // an Owner table column
 ];

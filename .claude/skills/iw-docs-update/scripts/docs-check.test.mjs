@@ -133,7 +133,7 @@ const OWNERSHIP = [
   'ownership by directory (`scraper/` Adam, `web/` Kacper).',
   'scheduler -> scraper (Adam) -> analytics',
   'Rules for the web dashboard, Kacper\'s module.',
-  'Modules: web/ frontend (Kacper).',
+  'Modules: web/ dashboard (Kacper).',
   'analytics/ (Damian; an api/ folder later).',
   '| Folder | Purpose | Owner |',
 ];
@@ -154,7 +154,7 @@ test('history, in-flight changes, prose about work and spec scenario steps may n
     '.docs/decisions/README.md': '0101-x.md',
     '.docs/ai-workflow.md': body,
     'openspec/changes/some-change/proposal.md': body,
-    'api/README.md': 'Scraper (Adam), insert a document. Kacper\'s review of PR #35. Fixed (Adam, PR #48). In mock-api (Adam, PR #48).',
+    'api/README.md': 'Scraper (Adam), insert a document. Kacper\'s review of PR #35. Fixed (Adam, PR #48). In mock-api (Adam, PR #48). Dashboard part (Kacper) and scraper part (Adam) pending.',
     'openspec/specs/x/spec.md': '- **GIVEN** `analytics/` is owned by Damian\n- **THEN** the result is Adam\n',
     'README.md': 'Owners: [`.github/CODEOWNERS`](.github/CODEOWNERS)',
     '.github/CODEOWNERS': '/api/ @Yufukfu\n',
