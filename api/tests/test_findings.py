@@ -358,22 +358,22 @@ def _rescan(client, finding):
     return body["document"]["scrape_meta"]["rescan"]
 
 
-def _job_error(url, **over):
+def _job_error(db_url, **over):
     row = dict(id=uuid.uuid4(), source_id=None, url="https://alfa.example/oferta", reason="http_error",
                detail="HTTP 404", occurred_at=datetime.now(timezone.utc))
     row.update(over)
-    engine = create_engine(url)
+    engine = create_engine(db_url)
     with engine.begin() as conn:
         conn.execute(insert(job_errors).values(row))
     engine.dispose()
 
 
-def _rescanned(migrated_db, **newer_over):
-    """An old document with a finding and a later fetch of the same page."""
-    src = source_row()
+def _rescanned(migrated_db, src_over=None, both=None, **newer_over):
+    """An old document with a finding and a later fetch of the same page (`both` goes on the two documents)."""
+    src = source_row(**(src_over or {}))
     t = datetime.now(timezone.utc) - timedelta(hours=2)
-    old = document_row(source_id=src["id"], fetched_at=t, payload={"scrape_meta": {"scraper": "httpx"}})
-    new = document_row(source_id=src["id"], fetched_at=t + timedelta(hours=1), **newer_over)
+    old = document_row(source_id=src["id"], fetched_at=t, payload={"scrape_meta": {"scraper": "httpx"}}, **(both or {}))
+    new = document_row(source_id=src["id"], fetched_at=t + timedelta(hours=1), **{**(both or {}), **newer_over})
     f_old, f_new = finding_row(old["id"]), finding_row(new["id"])
     engine = create_engine(migrated_db.app_url)
     with engine.begin() as conn:
@@ -443,3 +443,66 @@ def test_rescan_job_error_before_the_last_fetch_or_not_gone_is_ignored(client, m
     _job_error(migrated_db.app_url, source_id=None, occurred_at=new["fetched_at"] + timedelta(minutes=1))
     assert _rescan(client, f_old)["state"] == "changed"
     assert _rescan(client, f_new)["state"] == "current"
+
+
+@pytest.mark.parametrize("reason", ["gone", "http_error"])
+def test_rescan_gone_reason_from_the_scraper_marks_removed(client, migrated_db, reason):
+    # the scraper writes `gone` for a page that answered 404/410 twice (PR #108); old `http_error` rows still count
+    src, _, new, f_old, _ = _rescanned(migrated_db)
+    _job_error(migrated_db.app_url, source_id=src["id"], reason=reason, detail="HTTP 410",
+               occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    assert _rescan(client, f_old)["state"] == "removed"
+
+
+def test_rescan_other_reason_with_a_404_detail_is_ignored(client, migrated_db):
+    src, _, new, f_old, _ = _rescanned(migrated_db)
+    _job_error(migrated_db.app_url, source_id=src["id"], reason="blocked",
+               occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    assert _rescan(client, f_old)["state"] == "changed"
+
+
+def test_rescan_gone_on_a_redirecting_web_source_marks_removed(client, migrated_db):
+    # the source URL redirects; the documents hold the final URL, the scraper's `gone` row the URL as entered
+    entered, final = "https://alfa.example/stara-oferta", "https://alfa.example/oferta"
+    src, _, new, f_old, f_new = _rescanned(migrated_db, src_over={"url": entered},
+                                           both={"url": final, "canonical_url": final})
+    _job_error(migrated_db.app_url, source_id=src["id"], reason="gone", url=entered,
+               occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    for f in (f_old, f_new):
+        state = _rescan(client, f)
+        assert state["state"] == "removed" and state["latest_document_id"] is None
+
+
+def test_rescan_gone_of_another_web_source_is_ignored(client, migrated_db):
+    _, _, new, f_old, _ = _rescanned(migrated_db)
+    other = source_row()
+    engine = create_engine(migrated_db.app_url)
+    with engine.begin() as conn:
+        conn.execute(insert(sources).values(other))
+    engine.dispose()
+    _job_error(migrated_db.app_url, source_id=other["id"], reason="gone",
+               occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    assert _rescan(client, f_old)["state"] == "changed"
+
+
+def test_rescan_on_a_many_page_platform_still_needs_the_page_url(client, migrated_db):
+    # one forum source holds many posts: a 404 on one post's URL does not remove the others
+    post = "https://forum.example/watek/1"
+    src, _, new, f_old, _ = _rescanned(migrated_db, src_over={"platform": "forum", "url": "https://forum.example/"},
+                                       both={"platform": "forum", "url": post})
+    later = new["fetched_at"] + timedelta(minutes=1)
+    _job_error(migrated_db.app_url, source_id=src["id"], url="https://forum.example/watek/2", occurred_at=later)
+    assert _rescan(client, f_old)["state"] == "changed"
+    _job_error(migrated_db.app_url, source_id=src["id"], url=post, occurred_at=later)
+    assert _rescan(client, f_old)["state"] == "removed"
+
+
+def test_rescan_web_page_without_a_source_still_needs_the_page_url(client, migrated_db):
+    t = datetime.now(timezone.utc) - timedelta(hours=1)
+    doc = document_row(fetched_at=t)  # no source_id
+    f = finding_row(doc["id"])
+    _insert(migrated_db.app_url, [doc], [f])
+    _job_error(migrated_db.app_url, reason="gone", url="https://beta.example/inna", occurred_at=t + timedelta(minutes=1))
+    assert _rescan(client, f)["state"] == "current"
+    _job_error(migrated_db.app_url, reason="gone", url=doc["url"], occurred_at=t + timedelta(minutes=2))
+    assert _rescan(client, f)["state"] == "removed"
