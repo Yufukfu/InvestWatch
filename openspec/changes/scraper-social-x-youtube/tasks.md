@@ -47,4 +47,4 @@
 ## 7. Closing
 
 - [x] 7.1 Apply iw-docs-update (`scraper/README.md` and `scraper/CLAUDE.md` env keys, the exception and how to stop a lost account, `.docs/status/scraper.md`, ADR 0109 link) and add the iw-ai-log row
-- [ ] 7.2 Run iw-pr-review and fix real findings
+- [x] 7.2 Run iw-pr-review and fix real findings (whole-branch review: no blocking findings; strict validation failure fixed by splitting four long requirements)
