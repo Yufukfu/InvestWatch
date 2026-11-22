@@ -33,6 +33,7 @@ from .runner import (
     DEFAULT_REGISTRY,
     THRESHOLDS_FILE,
     evaluate,
+    llm_measured_defaults,
     load_build,
     report_json,
     write_thresholds,
@@ -131,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         log.error("default thresholds not written", extra={"error": "gold documents failed analysis"})
     elif args.write_thresholds is not None:
         try:
-            written = write_thresholds(args.write_thresholds, report)
+            written = write_thresholds(args.write_thresholds, report, llm_measured_defaults())
         except (OSError, ValueError) as exc:  # JSONDecodeError is a ValueError
             return _fail("invalid configuration", error=f"thresholds file: {type(exc).__name__}: {exc}")
         log.info("default thresholds written", extra={"thresholds": written, "file": str(args.write_thresholds)})
