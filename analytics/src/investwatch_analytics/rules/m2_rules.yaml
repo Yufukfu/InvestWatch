@@ -208,7 +208,9 @@ rules:
   # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
   - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
-  - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
+  # R9: LLM-first (no rules signal, analytics-m2-p1-rules follow-up F2); not_applicable with "brak informacji o
+  # ryzyku" without risk information.
+  - {id: R9, name: Zrozumiałość, severity: low, legal_basis: art. 44 ust. 2 lit. d rozp. del. 2017/565, implemented: false}
   - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
   # ZASÓB R11 (art. 44 ust. 3): "Wykrywa porównania produktów i usług, weryfikuje źródło informacji, przyjęte
   # założenia i flaguje naruszenia w raporcie" – violations only: a compliant comparison is a plain pass that quotes
@@ -262,6 +264,14 @@ rules:
         - '(?<!\d)\d{1,2}[./]\d{1,2}[./](?:19|20)\d{2}(?!\d)'
         - '\b(?:zleceni|kwot|wpłat|transakcj|saldo)\w*\s+(?:\w+\s+)?\d'
         - '\b(?:assuming|as\s+of)\b'
+    # Only an uncertain result is deferred: a superlative without a comparator, or a source without assumptions.
+    llm:
+      when: uncertain
+      question: >-
+        Czy materiał porównuje produkt lub usługę z innymi produktami, usługami lub podmiotami (także z indeksem
+        lub benchmarkiem) i czy podaje źródło tej informacji oraz przyjęte założenia (np. okres, kwotę, datę)?
+        Odpowiedz fail, jeśli to porównanie bez źródła lub bez założeń, pass, jeśli źródło i założenia są podane
+        albo jeśli to nie jest porównanie z innymi produktami. Zacytuj dosłownie zdanie z porównaniem.
   # ZASÓB R12a (art. 44 ust. 4): "okres ostatnich 5 lat … pełne okresy 12-miesięczne; oraz czy wskazano okres
   # referencyjny i źródło". Three named sub-checks (5 lat / 12 mies., okres referencyjny, źródło); the worst one is
   # the result. Same past-performance trigger as R12b and R14 (shared pp_* lists, ADR 0315). N months, year ranges,
@@ -295,6 +305,14 @@ rules:
         - '\bod\s+(?:początku\s+(?:działalności|istnienia)|uruchomienia|powstania|startu|debiutu)\b'
         - '\bsince\s+(?:inception|launch)\b'
       source_patterns: *source_markers
+    # Deferred only when the 5-year sub-check alone is uncertain (since inception, dated): art. 44 ust. 4 lit. b.
+    llm:
+      when: uncertain
+      question: >-
+        Wyniki historyczne podano od początku działalności produktu, a nie za ostatnie 5 lat. Czy z materiału
+        wynika, że produkt istnieje krócej niż 5 lat (np. podana data uruchomienia jest późniejsza niż 5 lat
+        temu)? Odpowiedz pass, jeśli tak, fail, jeśli nie lub jeśli tego nie wiadomo. Zacytuj dosłownie zdanie
+        z wynikami lub z datą uruchomienia.
   # ZASÓB R12b (art. 44 ust. 4): "ostrzeżenie o wpływie zmian kursów walutowych oraz czy wskazano wpływ prowizji,
   # opłat i obciążeń na wyniki". The fee statement always applies to past performance; the currency warning only
   # to results in, or a product denominated in, a currency other than PLN (art. 44 ust. 4 lit. e, Damian), and every
@@ -330,7 +348,8 @@ rules:
         - '\bryzyk\w*\s+(?:\w+\s+)?walutow\w*'
         - '\bcurrency\s+(?:fluctuations?|risk)\b'
         - '\bexchange\s+rates?\b'
-  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: null, implemented: false}
+  # R13: visual, needs `blocks` (font size, position in the viewport; #29).
+  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: art. 44 ust. 4 lit. a rozp. del. 2017/565, implemented: false}
   # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
   # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").
   - id: R14
@@ -409,6 +428,14 @@ rules:
         - '\bprzyszł\w*\s+wynik\w*\b.{0,60}?\b(?:mogą\s+(?:się\s+)?różni\w*|nie\s+(?:są|jest)\s+gwarantowan\w*)'
         - '\bnie\s+ma\s+gwarancji\b.{0,40}?\b(?:osiągnięcia|realizacji)\b.{0,40}?\b(?:prognoz|zakładan)\w*'
         - '\b(?:forecasts?|projections?)\b.{0,40}?\b(?:are|is)\s+not\s+(?:a\s+)?(?:reliable|guarantee)'
+    # Only a weak marker without a figure is deferred; a strong-marker forecast stays a rules-only fail.
+    llm:
+      when: uncertain
+      question: >-
+        Czy to zdanie prognozuje przyszłe wyniki produktu (zysk, stopę zwrotu, wzrost wartości)? Jeśli tak, a
+        materiał nie zawiera ostrzeżenia, że prognozy nie są wiarygodnym wskaźnikiem przyszłych wyników, odpowiedz
+        fail; jeśli to nie jest prognoza wyników albo ostrzeżenie jest podane, odpowiedz pass. Zacytuj dosłownie
+        to zdanie.
   # ZASÓB R16 (art. 44 ust. 7): a reference to tax treatment needs both disclaimer parts, "zależności od
   # indywidualnej sytuacji klienta i możliwości zmian". VAT is not tax treatment of the investment, and the
   # disclaimer sentence itself is not a tax reference (a lone disclaimer is not_applicable). Rules-only.

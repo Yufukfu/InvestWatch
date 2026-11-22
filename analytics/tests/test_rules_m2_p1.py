@@ -644,3 +644,92 @@ def test_r11_gold_comparison_with_source_passes(registry, catalogue):
     r = run(text, registry, catalogue)["R11"]
     assert r.result == "pass"
     assert r.evidence == text
+
+
+# ---- catalogue and the LLM seam (group 7) -------------------------------------------------------
+
+from investwatch_analytics.llm.judge import JudgeOutcome, LlmVerdict  # noqa: E402
+
+
+class FakeJudge:
+    """Records the checks it is asked; answers with the given verdicts (none: the rules-only results stand)."""
+
+    def __init__(self, *verdicts: LlmVerdict):
+        self.verdicts = {v.rule_id: v for v in verdicts}
+        self.calls: list[dict] = []
+
+    def judge(self, **kw) -> JudgeOutcome:
+        self.calls.append(kw)
+        return JudgeOutcome(verdicts=dict(self.verdicts), model="fake" if self.verdicts else None)
+
+    def asked(self) -> set[str]:
+        return {c.rule_id for call in self.calls for c in call["checks"]}
+
+
+def judged(text: str, registry: Registry, catalogue: Catalogue, judge: FakeJudge, **doc_fields) -> dict:
+    doc = ScrapedDocument.model_validate(make_doc(text=text, **doc_fields))
+    ctx = Context(doc=doc, pre=preprocess(text), firm_match=registry.match(text, doc.url), registry=registry)
+    return {r.rule_id: r for r in run_rules(catalogue, ctx, judge=judge, module="M2")}
+
+
+def test_llm_blocks_only_on_the_refined_rules(catalogue):
+    assert {s.id for s in catalogue.specs if s.llm is not None} == {"R3", "R11", "R12a", "R15", "R17", "R18"}
+    for rule_id in ("R11", "R12a", "R15"):
+        assert catalogue.get(rule_id).llm["when"] == "uncertain"
+
+
+def test_every_entry_has_a_legal_basis(catalogue):
+    assert [s.id for s in catalogue.specs if not s.legal_basis] == []
+    assert catalogue.get("R9").legal_basis == "art. 44 ust. 2 lit. d rozp. del. 2017/565"
+    assert catalogue.get("R13").legal_basis == "art. 44 ust. 4 lit. a rozp. del. 2017/565"
+
+
+def test_r15_weak_marker_is_deferred_and_merged_as_hybrid(registry, catalogue):
+    text = "Wyniki będą zależeć od sytuacji rynkowej."
+    judge = FakeJudge(LlmVerdict("R15", "pass", text, "To nie jest prognoza wyników."))
+    r = judged(text, registry, catalogue, judge)["R15"]
+    assert "R15" in judge.asked()
+    assert r.result == "pass" and r.method == "hybrid" and r.explanation == "To nie jest prognoza wyników."
+
+
+def test_r15_strong_forecast_is_never_deferred(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R15", "pass", "x", "x"))
+    r = judged("W przyszłym roku spodziewamy się jeszcze lepszych wyników.", registry, catalogue, judge)["R15"]
+    assert "R15" not in judge.asked()
+    assert r.result == "fail" and r.method == "rule"
+
+
+def test_r11_superlative_is_deferred(registry, catalogue):
+    text = "Najlepsze konto maklerskie na rynku!"
+    judge = FakeJudge(LlmVerdict("R11", "fail", text, "Porównanie z rynkiem bez źródła."))
+    r = judged(text, registry, catalogue, judge)["R11"]
+    assert "R11" in judge.asked()
+    assert r.result == "fail" and r.method == "hybrid"
+
+
+def test_r11_unsourced_explicit_comparison_is_never_deferred(registry, catalogue):
+    judge = FakeJudge()
+    judged(LOKATA, registry, catalogue, judge)
+    assert "R11" not in judge.asked()
+
+
+def test_r12a_since_inception_is_deferred(registry, catalogue):
+    judge = FakeJudge()
+    r = judged(f"Od uruchomienia w 2023 r. fundusz zarobił 18%. {SOURCE}", registry, catalogue, judge)["R12a"]
+    assert "R12a" in judge.asked()
+    assert r.result == "uncertain" and r.method == "rule"  # no verdict: the rules-only result stands
+
+
+def test_r12b_and_r16_never_send_a_check(registry, catalogue):
+    judge = FakeJudge()
+    judged(f"{USD} Inwestuj bez podatku Belki w IKZE! Wyniki będą zależeć od sytuacji rynkowej.", registry, catalogue, judge)
+    assert judge.asked() and not judge.asked() & {"R12b", "R16", "R14"}
+
+
+@pytest.mark.parametrize("with_judge", [False, True], ids=["rules-only", "stub-judge"])
+def test_every_evidence_is_a_quote_on_every_mock(with_judge, mock_documents, registry, catalogue):
+    for raw in mock_documents:
+        doc = ScrapedDocument.model_validate(raw)
+        ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=registry.match(doc.text, doc.url), registry=registry)
+        for r in run_rules(catalogue, ctx, judge=FakeJudge() if with_judge else None, module="M2"):
+            assert r.evidence is None or r.evidence in doc.text, (raw["id"], r.rule_id, r.evidence)

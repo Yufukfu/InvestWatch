@@ -544,9 +544,9 @@ def test_r18_pewnego_is_not_a_safety_word(registry, catalogue):
     assert run(text, registry, catalogue)["R18"].result == "pass"
 
 
-def test_llm_blocks_only_on_r3_r17_r18(catalogue):
+def test_llm_blocks_only_on_the_refined_rules(catalogue):
     with_llm = [s.id for s in catalogue.specs if s.llm is not None]
-    assert with_llm == ["R3", "R17", "R18"]
+    assert with_llm == ["R3", "R11", "R12a", "R15", "R17", "R18"]  # R11, R12a, R15: analytics-m2-p1-rules
     assert all(catalogue.get(i).llm["question"].strip() for i in with_llm)
     assert catalogue.get("R17").llm["when"] == "always"
 

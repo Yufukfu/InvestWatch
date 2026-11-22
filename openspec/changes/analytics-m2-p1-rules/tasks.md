@@ -97,14 +97,14 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
 
 ## 7. Catalogue scenarios and `llm:` blocks (~45 min, needs `analytics-llm-p0` group 8)
 
-- [ ] 7.1 Write the failing tests:
-  - catalogue complete: R1, R2, R3, R4, R6, R10, R11, R12a, R12b, R14, R15, R16, R17 and R18 are implemented;
+- [x] 7.1 Write the failing tests:
+  - catalogue complete: R1, R2, R3, R4, R6, R11, R12a, R12b, R14, R15, R16, R17 and R18 are implemented (R10 stays unbuilt: `analytics-llm-p0` merged without its group 11);
   - `llm:` blocks only on R3, R11, R12a, R15, R17 and R18;
   - every entry has a legal basis;
   - `FakeJudge`: an R15 weak-marker `uncertain` is deferred and its verdict merged as `hybrid`; R15's strong `fail` is never deferred; an R11 superlative is deferred; an R12a since-inception case is deferred; R12b and R16 never send a check;
   - the evidence check over all mocks holds, rules-only and with the stub judge.
-- [ ] 7.2 Write the `llm:` blocks with Polish questions on R11, R12a and R15 (`when: uncertain`). Set the legal bases for R9 and R13, and add the catalogue comments on R9 (LLM-first) and R13 (visual, #29). Correct the stage-2 R11 comment to say that ZASÓB "flaguje naruszenia" means violations only (follow-up F6). Tests green.
-- [ ] 7.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 7.2 Write the `llm:` blocks with Polish questions on R11, R12a and R15 (`when: uncertain`). Set the legal bases for R9 and R13, and add the catalogue comments on R9 (LLM-first) and R13 (visual, #29). Correct the stage-2 R11 comment to say that ZASÓB "flaguje naruszenia" means violations only (follow-up F6). Tests green.
+- [x] 7.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 7 tried, 7 caught` (each of the three blocks missing, R11 and R15 set to `when: always`, the R9 and R13 legal bases). The stage-2 pin `test_llm_blocks_only_on_r3_r17_r18` now lists the six refined rules. The R11 catalogue comment (F6) was replaced with the R11 entry in group 6.
 
 ## 8. Mock run (~30 min)
 
