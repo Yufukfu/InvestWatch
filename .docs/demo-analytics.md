@@ -115,9 +115,10 @@ The dashboard is one page (`https://localhost:8443/`): a header with the live-al
 - **Live-alert source:** XTB forex (`0bdd4ea5-1678-457e-ab40-9660d2558584`, `https://www.xtb.com/pl/forex`) has never been scanned on this stack, so scanning it during the demo yields a new document and a new M2 finding. It is not cached: with Gemini down it is built rules-only within seconds; with Gemini slow it can take up to the 50 s document budget, so start the scan, explain, then point at the toast.
 - The ids above are for this stack only. Open a finding with `https://localhost:8443/?finding=<id>`.
 
-## 5. Thresholds (ADR 0316, ADR 0317)
+## 5. Thresholds (ADR 0316, ADR 0317, ADR 0318, ADR 0319)
 
-- The defaults are measured, not chosen: the best-F1 point of the rules-only gold-set run, taking the higher end of the plateau (ties go to precision). **M1 0.65, M2 0.1, M3 0.4.**
+- The defaults are measured, not chosen: the best-F1 point of the gold-set run, taking the higher end of the plateau (ties go to precision). On `main` they are **M1 0.75, M2 0.05, M3 0.4**: M1 from the DeepSeek Flash run (ADR 0318), M2 from the rules-only run once all 18 rules were built (ADR 0319: the M2 score is Σ weight·fail / Σ weight·applicable, so more applicable rules make one violation weigh less).
+- **This stack is older.** `iw-demo` runs `a0ad3d13` (12 of 18 M2 rules) and keeps its own thresholds in Redis (`iw:settings:thresholds`), the older defaults M1 0.65, M2 0.1 in the table below. Every score and slider number in this script is from that stack.
 - M3 is the exception: its best-F1 point is 0.25, but the default is raised to the S3.4 gate cap of 0.4 (ADR 0308). We prefer no false accusation of unauthorized advice over recall.
 - Every `docker compose up` runs the evaluation once (`analytics-eval`) and stores the curve, so the calibration panel shows a measured curve from the first minute. The gold set is synthetic (69 documents from the challenge criteria), so the numbers say "the rules do what we specified", not real-world prevalence.
 - **Slider, live numbers on this stack** (`GET /api/calibration?module=…`, rules-only gold run of `a0ad3d13`; they are newer than the slide deck, which predates the M2 P1 rules):
@@ -133,13 +134,24 @@ The dashboard is one page (`https://localhost:8443/`): a header with the live-al
 | M3 | **0.40 (default)** | 1.00 | 0.40 | 4 |
 
 - Suggested move: M2 from 0.10 to 0.25 (precision reaches 1.0, four fewer alerts, recall drops), then back. "Zapisz próg" only if you want to keep it; the XTB IKE finding (0.368) stays above both.
+- **M2 slider on current `main`** (rules-only gold run of `61238394`, all 18 rules; what the panel shows after the rebuild below):
+
+| M2 threshold | Precision | Recall | Alerts on the gold set |
+|---|---|---|---|
+| **0.05 (default)** | 0.955 | 0.913 | 22 |
+| 0.10 | 0.95 | 0.826 | 20 |
+| 0.25 | 1.00 | 0.609 | 14 |
+| 0.40 | 1.00 | 0.304 | 7 |
+
+  The move there is 0.05 to 0.25: precision reaches 1.0, eight fewer alerts, recall drops to 0.61.
+- **To show 18 rules on the demo stack** (not done; it costs the cached LLM verdicts of section 4, see section 0): move the demo worktree to the current `origin/main`, rebuild analytics (`docker compose up -d --build analytics analytics-eval`, so the calibration curve is re-measured), and set the thresholds to M1 0.75, M2 0.05 with "Zapisz próg" (the stored key wins over the new defaults; the API writes defaults only when the key is missing). Then re-announce each demo document on `iw:documents` as in section 4: a rescan of an unchanged page is deduplicated and never reaches analytics. The XTB IKE score and the other numbers in sections 2 and 4 will change and must be re-read.
 - ADR 0317 adds the runtime limits that the hosted Gemma needs: `LLM_TIMEOUT_S=45`, `LLM_DOC_BUDGET_S=50`, and `CLAIM_MIN_IDLE_MS=90000` above the budget, so a slow model call is not mistaken for a dead worker.
 
 ## 6. Known limits (say them before the jury asks)
 
 - **Visual rules need the renderer.** R4 (font size of the risk warning) and R6 (risk hidden in a footer) read the block render metadata from the page renderer. On a page or post without blocks they are `not_applicable`, as on XTB IKE here.
 - **M3 recall is low by design.** Rules-only, S3.3 and S3.4 only mark candidates; the gate keeps scores at 0.4 or below without S3.4. Gold set at 0.4: precision 1.00, recall 0.40. Crypto-only signals (most Telegram channels) are outside art. 2 and are capped by S3.8.
-- **12 of the 18 M2 rules are implemented** on `main` (R1, R2, R3, R4, R6, R11, R12 as R12a/R12b, R14, R15, R16, R17, R18: 13 catalogue entries). R5, R7-R10 and R13 are not built yet. The slide deck (`presentation-analytics.md`) still says 8: it was written from an older run.
+- **This stack runs 12 of the 18 M2 rules** (R1, R2, R3, R4, R6, R11, R12 as R12a/R12b, R14, R15, R16, R17, R18: 13 catalogue entries). Current `main` has all 18 (19 entries with R12a/R12b), and the slide deck (`presentation-analytics.md`) gives the 18-rule numbers. If asked, say the gold-set numbers are from `main` and the live stack is the older build; section 5 says how to bring it up to date.
 - **The hosted model is slow and often unavailable** (measured on 2026-11-22: many 503 "high demand", 429 per-minute quota, 17-41 s per successful call on 26b). That is why the demo relies on the cache.
 
 ## 7. Fallback if Gemini is down (2 minutes)
