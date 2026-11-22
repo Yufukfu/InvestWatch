@@ -15,9 +15,9 @@
 
 ## 3. Removed page in the web flow
 
-- [ ] 3.1 Test first (`scraper/tests/test_collect_gone.py`, stub server): the six scenarios of "Record a removed page once, with its URL" (410 twice after a stored document, a redirect to a 404, 404 on the next re-scan makes one request and stores no second row, replaced then removed again stores a new row, never stored stays `http_error`, 503 and 403 are never `gone`, lookup failure falls back to `http_error`) plus "one flaky 404", "confirmation answers something else" (503 and 429 keep their status and `Retry-After`) and "URL is redacted"; the test's ingestor fake gains `rescan_state` and `record_gone`
-- [ ] 3.2 `Ingestor.record_gone` and the 404/410 branch of the web flow in `collect.py` (one confirmation request with its own `wait_turn`, same identity and session, skipped when a `gone` is already newer than the newest document; stored URL is `source.url`). Rebase on `scraper-social-x-youtube` first if it has merged
-- [ ] 3.3 Mutation check — mutations: N tried, N caught
+- [x] 3.1 Test first (`scraper/tests/test_collect_gone.py`, stub server): the six scenarios of "Record a removed page once, with its URL" (410 twice after a stored document, a redirect to a 404, 404 on the next re-scan makes one request and stores no second row, replaced then removed again stores a new row, never stored stays `http_error`, 503 and 403 are never `gone`, lookup failure falls back to `http_error`) plus "one flaky 404", "confirmation answers something else" (503 and 429 keep their status and `Retry-After`) and "URL is redacted"; the test's ingestor fake gains `rescan_state` and `record_gone`
+- [x] 3.2 `Ingestor.record_gone` and the 404/410 branch of the web flow in `collect.py` (one confirmation request with its own `wait_turn`, same identity and session, skipped when a `gone` is already newer than the newest document; stored URL is `source.url`). Rebase on `scraper-social-x-youtube` first if it has merged
+- [x] 3.3 Mutation check — mutations: 11 tried, 11 caught
 
 ## 4. A removal is not a failed run
 

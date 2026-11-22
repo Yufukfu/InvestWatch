@@ -185,3 +185,38 @@ async def test_a_post_of_a_social_source_is_not_classified(ingestor, seeded_sour
     assert [r.outcome for r in results] == ["inserted", "inserted", "duplicate"]
     assert results[1].previous_document_id is None
     assert outcomes(caplog) == []
+
+
+async def job_errors(pool):
+    async with pool.acquire() as conn:
+        return [dict(r) for r in await conn.fetch("SELECT source_id, url, reason, detail FROM job_errors")]
+
+
+async def test_record_gone_stores_one_row_with_the_source_url_and_logs_gone(pool, ingestor, seeded_source, caplog):
+    await ingestor.record_gone(seeded_source, 410)
+    [row] = await job_errors(pool)
+    assert (str(row["source_id"]), row["url"], row["reason"], row["detail"]) == (
+        seeded_source.id, seeded_source.url, "gone", "HTTP 410",
+    )
+    assert [l["outcome"] for l in outcomes(caplog)] == ["gone"]
+
+
+async def test_record_gone_again_logs_without_a_second_row(pool, ingestor, seeded_source, caplog):
+    await ingestor.record_gone(seeded_source, 404, already_recorded=True)
+    assert await job_errors(pool) == []
+    assert [l["outcome"] for l in outcomes(caplog)] == ["gone"]
+
+
+async def test_record_gone_redacts_the_source_url(pool, ingestor, seeded_source):
+    secret_source = replace(seeded_source, url="https://user:hunter2@alfa.example.com/ad?token=abc123def")
+    await ingestor.record_gone(secret_source, 404)
+    [row] = await job_errors(pool)
+    assert "hunter2" not in row["url"] and "abc123def" not in row["url"]
+
+
+async def test_record_gone_never_raises_when_the_sink_fails(ingestor, seeded_source, monkeypatch):
+    async def broken(*_args):
+        raise OSError("connection reset")
+
+    monkeypatch.setattr(pipeline, "record_error", broken)
+    await ingestor.record_gone(seeded_source, 404)

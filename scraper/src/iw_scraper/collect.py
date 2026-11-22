@@ -15,7 +15,7 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 
 from iw_scraper.document import build_document
-from iw_scraper.fetch import FetchDeferred, FetchFailure, close_session, fetch, open_session
+from iw_scraper.fetch import FetchDeferred, FetchFailure, FetchResult, close_session, fetch, open_session
 from iw_scraper.identities import draw_identity
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure, parse_page
@@ -30,6 +30,7 @@ DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 DEFAULT_SOCIAL_MAX_POSTS = 40  # `SOCIAL_MAX_POSTS`: two pages of twenty
 _log = logging.getLogger(__name__)
+_GONE_STATUSES = frozenset({404, 410})
 _MAX_DIGITS = 15  # more digits than this is beyond any cap; `int()` also refuses 4300+ digits
 
 
@@ -133,12 +134,10 @@ class Collector:
         if source.platform != "web":
             return await self._collect_social(source, identity, session, proxy, guard, domain)
 
-        await self._limiter.wait_turn(domain)
-        began = time.monotonic()
-        result = await stages.fetch(
-            source.url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
-        )
-        duration_ms = int((time.monotonic() - began) * 1000)
+        fetched = await self._fetch_web(source, identity, session, proxy, guard, domain)
+        if isinstance(fetched, AttemptResult):  # the page is gone: recorded, not a failed run
+            return fetched
+        result, duration_ms = fetched
 
         page = stages.parse(result.body, result.content_type, result.url)
         fetched_at = self._clock()
@@ -150,6 +149,43 @@ class Collector:
         if stored.outcome == "failed":  # the ingestor has recorded it in `job_errors`
             return AttemptResult(error=stored.error, recorded=True)
         return AttemptResult(documents=1 if stored.outcome == "inserted" else 0)
+
+    async def _fetch_web(
+        self, source: Source, identity, session, proxy, guard, domain: str
+    ) -> tuple[FetchResult, int] | AttemptResult:
+        """Fetch the page; a 404 or 410 on a source that stored a document is confirmed once and recorded as `gone`.
+
+        `fetch()` follows redirects itself, so a redirect that ends in 404 looks like a 404 on the source URL.
+        The confirmation is the same run's second observation, not a retry: any other answer to it keeps its own
+        outcome, and a page that answers 200 the second time is processed like any fetch.
+        """
+
+        async def attempt() -> tuple[FetchResult, int]:
+            await self._limiter.wait_turn(domain)
+            began = time.monotonic()
+            result = await self._stages.fetch(
+                source.url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
+            )
+            return result, int((time.monotonic() - began) * 1000)
+
+        try:
+            return await attempt()
+        except FetchFailure as first:
+            if first.http_status not in _GONE_STATUSES:
+                raise
+            state = await self._ingestor.rescan_state(source.id)
+            if state is None or state.document_id is None:  # lookup failed (logged), or nothing stored to be removed
+                raise
+            if state.gone_is_newer:  # already recorded: no second row and no second request
+                await self._ingestor.record_gone(source, first.http_status, already_recorded=True)
+                return AttemptResult()
+        try:
+            return await attempt()
+        except FetchFailure as second:
+            if second.http_status not in _GONE_STATUSES:
+                raise
+            await self._ingestor.record_gone(source, second.http_status)
+            return AttemptResult()
 
     async def _collect_social(self, source: Source, identity, session, proxy, guard, domain: str) -> AttemptResult:
         """Read a channel's pages, newest first, through the same fetch path as a web page.

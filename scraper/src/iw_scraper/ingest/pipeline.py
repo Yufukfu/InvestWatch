@@ -108,6 +108,16 @@ class Ingestor:
             self._log_lookup_failure(source_id, exc)
             return None
 
+    async def record_gone(self, source: Source, status: int, *, already_recorded: bool = False) -> None:
+        """A web page answered 404 or 410 twice: store one `gone` job error with the source URL, and log it.
+
+        `already_recorded` is a re-scan that found the page still missing after a `gone` that is newer than its
+        newest document: only the log line is written. Never raises; it observes, it does not fail the run.
+        """
+        if not already_recorded:
+            await self._record(JobError(Reason.GONE, f"HTTP {status}", source.id, url=source.url))
+        self._log_outcome("gone", source.id, None)
+
     async def _with_previous(self, result: IngestResult, doc: dict) -> IngestResult:
         """A web page that already had a version reports it; the first collection says nothing."""
         if doc["platform"] != "web":
