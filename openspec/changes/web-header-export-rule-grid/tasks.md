@@ -15,5 +15,5 @@
 
 ## 3. Closing
 
-- [ ] 3.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry.
+- [x] 3.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry.
 - [ ] 3.2 Run `iw-pr-review` and fix real findings.
