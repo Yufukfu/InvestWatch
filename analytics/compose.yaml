@@ -1,4 +1,4 @@
-# analytics/ deployment unit (owner Damian): the iw:documents stream worker and the one-shot gold-set evaluation. Included from the root compose.yaml
+# analytics/ deployment unit: the iw:documents stream worker and the one-shot gold-set evaluation. Included from the root compose.yaml
 # next to infra/compose.yaml, which owns postgres, redis and the data network (none is declared here),
 # and api/compose.yaml, whose one-shot api-migrate creates the tables this worker reads and writes.
 # Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml up analytics
@@ -7,7 +7,9 @@ services:
     # ../analytics, not `.`: with several -f files Compose resolves paths from the first file's directory (infra/ in
     # the command above); from analytics/ (root include) it is the same directory. api-migrate uses `..` likewise.
     build: ../analytics
-    image: investwatch/analytics:${IW_VERSION:-dev}
+    # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
+    pull_policy: build
+    image: investwatch/analytics:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     restart: unless-stopped
     environment:
       # App role: CRUD only, no DDL (infra/postgres/init/01-app-role.sh).
@@ -28,7 +30,27 @@ services:
       LLM_CACHE_TTL_S: ${LLM_CACHE_TTL_S:-}
       LLM_BREAKER_FAILURES: ${LLM_BREAKER_FAILURES:-}
       LLM_BREAKER_COOLDOWN_S: ${LLM_BREAKER_COOLDOWN_S:-}
-      # Must stay above (LLM_DOC_BUDGET_S + 3 s) * 1000 (the worker refuses to start otherwise); 90000 for hosted Gemma.
+      # Embeddings (ADR 0313): local only. Empty EMBED_BASE_URL = off (model.embedder = null, dictionary-only gate).
+      # With --profile llm and bge-m3 pulled (issue #65): EMBED_BASE_URL=http://ollama:11434/v1. Limits: analytics/.env.example.
+      EMBED_BASE_URL: ${EMBED_BASE_URL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-bge-m3}
+      EMBED_API_KEY: ${EMBED_API_KEY:-}
+      EMBED_DIM: ${EMBED_DIM:-}
+      EMBED_TIMEOUT_S: ${EMBED_TIMEOUT_S:-}
+      EMBED_MAX_CHARS: ${EMBED_MAX_CHARS:-}
+      EMBED_CACHE_TTL_S: ${EMBED_CACHE_TTL_S:-}
+      EMBED_BREAKER_FAILURES: ${EMBED_BREAKER_FAILURES:-}
+      EMBED_BREAKER_COOLDOWN_S: ${EMBED_BREAKER_COOLDOWN_S:-}
+      # Topic gate and near-duplicates (ADR 0314); defaults in analytics/.env.example.
+      GATE_ENABLED: ${GATE_ENABLED:-}
+      GATE_SIM_THRESHOLD: ${GATE_SIM_THRESHOLD:-}
+      NEARDUP_NUM_PERM: ${NEARDUP_NUM_PERM:-}
+      NEARDUP_BANDS: ${NEARDUP_BANDS:-}
+      NEARDUP_THRESHOLD: ${NEARDUP_THRESHOLD:-}
+      NEARDUP_MAX_CHARS: ${NEARDUP_MAX_CHARS:-}
+      NEARDUP_TTL_S: ${NEARDUP_TTL_S:-}
+      # Must stay above (LLM_DOC_BUDGET_S + 3 s + EMBED_TIMEOUT_S) * 1000 (the worker refuses to start otherwise);
+      # 90000 for hosted Gemma.
       CLAIM_MIN_IDLE_MS: ${CLAIM_MIN_IDLE_MS:-}
       # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
       # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).
@@ -63,7 +85,7 @@ services:
   # No `build:` here: `analytics` builds the shared image (like api-migrate/api). Two services building one tag run
   # two parallel exports, and with the containerd image store one fails "image ... already exists", aborting `up --build`.
   analytics-eval:
-    image: investwatch/analytics:${IW_VERSION:-dev}
+    image: investwatch/analytics:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["python", "-m", "investwatch_analytics.evaluation", "--db"]
     restart: "no"
     environment:

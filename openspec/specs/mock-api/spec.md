@@ -2,7 +2,9 @@
 
 ## Purpose
 A contract-conformant stand-in for the InvestWatch REST API and Socket.IO events, backed by `contracts/mocks/`, so the dashboard can be developed and demoed without the other services. Lives in `contracts/mock-server/`.
+
 ## Requirements
+
 ### Requirement: Serve the contract REST routes from mock data
 The mock server SHALL expose every path of `contracts/openapi.yaml` under the `/api` prefix on a configurable port (default `8000`), and every JSON response SHALL validate against the schema referenced by that path in `contracts/openapi.yaml` and `contracts/schemas/`. Data SHALL come from the files in `contracts/mocks/` (mock-to-endpoint table in `contracts/README.md`); the contracts themselves are defined in `.docs/integration-plan.md` §4-§5 and are not restated here.
 
@@ -128,3 +130,24 @@ The server SHALL allow cross-origin requests from configurable origins (default 
 - **WHEN** the server starts and `contracts/mocks/findings.json` is missing or contains an item that fails `finding.schema.json`
 - **THEN** the process exits with a non-zero code and an error naming the file, instead of serving invalid data
 
+### Requirement: Filter mock findings by document
+The mock server's `GET /api/findings` SHALL accept an optional `document_id` (UUID), as `contracts/openapi.yaml` defines it, and return only findings of that document, combined (AND) with the other filters, sort and pagination, with `total` counting all matches before pagination. A malformed value SHALL get 422.
+
+#### Scenario: Document with two findings
+- **WHEN** a client sends `GET /api/findings?document_id=<the mock document with M1 and M3 findings>`
+- **THEN** the response holds exactly its M1 and M3 findings and `total` is 2
+
+#### Scenario: Document and module together
+- **WHEN** a client sends the same request with `module=M1`
+- **THEN** only the M1 finding is returned and `total` is 1
+
+#### Scenario: Malformed or unknown document id
+- **WHEN** a client sends `document_id=not-a-uuid`, or a UUID no mock finding references
+- **THEN** the server responds 422 for the first and 200 with empty `items` and `total` 0 for the second
+
+### Requirement: Mocks include a document with several findings
+The generated mocks SHALL contain at least one document that has findings from two modules (M1 and M3), each with its own `id`, so the dashboard can show several findings for one post. Findings SHALL stay unique per `(document_id, module)`.
+
+#### Scenario: M1 and M3 on one post
+- **WHEN** `python contracts/mocks/generate_mocks.py` runs
+- **THEN** `findings.json` has exactly one `document_id` shared by two findings, one with `module` M1 and one with M3, and `python contracts/validate.py` exits 0

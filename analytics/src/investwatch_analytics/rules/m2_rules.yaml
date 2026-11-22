@@ -13,6 +13,85 @@ shared:
     - '\b(?:osiągnięt\w*\s+w\s+przeszłości|historyczn\w*|przeszł\w*)\s+wynik\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*|gwarantuj\w*)'
     - '\bnie\s+(?:gwarantuj\w*|są\s+gwarancją|stanowi\w*\s+gwarancji)\b.{0,60}?\b(?:podobnych|przyszłych)\s+(?:wynik\w*|zysk\w*|stóp)'
 
+  # Past-performance detector of R12a, R12b and R14 (ADR 0315: one trigger, never a disagreement). A sentence
+  # presents past performance with a return figure (pp_figure minus fees/taxes, or pp_amount next to
+  # pp_amount_return) and a past marker (pp_past), or a year <= the fetch year with no pp_future marker.
+  pp_figure: &pp_figure
+    - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
+  pp_amount: &pp_amount
+    - '\b\d+(?:[.,]\d+)?\s?(?:zł|PLN|EUR|USD|€|\$)'
+  pp_amount_return: &pp_amount_return
+    - '\bzysk\w*'
+    - '\bzarobi\w*'
+    - '\bwypracowa\w*'
+    - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
+    - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+    - '\bdoch(?:ód|od(?!z))\w*'
+    - '\b(?:profit|return|gain)\w*'
+  pp_figure_exclude: &pp_figure_exclude
+    - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
+    - '\bbonus\w*\s+(?:\w+\s+)?\d+(?:[.,]\d+)?\s?%'
+    - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
+  pp_past: &pp_past
+    - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
+    - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
+    - '\bosiągn(?:ął|ęła|ęło|ęli|ęły|ęliśmy)\b'
+    - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
+    - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
+    - '\bda(?:ł|ła|ło|li|ły)\b'
+    - '\bwzr[oó]s(?:ł|ła|ło|ły|li)\b'
+    - '\bhistoryczn\w*'
+    - '\b(?:w|przez|za)\s+ostatni\w*\s+(?:\d+\s+)?(?:lat\w*|rok\w*|miesi\w*|kwarta\w*)'
+    - '\bw\s+(?:zeszłym|ubiegłym|poprzednim)\s+(?:roku|kwartale|miesiącu)'
+    - '\bpast performance\b'
+    - '\b(?:returned|delivered|gained|grew)\b'
+  pp_future: &pp_future
+    - '\bspodziewa\w*'
+    - '\bprognoz\w*'
+    - '\bbędzie\w*'
+    - '\bbędą\b'
+    - '\bprzewidu\w*'
+    - '\bplanuje\w*'
+    - '\bcel\w*\b'
+    - '\bexpect\w*'
+    - '\bwill\b'
+    - '\bforecast\w*'
+    - '\bzyskaj\w*'
+    - '\bzarabiaj\w*'
+    - '\bmożesz\b'
+    - '\bnawet\b'
+    - '\bważn\w*\s+do\b'
+    - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
+  # Source of figures, shared by R11 (comparisons) and R12a (past performance); counts anywhere in the text.
+  source_markers: &source_markers
+    - '\bźródł\w*'
+    - '\b(?:według|wg\.?|na\s+podstawie)\s+danych\b'
+    - '\bdane\s+(?:z|ze|za)\b'
+    - '\bsource\b'
+    - '\bdata\s+from\b'
+    # The method of a comparison names its source too (gold m2-r11-comparison-with-source).
+    # Not `opublikowany przez …`: that names the publisher, not the source (group 6 review).
+    - '\bopublikowan\w*\s+(?:\S+\s+){0,4}(?:na\s+stronach|w\s+raport|w\s+sprawozdani)\w*'
+    # Data published by someone is a source ("dane opublikowane przez KNF"; group 7 review).
+    - '\bdan\w*\s+(?:\w+\s+)?opublikowan\w*\s+przez\b'
+    - '\bporównani\w*\s+(?:\w+\s+){0,2}(?:tabel|cennik|taryf|ofert)\w*'
+
+  # R15's forecast markers (strong ones, and future-tense return verbs): also future markers of the shared
+  # past-performance detector, so a forecast dated in the fetch year is never past performance (ADR 0315).
+  forecast_markers: &forecast_markers
+    - '\bprognoz\w*'
+    - '\bspodziewa\w*'
+    - '\boczekuj(?:emy|e\s+się)\b'
+    - '\boczekiwan\w*'
+    - '\bprzewidu\w*'
+    - '\bszacuj\w*'
+    - '\bw\s+(?:przyszłym|kolejnym|następnym|nadchodzącym)\s+roku\b'
+    - '\bcel\w*\s+(?:\w+\s+)?zwrotu\b'
+    - '\b(?:expect\w*|forecast\w*|projected)\b'
+    - '\btarget\s+returns?\b'
+  forecast_verbs: &forecast_verbs
+    - '\b(?:zarobisz|zarobicie|zarobimy|zyskasz|zyskacie|zyskamy|przyniesie|przyniosą|wypracuje|wypracują|osiągnie|osiągną|wyniesie|wyniosą|zarobi|zyska)\b'
+
 rules:
   - id: R1
     name: Identyfikacja firmy
@@ -148,13 +227,159 @@ rules:
   # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
   - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
-  - {id: R9, name: Zrozumiałość, severity: low, legal_basis: null, implemented: false}
+  # R9: LLM-first (no rules signal, analytics-m2-p1-rules follow-up F2); not_applicable with "brak informacji o
+  # ryzyku" without risk information.
+  - {id: R9, name: Zrozumiałość, severity: low, legal_basis: art. 44 ust. 2 lit. d rozp. del. 2017/565, implemented: false}
   - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
-  # R11 (P2): ZASÓB "Flaguje w raporcie" – report a detected comparison even when it is compliant.
-  - {id: R11, name: Porównania produktów, severity: medium, legal_basis: null, implemented: false}
-  - {id: R12a, name: Wyniki historyczne – okres, severity: medium, legal_basis: null, implemented: false}
-  - {id: R12b, name: Wyniki historyczne – waluta i koszty, severity: medium, legal_basis: null, implemented: false}
-  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: null, implemented: false}
+  # ZASÓB R11 (art. 44 ust. 3): "Wykrywa porównania produktów i usług, weryfikuje źródło informacji, przyjęte
+  # założenia i flaguje naruszenia w raporcie" – violations only: a compliant comparison is a plain pass that quotes
+  # the comparison (Damian, ADR 0315). The core is other products, services and providers; index and benchmark
+  # comparisons are an extension (`benchmark_patterns`, cut alone if needed); inflation and time comparisons are out.
+  # A superlative without a comparator is an implicit market comparison: uncertain rules-only, naming the source.
+  - id: R11
+    name: Porównania produktów
+    severity: medium
+    legal_basis: art. 44 ust. 3 rozp. del. 2017/565
+    implemented: true
+    params:
+      comparison_patterns:
+        - '\b(?:lepsz|wyższ|niższ|tańsz|droższ|korzystniejsz|większ|mniejsz|szybsz|bezpieczniejsz|atrakcyjniejsz)\w*\s+(?:\w+\s+){0,3}niż\b'
+        - '\b(?:więcej|mniej)\s+(?:\w+\s+){0,3}niż\b'
+        - '\bw\s+porównaniu\s+(?:z|ze|do)\b'
+        - '\b(?:vs|versus)\b'
+        - '\bbij\w*\s+(?:\w+\s+){0,2}(?:lokat|konkurencj|rynek|bank)\w*'
+        - '\boutperform\w*'
+        - '\b(?:better|higher|lower|cheaper)\s+than\b'
+        - '\bcompared\s+(?:to|with)\b'
+      # The extension: an index or a benchmark, kept apart so it can be cut alone.
+      benchmark_patterns:
+        - '\b(?:pobi|pokona|przebi|wyprzedzi)\w*\s+(?:\w+\s+){0,2}(?:[ms]?WIG\w*|indeks\w*|benchmark\w*|rynek|S&P|DAX|Nasdaq\w*)'
+        - '\b(?:niż|od)\s+(?:\w+\s+)?(?:[ms]?WIG\w*|indeks\w*|benchmark\w*)'
+      # Stripped first: time and inflation comparisons, and a number after `niż` ("w mniej niż 5 minut").
+      comparison_exclude_patterns:
+        - '\bniż\s+(?:\w+\s+)?(?:rok|miesiąc|kwartał|tydzień)\s+temu\b'
+        - '\bniż\s+(?:wcześniej|kiedykolwiek|dotychczas|zwykle|przedtem|poprzednio)\b'
+        - '\bniż\s+w\s+(?:zeszłym|ubiegłym|poprzednim)\s+\w+'
+        - '\bniż\s+(?:\w+\s+)?inflacj\w*'
+        - '\bw\s+porównaniu\s+(?:z|ze|do)\s+(?:\w+\s+)?inflacj\w*'
+        - '\bniż\s+(?:\d[\d.,]*|kilk\w*|pół\w*)'
+        # Also stripped before the superlatives: document numbers and best execution are boilerplate (group 6 review).
+        - '\b(?:załącznik\w*|zał\.|poz\.|ust\.|art\.|pkt\.?)\s*(?:nr|numer)\s*\d+'
+        # Only best-execution wording; "najlepsze warunki realizacji" stays a superlative (group 7 review).
+        - '\bnajlepsz\w*\s+(?:możliw\w*\s+)?realizacj\w*'
+        - '\bbest\s+execution\b'
+      superlative_patterns:
+        - '\bnajlepsz\w*'
+        - '\bnajtańsz\w*'
+        - '\bnajwyższ\w*\s+(?:\w+\s+)?(?:oprocentowani|zysk|stop|zwrot)\w*'
+        - '\bnajniższ\w*\s+(?:\w+\s+)?(?:prowizj|opłat|koszt|spread)\w*'
+        - '\b(?:nr|numer)\s*1\b'
+        - '\blider\w*\s+rynku\b'
+        - '\b(?:best|cheapest)\b'
+      source_patterns: *source_markers
+      assumption_patterns:
+        - '\bprzy\s+założeni\w*'
+        - '\bzakładając\b'
+        - '\bzałożeni\w*'
+        - '\b(?:dla|przy)\s+(?:kwot|wpłat|inwestycj)\w*'
+        - '\bw\s+okresie\b'
+        - '\b(?:na\s+dzień|stan\s+na)\b'
+        # A date and an order or deposit size are assumptions of a comparison (gold m2-r11-comparison-with-source).
+        - '(?<!\d)\d{1,2}[./]\d{1,2}[./](?:19|20)\d{2}(?!\d)'
+        - '\b(?:zleceni|kwot|wpłat|transakcj|saldo)\w*\s+(?:\w+\s+)?\d'
+        - '\b(?:assuming|as\s+of)\b'
+    # Only an uncertain result is deferred: a superlative without a comparator, or a source without assumptions.
+    llm:
+      when: uncertain
+      question: >-
+        Czy materiał porównuje produkt lub usługę z innymi produktami, usługami lub podmiotami (także z indeksem
+        lub benchmarkiem) i czy podaje źródło tej informacji oraz przyjęte założenia (np. okres, kwotę, datę)?
+        Odpowiedz fail, jeśli to porównanie bez źródła lub bez założeń, pass, jeśli źródło i założenia są podane
+        albo jeśli to nie jest porównanie z innymi produktami. Zacytuj dosłownie zdanie z porównaniem.
+  # ZASÓB R12a (art. 44 ust. 4): "okres ostatnich 5 lat … pełne okresy 12-miesięczne; oraz czy wskazano okres
+  # referencyjny i źródło". Three named sub-checks (5 lat / 12 mies., okres referencyjny, źródło); the worst one is
+  # the result. Same past-performance trigger as R12b and R14 (shared pp_* lists, ADR 0315). N months, year ranges,
+  # "ostatnich N lat" and distinct past years are checked in code (rules/m2.py).
+  - id: R12a
+    name: Wyniki historyczne – okres
+    severity: medium
+    legal_basis: art. 44 ust. 4 rozp. del. 2017/565
+    implemented: true
+    params:
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      amount_return_patterns: *pp_amount_return
+      figure_exclude_patterns: *return_figure_exclude
+      figure_extra_exclude_patterns: *pp_figure_exclude
+      past_patterns: *pp_past
+      future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
+      # A period shorter than 12 months (N months with N not a multiple of 12 is checked in code).
+      short_period_patterns:
+        - '\bod\s+początku\s+(?:roku|miesiąca|kwartału|półrocza)\b'
+        - '\bYTD\b'
+        - '\b(?:ostatni|bieżąc|poprzedni|ubiegł|zeszł|tym|pierwsz|drug|trzeci|czwart|(?-i:I{1,3}|IV))\w*\s+(?:kwartał\w*|kwartale|półrocz\w*|miesiąc\w*|tydzień|tygodni\w*)'
+        - '\bw\s+(?:styczniu|lutym|marcu|kwietniu|maju|czerwcu|lipcu|sierpniu|wrześniu|październiku|listopadzie|grudniu)\b'
+        - '\b(?:tygodniow|dzienn|kwartaln)\w*\s+(?:wynik|zysk|stop|zwrot)\w*'
+        - '\b(?:year[- ]to[- ]date|last\s+(?:month|quarter|week))\b'
+      five_year_patterns:
+        - '\b(?:5|pięcio)[- ]?letn\w*'
+        - '\b(?:5|five)[- ]years?\b'
+      # Allowed only for a product younger than 5 years (art. 44 ust. 4 lit. b): uncertain, never a pass.
+      inception_patterns:
+        - '\bod\s+(?:początku\s+(?:działalności|istnienia)|uruchomienia|powstania|startu|debiutu)\b'
+        - '\bsince\s+(?:inception|launch)\b'
+      source_patterns: *source_markers
+    # Deferred only when the 5-year sub-check alone is uncertain: since inception, launched exactly 5 calendar
+    # years before the fetch year (art. 44 ust. 4 lit. b). The age is computed in code from the fetch date; the model
+    # has no reference date, so it is asked only what the text itself states, and never answers fail.
+    llm:
+      when: uncertain
+      question: >-
+        Wyniki historyczne podano od początku działalności produktu. Czy sam tekst wprost stwierdza, że produkt
+        istnieje krócej niż 5 lat (np. "działa od 4 lat" albo dokładna data uruchomienia z miesiącem)? Nie
+        obliczaj wieku z bieżącej daty. Odpowiedz pass, jeśli tekst to stwierdza, w przeciwnym razie uncertain.
+        Zacytuj dosłownie zdanie, które o tym mówi.
+  # ZASÓB R12b (art. 44 ust. 4): "ostrzeżenie o wpływie zmian kursów walutowych oraz czy wskazano wpływ prowizji,
+  # opłat i obciążeń na wyniki". The fee statement always applies to past performance; the currency warning only
+  # to results in, or a product denominated in, a currency other than PLN (art. 44 ust. 4 lit. e, Damian), and every
+  # explanation cites lit. e. Same past-performance trigger as R12a and R14 (ADR 0315). Rules-only.
+  - id: R12b
+    name: Wyniki historyczne – waluta i koszty
+    severity: medium
+    legal_basis: art. 44 ust. 4 rozp. del. 2017/565
+    implemented: true
+    params:
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      amount_return_patterns: *pp_amount_return
+      figure_exclude_patterns: *return_figure_exclude
+      figure_extra_exclude_patterns: *pp_figure_exclude
+      past_patterns: *pp_past
+      future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
+      # A statement of the impact of fees, anywhere in the material.
+      fee_patterns:
+        - '\bpo\s+(?:potrąceniu|odliczeniu|uwzględnieniu|pomniejszeniu\s+o)\s+(?:\w+\s+){0,2}(?:opłat|prowizj|koszt|obciąż)\w*'
+        - '\buwzględnia\w*\s+(?:\w+\s+){0,3}(?:opłat|prowizj|koszt|obciąż)\w*'
+        - '\b(?:wynik|stop)\w*\s+(?:\w+\s+){0,2}(?:netto|brutto)\b'
+        - '\b(?:opłat|prowizj|koszt|obciąż)\w*\s+(?:\w+\s+){0,3}(?:obniżaj|pomniejszaj|zmniejszaj|wpływaj)\w*'
+        - '\b(?:net|gross)\s+of\s+(?:fees|charges|costs)\b'
+        - '\b(?:before|after|excluding|including)\s+(?:all\s+)?(?:fees|charges|costs)\b'
+      # Checked in the past-performance sentences; a sentence anywhere that also says "denominowany" counts too.
+      foreign_currency_patterns:
+        - '\b(?:EUR|USD|CHF|GBP|JPY)\b'
+        - '[€$£]'
+        - '\bw\s+(?:euro|dolar\w*|frank\w*|funt\w*|walu(?:cie|tach)\s+obc\w*)\b'
+      currency_warning_patterns:
+        - '\b(?:zmian|wahan|waha)\w*\s+(?:\w+\s+){0,2}kurs\w*\s+walut\w*'
+        - '\bryzyk\w*\s+(?:\w+\s+)?walutow\w*'
+        - '\bcurrency\s+(?:fluctuations?|risk)\b'
+        - '\bexchange\s+rates?\b'
+  # R13: visual, needs `blocks` (font size, position in the viewport; #29).
+  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: art. 44 ust. 4 lit. a rozp. del. 2017/565, implemented: false}
   # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
   # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").
   - id: R14
@@ -165,60 +390,124 @@ rules:
     params:
       # A past-performance sentence: a return figure plus a past marker (or a year <= the fetch year
       # with no future marker in the sentence).
-      figure_patterns:
-        - '(?<!\d)\d+(?:[.,]\d+)?\s?%'
+      # Past-performance detector: the `pp_*` lists in `shared`, also read by R12a and R12b (ADR 0315).
+      figure_patterns: *pp_figure
       # Past results in any unit (coordinator answer, follow-up R9): an amount next to return vocabulary.
-      amount_patterns:
-        - '\b\d+(?:[.,]\d+)?\s?(?:zł|PLN|EUR|USD|€|\$)'
-      amount_return_patterns:
-        - '\bzysk\w*'
-        - '\bzarobi\w*'
-        - '\bwypracowa\w*'
-        - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
-        - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
-        - '\bdoch(?:ód|od(?!z))\w*'
-        - '\b(?:profit|return|gain)\w*'
+      amount_patterns: *pp_amount
+      amount_return_patterns: *pp_amount_return
       figure_exclude_patterns: *return_figure_exclude
       # R14 only: percentages that are not returns (share of clients or accounts, bonuses).
-      figure_extra_exclude_patterns:
-        - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:rachunk\w*|klient\w*|inwestor\w*|użytkownik\w*|os[óo]b\w*|of\s+retail|retail|accounts?|clients?|investors?)'
-        - '\bbonus\w*\s+(?:\w+\s+)?\d+(?:[.,]\d+)?\s?%'
-        - '(?<!\d)\d+(?:[.,]\d+)?\s?%\s+(?:bonus\w*|rabat\w*|zniżk\w*|taniej|cashback)'
-      past_patterns:
-        - '\bzarobi(?:li|ł|ła|ło|ły|liśmy|łyśmy|łem|łam|łeś|łaś)\b'
-        - '\bwypracowa(?:ł|ła|ło|li|ły|liśmy)\w*'
-        - '\bosiągn(?:ął|ęła|ęło|ęli|ęły|ęliśmy)\b'
-        - '\bprzyni(?:ósł|osła|osło|osły|ośli)\b'
-        - '\bzyska(?:ł|ła|ło|li|ły|liśmy)\b'
-        - '\bda(?:ł|ła|ło|li|ły)\b'
-        - '\bwzr[oó]s(?:ł|ła|ło|ły|li)\b'
-        - '\bhistoryczn\w*'
-        - '\b(?:w|przez|za)\s+ostatni\w*\s+(?:\d+\s+)?(?:lat\w*|rok\w*|miesi\w*|kwarta\w*)'
-        - '\bw\s+(?:zeszłym|ubiegłym|poprzednim)\s+(?:roku|kwartale|miesiącu)'
-        - '\bpast performance\b'
-        - '\b(?:returned|delivered|gained|grew)\b'
-      future_patterns:
-        - '\bspodziewa\w*'
-        - '\bprognoz\w*'
-        - '\bbędzie\w*'
-        - '\bbędą\b'
-        - '\bprzewidu\w*'
-        - '\bplanuje\w*'
-        - '\bcel\w*\b'
-        - '\bexpect\w*'
-        - '\bwill\b'
-        - '\bforecast\w*'
-        - '\bzyskaj\w*'
-        - '\bzarabiaj\w*'
-        - '\bmożesz\b'
-        - '\bnawet\b'
-        - '\bważn\w*\s+do\b'
-        - '\bdo\s+(?:końca\s+)?(?:\d{1,2}[./]\d{1,2}[./])?(?:19|20)\d{2}'
+      figure_extra_exclude_patterns: *pp_figure_exclude
+      past_patterns: *pp_past
+      future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
-  # R15 (P1): ZASÓB "Flaguje w raporcie" – report a detected forecast even when it is compliant.
-  - {id: R15, name: Prognozy przyszłych wyników, severity: medium, legal_basis: art. 44 ust. 6 rozp. del. 2017/565, implemented: false}
-  - {id: R16, name: Informacja podatkowa, severity: medium, legal_basis: null, implemented: false}
+  # ZASÓB R15 (art. 44 ust. 6): "Flaguje w raporcie wykrycie prognozy przyszłych wyników" – every detected
+  # forecast is reported: a compliant one is a pass that quotes the forecast (ADR 0315). A forecast is result
+  # vocabulary plus a strong marker (or a year after the fetch year, or a future-tense return verb with a figure),
+  # or a weak marker with a figure; a weak marker with result vocabulary only is uncertain. The promotional
+  # imperative ("Zarabiaj nawet do 18% rocznie") is R3's return claim, never a forecast.
+  - id: R15
+    name: Prognozy przyszłych wyników
+    severity: medium
+    legal_basis: art. 44 ust. 6 rozp. del. 2017/565
+    implemented: true
+    params:
+      performance_patterns:
+        - '\bwynik\w*'
+        - '\bzysk\w*'
+        - '\bstop\w*\s+zwrotu'
+        - '\bzwrot\w*'
+        - '\brentown\w*'
+        - '\bdoch(?:ód|od(?!z))\w*'
+        - '\bwzro(?:st|sn|śn)\w*'
+        - '\bzar(?:ob|ab)\w*'
+        - '\b(?:returns?|performance|growth)\b'
+      forecast_patterns: *forecast_markers
+      # Strong only together with a figure ("W 2026 zarobisz 12%").
+      forecast_verb_patterns: *forecast_verbs
+      forecast_weak_patterns:
+        - '\bbęd(?:zie\w*|ą)\b'
+        - '\bmoże\s+(?:przynieść|osiągnąć|wynieść)\b'
+        - '\bwill\b'
+      # Stripped before matching: imperatives (a return claim, R3) and fee or tax percentages.
+      forecast_exclude_patterns:
+        - '\b(?:zarabiaj|zyskaj|pomnażaj|pomnóż|earn)\w*'
+        # From the fee or tax word to its percentage within one sentence (at most 60 characters) unless a return
+        # verb starts in between, so "po odliczeniu opłat fundusz będzie zarabiał 8%" keeps its forecast while
+        # "Podatek od zysków kapitałowych (19%)" is still a tax figure, while "zysk funduszu będzie wynosił 8%" is not
+        # (group 3-5 reviews). Letters only after the stem: `\w*` would eat a digit run and backtrack quadratically.
+        - '\b(?:prowizj|opłat|marż|podat|koszt)[^\W\d]*(?:(?!\b(?:zarab|zarob|zysk(?!ów|u\s+kapitałow)|wypracow|wypracu|przyni|osiąg))[^.!?]){0,60}?\d+(?:[.,]\d+)?\s?%'
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      figure_exclude_patterns: *return_figure_exclude
+      # Not the R14 past-performance disclaimer: ZASÓB R15 names the forecast explicitly.
+      forecast_disclaimer_patterns: &forecast_disclaimers
+        - '\bprognoz\w*\b.{0,80}?\bnie\s+(?:są|jest|stanowi\w*)\b.{0,40}?\b(?:wiarygodn|gwarancj|pewn)\w*'
+        - '\bprzyszł\w*\s+wynik\w*\b.{0,60}?\b(?:mogą\s+(?:się\s+)?różni\w*|nie\s+(?:są|jest)\s+gwarantowan\w*)'
+        - '\bnie\s+ma\s+gwarancji\b.{0,40}?\b(?:osiągnięcia|realizacji)\b.{0,40}?\b(?:prognoz|zakładan)\w*'
+        - '\b(?:forecasts?|projections?)\b.{0,40}?\b(?:are|is)\s+not\s+(?:a\s+)?(?:reliable|guarantee)'
+    # Only a weak marker without a figure is deferred; a strong-marker forecast stays a rules-only fail.
+    llm:
+      when: uncertain
+      question: >-
+        Czy to zdanie prognozuje przyszłe wyniki produktu (zysk, stopę zwrotu, wzrost wartości)? Jeśli tak, a
+        materiał nie zawiera ostrzeżenia, że prognozy nie są wiarygodnym wskaźnikiem przyszłych wyników, odpowiedz
+        fail; jeśli to nie jest prognoza wyników albo ostrzeżenie jest podane, odpowiedz pass. Zacytuj dosłownie
+        to zdanie.
+  # ZASÓB R16 (art. 44 ust. 7): a reference to tax treatment needs both disclaimer parts, "zależności od
+  # indywidualnej sytuacji klienta i możliwości zmian". VAT is not tax treatment of the investment, and the
+  # disclaimer sentence itself is not a tax reference (a lone disclaimer is not_applicable). Rules-only.
+  - id: R16
+    name: Informacja podatkowa
+    severity: medium
+    legal_basis: art. 44 ust. 7 rozp. del. 2017/565
+    implemented: true
+    params:
+      tax_patterns:
+        # Tax stems only: `podatny` ("susceptible") is common in risk warnings (group 2 review).
+        - '\bpodat(?:ek|k|nik|nicz)\w*'
+        - '\bopodatkowan\w*'
+        - '\bIKZE\b'
+        - '\bIKE\b'
+        - '\bBelk\w*'
+        - '\bPIT\b'
+        - '\bodliczen\w*\s+(?:\w+\s+){0,2}od\s+(?:dochodu|podstawy)'
+        - '\btax\w*'
+      # Stripped before matching: VAT and its long form are not tax treatment of the investment.
+      tax_exclude_patterns:
+        - '\b(?:podat\w*\s+)?VAT\b'
+        - '\bpodat\w*\s+od\s+towarów\s+i\s+usług\b'
+        # Whether the results include tax is a performance statement, not tax treatment (gold m2-r12 compliant).
+        - '\buwzględnia\w*\s+(?:\w+\s+){0,3}podat\w*'
+        - '\b(?:przed|po)\s+(?:opodatkowani|potrąceni\w*\s+podatk|odliczeni\w*\s+podatk)\w*'
+      tax_individual_patterns:
+        - '\b(?:zależ|uzależnion)\w*\s+(?:\w+\s+){0,2}od\s+(?:\w+\s+)?(?:indywidualn|osobist)\w*\s+sytuacj\w*(?:\s+(?:\w+\s+)?(?:klient|inwestor|podatnik)\w*)?'
+        - '\b(?:indywidualn|osobist)\w*\s+sytuacj\w*\s+(?:\w+\s+){0,2}(?:klient|inwestor|podatnik)\w*'
+        - '\bindividual\s+circumstances\b'
+      # Counts only in the sentence of the individual part, or in a sentence with `tax_context_patterns`.
+      tax_change_patterns:
+        - '\b(?:może|mogą)\s+(?:\w+\s+){0,2}(?:ulec\s+zmian\w*|się\s+zmieni\w*|zmieni(?:ć|ać)\s+się)'
+        - '\bpodleg\w*\s+(?:\w+\s+)?zmian\w*'
+        - '\bsubject\s+to\s+change\b'
+        - '\bmay\s+change\b'
+      # Generic tax words, stripped from a disclaimer sentence together with its two parts ("Traktowanie
+      # podatkowe / Opodatkowanie / Taxation zależy…"): such a sentence is a tax reference only through a concrete
+      # tax word left after that (`podatku Belki`, `IKE`, `IKZE`, `PIT`; group 2 and 3 reviews).
+      tax_subject_patterns:
+        - '\bpodatkow\w*'
+        - '\bopodatkowan\w*'
+        - '\btax(?:ation|es)?\b(?:\s+treatment)?'
+      tax_context_patterns:
+        # Tax stems only: `podatny` ("susceptible") is common in risk warnings (group 2 review).
+        - '\bpodat(?:ek|k|nik|nicz)\w*'
+        - '\bopodatkowan\w*'
+        - '\bprzepis\w*'
+        - '\bIKZE\b'
+        - '\bIKE\b'
+        - '\btax\w*'
   # ZASÓB R17: a supervisor mention "używane do sugerowania zatwierdzenia lub aprobaty produktu/usługi".
   # Stating supervision alone is not a violation: detect the mention, then classify its use. An approval word
   # in the same sentence is a rules fail; otherwise pass rules-only, and the LLM judges the wording (always).

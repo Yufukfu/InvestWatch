@@ -1,4 +1,6 @@
-# analytics (Damian's module)
+# analytics
+
+Owners: [`.github/CODEOWNERS`](../.github/CODEOWNERS).
 
 Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modules M1-M3, inserts `findings` and publishes to `iw:events`. The logic lives in the docs, not here:
 
@@ -16,6 +18,7 @@ Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modu
 - Logs are JSON on stdout, except the CLI (`python -m investwatch_analytics.cli`), which logs to stderr because its stdout is the findings JSON. A collector of CLI runs reads stderr.
 - Scraped text is untrusted: put it in a delimited block, tell the model to ignore instructions inside it, limit its length.
 - LLM: an OpenAI-compatible chat completions API configured by env only (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, limits in `.env.example`). Hosted default Gemma 4 on the Gemini API ([ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)); local Ollama `/v1` with `gemma3:4b` must keep working as the swap target, so no provider-specific SDK or features ([ADR 0304](../.docs/decisions/0304-llm-serving.md)).
+- Embeddings: an OpenAI-compatible `/embeddings` endpoint, env only (`EMBED_*`), local only (`bge-m3` on `ollama`); never a paid hosted API ([ADR 0313](../.docs/decisions/0313-embeddings-model-and-serving.md)). Off or failing means `model.embedder = null`, never a failed document. The topic gate drops only `third_party`/`unknown` text with no investment signal and logs `off_topic`; a near-duplicate is analyzed, not dropped ([ADR 0314](../.docs/decisions/0314-topic-gate-and-near-duplicates.md)).
 - The LLM only decides checks the rules defer: an `llm:` block in the catalogue plus the rule's `ask_llm`. Never send a deterministic rules-only verdict, and never let a verdict carry a quote that is not in the document ([ADR 0309](../.docs/decisions/0309-llm-prompt-and-cache-contract.md)). Tests never call a real LLM: `tests/llm_stub.py` and the conftest guard.
 
 ## Stack and done

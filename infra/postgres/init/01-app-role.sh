@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs once, on an empty data volume. Creates the least-privilege application role used by services;
-# the admin role is only for migrations and ops. Schema and tables come from migrations (owner Damian), not here.
+# the admin role is only for migrations and ops. Schema and tables come from migrations (api/), not here.
 set -eu
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
   -v app_user="$IW_APP_USER" -v app_password="$IW_APP_PASSWORD" -v db="$POSTGRES_DB" <<'SQL'

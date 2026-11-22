@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "InvestWatch API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "REST API between the `api` service (owner: C) and the dashboard (owner: B).\nReal-time events are delivered over Socket.IO (namespace `/events`), see `schemas/events.schema.json`.\nMock responses for every endpoint are in `mocks/`.\n"
   },
   "servers": [
@@ -74,6 +74,15 @@
           {
             "name": "source_id",
             "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "query",
+            "description": "Only the findings of this document (at most one per module). Combines with the other filters and pagination. Added in 1.1.0",
             "schema": {
               "type": "string",
               "format": "uuid"

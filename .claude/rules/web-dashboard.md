@@ -3,7 +3,7 @@ paths:
   - "web/**"
 ---
 
-# Web dashboard rules (Kacper's module)
+# Web dashboard rules
 
 Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../../.docs/integration-plan.md) §4 (`Finding`), §5 (REST), §6 (Socket.IO). Calibration: [`.docs/analytics-plan.md`](../../.docs/analytics-plan.md) §8. The data-from-backend and console rules in [`web/CLAUDE.md`](../../web/CLAUDE.md) also apply.
 
@@ -30,7 +30,7 @@ Applies to `web/`. Business contracts are in [`.docs/integration-plan.md`](../..
 - Risk level is shown as text plus colour (`Wysoki`, `Średni`, `Niski`), never colour alone. Badges and risk text meet WCAG AA contrast (at least 4.5:1 for body text).
 - Risk text is not smaller than the surrounding body text. Do not use a reduced font size for warnings.
 - Layouts are checked at 375 px (phone), 768 px (tablet) and 1280 px (desktop). Table and detail text is not cut off. Wide tables scroll horizontally inside their container instead of clipping.
-- Scraped content (`content_excerpt`, `evidence`, `summary`) is rendered as text. Never `dangerouslySetInnerHTML` (oxlint enforces this).
+- Scraped content and model output (`title`, `summary`, `explanation`, `evidence`, `advertiser.name`/`handle`, `content_excerpt`, document text) are rendered as text. Never `dangerouslySetInnerHTML` (oxlint enforces this), never Markdown, never auto-linked URLs. Each value sits alone in an element with `dir="auto"` (a `<span dir="auto">` when it shares a line with UI text), so a bidi override cannot reorder the UI around it (`untrustedText.test.tsx`).
 - Render `rule_id` and `name` exactly as the API returns them, for any id. Do not keep a fixed list: the contract allows `R1`–`R18` with `R12a`/`R12b`, and `S1.x` (M1) and `S3.x` (M3) signals (`finding.schema.json`). Do not rename or re-number them in the UI.
 
 ## Language

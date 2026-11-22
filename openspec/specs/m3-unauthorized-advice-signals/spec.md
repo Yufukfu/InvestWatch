@@ -2,9 +2,7 @@
 
 ## Purpose
 Flag offers by entities outside the KNF registry that may indicate investment advice (Art. 76 of the Act on Trading in Financial Instruments: a recommendation concerning financial instruments, based on the client's situation), with entity data, offer content and URL, rules-only until the LLM confirms the semantic signals.
-
 ## Requirements
-
 ### Requirement: M3 signal semantics
 Each M3 signal result SHALL be `fail` when the signal is present, `pass` when absent, `uncertain` when a rule found a candidate only the LLM can confirm, and `not_applicable` when inputs are missing. Without a merged judge verdict, S3.3 and S3.4 SHALL be `uncertain` with the rule candidate as evidence when a candidate exists, and `pass` otherwise. S3.7 (KNF public warnings list) SHALL NOT run while it is not implemented.
 
@@ -165,8 +163,8 @@ The M3 score SHALL be `σ(bias + Σ wᵢ·xᵢ)` with `bias` and weights from `m
 - **THEN** its score is higher than with S3.4 `fail` alone
 
 #### Scenario: Educational article is capped
-- **WHEN** the mock document `72acbb3b…` is analyzed
-- **THEN** a finding is returned with a score of at most 0.4
+- **WHEN** the M3 signals of the mock document `72acbb3b…` are scored
+- **THEN** the score is at most 0.4 (the pipeline returns no finding for it, since it has no offer signal; requirement "Routing to modules" in `document-analysis`)
 
 #### Scenario: Gate caps strong non-advisory signals
 - **WHEN** a page has S3.1, S3.2, S3.5 and S3.6 `fail` and S3.3 and S3.4 `pass`
@@ -223,3 +221,4 @@ The M3 finding SHALL carry the challenge's M3 output: entity data in `advertiser
 - **THEN** It SHALL also have `module` M3, `firm` null, the M3 signal results, the raw `score`, a Polish title that names the advertiser and the deciding signal, prefixed "możliwe" while that signal is `uncertain`, and never states that the entity is outside the KNF register, a Polish summary listing present and uncertain signals and any cap or S3.8 note ("kryptoaktywa nie są wymienione w katalogu z art. 2 u.o.i.f.
 - **AND** (załącznik do tematu 3)"), saying that personalisation (art. 76) is unconfirmed when S3.3 is `pass`, `status` new, and `model.llm` null in rules-only mode.
 - **AND** It SHALL validate against `contracts/schemas/finding.schema.json` v1.
+

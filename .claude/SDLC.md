@@ -4,7 +4,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 ## Who owns which fact (edit the owner, link from elsewhere)
 
-| Fact | Owner |
+| Fact | Lives in |
 |---|---|
 | Hard rules (push, secrets, contracts) | `CLAUDE.md` |
 | Stage order, gates, which skill when | this file |
@@ -13,7 +13,8 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | Review criteria ("ready") | `.claude/CODE_REVIEW.md` |
 | Review commands, PR body | `.claude/skills/iw-pr-review/SKILL.md` |
 | Which doc to update, ADRs, closing a change | `.claude/skills/iw-docs-update/SKILL.md` |
-| AI log row | `.claude/skills/iw-ai-log/SKILL.md` |
+| AI log entry | `.claude/skills/iw-ai-log/SKILL.md` |
+| Agent hand-offs: watching GitHub for reviews, review requests, owner-routed issues | `.claude/skills/iw-watch/SKILL.md` |
 | Hook behaviour and escapes | header of `.claude/hooks/git-guard.js` |
 | Closing tasks and apply/archive guidance | `openspec/config.yaml` |
 | Docs map | `.docs/INDEX.md` |
@@ -23,7 +24,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 | # | Stage | Tool | Gate |
 |---|---|---|---|
-| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md` and your domain file in `.docs/status/`, the owning spec | agent | none |
+| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md` and the `.docs/status/` file for your directories, the owning spec | agent | none |
 | 1 | Size, worktree, branch | `iw-implement` | branch prefix = module |
 | 2 | Explore (only if scope is foggy) | `/openspec-explore` | none |
 | 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
@@ -32,6 +33,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | 6 | Archive, as the last commit of the branch | `/openspec-archive-change` | specs updated |
 | 7 | Push the branch and open the PR | agent | PR-ready criteria in `.claude/CODE_REVIEW.md`; `origin` and the current branch only, never `main`, never `--force` (hook); the PR body lists every `IW_*` escape used and says that it loosens no permission beyond ADR 0207 |
 | 7b | Approve and merge | human | review, approval and merge are always the human's (`gh pr merge`, `gh pr ready` and `gh pr review` stay in `permissions.ask`; the hook denies `gh api` merge and approve calls) |
+| 7c | Hand-offs between teammates' agents (optional) | `iw-watch`: `/loop 2m /iw-watch --mine` in a session, or `watch.mjs run` from launchd or cron | headless sessions run sandboxed and publish nothing; the runner checks their commits and pushes that PR's branch and one comment, only with `--publish` (ADR 0210); never approve or merge, stop at 3 rounds per PR and hand over to the human |
 | 8 | CI (advisory for now) | `.github/workflows/ci.yml`, manual dispatch | not a merge gate during the hackathon; becomes a required check in the full SDLC |
 | 9 | After merge | remove the worktree | nothing else: docs, log and archive were in the PR |
 
@@ -45,7 +47,7 @@ Anything real but out of scope goes into the change's `follow-ups.md` with one d
 
 ## Parallel work
 
-Three people, three modules, a worktree per change, ownership by directory (`scraper/` Adam, `web/` Kacper, `analytics/` and `contracts/` Damian, plus `api/` once created). To limit merge conflicts: edit only your own domain file in `.docs/status/` (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by owner (A 01xx, Kacper 02xx, Damian 03xx); the AI log table merges by keeping both sides' rows. Touching another owner's directory or a frozen contract is announced in the team chat first.
+Three people, a worktree per change, ownership by directory in [`.github/CODEOWNERS`](../.github/CODEOWNERS) (the only place that names owners; shared areas have none, [ADR 0211](../.docs/decisions/0211-codeowners-single-source.md)). To limit merge conflicts: edit only the `.docs/status/` file for the directories you changed (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by person (Adam 01xx, Kacper 02xx, Damian 03xx); the AI log is one file per entry in `.docs/ai-log/` ([ADR 0212](../.docs/decisions/0212-ai-log-one-file-per-entry.md)). Touching a directory someone else owns in `CODEOWNERS`, or a frozen contract, is announced in the team chat first.
 
 ## Not adopted from Neopadel (on purpose)
 

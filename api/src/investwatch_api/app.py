@@ -83,7 +83,7 @@ def create_app(services_factory: ServicesFactory = services_from_env) -> FastAPI
             await relay.stop()
             await services.close()
 
-    api = FastAPI(title="InvestWatch API", version="1.0.0", lifespan=lifespan)
+    api = FastAPI(title="InvestWatch API", version="1.2.0", lifespan=lifespan)
     api.state.sio = sio
     errors.install(api)
     if origins:

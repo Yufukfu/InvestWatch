@@ -12,16 +12,21 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0104](0104-ingest-order-and-republish-sweep.md) | Ingest order, at-least-once delivery and the republish sweep | accepted (agent-written; effective on merge) |
 | [0105](0105-content-hash-normalisation.md) | One `content_hash` normalisation: NFC (the scraper's), written into integration-plan §3 | accepted (agent-written; effective on merge) |
 | [0106](0106-scraper-deployment-unit.md) | Scraper deployment unit: three services, networks, stop grace, merge order with the renderer | accepted (agent-written; effective on merge) |
+| [0107](0107-playwright-renderer-service.md) | Playwright renderer as a separate, hardened service (`--no-sandbox`, Chromium 147 pin) | accepted (agent-written; effective on merge) |
 | [0108](0108-source-discovery-candidates.md) | Source discovery: inactive candidate sources mined from stored links, approved by a human | accepted (agent-written; effective on merge) |
+| [0109](0109-social-collectors-research.md) | Social collectors for X and YouTube: X posts through a cookie-based library with a dedicated account, YouTube metadata through our fetcher, transcripts through `youtube-transcript-api` on a residential proxy (local speech-to-text on audio as the proven fallback) (probes, evidence, the robots.txt and login exception) | accepted (agent-written; effective on merge) |
 | [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted; dev mocks superseded by [0206](0206-dashboard-data-from-backend.md) |
-| [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted |
+| [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted; ownership of `infra/` and the include list superseded by [0211](0211-codeowners-single-source.md) |
 | [0203](0203-dashboard-charts-recharts.md) | Dashboard charts: Recharts (the only chart library in `web/`) | accepted (takes effect when PR merges) |
 | [0204](0204-frontend-architecture.md) | Frontend layering: feature data hooks wrap the generated client, components take props | accepted (takes effect when PR merges) |
-| [0205](0205-status-per-domain.md) | Status split per domain: `.docs/STATUS.md` team-wide only, one file per owner in `.docs/status/` | accepted (takes effect when the PR merges) |
+| [0205](0205-status-per-domain.md) | Status split per domain: `.docs/STATUS.md` team-wide only, one file per owner in `.docs/status/` | accepted; domains mapped to people superseded by [0211](0211-codeowners-single-source.md) |
 | [0206](0206-dashboard-data-from-backend.md) | Dashboard data from the backend only; MSW only in tests (supersedes 0201's dev mocks) | accepted (takes effect when PR merges) |
 | [0207](0207-agent-push-and-pr.md) | Agents push their branch and open the PR; humans approve and merge | accepted (takes effect when the PR merges) |
 | [0208](0208-dashboard-realtime-socketio-client.md) | Dashboard real-time client: socket.io-client, one connection owned by the alerts feature | accepted (takes effect when the `realtime-alerts` PR merges) |
 | [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted (takes effect when the PR merges) |
+| [0210](0210-unattended-pr-watcher.md) | An unattended PR watcher runs sandboxed agent sessions and publishes from the runner | accepted (takes effect when PR #48 merges; needs Adam's and Damian's approval) |
+| [0211](0211-codeowners-single-source.md) | `.github/CODEOWNERS` is the only place that names owners; shared areas have none (partly supersedes 0202 and 0205) | accepted (takes effect when the `codeowners-single-source` PR merges) |
+| [0212](0212-ai-log-one-file-per-entry.md) | AI log: one file per entry in `.docs/ai-log/`, table rendered on demand (replaces the `merge=union` table) | accepted (takes effect when the PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
@@ -34,10 +39,12 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0308](0308-m3-s34-gate.md) | M3 gate: a recommendation of instruments alone lifts the 0.4 cap ("may indicate" advice, personalisation unconfirmed) | accepted (takes effect when PR #35 merges) |
 | [0311](0311-knf-registry-source-and-ids.md) | KNF registry: HTML lists parsed by a manual loader, committed `registry/knf.csv`, uuid5 firm ids | accepted (takes effect when the `analytics-knf-registry` PR merges) |
 | [0312](0312-gold-set-evaluation.md) | Gold-set evaluation feeds the calibration panel: fictional eval registry, strict/review readings, idempotent default-stack run, labels plus gold in the API | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
+| [0313](0313-embeddings-model-and-serving.md) | Embeddings: `bge-m3` on the local `ollama` service through OpenAI-compatible `/v1/embeddings`, env-only, no hosted default (depends on [0304](0304-llm-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
+| [0314](0314-topic-gate-and-near-duplicates.md) | Topic gate (dictionary or embedding, drop only when both say no) and near-dups (MinHash, analyzed and grouped, never dropped) (depends on [0313](0313-embeddings-model-and-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
+| [0315](0315-m2-art44-element-ownership.md) | M2: one owner rule per art. 44 element (count once); R15 reports every detected forecast, R11 flags only violations | accepted (takes effect when the `analytics-m2-p1-rules` PR merges) |
 | [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
 | [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted (takes effect when the `analytics-llm-p0` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
-- **Playwright boundary:** which sources must be rendered, because `blocks` and screenshots (`.docs/integration-plan.md` §3) feed rules R4-R8 and R13 (`.docs/analytics-plan.md` §5). Owner Adam, with Damian.
-- **First social platform** (team decision: one platform first). Owner Adam.
+- **First social platform** (team decision: one platform first). Lead: Adam.

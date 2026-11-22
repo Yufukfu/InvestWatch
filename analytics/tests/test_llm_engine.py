@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import NOW, make_doc
+from conftest import NOW, make_doc, stored_hash
 from investwatch_analytics.llm.judge import JudgeOutcome, LlmVerdict
 from investwatch_analytics.models import ScrapedDocument
 from investwatch_analytics.preprocessing import preprocess
@@ -51,6 +51,7 @@ def catalogue() -> Catalogue:
 
 
 def ctx_for(text: str, registry: Registry, **doc) -> Context:
+    doc.setdefault("content_hash", stored_hash(text))  # as the scraper stores it (issue #31)
     d = ScrapedDocument.model_validate(make_doc(text=text, **doc))
     return Context(doc=d, pre=preprocess(text), firm_match=registry.match(text, d.url), registry=registry)
 
@@ -79,9 +80,19 @@ def test_bare_mention_is_deferred_and_merged(registry, catalogue):
     assert r.result == "fail" and r.evidence == KNF and r.method == "hybrid" and r.explanation == "Sugeruje aprobatę."
     [call] = judge.calls
     assert call["module"] == "M2" and call["module_context"] == "ctx" and call["text"] == ALFA
-    assert call["content_hash"] == preprocess(ALFA).content_hash and call["sentences"]
+    assert call["content_hash"] == stored_hash(ALFA) and call["sentences"]
     [check] = [c for c in call["checks"] if c.rule_id == "R17"]
     assert check.question == catalogue.get("R17").llm["question"]
+
+
+def test_judge_gets_the_stored_hash_as_is(registry, catalogue):
+    """Issue #31: the document's stored `content_hash` reaches the judge unchanged, even when the text holds
+    compatibility characters that NFKC would fold; a document without one passes None (no hash is computed)."""
+    text = ALFA + " Zysk ﬁrmy 20%²."
+    judge = FakeJudge(LlmVerdict("R17", "fail", KNF, "x"))
+    run_rules(catalogue, ctx_for(text, registry, content_hash="d" * 64), judge=judge, module="M2")
+    run_rules(catalogue, ctx_for(text, registry, content_hash=None), judge=judge, module="M2")
+    assert [c["content_hash"] for c in judge.calls] == ["d" * 64, None]
 
 
 def test_deterministic_fails_are_never_sent(registry, catalogue):

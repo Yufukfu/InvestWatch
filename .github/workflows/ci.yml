@@ -20,9 +20,11 @@ jobs:
         with:
           node-version: 22
       - name: Hook and script tests
-        run: node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs" ".claude/skills/iw-pr-review/scripts/*.test.mjs"
+        run: node --test ".claude/hooks/*.test.js" ".claude/skills/iw-docs-update/scripts/*.test.mjs" ".claude/skills/iw-pr-review/scripts/*.test.mjs" ".claude/skills/iw-watch/scripts/*.test.mjs" ".claude/skills/iw-ai-log/scripts/*.test.mjs"
       - name: Docs check (paths, ADR index, service CLAUDE.md)
         run: node .claude/skills/iw-docs-update/scripts/docs-check.mjs
+      - name: AI log entries (.docs/ai-log/)
+        run: node .claude/skills/iw-ai-log/scripts/ai-log.mjs check
       - name: Validate OpenSpec specs and changes
         run: npx -y @fission-ai/openspec@2.1.1 validate --all --strict --no-interactive
         env:

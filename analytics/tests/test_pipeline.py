@@ -267,7 +267,9 @@ def test_finding_url_is_document_url_not_canonical(registry, catalogue):
 def test_compliant_material(registry, catalogue):
     text = (
         "Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. "
-        "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału."
+        "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału. "
+        # IKE is a tax reference: without the disclaimer of the m2-bank-ok mock, R16 fails (analytics-m2-p1-rules).
+        "Traktowanie podatkowe zależy od indywidualnej sytuacji klienta i może ulec zmianie."
     )
     [f] = run(make_doc(text=text), registry, catalogue)
     assert all(r.result != "fail" for r in f.rules)
@@ -335,7 +337,9 @@ def test_summary_when_no_rule_applies():
 def test_six_m1_m3_mocks(mock_documents, registry, catalogue, finding_validator):
     """Routing, contract validity and evidence of the six M1/M3 mock documents (read-only test double)."""
     docs = {d["id"]: d for d in mock_documents}
-    expected = {"jan": ["M1"], "kasia": ["M1"], "edu": [], "gold": ["M3"], "vip": ["M3"], "blog": ["M3"]}
+    expected = {"jan": ["M1"], "kasia": ["M1"], "edu": [], "gold": ["M3"], "vip": ["M3"],
+                # analytics-post-integration-fixes: the family-office explainer has vocabulary, no offer
+                "blog": []}
     for key, modules in expected.items():
         findings = run(docs[MOCK[key]], registry, catalogue)
         assert modules_of(findings) == modules, key
