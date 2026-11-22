@@ -4,6 +4,8 @@
 
 `contracts/mocks/findings.json` stays as the web test double and is never edited or regenerated (Damian's rule). Task 8.1 runs the CLI to check these rows and adds any new ones. Every row is `keep-mock`: the mock is illustrative, and the rule follows ZASÓB and the specs.
 
+Confirmed by the rules-only mock run (task 8.1: `REGISTRY_CSV=analytics/registry/seed.csv python -m investwatch_analytics.cli --no-llm contracts/mocks/documents.json`, schema-valid, mocks unchanged): every row below is what the rules return.
+
 | # | Mock document | Mock | Expected from this change | Why |
 |---|---|---|---|---|
 | M1 | `eurotrade` (`c99e2a35`) | R15 `fail`, `method: llm` | R15 `fail`, `method: rule` | `spodziewamy się` together with `wyników` is a strong-marker forecast, a deterministic fail that is never deferred |
@@ -12,7 +14,7 @@
 | M4 | `m2-bank-ok` (`5030107e`) | no R16 | R16 `pass`, quoting `Traktowanie podatkowe zależy…` | IKE is a tax reference, and both parts of the disclaimer are present |
 | M5 | `m2-bank-ok` | no R11, R12a, R12b, R15 | all `not_applicable` | no trigger |
 | M6 | `m2-alfa-landing` (`a3c88321`) | no R11, R12a, R12b, R15, R16 | all `not_applicable` | `Zarabiaj nawet do 18%` is R3's return claim, not a forecast (resolved question 2) |
-| M7 | all M2 mocks | score | it changes because more applicable rules are in the denominator; `eurotrade` gains two medium fails | follows from M1-M6 |
+| M7 | all M2 mocks | score `alfa` 0.86, `eurotrade` 0.74, `bank-ok` 0.12 | rules-only 0.722, 0.684, 0.0 | the mock scores are hand-written; the rules-only scores follow from M1-M6 and the stage-2 rules (the `bank-ok` 0.0 is the compliant reading) |
 
 ## Items for later
 

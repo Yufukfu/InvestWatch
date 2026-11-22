@@ -108,7 +108,7 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
 
 ## 8. Mock run (~30 min)
 
-- [ ] 8.1 Run the CLI on `contracts/mocks/documents.json`, rules-only. The output must pass `contracts/validate.py finding`. Update `follow-ups.md` rows M1-M7 with the real results and add any new rows. `git diff --exit-code contracts/mocks contracts/mock-server web` must be empty.
+- [x] 8.1 Run the CLI on `contracts/mocks/documents.json`, rules-only. The output must pass `contracts/validate.py finding`. Update `follow-ups.md` rows M1-M7 with the real results and add any new rows. `git diff --exit-code contracts/mocks contracts/mock-server web` must be empty. Done: 8 findings, `validate.py finding` ok, M1-M6 hold as written, M7 records the scores, the diff is empty. The CLI now defaults to the real KNF registry (#50), which has none of the fictional mock firms, so the run sets `REGISTRY_CSV=analytics/registry/seed.csv`.
 
 ## 9. Closing
 
