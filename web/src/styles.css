@@ -343,7 +343,7 @@ kbd { font-family: var(--font-mono); font-size: 14px; font-weight: 600; min-widt
 .trend-note { color: var(--muted); margin: 8px 0 0; }
 .trend-table { margin: 0; }
 .trend-table[open] { flex-basis: 100%; order: 4; }
-.trend-table summary { cursor: pointer; padding: 11px 0; color: var(--link); font-size: 13px; font-weight: 600; list-style: none; }
+.trend-table summary { cursor: pointer; display: flex; align-items: center; min-height: var(--tap); color: var(--link); font-size: 13px; font-weight: 600; list-style: none; }
 .trend-table summary::-webkit-details-marker { display: none; }
 .trend-table summary::after { content: ' →'; }
 .trend-table table { border-collapse: collapse; margin-top: 8px; }
@@ -482,5 +482,5 @@ kbd { font-family: var(--font-mono); font-size: 14px; font-weight: 600; min-widt
 .calibration-save { margin-top: var(--space-6); display: grid; gap: 10px; }
 .calibration-callout { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3) var(--space-6); padding: 18px 20px; border-left: 5px solid var(--callout-line); border-radius: 6px; background: var(--callout-bg); color: var(--callout-text); }
 .calibration-callout p { margin: 0; font-size: 14px; line-height: 21px; font-weight: 600; flex: 1 1 280px; }
-.calibration-buttons { display: flex; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+.calibration-buttons { display: flex; flex-wrap: wrap; gap: 10px; flex: 0 1 auto; max-width: 100%; }
 .calibration-buttons .btn { font-size: 13px; font-weight: 600; padding: 0 20px; }
