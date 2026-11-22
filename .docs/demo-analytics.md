@@ -1,6 +1,6 @@
 # Demo script: analytics (M1, M2, M3)
 
-The analytics part of the hand-in demo (Sun 2026-11-22, 10:30). It lists the documents to show, what each finding should look like, what to click, what to say, and a fallback if Gemini is down. Written by Damian's demo-prep session on 2026-11-22 between 02:55 and 03:50 local time. All numbers below were read from the running demo stack at that time.
+The analytics part of the hand-in demo (Sun 2026-11-22, 10:30), to be read next to the shared demo flow in [presentation-dashboard.md](presentation-dashboard.md). It lists the documents to show, what each finding should look like, what to click, what to say, and a fallback if Gemini is down. Written by Damian's demo-prep session on 2026-11-22 between 02:55 and 03:50 local time. All numbers below were read from the running demo stack at that time.
 
 ## 0. Stack
 
@@ -25,7 +25,7 @@ Every source is in `scraper/seeds/*.toml` (seeded at start-up) except the M3 pag
 
 Telegram channels (`telegram.toml`) are scanned too and appear in the list. Their posts are about crypto only ("VIP za 149$", BTC longs and shorts). No share, bond, ETF or CFD is named, so S3.4 never fires and the gate keeps their M3 scores at 0.18-0.38, below the 0.4 threshold; a crypto-only recommendation is outside art. 2 anyway (S3.8). Use them to show the gate, not as a positive.
 
-**Wording.** Say "the system flags this for an analyst", never "this firm breaks the law". A finding is a set of matched signals with quotes; the decision is the analyst's (status change, section 3).
+**Wording.** Say "the system flags this for an analyst", never "this firm breaks the law". A finding is a set of matched signals with quotes; the decision is the analyst's (status change, step 5 of the demo flow).
 
 ## 2. Expected findings
 
@@ -80,18 +80,29 @@ Scores are as stored on the demo stack. `model.llm` is the model that decided at
 
 If the jury asks: a repost is analyzed as usual, its summary names the original's URL, and it fires no second `finding.high_risk` for its group and module (`analytics/README.md`, "Modules and routing").
 
-## 3. Click path in the dashboard (about 6 minutes)
+## 3. Where analytics fits in the demo flow
 
-The dashboard is one page (`https://localhost:8443/`): a header with the live-alert badge and the health badge, then the summary cards, the trend chart, the findings list and the calibration panel, top to bottom.
+The live demo follows the shared flow in [presentation-dashboard.md](presentation-dashboard.md), "Demo flow" (deck order in [hand-in.md](hand-in.md)). The clicks are not repeated here. This section says, per step of that flow, which analytics finding to show and what to say about it on the `iw-demo` stack. All findings below were checked on this stack at about 03:50 local time; 72 findings in total, 11 high-risk (M1 54, M2 4, M3 14).
 
-1. **Overview:** summary cards (total, by module, by risk level) and the trend chart. Health badge "System działa".
-2. **Zgłoszenia** (findings list): filter Moduł = M2, sort by Wynik. Click the XTB IKE row. The address bar gets `?finding=<id>`, so each demo finding can be bookmarked ahead of time (ids in section 4).
-3. **Finding detail** ("Szczegóły zgłoszenia"): "Dlaczego to zgłoszenie" (summary), the rules table with "Niespełniona" / "Niepewne", "Cytat z materiału" and "Podstawa prawna" per rule, the firm card, the screenshot when the renderer stored one, "Treść materiału" / "Pełna treść".
-4. **Evidence pack export:** there is no button in the panel. Open `https://localhost:8443/api/findings/<id>/export?format=html` in a new tab (the id is in the address bar of the detail view): a printable Polish case file with the stored text, the raw HTML's SHA-256, the failed rules with legal basis and quotes. `format=json` gives the same as JSON.
-5. **Status change:** in the detail panel, "Decyzja analityka": set Status to "W analizie" (`in_review`), add a "Notatka", "Zapisz". Then "Potwierdzone" or "Fałszywy alarm". Confirmed and false-positive labels feed the calibration curve.
-6. Repeat 2-3 for M1 (comparic) and M3 (ppcg), pointing at the module-specific cards (advertiser, "Nadawca spoza rejestru KNF").
-7. **Kalibracja progów** (calibration): choose a module, move the slider. Precision and recall ("Precyzja", "Czułość") and the number of alerts update; "Zapisz próg" writes `iw:settings:thresholds`, which analytics reads per document. Story in section 5.
-8. **Live alert:** keep the dashboard open with the "Na żywo" badge. The dashboard has no scan button, so trigger the scan from a terminal: `POST https://localhost:8443/api/scans` with `{"source_id": "<id>"}` from `GET /api/sources`. Use a source not scanned yet, so it yields a new document (an unchanged page is deduplicated and analytics does not run again); the prepared one is section 4's "live alert" source. A `finding.high_risk` event appears as a toast within seconds of the analytics log line `finding built`.
+**"Before the demo", on this stack:**
+- **Skip step 1** (`docker compose down -v` and rebuild): on `iw-demo` it would delete the warmed LLM cache and every stored finding. The stack is already a clean run from `main` (section 0).
+- **Step 2:** the hosted Gemma stays on, with the warmed cache (section 4). Say which findings are rules-only (`model.llm` null) rather than switching to local Ollama on the morning of the demo.
+- **Step 3 is done:** every seeded source was scanned once, except the kept one, the mBank IKE promo page (`625e672e-db10-41db-9b95-bbbc3a244e9e`, cron `0 6 * * 1`, Mondays, so it does not fire on Sunday). ppcg.com.pl was added on top (section 1).
+- **Step 5 holds:** the Grant Thornton family-office page (negative control) is again a high-risk M3 finding, 0.777 rules-only, as in #78. Do not open it.
+
+| Flow step | Analytics finding to show | Say |
+|---|---|---|
+| 3, live toast | mBank IKE promo, M2. It scored 0.50 in #78; it has not been scanned on this stack, so its score here is not known in advance | Not cached: with Gemini down the finding is rules-only within seconds; with Gemini slow it can take up to the 50 s document budget. Start the scan, talk through step 2 meanwhile. |
+| 4, detail | the toast's mBank finding, or XTB IKE (section 2.1, `?finding=17f6e7e5-8b5d-4d09-a628-9ec62113cec5`) to show an LLM-decided M2 | R2, R3 and R16 fail with quotes; R15, R17 and R18 were decided by Gemma (`method: hybrid`), and the summary names the model. |
+| 4, optional: evidence pack | the same finding: open `https://localhost:8443/api/findings/<id>/export?format=html` in a new tab (there is no button in the panel) | A printable Polish case file: the stored text, the raw HTML's SHA-256, and the failed rules with legal basis and quotes. `format=json` gives the same data as JSON. |
+| 5, status | any | Confirmed and false-positive labels feed the calibration curve (`Liczba oznaczonych próbek`). |
+| 6, M1 high | Comparic 0.94 (LLM, section 2.2), Take Profit guide 0.924, icobench list 0.818, ppcg.com.pl 0.818 (LLM) | Open Comparic: S1.5 is the model's verdict, quoting "Polecamy brokera XTB Załóż konto i wpisz COMPARIC…". |
+| 7, M3 | Moneteo XTB review 0.50 (high, rules-only, as in #78), ppcg.com.pl 0.622 (section 2.3) | The S3.4 gate: Telegram signal posts stay at 0.18-0.38 (crypto only, no instrument), the two pages above pass the gate only because S3.4 is "do weryfikacji". |
+| 8, M2 slider 0.10 → 0.40 | live curve of this build: precision **0.944 → 1.00**, recall **0.739 → 0.478**, 18 → 11 alerts on the gold set (section 5) | The numbers in the shared flow (0.93 → 1.00, 0.61 → 0.48) are from the older slide run; read the panel. |
+| 9, `Zapisz próg` at 0.40 | M2 high-risk findings here: XTB forex 0.658, XTB IKZE 0.553, mBank eMakler 0.529, XTB IKE 0.368 (plus the mBank promo from step 3) | **XTB IKE** (0.368) drops from high to medium, not mBank eMakler (0.529 on this build, against 0.39 in #78). The `Wysokie ryzyko` card goes down by one if the mBank promo scores 0.40 or more, and by two if it scores less. |
+| 10, back to 0.10 | | The card goes back. |
+
+The filter labels in steps 6 and 7 come from the shared flow. M1 and M3 findings are opened from the list, not from a toast.
 
 ## 4. LLM: what to say, what is cached
 
@@ -111,8 +122,8 @@ The dashboard is one page (`https://localhost:8443/`): a header with the live-al
 
 - Redis holds 9 verdict keys (6 `iw:llm:v1:M1:*`, 3 `iw:llm:v1:M2:*`), TTL 7 days, and Redis runs with AOF, so they survive `docker compose restart`.
 - **Second pass check:** comparic and XTB IKE re-announced at 02:42 UTC: **0 requests** to `generativelanguage.googleapis.com` in the analytics log, 0.9 s and 1.2 s per document (against 20-40 s with a live call), same scores, `model.llm` kept.
-- **Kept stable for the demo:** the scheduler's cron was cleared (`PATCH /api/sources/{id}` with `schedule_cron: null`) on comparic, XTB IKE and XTB forex, so no scheduled rescan before 10:30 can store a new, uncached version of a demo page. ppcg.com.pl was added without a cron. Restore the crons after the demo if wanted (`0 7 * * *`, `0 6 * * *`, `20 6 * * *`, as in `scraper/seeds/sources.toml`).
-- **Live-alert source:** XTB forex (`0bdd4ea5-1678-457e-ab40-9660d2558584`, `https://www.xtb.com/pl/forex`) has never been scanned on this stack, so scanning it during the demo yields a new document and a new M2 finding. It is not cached: with Gemini down it is built rules-only within seconds; with Gemini slow it can take up to the 50 s document budget, so start the scan, explain, then point at the toast.
+- **Kept stable for the demo:** the scheduler's cron was cleared (`PATCH /api/sources/{id}` with `schedule_cron: null`) on comparic and XTB IKE. Otherwise a scheduled rescan before 10:30 (07:00 and 06:00 UTC) could store a new, uncached version of these pages. ppcg.com.pl was added without a cron. Restore both crons after the demo if wanted (`0 7 * * *`, `0 6 * * *`, as in `scraper/seeds/sources.toml`). Other sources keep their crons; an unchanged page rescanned by the scheduler is deduplicated.
+- **Live-alert source:** the mBank IKE promo page, kept unscanned for step 3 of the shared flow (section 3).
 - The ids above are for this stack only. Open a finding with `https://localhost:8443/?finding=<id>`.
 
 ## 5. Thresholds (ADR 0316, ADR 0317)
