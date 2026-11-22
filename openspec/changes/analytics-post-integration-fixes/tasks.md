@@ -10,9 +10,9 @@ Each group is one commit, and its first task is the failing test. No test calls 
 
 ## 2. M3 needs an offer signal (~30 min)
 
-- [ ] 2.1 Failing tests: an EY-like page (`unknown`, Polish host, only `family office` and `doradztwo inwestycyjne`) and the mock `72acbb3b…` give no finding and log `no_signals`; S3.3, S3.4, S3.5 and S3.8 each, `fail` or `uncertain`, still give a finding; S3.2 `uncertain` alone does not (`test_has_advisory` is changed for this, as the spec delta says)
-- [ ] 2.2 `m3.ADVISORY` without S3.2 (renamed `OFFER`, with the alias kept); tests green; `test_eval_thresholds` still green (defaults unchanged)
-- [ ] 2.3 Mutation check
+- [x] 2.1 Failing tests: an EY-like page (`unknown`, Polish host, only `family office` and `doradztwo inwestycyjne`) and the mock `72acbb3b…` give no finding and log `no_signals`; S3.3, S3.4, S3.5 and S3.8 each, `fail` or `uncertain`, still give a finding; S3.2 `uncertain` alone does not (`test_has_advisory` is changed for this, as the spec delta says)
+- [x] 2.2 `m3.ADVISORY` without S3.2 (renamed `OFFER`, with the alias kept); tests green; `test_eval_thresholds` still green (defaults unchanged)
+- [x] 2.3 Mutation check; `mutations: 7 tried, 7 caught` (three first killed by an unpack error, not an assertion; the test now asserts the module list)
 
 ## 3. NFKC once (~30 min)
 
