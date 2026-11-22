@@ -9,4 +9,4 @@
 
 - [x] 2.1 Docs: `api/README.md`, `.docs/status/platform.md`
 - [x] 2.2 AI log entry (`iw-ai-log`)
-- [ ] 2.3 Review (`iw-reviewer`)
+- [x] 2.3 Review (`iw-reviewer`, range a0ad3d13..cb8060ef, security folded in): no blocking findings
