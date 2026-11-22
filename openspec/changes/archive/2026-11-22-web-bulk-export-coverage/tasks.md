@@ -21,4 +21,4 @@
 ## 4. Closing
 
 - [x] 4.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry.
-- [ ] 4.2 Run `iw-pr-review` and fix real findings.
+- [x] 4.2 Run `iw-pr-review` and fix real findings. Group reviews (3) and the whole-branch review: no blocking findings. Could not check: a visual run in a browser, Gitleaks locally (not installed; CI runs it).
