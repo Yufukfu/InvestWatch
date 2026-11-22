@@ -65,7 +65,7 @@ docker run --rm -v "$PWD:$PWD:ro" -v "$GIT_COMMON:$GIT_COMMON:ro" -w "$PWD" "$GI
 
 | Control | State |
 |---|---|
-| `pip-audit`, `npm audit` in CI | in `.github/workflows/ci.yml`, but manual `workflow_dispatch` only: not a required check and not a merge gate yet (ADR 0209, Consequences) |
+| `pip-audit`, `npm audit` in CI | in `.github/workflows/ci.yml`, on every PR to `main` ([ADR 0213](decisions/0213-ci-on-every-pr.md)); advisory, not a required check |
 | `.env` isolation (gitignore, hook, CI) | in place |
 | OSV-Scanner (offline) | manual (section 2); CI job is the ADR 0209 follow-up |
 | Gitleaks + `.gitleaks.toml` | manual (section 4); CI job is the ADR 0209 follow-up |
