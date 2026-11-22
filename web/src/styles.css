@@ -258,7 +258,10 @@ button.link:hover { color: var(--accent-strong); }
 /* Finding detail: a side panel over the page; full width on phones. */
 .detail-layer { position: relative; z-index: 10; }
 .detail-backdrop { position: fixed; inset: 0; background: rgb(15 23 42 / 35%); z-index: 10; }
-.detail { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); overflow-y: auto; background: var(--surface); z-index: 11; padding: 0 20px 24px; box-shadow: -8px 0 24px rgb(15 23 42 / 18%); }
+.detail { position: fixed; top: 0; right: 0; bottom: 0; width: 100vw; overflow-y: auto; background: var(--surface); z-index: 11; padding: 0 var(--space-4) var(--space-6); box-shadow: -8px 0 24px rgb(15 23 42 / 18%); animation: drawer-in 0.2s ease-out; }
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Phone (below 600px): the detail fills the screen. From 600px it is a side panel; the page stays visible from 1024px. */
+@media (min-width: 600px) { .detail { width: min(640px, 100vw); padding: 0 20px 24px; } }
 .detail-header { position: sticky; top: 0; background: var(--surface); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 0 12px; border-bottom: 1px solid var(--border); z-index: 1; }
 .detail-header h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 16px; margin: 16px 0 8px; }
@@ -269,7 +272,7 @@ button.link:hover { color: var(--accent-strong); }
 .detail-section { margin-top: 20px; }
 .detail-section h3 { font-size: 17px; margin: 0 0 8px; }
 .rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.rule { border: 1px solid var(--border); border-left: 5px solid var(--slate); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+.rule { border: 1px solid var(--border); border-left: 6px solid var(--slate); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface); }
 .rule.sev-high { border-left-color: var(--sev-high); }
 .rule.sev-medium { border-left-color: var(--sev-medium); }
 .rule.sev-low { border-left-color: var(--control-border); }
@@ -311,6 +314,7 @@ button.link:hover { color: var(--accent-strong); }
 .live-offline { background: var(--offline-bg); color: var(--offline-fg); }
 .live-offline::before { background: var(--offline-dot); }
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: grid; gap: 10px; width: min(380px, calc(100vw - 32px)); }
+.toast-actions .btn { flex: 1 1 auto; }
 /* Inside the detail dialog the toasts are in its flow, above the content, not floating over the Save button. */
 .detail .toasts { position: static; width: auto; margin: 12px 0 0; }
 .toast { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--sev-high); border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 8px 24px rgb(15 23 42 / 20%); animation: toast-in 0.2s ease-out; }

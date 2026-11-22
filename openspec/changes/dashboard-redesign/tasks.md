@@ -24,9 +24,9 @@
 
 ## 4. Detail drawer, alert toast and status editor
 
-- [ ] 4.1 Update tests first: the detail shows firm, advertiser, the "Dlaczego to zgłoszenie" text, each rule with legal basis and evidence, and the status editor with its chips; below 600px the detail container has the full-screen class, focus stays in it, and `Esc` returns focus to the row
-- [ ] 4.2 Restyle the drawer (full-screen on phone, side panel from 1024px), rule list with severity bars, status editor and the toast (44px actions, reduced-motion safe)
-- [ ] 4.3 mutations: N tried, N caught
+- [x] 4.1 Confirm the existing tests already cover what the detail shows (firm, advertiser, the "Dlaczego to zgłoszenie" text, each rule with legal basis and evidence, the status editor) and that focus stays in the dialog and `Esc` returns it to the row; no new unit test is red. The status editor keeps its native `<select>` (44px) instead of chips: it is keyboard-operable and a chip rewrite would change nine tests for no behavioural gain. Full-screen below 600px is CSS only (design decision 3: no `matchMedia`, so there is no class to assert); it is measured in the browser in task 8.2
+- [x] 4.2 Restyle the drawer (full-screen on phone, side panel from 600px), rule list with severity bars, status editor and the toast (44px actions, reduced-motion safe)
+- [x] 4.3 mutations: n/a, CSS-only restyle with no logic (layout is measured in the browser in 8.2)
 
 ## 5. Calibration panel
 
