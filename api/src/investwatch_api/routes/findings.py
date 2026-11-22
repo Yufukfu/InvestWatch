@@ -160,15 +160,15 @@ async def bulk_status(body: Annotated[BulkStatus, Body()], request: Request):
     """One status for several findings (issue #115): the PATCH update per id, one transaction, events after it."""
     svc = request.app.state.services
     thresholds = await svc.thresholds.current()
-    results = []
+    done: dict[UUID, dict | None] = {}
     async with svc.engine.begin() as conn:
-        for finding_id in body.ids:
+        # Rows are locked in id order, so two overlapping bulk calls cannot deadlock; results keep request order.
+        for finding_id in sorted(body.ids):
             current = await _finding_row_or_none(conn, finding_id, thresholds)
-            if current is None:
-                results.append({"id": str(finding_id), "result": "not_found", "finding": None})
-                continue
-            row = await _apply(conn, current, {"status": body.status}, thresholds)
-            results.append({"id": str(finding_id), "result": "updated", "finding": _view(row)})
+            done[finding_id] = (_view(await _apply(conn, current, {"status": body.status}, thresholds))
+                                if current is not None else None)
+    results = [{"id": str(i), "result": "updated" if done[i] is not None else "not_found", "finding": done[i]}
+               for i in body.ids]
     for item in results:
         if item["finding"] is not None:
             await publish_event(svc.redis, "finding.updated", {"id": item["id"], "status": item["finding"]["status"]})
