@@ -464,6 +464,18 @@ test('run: --limit caps the sessions per run', async () => {
   assert.equal(s.calls.length, 1);
 });
 
+test('run: an approved notice takes no --limit slot from a session', async () => {
+  const approval = { ...fx('reviews-11.json').find((r) => r.state === 'APPROVED'), body: '' };
+  const s = setup();
+  const pr11 = { ...s.pr11, reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  // #11 is approved (sorts first, no session), #28 waits for my review (a session)
+  s.deps.gh = fakeGh({ 'pr list mine': [pr11], 'pr list review': [s.pr28], 'pr list open': [{ number: 11 }, { number: 28 }], 'pulls/11/reviews': [approval], 'pulls/11/comments': [], 'issues/11/comments': [] }).gh;
+  assert.equal(await main(['run', '--mine', '--review-requested', '--limit', '1'], s.deps), 0, s.err.join(''));
+  assert.equal(s.calls.length, 1, 'the review session still runs');
+  assert.deepEqual(s.notices().map((n) => n.kind).sort(), ['approved', 'draft-ready']);
+  assert.doesNotMatch(s.err.join(''), /wait for the next run/);
+});
+
 test('run: without the claude CLI it exits non-zero with install guidance and writes no state', async () => {
   const s = setup();
   s.deps.claudeAvailable = () => false;
