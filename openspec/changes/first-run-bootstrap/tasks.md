@@ -14,9 +14,9 @@
 
 ## 3. Compose service and stack check
 
-- [ ] 3.1 Add the `bootstrap` one-shot to `scraper/compose.yaml` (scraper image, app role and `REDIS_URL` only, `data` network, hardening, `restart: "no"`, depends on `seed` completed and `worker` healthy) and `BOOTSTRAP_SCAN` to `scraper/.env.example` and the root `.env.example`; verify `docker compose config` for the root file and the documented `-f` chain lists it and shows no `MINIO_*`.
-- [ ] 3.2 Add a `scraper/tests/stack.sh` group: clean stack, `bootstrap` exits 0, one stream entry per source, `scan.finished` seen, second `up` adds none; run it and record the output.
-- [ ] 3.3 Update `openspec/specs/scraper-deployment` expectations only if the start-order scenarios change (they should not); verify with `openspec validate --strict`.
+- [x] 3.1 Add the `bootstrap` one-shot to `scraper/compose.yaml` (scraper image, app role and `REDIS_URL` only, `data` network, hardening, `restart: "no"`, depends on `seed` completed and `worker` healthy) and `BOOTSTRAP_SCAN` to `scraper/.env.example` and the root `.env.example`; verify `docker compose config` for the root file and the documented `-f` chain lists it and shows no `MINIO_*`. Also `scheduler` depends on `bootstrap` with `required: false`, so `up --wait` does not fail on the finished one-shot. mutations: 7 tried, 7 caught (config checks in `stack.sh config`: worker gate, MinIO variable, extra network, flag pass-through, restart policy, seed gate, scheduler dependency).
+- [x] 3.2 Add a `scraper/tests/stack.sh` group: clean stack, `bootstrap` exits 0, one stream entry per source, `scan.finished` seen, second `up` adds none; run it and record the output. Run on this branch: 13 passed, 0 failed (`stack.sh run`); the live group found that a finished one-shot fails `up --wait` and that queued scans make the worker non-idle, both fixed here.
+- [x] 3.3 Update `openspec/specs/scraper-deployment` expectations only if the start-order scenarios change (they should not); verify with `openspec validate --strict`.
 
 ## 4. Docs and brief traceability
 

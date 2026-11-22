@@ -13,6 +13,10 @@ A one-shot `bootstrap` service SHALL, after `seed` completed and `worker` is hea
 - **WHEN** `docker compose up` runs on empty volumes with the default seeds
 - **THEN** one request is enqueued per seeded source that has a cron (17 with the shipped seeds), `bootstrap` exits 0, and each gets a `scan.started` and a `scan.finished` event without any `POST /api/scans`
 
+#### Scenario: Wait-compatible
+- **WHEN** `docker compose up -d --wait` runs on a clean clone
+- **THEN** it exits 0 although `bootstrap` has exited, because a service that depends on it with `required: false` makes Compose wait for its completion
+
 #### Scenario: Inactive source
 - **WHEN** a source has `active = false`
 - **THEN** no request is enqueued for it
