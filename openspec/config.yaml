@@ -28,7 +28,7 @@ rules:
   tasks:
     - Each task group is one commit-sized unit whose first task is its failing test. Keep tasks under about 2 hours.
     - 'Each task group ends with a mutation-check task (iw-commit-cycle step 3); when done, its tasks.md line reads `mutations: N tried, N caught` (or `mutations: n/a, <reason>`).'
-    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, your own domain file in .docs/status/, ADRs) and add the iw-ai-log row; (2) run the iw-pr-review skill and fix real findings.
+    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, the .docs/status/ file for the directories you changed, ADRs) and add the iw-ai-log row; (2) run the iw-pr-review skill and fix real findings.
 
 operations:
   apply:

@@ -1,6 +1,6 @@
 # Status
 
-Team-wide state only: milestones and decisions that need the whole team. Module state, active OpenSpec changes and module blockers live in one file per domain (below); edit only your own file, never another owner's ([ADR 0205](decisions/0205-status-per-domain.md)). Agents read this file and then the file of their domain at session start. The owner of a milestone edits its row here.
+Team-wide state only: milestones and decisions that need the whole team. Module state, active OpenSpec changes and module blockers live in one file per domain (below); whoever changes a directory updates only the file that covers it, which limits merge conflicts ([ADR 0205](decisions/0205-status-per-domain.md), [ADR 0211](decisions/0211-codeowners-single-source.md)). Agents read this file and then the file for the directories they change at session start. The owner of a milestone edits its row here.
 
 ## Milestones (from `integration-plan.md` §8)
 

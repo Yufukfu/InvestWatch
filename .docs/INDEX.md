@@ -7,7 +7,7 @@
 | I want to… | Open |
 |---|---|
 | See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then the file for your directories: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
-| See who owns a directory, or who to ask for review | [`.github/CODEOWNERS`](../.github/CODEOWNERS), the only place that names owners; shared areas (`infra/`, `.docs/`, `.claude/`, `openspec/`, root files) have none ([ADR 0211](decisions/0211-codeowners-single-source.md)) |
+| See who owns a directory, or who to ask for review | [`.github/CODEOWNERS`](../.github/CODEOWNERS), the only place that names owners; shared areas (`infra/`, `.docs/`, `.claude/`, `openspec/`, `.github/`, root files) have none ([ADR 0211](decisions/0211-codeowners-single-source.md)) |
 | Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
 | Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
 | What exactly `content_hash` hashes (normalisation, who computes it) | [integration-plan.md](integration-plan.md) §3, [decisions/0105-content-hash-normalisation.md](decisions/0105-content-hash-normalisation.md) |

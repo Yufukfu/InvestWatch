@@ -18,7 +18,7 @@
 ## 3. Closing
 
 - [x] 3.1 `iw-docs-update`: ADR `.docs/decisions/0211-codeowners-single-source.md` (partly supersedes 0202 and 0205), listed in `.docs/decisions/README.md`; `.docs/status/dashboard.md` updated; `iw-ai-log` row. Verify: `docs-check` exits 0.
-- [ ] 3.2 Run `iw-pr-review` and fix real findings.
+- [x] 3.2 Run `iw-pr-review` and fix real findings. The whole-branch review found 4 places that still stated the old status and layout rule, all verified and fixed: the `.docs/STATUS.md` intro, the closing-task text in `openspec/config.yaml` (and the `iw-implement` skill), "if Kacper changes the layout" in `iw-docs-update`, and a stale "Kacper must OK" blocker in `.docs/status/scraper.md` (`scraper/compose.yaml` is already in the root `include:`). `.github/` was added to the shared-area lists. Not changed: `.docs/analytics-plan.md` §12.1, a historical plan step ("until the repository structure from Kacper lands").
 
 ## Workflow follow-up
 

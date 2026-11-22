@@ -53,4 +53,4 @@ node .claude/skills/iw-docs-update/scripts/docs-check.mjs
 node --test ".claude/skills/iw-docs-update/scripts/*.test.mjs"   # only if the script changed
 ```
 
-It fails on a broken relative link or backticked `.md` path, an ADR missing from the index, and a service directory without `CLAUDE.md`. Fix each finding at its source; don't silence it. The service list is `SERVICE_DIRS` in the script; update it if Kacper changes the layout.
+It fails on a broken relative link or backticked `.md` path, an ADR missing from the index, a service directory without `CLAUDE.md` or without a `/<dir>/` line in `.github/CODEOWNERS`, and a per-person ownership statement in a live doc (link `CODEOWNERS` instead, [ADR 0211](../../../.docs/decisions/0211-codeowners-single-source.md)). Fix each finding at its source; don't silence it. The service list is `SERVICE_DIRS` in the script; update it when the team adds a directory.
