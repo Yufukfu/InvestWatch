@@ -445,6 +445,34 @@ async def test_a_block_on_a_later_watch_page_keeps_the_stored_documents_and_requ
     assert h.fetched == [LIST_URL, *[watch_url(i) for i in ids[:3]]]
 
 
+@pytest.mark.parametrize(
+    "failure",
+    [
+        FetchFailure(Reason.BLOCKED, "HTTP 429", None, "60", 429),
+        FetchFailure(Reason.HTTP_ERROR, "HTTP 503", None, "60", 503),
+    ],
+)
+async def test_a_retry_after_on_a_later_watch_page_reaches_the_queue_so_it_defers_the_domain(failure):
+    ids = channel_ids()[:3]
+    pages = with_watch_pages(ids)
+    pages[watch_url(ids[1])] = failure
+    h = Harness(pages)
+
+    result = await h.run(max_videos=3)
+
+    assert result.documents == 1 and result.retry_after == 60.0 and result.http_status == failure.http_status
+
+
+async def test_a_later_watch_page_failure_without_retry_after_leaves_it_unset():
+    ids = channel_ids()[:3]
+    pages = with_watch_pages(ids)
+    pages[watch_url(ids[1])] = FetchFailure(Reason.BLOCKED, "HTTP 403", None, None, 403)
+
+    result = await Harness(pages).run(max_videos=3)
+
+    assert result.documents == 1 and result.retry_after is None
+
+
 async def test_an_ingest_failure_ends_the_run_with_the_recorded_error():
     ids = channel_ids()[:3]
 

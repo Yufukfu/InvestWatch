@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from iw_scraper.config import yt_transcript_proxy, youtube_max_videos
-from iw_scraper.fetch import FetchDeferred, FetchFailure
+from iw_scraper.fetch import FetchDeferred, FetchFailure, retry_after_seconds
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure
 from iw_scraper.social.model import Flow, FlowContext
@@ -234,7 +234,10 @@ def make_flow(*, max_videos=youtube_max_videos, transcript=fetch_transcript, pro
                 if stored == 0:
                     raise
                 error = JobError(failure.reason, failure.detail, source.id)
-                return AttemptResult(documents=stored, error=error, http_status=failure.http_status)
+                return AttemptResult(  # `retry_after` is what makes the queue defer the whole domain
+                    documents=stored, error=error, http_status=failure.http_status,
+                    retry_after=retry_after_seconds(failure.retry_after, ctx.clock()),
+                )
             video = parse_watch(result.body)
             if video == "unplayable":
                 unplayable += 1

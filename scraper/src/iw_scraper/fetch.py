@@ -9,11 +9,14 @@ Facts about the client (`noble-tls` over the Go `tls-client`, ADR 0101) that sha
 """
 
 import logging
+import math
 import os
 import re
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import SplitResult, unquote, urljoin, urlsplit
 
@@ -294,3 +297,23 @@ async def fetch(
     finally:
         if owned:
             await close_session(session)
+
+
+_MAX_DIGITS = 15  # more digits than this is beyond any cap; `int()` also refuses 4300+ digits
+
+
+def retry_after_seconds(header: str | None, now: datetime) -> float | None:
+    """A `Retry-After` header (delay seconds or an HTTP date) as seconds from `now`; None when unusable."""
+    if not header:
+        return None
+    value = header.strip()
+    if value.isascii() and value.isdigit():
+        return float(int(value)) if len(value) <= _MAX_DIGITS else None
+    try:
+        moment = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    seconds = (moment - now).total_seconds()
+    return max(0.0, seconds) if math.isfinite(seconds) else None
