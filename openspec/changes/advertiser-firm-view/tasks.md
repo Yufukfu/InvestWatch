@@ -8,9 +8,9 @@
 
 ## 2. Table and section
 
-- [ ] 2.1 Write failing tests: `AdvertisersTable.test.tsx` (rows, firm counts, `Powtarzający się` only on repeats, `bez dopasowanej firmy`, untrusted name in a `dir="auto"` element, cap text, empty, error, loading) and `AdvertisersPage.test.tsx` (the contract mock renders the four M1 advertisers and no M3 advertiser). Verify they fail first.
-- [ ] 2.2 Implement `components/AdvertisersTable.tsx`, `AdvertisersPage.tsx`, the section in `App.tsx` and CSS. Verify tests, lint, typecheck, build.
-- [ ] 2.3 Mutation check.
+- [x] 2.1 Write failing tests: `AdvertisersTable.test.tsx` (rows, firm counts, `Powtarzający się` only on repeats, `bez dopasowanej firmy`, untrusted name in a `dir="auto"` element, cap text, empty, error, loading) and `AdvertisersPage.test.tsx` (the contract mock renders the four M1 advertisers and no M3 advertiser). Verify they fail first.
+- [x] 2.2 Implement `components/AdvertisersTable.tsx`, `AdvertisersPage.tsx`, the section in `App.tsx` and CSS. Verify tests, lint, typecheck (`vite build` not run: shared 8 GB machine, coordinator asked for no builds). `App.test.tsx` API-down case now expects two alerts (findings and advertisers).
+- [x] 2.3 Mutation check, each against `AdvertisersTable.test.tsx` or `AdvertisersPage.test.tsx`: repeat label always shown; repeat row class dropped; truncation boundary `>` to `>=`; truncation note dropped; `dir` dropped from name and from handle; handle fallback for a missing name dropped; handle line shown without a name; `bez dopasowanej firmy` dropped; error, loading and empty states dropped; page renders no table. mutations: 13 tried, 13 caught.
 
 ## 3. Closing
 

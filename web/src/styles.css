@@ -228,3 +228,11 @@ button.link:hover { color: #1e40af; }
 .calibration-plot { width: 100%; }
 .calibration-save { margin-top: 16px; display: grid; gap: 10px; }
 .warning { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--risk-medium-bg); color: var(--risk-medium-fg); font-weight: 600; }
+
+/* Advertiser-to-firm table (M1) */
+.advertisers { min-width: 560px; }
+.advertisers tbody tr.repeat { background: var(--risk-medium-bg); box-shadow: inset 4px 0 0 var(--risk-medium-fg); }
+.advertiser-name { font-weight: 600; }
+.firm-list { margin: 0; padding-left: 18px; }
+.advertiser-count { font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 8px; }
+.badge-repeat { background: var(--risk-medium-fg); color: #ffffff; white-space: nowrap; }

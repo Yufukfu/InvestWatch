@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { SectionBoundary } from './SectionBoundary';
+import { AdvertisersPage } from './features/advertisers/AdvertisersPage';
 import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
@@ -42,6 +43,7 @@ export function App() {
             </Suspense>
           </SectionBoundary>
           <FindingsPage />
+          <AdvertisersPage />
           <SectionBoundary
             fallback={
               <p className="trend-state" role="alert">

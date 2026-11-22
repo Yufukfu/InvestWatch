@@ -83,6 +83,10 @@ describe('App (against contract mocks)', () => {
     );
     renderApp();
     expect(await screen.findByText('Brak połączenia z API')).toBeInTheDocument();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
+    // The findings table and the advertiser section each show their own error alert.
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toEqual(
+      expect.arrayContaining(['Nie udało się pobrać zgłoszeń.', 'Nie udało się pobrać danych o reklamodawcach.']),
+    );
   });
 });
