@@ -43,7 +43,7 @@ Covers `analytics/`, `api/` and `contracts/`; whoever changes them updates this 
 - Merged with PR #15 (Kacper's review fixed in `api-db-schema-review-fixes`).
 - `api-v1` applied and archived: REST under `/api` (all 11 contract paths), Socket.IO relay `iw:events` → `/events`, calibration curve from analyst labels, the `api` service in `api/compose.yaml`.
 - In PR #21, stacked on PR #18 (`infra-compose`) and merging after it; Kacper's review fixed in `api-v1-review-fixes`.
-- `api-rescan-state` (issue #71, M1 periodic update): `GET /findings/{id}` serves `document.scrape_meta.rescan` (`current`/`changed`/`removed`), derived from later documents of the same page and gone `job_errors`; no contract or table change. Open: a list badge needs an optional `Finding` field (contract change); `removed` from job errors needs the scraper to write `job_errors.url`.
+- `api-rescan-state` (issue #71, M1 periodic update): `GET /findings/{id}` serves `document.scrape_meta.rescan` (`current`/`changed`/`removed`), derived from later documents of the same page and gone `job_errors`; no contract or table change. Open: a list badge needs an optional `Finding` field (contract change). `rescan-gone-source-match`: `removed` counts the scraper's `gone` job errors (PR #108) and matches a web page by `source_id`, so redirecting sources work too.
 - `POST /api/scans` runs a scan: the scraper consumes `iw:scan-requests` (#30). Verified in the #78 rehearsal: 17 requests through the gateway, all answered 202 and scanned.
 
 ### infra-compose
