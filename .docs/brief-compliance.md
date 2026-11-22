@@ -39,7 +39,7 @@ Each requirement of the challenge brief (`doc/Opis Wyzwania HackNation UKNF 19.1
 | Docker and Compose, whole stack on-premise with one command | [compose.yaml](../compose.yaml), [infra/README.md](../infra/README.md) | Done; the first run fills itself ([first-run bootstrap](../openspec/specs/first-run-bootstrap/spec.md)). |
 | Open source and on-premise, no paid external API | [ADR 0304](decisions/0304-llm-serving.md) | Done except the hosted-LLM exception above. |
 | Dependency scanning, secrets only in `.env` | [supply-chain.md](supply-chain.md), [security-audit.md](security-audit.md), [ADR 0209](decisions/0209-supply-chain-scanning.md), [supply-chain scanning](../openspec/specs/supply-chain-scanning/spec.md) | Done; results are in each PR body. |
-| README: Quick Start, hardware requirements, service configuration | [README.md](../README.md) (Quick Start, hardware), [infra/README.md](../infra/README.md) (variable reference per service) | Done. |
+| README: Quick Start, hardware requirements, service configuration | [README.md](../README.md) (Quick Start, hardware, configuration) | Done. |
 
 ## 6. What the jury checks
 

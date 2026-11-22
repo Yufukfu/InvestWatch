@@ -63,12 +63,12 @@ One page, top to bottom (`web/src/App.tsx`): header with live and health badges,
 - `Zapisz próg` stores it (`PUT /settings/thresholds`); the API derives every finding's risk level on read from that threshold (`high` if `score >= t`, `medium` if `score >= t - 0.2`), so the findings, the summary and future alerts change at once (`Zapisano. Poziomy ryzyka zostały przeliczone.`). `Wróć do obecnego` undoes the preview.
 - The curve comes from the gold-set evaluation that runs on every `docker compose up` (`analytics-eval`) plus the analysts' own labels (`Liczba oznaczonych próbek`).
 
-| M2 threshold (gold set, `GET /api/calibration?module=M2` on `main` a0ad3d13, before R9 and R10: with them the default row reads 0.947 / 0.783 / 19 alerts and the other rows do not change; [demo-analytics.md](demo-analytics.md) §5) | Precision | Recall | Alerts (TP+FP) |
+| M2 threshold (gold set, rules-only run of `main` 61238394 with all 18 rules; [demo-analytics.md](demo-analytics.md) §5) | Precision | Recall | Alerts (TP+FP) |
 |---|---|---|---|
-| 0.10 (default) | 0.944 | 0.739 | 18 |
+| 0.05 (default) | 0.955 | 0.913 | 22 |
+| 0.10 | 0.95 | 0.826 | 20 |
 | 0.25 | 1.00 | 0.609 | 14 |
-| 0.40 | 1.00 | 0.478 | 11 |
-| 0.50 | 1.00 | 0.348 | 8 |
+| 0.40 | 1.00 | 0.304 | 7 |
 
 **Notes:** This is jury criterion "wpływ zmian parametrów progowych na wyniki w panelu kalibracji" made concrete: the numbers in the table are the panel's own data source (synthetic gold set, rules only; see the analytics section). The panel needs labelled data; with none it says `Za mało oznaczonych danych, aby skalibrować ten moduł.` Raising a threshold is a precision-for-recall trade the analyst sees before saving, and saving is explicit and global, with a warning that it changes every finding of that module.
 
@@ -154,9 +154,9 @@ Not slides. The live order follows the jury's criteria in challenge §6: scrapin
 | 5 | In `Decyzja analityka` set `W analizie`, type a note, click `Zapisz` | `Zapisano.`; the status changes in the list behind | "Status workflow; the change is broadcast to other open dashboards (`finding.updated`)." |
 | 6 | Close the detail; in the filters pick `Moduł` = `M1 · Finfluencerzy`, `Poziom ryzyka` = `Wysoki` | only high-risk M1 findings (in #78: the Take Profit guide, the Comparic ranking, the icobench list) | "Filters stay in the URL, so this view is a link." |
 | 7 | Click `Wyczyść filtry`, then `Moduł` = `M3 · Usługi bez zezwolenia` | M3 findings, e.g. the Moneteo review (high, 0.50 in #78) | "Shadow advisory: firms outside the KNF register offering advice." |
-| 8 | Scroll to `Kalibracja progów`, pick `M2`, move the slider from 0.10 to 0.25 | TP/FP/FN/TN, precision 0.944 → 1.00, recall 0.739 → 0.609, alerts 18 → 14 on the pre-warmed demo stack's build (a build with R9 and R10 starts at 0.947, 0.783, 19 alerts; read the panel, not this cell), the chart marker moves | "Threshold up: fewer false alarms, more misses. Preview only, nothing changed yet." |
-| 9 | Optional: click `Zapisz próg` | `Zapisano. Poziomy ryzyka zostały przeliczone.`; M2 findings scoring 0.10-0.25 drop from high, so the `Wysokie ryzyko` card may go down | The XTB IKE finding (0.368) stays high at 0.25. Do not save 0.40: XTB IKE would drop. How far the card moves depends on the stack's other M2 scores; read it at the rehearsal. |
-| 10 | `Wróć do obecnego` is only for the preview; if you saved, move back to 0.10 and `Zapisz próg` again | the card goes back | "The threshold is the analyst's choice, measured, not hard-coded." |
+| 8 | Scroll to `Kalibracja progów`, pick `M2`, move the slider from the default 0.05 to 0.25 | TP/FP/FN/TN, precision 0.955 → 1.00, recall 0.913 → 0.609, alerts 22 → 14 on a build of current `main` (a stack built before ADR 0319 starts at 0.10; read the panel, not this cell), the chart marker moves | "Threshold up: fewer false alarms, more misses. Preview only, nothing changed yet." |
+| 9 | Optional: click `Zapisz próg` | `Zapisano. Poziomy ryzyka zostały przeliczone.`; M2 findings scoring between the old and the new threshold drop from high, so the `Wysokie ryzyko` card may go down | The XTB IKE finding (0.368) stays high at 0.25. Do not save 0.40: XTB IKE would drop. How far the card moves depends on the stack's other M2 scores; read it at the rehearsal. |
+| 10 | `Wróć do obecnego` is only for the preview; if you saved, move back to 0.05 and `Zapisz próg` again | the card goes back | "The threshold is the analyst's choice, measured, not hard-coded." |
 
 ## 3-minute video script
 
