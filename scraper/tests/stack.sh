@@ -17,8 +17,8 @@ TMP=$(mktemp -d)
 RUN_ID="$$"
 PROJECT="iw-stack-$RUN_ID"
 HEALTH_PORT=18099  # not the default 8080, so "refused on the host" cannot hit the gateway or another service
-# Included, not merged with several -f: scraper/compose.yaml includes compose.renderer.yaml, and an include resolves
-# against the project directory (infra/) when files are merged.
+# Included, not merged with several -f: the containers run from one project file. The merged -f chain of the docs is
+# checked on its own in the root group.
 printf 'include:\n  - %s\n  - %s\n  - %s\n' "$ROOT/infra/compose.yaml" "$ROOT/api/compose.yaml" "$ROOT/scraper/compose.yaml" >"$TMP/modules.yaml"
 FILES=(-f "$TMP/modules.yaml")
 [ -z "${STACK_ROOT:-}" ] || FILES=(-f "$ROOT/compose.yaml")  # STACK_ROOT=1: run through the root file, as `docker compose up` does
@@ -292,13 +292,20 @@ group_run() {
 
 # ------------------------------------------------------------ root group (root compose.yaml)
 
-root_lists_scraper() {
-  docker compose --env-file "$ENVF" -f "$ROOT/compose.yaml" config --services >"$TMP/root-services.txt" || return 1
-  local s; for s in worker scheduler seed; do grep -qx "$s" "$TMP/root-services.txt" || { echo "root compose has no $s"; return 1; }; done
+# The four services of the scraper unit, from the root file or from the documented merge of the module files.
+lists_scraper_services() { # lists_scraper_services <compose -f args...>
+  docker compose --env-file "$ENVF" "$@" config --services >"$TMP/services.txt" || return 1
+  local s; for s in worker scheduler seed renderer; do grep -qx "$s" "$TMP/services.txt" || { echo "no $s in: $*"; return 1; }; done
+}
+root_lists_scraper() { lists_scraper_services -f "$ROOT/compose.yaml"; }
+# scraper/compose.yaml's include resolves against the first -f file's directory (infra/ here), issue #97.
+documented_chain_lists_scraper() {
+  lists_scraper_services -f "$ROOT/infra/compose.yaml" -f "$ROOT/api/compose.yaml" -f "$ROOT/scraper/compose.yaml"
 }
 
 group_root() {
-  check "the root compose.yaml lists worker, scheduler and seed" root_lists_scraper
+  check "the root compose.yaml lists worker, scheduler, seed and renderer" root_lists_scraper
+  check "the documented -f infra -f api -f scraper chain lists the same services" documented_chain_lists_scraper
 }
 
 groups=("$@")

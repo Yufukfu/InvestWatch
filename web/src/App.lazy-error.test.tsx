@@ -22,7 +22,7 @@ describe('App when the trend chunk fails to load', () => {
         <App />
       </Provider>,
     );
-    expect(await screen.findByRole('alert', {}, { timeout: 4000 })).toHaveTextContent('Nie udało się pobrać danych trendu.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać danych trendu.');
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
     expect(region).toHaveTextContent(`${summary.total}Wszystkie zgłoszenia`);
   });
