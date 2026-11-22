@@ -15,11 +15,21 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       HEALTH_PORT: "8001"
-      # LLM slots (ADR 0304), from the root .env; empty = rules-only (model.llm = null). The client is wired by the
-      # later change analytics-llm-p0. Local fallback: LLM_BASE_URL=http://ollama:11434/v1 with --profile llm.
+      # LLM (ADR 0304, 0317), from the root .env; empty LLM_BASE_URL = rules-only (model.llm = null). Default: hosted
+      # Gemma 4 on the Gemini API (OpenAI-compatible endpoint, mentor exception); local swap target: LLM_BASE_URL=http://ollama:11434/v1,
+      # LLM_MODEL=gemma3:4b, LLM_API_KEY=ollama with --profile llm. Limits: analytics/.env.example.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-}
+      LLM_DOC_BUDGET_S: ${LLM_DOC_BUDGET_S:-}
+      LLM_CHUNK_CHARS: ${LLM_CHUNK_CHARS:-}
+      LLM_MAX_CHUNKS: ${LLM_MAX_CHUNKS:-}
+      LLM_CACHE_TTL_S: ${LLM_CACHE_TTL_S:-}
+      LLM_BREAKER_FAILURES: ${LLM_BREAKER_FAILURES:-}
+      LLM_BREAKER_COOLDOWN_S: ${LLM_BREAKER_COOLDOWN_S:-}
+      # Must stay above (LLM_DOC_BUDGET_S + 3 s) * 1000 (the worker refuses to start otherwise); 90000 for hosted Gemma.
+      CLAIM_MIN_IDLE_MS: ${CLAIM_MIN_IDLE_MS:-}
       # Registry: empty = the bundled real KNF register snapshot, registry/knf.csv (749 firms; the worker logs its
       # snapshot date as registry_loaded). registry/seed.csv is the fictional test fixture (registry_seed WARNING).
       # Format and refresh: analytics/registry/README.md.
@@ -30,9 +40,14 @@ services:
       api-migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-    # data only: Postgres and Redis, internal, no route out. The worker makes no outbound call yet; analytics-llm-p0
-    # adds egress together with the hosted LLM client (ADR 0304).
-    networks: [data]
+      # Makes `up --wait` check the one-shot for completion, as it does for api-migrate. A service nobody depends on is
+      # checked for "running or healthy", and a finished one-shot fails that ("no healthcheck configured" while it
+      # runs, "exited (0)" once done). required: false still starts the worker if the evaluation fails; --wait then
+      # exits 1 with "didn't complete successfully". Delays the worker only by the evaluation run (seconds).
+      analytics-eval: { condition: service_completed_successfully, required: false }
+    # data: Postgres, Redis and the optional ollama service (internal, no route out). egress: the hosted LLM endpoint
+    # (ADR 0304), added together with the LLM client in analytics-llm-p0. Network keys only, never `name:`.
+    networks: [data, egress]
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -59,7 +74,8 @@ services:
       postgres: { condition: service_healthy }
     # data only: Postgres. No Redis, no egress (no LLM in the default run).
     networks: [data]
-    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none.
+    # The image's HEALTHCHECK polls the worker's /health; a one-shot job has none. `up --wait` checks this service
+    # for completion because `analytics` depends on it (see there), so it does not need a healthcheck.
     healthcheck:
       disable: true
     read_only: true

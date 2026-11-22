@@ -100,6 +100,16 @@ class ScrapedDocument(_Lenient):
 # ---- output ------------------------------------------------------------------------------------
 
 
+Viewport = Literal["desktop", "tablet", "mobile"]
+
+
+class EvidenceLocator(_Strict):
+    """Where a visual rule's evidence sits on the rendered page (contract `rules[].evidence_locator`)."""
+
+    viewport: Viewport | None = None
+    bbox: list[float] | None = Field(default=None, min_length=4, max_length=4)
+
+
 class RuleResult(_Strict):
     rule_id: str = Field(pattern=RULE_ID_PATTERN)
     name: str
@@ -109,6 +119,7 @@ class RuleResult(_Strict):
     explanation: str | None = None
     legal_basis: str | None = None
     method: Literal["rule", "llm", "hybrid"] | None = None
+    evidence_locator: EvidenceLocator | None = None
 
 
 class FirmRef(_Strict):

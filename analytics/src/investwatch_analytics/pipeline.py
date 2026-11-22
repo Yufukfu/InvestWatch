@@ -12,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from .models import Finding, ScrapedDocument
 from .modules import m1, m2, m3
@@ -21,6 +22,9 @@ from .preprocessing import preprocess
 from .registry import SCAN_MAX as REGISTRY_SCAN_MAX
 from .registry import Registry
 from .rules.engine import Catalogue, Context, run_rules
+
+if TYPE_CHECKING:
+    from .llm.judge import LlmJudge
 
 log = logging.getLogger(__name__)
 #: Foreign firms without a Polish branch are in M1 scope only through ads aimed at Polish readers (a branch
@@ -51,8 +55,13 @@ def analyze(
     now: datetime | None = None,
     new_id: Callable[[], str] = lambda: str(uuid.uuid4()),
     signals: SignalCatalogues | None = None,
+    judge: "LlmJudge | None" = None,
 ) -> list[Finding]:
+    """`judge` is the only I/O and is injected: None (the default) is rules-only."""
     now = now or datetime.now(timezone.utc)
+    begin = getattr(judge, "begin_document", None)
+    if begin is not None:
+        begin()  # the per-document LLM budget (ADR 0310) covers every module of this document
     pre = preprocess(doc.text)
     if pre.is_empty:
         _skipped(doc, "empty_text")
@@ -72,14 +81,14 @@ def analyze(
         _skipped(doc, r.reason)
         return []
     if r.module == "M2":
-        findings.append(m2.build_finding(m2_ctx, catalogue, now=now, new_id=new_id))
+        findings.append(m2.build_finding(m2_ctx, catalogue, now=now, new_id=new_id, judge=judge))
     elif r.module == "M1":
-        findings += _m1_and_m3(ctx, signals, now=now, new_id=new_id)
+        findings += _m1_and_m3(ctx, signals, now=now, new_id=new_id, judge=judge)
     else:
-        m3_rules = run_rules(signals.m3, ctx)
+        m3_rules = run_rules(signals.m3, ctx, judge, module="M3", module_context=m3.M3_CONTEXT)
         if m3.has_advisory(m3_rules):
             findings.append(m3.build_finding(ctx, signals.m3, advertiser=build_advertiser(doc, registry), now=now,
-                                             new_id=new_id, rules=m3_rules))
+                                             new_id=new_id, rules=m3_rules, judge=judge))
         else:
             _skipped(doc, "no_signals")
     for f in findings:
@@ -87,10 +96,11 @@ def analyze(
     return findings
 
 
-def _m1_and_m3(ctx: Context, signals: SignalCatalogues, *, now: datetime, new_id: Callable[[], str]) -> list[Finding]:
+def _m1_and_m3(ctx: Context, signals: SignalCatalogues, *, now: datetime, new_id: Callable[[], str],
+               judge: "LlmJudge | None" = None) -> list[Finding]:
     advertiser = build_advertiser(ctx.doc, ctx.registry)
     out: list[Finding] = []
-    finding = m1.build_finding(ctx, signals.m1, advertiser=advertiser, now=now, new_id=new_id)
+    finding = m1.build_finding(ctx, signals.m1, advertiser=advertiser, now=now, new_id=new_id, judge=judge)
     s17 = next((r for r in finding.rules if r.rule_id == "S1.7"), None)
     foreign = ctx.firm_match is not None and ctx.firm_match.firm.type in FOREIGN_TYPES
     if foreign and s17 is not None and s17.result == "pass":
@@ -98,9 +108,10 @@ def _m1_and_m3(ctx: Context, signals: SignalCatalogues, *, now: datetime, new_id
         _skipped(ctx.doc, "not_targeting_poland")
         return []
     out.append(finding)
-    m3_rules = run_rules(signals.m3, ctx)
+    m3_rules = run_rules(signals.m3, ctx, judge, module="M3", module_context=m3.M3_CONTEXT)
     if m3.offer_is_publishers(ctx, m3_rules, signals.m3):
-        out.append(m3.build_finding(ctx, signals.m3, advertiser=advertiser, now=now, new_id=new_id, rules=m3_rules))
+        out.append(m3.build_finding(ctx, signals.m3, advertiser=advertiser, now=now, new_id=new_id, rules=m3_rules,
+                                  judge=judge))
     return out
 
 

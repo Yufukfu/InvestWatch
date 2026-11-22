@@ -6,6 +6,8 @@ the score is how certain it is that this is a third-party ad of that firm.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -13,6 +15,16 @@ from datetime import datetime
 from ..config import PIPELINE_VERSION
 from ..models import AdvertiserRef, Finding, FirmRef, ModelInfo, RuleResult
 from ..rules.engine import Catalogue, Context, run_rules
+from .llm_note import llm_model_used, mode_sentence
+
+if TYPE_CHECKING:
+    from ..llm.judge import LlmJudge
+
+#: The module's legal frame for the LLM system prompt (analytics-llm-p0 design §2).
+M1_CONTEXT = (
+    "Module M1: material published by someone other than the investment firm (a finfluencer or another "
+    "third party). The question is whether it advertises a registered investment firm or its services."
+)
 from ..rules.scoring import sigmoid_score
 from .excerpt import excerpt
 
@@ -40,10 +52,13 @@ def build_finding(
     advertiser: AdvertiserRef,
     now: datetime,
     new_id: Callable[[], str] = lambda: str(uuid.uuid4()),
+    judge: "LlmJudge | None" = None,
 ) -> Finding:
-    rules = run_rules(catalogue, ctx)
+    rules = run_rules(catalogue, ctx, judge, module="M1", module_context=M1_CONTEXT)
+    llm_model = llm_model_used(rules, judge)
     firm = firm_ref(ctx)
-    title, summary = _texts(rules, firm, advertiser, " (dane demonstracyjne)" if ctx.registry.demo else "")
+    title, summary = _texts(rules, firm, advertiser, " (dane demonstracyjne)" if ctx.registry.demo else "",
+                            llm_model=llm_model)
     return Finding(
         id=new_id(),
         document_id=ctx.doc.id,
@@ -60,11 +75,12 @@ def build_finding(
         platform=ctx.doc.platform,
         detected_at=now,
         updated_at=now,
-        model=ModelInfo(pipeline_version=PIPELINE_VERSION, llm=None, embedder=None),
+        model=ModelInfo(pipeline_version=PIPELINE_VERSION, llm=llm_model, embedder=None),
     )
 
 
-def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: AdvertiserRef, demo: str = "") -> tuple[str, str]:
+def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: AdvertiserRef, demo: str = "", *,
+           llm_model: str | None = None) -> tuple[str, str]:
     by_id = {r.rule_id: r for r in rules}
     who = advertiser_label(advertiser)
     firm_name = firm.name if firm else "firmę z rejestru"
@@ -88,5 +104,5 @@ def _texts(rules: list[RuleResult], firm: FirmRef | None, advertiser: Advertiser
     if unchecked:
         parts.append("Nie sprawdzono: " + "; ".join(f"{r.rule_id} {r.name}" for r in unchecked)
                      + " (wymaga modelu językowego).")
-    parts.append("Tryb regułowy (bez modelu językowego).")
+    parts.append(mode_sentence(rules, llm_model))
     return title, " ".join(parts)

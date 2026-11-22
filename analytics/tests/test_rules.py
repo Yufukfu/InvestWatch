@@ -40,7 +40,7 @@ def test_catalogue_is_complete(catalogue):
     ids = [s.id for s in catalogue.specs]
     assert len(ids) == 19 and len(set(ids)) == 19
     assert all(re.match(RULE_ID_PATTERN, i) for i in ids)
-    assert [s.id for s in catalogue.implemented] == ["R1", "R2", "R3"]
+    assert [s.id for s in catalogue.implemented] == ["R1", "R2", "R3", "R4", "R6", "R14", "R17", "R18"]
 
 
 def _write(tmp_path, body: str) -> Path:
@@ -413,9 +413,9 @@ def _catalogue_with(tmp_path, old: str, new: str) -> Path:
         ("prominent_sentences: 2", "prominent_sentences: two", "prominent_sentences"),
         ("prominent_sentences: 2", "prominent_sentences: -1", "prominent_sentences"),
         ("prominent_sentences: 2", "prominent_sentences: true", "prominent_sentences"),
-        ('footnote_markers: ["*", "¹", "²", "³"]', "footnote_markers: 5", "footnote_markers"),
-        ('footnote_markers: ["*", "¹", "²", "³"]', 'footnote_markers: ["*", 1]', "footnote_markers"),
-        ('footnote_markers: ["*", "¹", "²", "³"]', 'footnote_markers: ["*", ""]', "footnote_markers"),
+        ('footnote_markers: &footnote_markers ["*", "¹", "²", "³"]', "footnote_markers: &footnote_markers 5", "footnote_markers"),
+        ('footnote_markers: &footnote_markers ["*", "¹", "²", "³"]', 'footnote_markers: &footnote_markers ["*", 1]', "footnote_markers"),
+        ('footnote_markers: &footnote_markers ["*", "¹", "²", "³"]', 'footnote_markers: &footnote_markers ["*", ""]', "footnote_markers"),
     ],
 )
 def test_bad_rule_params_fail_at_load(tmp_path, old, new, key):
