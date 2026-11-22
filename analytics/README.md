@@ -122,27 +122,28 @@ docker compose run --rm analytics-eval        # the same in the stack
 
 The one-shot `analytics-eval` service runs `--db` on every `docker compose up`, after `api-migrate`. It stores a module's run only when the gold set, the pipeline version or the results changed, so restarts add nothing. `GET /api/calibration` adds analysts' `confirmed` / `false_positive` labels to that run's counts. The report gives precision, recall and F1 per module on the thresholds 0.05-0.95, counted the same way as the API. Per rule or signal it gives two readings: **`strict` (the headline: `uncertain` counts as not flagged)** and `review` (`uncertain` counts as flagged). Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`, no rows stored for it) or a gold document crashed the pipeline (nothing stored); 2 invalid gold set or configuration; 3 the database write failed.
 
-Latest numbers (2026-11-22, `main` 0434553b, 69 gold documents): one rules-only run and one run with DeepSeek Flash (`run.py --llm`, recorded in [`eval/llm-run-deepseek-flash.json`](eval/llm-run-deepseek-flash.json)). The plateau is every threshold whose F1 is within 0.02 of the best. Each cell is precision / recall / F1 (tp / fp / fn / tn):
+Latest numbers (2026-11-22, 69 gold documents; M1 and M3 on `main` 0434553b, M2 on the `analytics-m2-visual-rules` branch): one rules-only run and one run with DeepSeek Flash (`run.py --llm`, recorded in [`eval/llm-run-deepseek-flash.json`](eval/llm-run-deepseek-flash.json)). The plateau is every threshold whose F1 is within 0.02 of the best. Each cell is precision / recall / F1 (tp / fp / fn / tn):
 
 | Module (gold cases: pos / neg) | Default | Rules-only at the default | DeepSeek at the default | Rules-only plateau | DeepSeek plateau |
 |---|---|---|---|---|---|
 | M1 (18: 10 / 8) | **0.75** | 1.0 / 0.7 / 0.824 (7 / 0 / 3 / 8) | 1.0 / 1.0 / 1.0 (10 / 0 / 0 / 8) | 0.40-0.65, F1 0.889 | 0.75-0.80, F1 1.0 |
 | M1 at the old 0.65 | | 1.0 / 0.8 / 0.889 (8 / 0 / 2 / 8) | 0.909 / 1.0 / 0.952 (10 / 1 / 0 / 7) | | |
-| M2 (35: 23 / 12) | 0.1 | 0.947 / 0.783 / 0.857 (18 / 1 / 5 / 11) | 0.95 / 0.826 / 0.884 (19 / 1 / 4 / 11) | 0.05-0.10 | 0.10 |
+| M2 (35: 23 / 12) | **0.05** | 0.955 / 0.913 / 0.933 (21 / 1 / 2 / 11) | 1.0 / 0.957 / 0.978 (22 / 0 / 1 / 12) | 0.05 only | 0.05 only |
+| M2 at the old 0.1 | | 0.95 / 0.826 / 0.884 (19 / 1 / 4 / 11) | 1.0 / 0.87 / 0.93 (20 / 0 / 3 / 12) | | |
 | M3 (18: 10 / 8) | 0.4 (gate cap) | 1.0 / 0.4 / 0.571 (4 / 0 / 6 / 8) | 1.0 / 0.4 / 0.571 (4 / 0 / 6 / 8) | 0.25 only, F1 0.706 | 0.05-0.40, F1 0.588 |
 
-The M2 row is from change `analytics-m2-text-rules` (R9, R10; the DeepSeek run on that branch). Its rules, strict precision / recall: R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R9 1.0 / 0.0 rules-only and 1.0 / 1.0 with DeepSeek (LLM-first: rules-only R9 never fails and its `uncertain` is not scored), R10 1.0 / 1.0, R11, R12a, R12b, R14, R15, R16 and R18 1.0 / 1.0, R17 1.0 / 0.33. R5, R7, R8 and R13 are not built.
+The M2 rows are from change `analytics-m2-visual-rules` after merging `main` 313c625, with all 18 rules built (the DeepSeek run on that branch, 29 calls, all 200). M2 moved from 0.1 to 0.05 because its score is the weighted share of failing rules among the applicable ones, and the six new rules made one violation weigh less ([ADR 0319](../.docs/decisions/0319-m2-default-threshold-005.md)).
 
-M2 slider: at 0.25, 1.0 / 0.609 / 0.757; at 0.40, 1.0 / 0.478 / 0.647, the same on both runs. The DeepSeek run made 28 calls, all valid (3.1 s average, 6.4 s p95).
+M2 slider: at 0.25, 1.0 / 0.609 / 0.757; at 0.40, 1.0 / 0.304 / 0.467, the same on both runs. The M1 and M3 DeepSeek numbers are from the recorded run (28 calls, all valid, 3.1 s average, 6.4 s p95).
 
 Rules as `strict` precision / recall, rules-only → DeepSeek where it differs:
 - **M1:** S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.3 1.0 / 0.71, S1.4 1.0 / 0.71 → 1.0 / 1.0, S1.5 1.0 / 0 → 1.0 / 1.0, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9.
-- **M2:** R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0 → 0.88 / 1.0, R4 1.0 / 0.5, R6, R11, R12a, R12b, R14, R15, R16 and R18 1.0 / 1.0, R17 1.0 / 0.33 → 1.0 / 0.67. R5, R7-R10 and R13 are not built.
+- **M2:** R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0 → 0.88 / 1.0, R4 1.0 / 0.5, R5-R8 1.0 / 1.0, R9 1.0 / 0 → 1.0 / 1.0 (LLM-first: rules-only R9 never fails and its `uncertain` is not scored), R10-R16 (with R12a, R12b) and R18 1.0 / 1.0, R17 1.0 / 0.33 → 1.0 / 1.0.
 - **M3:** S3.1 1.0 / 0.53 → 1.0 / 0.47, S3.2 1.0 / 0.43 → 1.0 / 0.29, S3.3 1.0 / 0 → 1.0 / 0.25, S3.4 1.0 / 0 → 1.0 / 0.27, S3.5 1.0 / 0.38, S3.6 1.0 / 0.53 → 1.0 / 0.47, S3.8 1.0 / 1.0.
 
 Without the LLM, S1.5, S3.3 and S3.4 are `uncertain` (`strict` recall 0). M3's default is raised to the S3.4 gate cap (0.4, ADR 0308) so capped findings never alert by default. With DeepSeek, M3's best F1 is lower than rules-only, and 0.4 is on its plateau.
 
-**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md), [ADR 0318](../.docs/decisions/0318-hosted-llm-deepseek-flash.md)): M1 0.75, M2 0.1, M3 0.4, written by the API when `iw:settings:thresholds` is missing. [`eval/thresholds.json`](eval/thresholds.json) is the source.
+**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md), [ADR 0318](../.docs/decisions/0318-hosted-llm-deepseek-flash.md), [ADR 0319](../.docs/decisions/0319-m2-default-threshold-005.md)): M1 0.75, M2 0.05, M3 0.4, written by the API when `iw:settings:thresholds` is missing. [`eval/thresholds.json`](eval/thresholds.json) is the source.
 - **M2 and M3** are the rules-only recommendations (M3 raised to its gate cap): `python eval/run.py --write-thresholds` rewrites them.
 - **M1** comes from the recorded DeepSeek run, because the hosted LLM is on by default: `LLM_MEASURED_DEFAULTS` in `evaluation/runner.py`, kept by `--write-thresholds`. It is refused if it is not on that run's F1 plateau.
 - **Copies.** The API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from the file.

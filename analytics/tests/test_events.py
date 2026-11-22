@@ -241,7 +241,7 @@ def test_names_match_the_contract():
 
 def test_defaults_match_adr_0316_and_0318():
     # literal on purpose; tests/test_eval_thresholds.py checks it against analytics/eval/thresholds.json
-    assert DEFAULT_THRESHOLDS == {"M1": 0.75, "M2": 0.1, "M3": 0.4}
+    assert DEFAULT_THRESHOLDS == {"M1": 0.75, "M2": 0.05, "M3": 0.4}
 
 
 # ---- failures -----------------------------------------------------------------------------------
