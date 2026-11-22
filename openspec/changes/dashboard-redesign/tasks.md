@@ -2,11 +2,11 @@
 
 ## 1. Tokens, fonts and base type
 
-- [ ] 1.1 Write the failing tests first: a contrast test that parses the token colours and fails below 4.5:1 for every text-on-fill pair used (placeholder, secondary text, text on risk pills, white on the amber and red fills), a check that non-text controls (borders, focus ring, slider) are at least 3:1, a test that `index.html` has no `style` attribute, and a test that `main.tsx` imports only `latin` and `latin-ext` font files
-- [ ] 1.2 Add `@fontsource-variable/space-grotesk`, `@fontsource-variable/inter` and `@fontsource/geist-mono`, run `npm audit`, import the used weights and subsets in `main.tsx`
-- [ ] 1.3 Replace the `:root` values in `styles.css` with the tokens from the Paper page (colour roles, spacing 4/8 steps, radii, type scale, 2px focus ring, reduced-motion rule) and set Inter as the body font
+- [x] 1.1 Write the failing tests first: a contrast test that parses the token colours and fails below 4.5:1 for every text-on-fill pair used (placeholder, secondary text, text on risk pills, white on the amber and red fills), a check that non-text controls (borders, focus ring, slider) are at least 3:1, a test that `index.html` has no `style` attribute, and a test that `main.tsx` imports only `latin` and `latin-ext` font files
+- [x] 1.2 Add `@fontsource/space-grotesk`, `@fontsource/inter` and `@fontsource/geist-mono` (the variable packages cannot be limited to two subsets), run `npm audit`, import the used weights and subsets in `main.tsx`
+- [x] 1.3 Replace the `:root` values in `styles.css` with the tokens from the Paper page (colour roles, spacing 4/8 steps, radii, type scale, 2px focus ring, reduced-motion rule) and set Inter as the body font
 - [ ] 1.4 Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`; open the build and confirm all three families load from the same origin with a clean console
-- [ ] 1.5 mutations: N tried, N caught
+- [x] 1.5 mutations: 12 tried, 12 caught
 
 ## 2. Header, hero summary and navigation
 
