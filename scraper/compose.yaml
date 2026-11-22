@@ -59,7 +59,7 @@ services:
   # One-shot, first run only in effect: queues a scan request (the one the dashboard's rescan writes) for every active
   # source that has a cron and never ran, so a clean `up` fills the database without a manual scan. A Redis key per
   # source and `last_run_at` make a rerun, a second `up` or a scale-out queue nothing twice. BOOTSTRAP_SCAN=false turns
-  # it off. Status of the whole pipeline: docker compose run --rm bootstrap python -m iw_scraper.bootstrap status
+  # it off. Status of the whole pipeline: docker compose run --rm --no-deps -T bootstrap python -m iw_scraper.bootstrap status
   # (spec first-run-bootstrap). The app role and the Redis URL only: no MinIO, no route out.
   bootstrap:
     <<: [*scraper-image, *hardening]

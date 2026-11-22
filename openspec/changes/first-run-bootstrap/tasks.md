@@ -20,13 +20,13 @@
 
 ## 4. Docs and brief traceability
 
-- [ ] 4.1 Write `.docs/brief-compliance.md` from the PDF (modules 1 to 3, sections 3, 5, 6), each row with evidence or a gap; verify every cited path exists and `docs-check` fails when one is broken (try a bad path, then remove it).
-- [ ] 4.2 Update `README.md` Quick Start and Configuration (one command, `docker compose run --rm bootstrap python -m iw_scraper.bootstrap status`, `down -v` for a clean demo, `BOOTSTRAP_SCAN`), `scraper/README.md` and `.docs/INDEX.md`; verify the documented commands run as written on a clean clone.
-- [ ] 4.3 End-to-end rehearsal on a clean stack from this branch: `up --build`, wait, `status` exits 0; record counts and timings in `.docs/status/scraper.md` with the date and commit.
+- [x] 4.1 Write `.docs/brief-compliance.md` from the PDF (modules 1 to 3, sections 3, 5, 6), each row with evidence or a gap; verify every cited path exists and `docs-check` fails when one is broken (try a bad path, then remove it).
+- [x] 4.2 Update `README.md` Quick Start and Configuration (one command, `docker compose run --rm --no-deps -T bootstrap python -m iw_scraper.bootstrap status`, `down -v` for a clean demo, `BOOTSTRAP_SCAN`), `scraper/README.md` and `.docs/INDEX.md`; verify the documented commands run as written on a clean clone.
+- [x] 4.3 End-to-end rehearsal on a clean stack from this branch: `up --build`, wait, `status` exits 0; record counts and timings in `.docs/status/scraper.md` with the date and commit.
 
 ## 5. Closing
 
-- [ ] 5.1 Apply the iw-docs-update skill (docs, `.docs/status/scraper.md`, no ADR needed) and add the iw-ai-log entry; `docs-check` prints `docs-check: ok`.
+- [x] 5.1 Apply the iw-docs-update skill (docs, `.docs/status/scraper.md`, no ADR needed) and add the iw-ai-log entry; `docs-check` prints `docs-check: ok`.
 - [ ] 5.2 Run the iw-pr-review skill and fix real findings.
 
 ## Workflow follow-up
