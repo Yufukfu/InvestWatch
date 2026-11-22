@@ -14,6 +14,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import yaml
 
+try:  # CPython's own regex parser; renamed from `sre_parse` in 3.11 (tests/test_regex_safety.py pins its shape)
+    import re._parser as _sre_parser
+except ImportError:  # pragma: no cover - older CPython
+    import sre_parse as _sre_parser  # type: ignore[no-redef]
+
 from ..models import RULE_ID_PATTERN, EvidenceLocator, Result, RuleResult, ScrapedDocument
 from ..preprocessing import Preprocessed
 from ..registry import FirmMatch, Registry
@@ -45,6 +50,15 @@ KNOWN_PARAMS = {
     "supervisor_exclude_patterns", "approval_exclude_patterns", "safety_exclude_patterns",
     "amount_patterns", "amount_return_patterns",
     "borderline_margin",
+    # analytics-m2-p1-rules (R11, R12a, R12b, R15, R16; design §9)
+    "comparison_patterns", "comparison_exclude_patterns", "benchmark_patterns", "superlative_patterns",
+    "source_patterns", "assumption_patterns",
+    "short_period_patterns", "five_year_patterns", "inception_patterns",
+    "fee_patterns", "foreign_currency_patterns", "currency_warning_patterns",
+    "forecast_patterns", "forecast_verb_patterns", "forecast_exclude_patterns", "forecast_weak_patterns",
+    "performance_patterns", "forecast_disclaimer_patterns",
+    "tax_patterns", "tax_exclude_patterns", "tax_individual_patterns", "tax_change_patterns", "tax_context_patterns",
+    "tax_subject_patterns",
 }
 # M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
 # the plain string lists below must hold non-empty strings.
@@ -146,6 +160,42 @@ def register(cls: type[Rule]) -> type[Rule]:
 
 def compile_patterns(patterns: list[str]) -> list[re.Pattern]:
     return [re.compile(p, re.IGNORECASE) for p in patterns]
+
+
+_REPEATS = {_sre_parser.MAX_REPEAT, _sre_parser.MIN_REPEAT, getattr(_sre_parser, "POSSESSIVE_REPEAT", None)} - {None}
+
+
+def nested_unbounded_repeat(pattern: str) -> bool:
+    r"""True when an unbounded repetition (`*`, `+`, `{n,}`) sits inside another one, e.g. `(\w+\s*)+`.
+
+    Such a pattern can backtrack exponentially on untrusted text and Python `re` has no timeout (design §8).
+    Bounded outer repeats (`(?:\w+\s+){0,3}`) are allowed; alternation overlap is left to the timing test.
+    """
+
+    def walk(node, inside: bool) -> bool:
+        if isinstance(node, _sre_parser.SubPattern):
+            return any(walk(item, inside) for item in node.data)
+        # Identity, not equality: opcodes are named-int singletons, and a class range `[+-9]` is a plain
+        # (43, 57) pair whose first int equals MIN_REPEAT (review of group 1).
+        if isinstance(node, tuple) and len(node) == 2 and any(node[0] is r for r in _REPEATS):
+            low, high, body = node[1]
+            unbounded = high == _sre_parser.MAXREPEAT
+            if unbounded and inside:
+                return True
+            return walk(body, inside or unbounded)
+        if isinstance(node, (tuple, list)):
+            return any(walk(item, inside) for item in node)
+        return False
+
+    return walk(_sre_parser.parse(pattern, re.IGNORECASE), False)
+
+
+def _check_regex(path: Path, rule_id: str, key: str, pattern: str) -> None:
+    if nested_unbounded_repeat(pattern):
+        raise CatalogueError(
+            f"{path}: {rule_id} {key} has a nested unbounded repetition (ReDoS risk): {pattern!r}; "
+            r"use a bounded gap such as (?:\w+\s+){0,3} or .{0,80}?"
+        )
 
 
 class Catalogue:
@@ -254,6 +304,7 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
                 re.compile(value)
             except re.error as exc:
                 raise CatalogueError(f"{path}: {rule_id} {key} is an invalid regex ({exc})") from exc
+            _check_regex(path, rule_id, key, value)
         if key in ("window", "prominent_sentences", "borderline_margin") and (
             isinstance(value, bool) or not isinstance(value, int) or value < 0
         ):
@@ -273,6 +324,8 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
                     compile_patterns(value)
                 except re.error as exc:
                     raise CatalogueError(f"{path}: {rule_id} {key} has an invalid regex ({exc})") from exc
+                for pattern in value:
+                    _check_regex(path, rule_id, key, pattern)
     return dict(params)
 
 
