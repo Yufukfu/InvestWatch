@@ -40,9 +40,9 @@
 ## 6. Seeds and end to end
 
 - [x] 6.1 Test first (`scraper/tests/test_seed_social.py`): the X row (and the YouTube row unless cut) seeds once, twice is one row each, rows have no schedule and are not scheduled, a scan request starts a run; add them in their own `seeds/x-youtube.toml` (`sources.toml` is pinned to web rows by `test_seed_file.py`, Telegram has its own file too); mutations: 5 tried, 5 caught
-- [ ] 6.2 End to end on the test stack (real Redis, PostgreSQL, MinIO) with the adapters' functions replaced by the saved fixtures: one X and one YouTube run store documents and publish events
+- [x] 6.2 End to end on the test stack (real Redis, PostgreSQL, MinIO) with the adapters' functions replaced by the saved fixtures: one X and one YouTube run store documents and publish events (`tests/test_e2e_social_x_youtube.py`: the seeded rows, a scan request, the production dispatch and ingest; a rerun stores nothing and requests no video again)
 - [ ] 6.3 One live run by hand with the cookies and proxy from `.env`; note the outcome in `.docs/status/scraper.md` (a failure there is reported, not hidden)
-- [ ] 6.4 Mutation check — mutations: n/a, wiring group; behaviour verified by the end-to-end run
+- [x] 6.4 Mutation check — mutations: n/a, wiring group; behaviour verified by the end-to-end run
 
 ## 7. Closing
 
