@@ -349,7 +349,7 @@ For labels, `confirmed` SHALL be a positive and `false_positive` a negative; oth
 - **THEN** the response is 422 naming `format`
 
 ### Requirement: Bulk status change
-`POST /api/findings/bulk-status` SHALL accept a body `{ids, status}` with 1 to 200 unique UUIDs and one status, and nothing else. In one transaction it SHALL apply to every existing id the same change as `PATCH /api/findings/{id}` with `{status}`. It SHALL return 200 with `results`, one entry per requested id in request order: `{id, result: "updated", finding}` (the finding with `risk_level`) or `{id, result: "not_found", finding: null}`, and the counts `updated` and `not_found`. After the commit it SHALL publish one `finding.updated` event `{id, status}` per updated finding. A publish failure SHALL be logged and SHALL NOT change the response.
+`POST /api/findings/bulk-status` SHALL accept a body `{ids, status}` with 1 to 200 unique UUIDs and one status, and nothing else. In one transaction it SHALL apply to every existing id the same change as `PATCH /api/findings/{id}` with `{status}`. It SHALL return 200 with `results`, one entry per requested id in request order: `{id, result: "updated", finding}` (the finding with `risk_level`) or `{id, result: "not_found", finding: null}`, and the counts `updated` and `not_found`.
 
 #### Scenario: Mixed ids
 - **WHEN** an analyst sends `{"ids": [a, missing, b], "status": "confirmed"}` where `a` and `b` exist
@@ -359,20 +359,34 @@ For labels, `confirmed` SHALL be a positive and `false_positive` a negative; oth
 - **WHEN** the body has no ids, more than 200 ids, a repeated id, a malformed id, an unknown or null status, or an extra key such as `note`
 - **THEN** the response is 422, nothing is stored and no event is published
 
+### Requirement: Bulk status change events
+After the commit, `POST /api/findings/bulk-status` SHALL publish one `finding.updated` event `{id, status}` per updated finding. A publish failure SHALL be logged and SHALL NOT change the response.
+
+#### Scenario: One event per updated finding
+- **WHEN** a bulk change updates two findings and one requested id does not exist
+- **THEN** two `finding.updated` events `{id, status}` are published after the commit, none for the missing id
+
+#### Scenario: Publish failure
+- **WHEN** publishing a `finding.updated` event fails after the commit
+- **THEN** the failure is logged and the response is still 200 with the same `results` and counts
+
 ### Requirement: Report export of the findings list
-`GET /api/findings/export` SHALL accept the same filters and `sort` as `GET /api/findings`, with the same validation, and `format=csv` (the default and only format). It SHALL return 200 `text/csv; charset=utf-8` with a UTF-8 BOM, a `Content-Disposition: attachment` filename, one header row and one row per matching finding in sort order, at most 10 000 rows. `X-Total-Count` SHALL hold the number of matches, and `X-Export-Truncated` SHALL be `true` when rows were cut and `false` otherwise. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return SHALL get a `'` prefix.
+`GET /api/findings/export` SHALL accept the same filters and `sort` as `GET /api/findings`, with the same validation, and `format=csv` (the default and only format). It SHALL return 200 `text/csv; charset=utf-8` with a UTF-8 BOM, a `Content-Disposition: attachment` filename, one header row and one row per matching finding in sort order, at most 10 000 rows.
 
 #### Scenario: Same filters as the list
 - **WHEN** a client calls `GET /api/findings/export?module=M2&status=new` and `GET /api/findings?module=M2&status=new&page_size=200`
 - **THEN** the CSV rows are the list's items in the same order, with the same id, module, status, risk level and score
 
-#### Scenario: Formula in scraped text
-- **WHEN** a finding's title is `=HYPERLINK("http://x")`
-- **THEN** the title cell is `'=HYPERLINK("http://x")`
-
 #### Scenario: Invalid filter
 - **WHEN** a client calls `GET /api/findings/export?status=archived` or `GET /api/findings/export?format=pdf`
 - **THEN** the response is 422
+
+### Requirement: Export headers and formula escaping
+In the CSV export, `X-Total-Count` SHALL hold the number of matches, and `X-Export-Truncated` SHALL be `true` when rows were cut and `false` otherwise. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return SHALL get a `'` prefix.
+
+#### Scenario: Formula in scraped text
+- **WHEN** a finding's title is `=HYPERLINK("http://x")`
+- **THEN** the title cell is `'=HYPERLINK("http://x")`
 
 ### Requirement: M2 coverage counts
 `GET /api/stats/summary` SHALL also return `m2_coverage` with `total`, the number of M2 findings, and `registry_matched`, the number of M2 findings whose `firm.registry_id` is not null. The other summary fields SHALL be unchanged.
