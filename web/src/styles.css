@@ -86,6 +86,8 @@
   --font-text: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The Powiązania graph labels use a serif face, as in the advertiser-graph mockup (#72). */
+  --font-graph: Georgia, 'Times New Roman', Times, serif;
   font-family: var(--font-text);
   font-size: 16px;
   line-height: 1.45;
@@ -579,3 +581,140 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
   .field-search > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 @media (max-width: 599px) { .pager-size { display: none; } }
+
+/* Powiązania (M1 advertisers and firms, hen68's mockup): KPI sentence, filter row, graph with side table, relation page */
+.adv-hero { border-bottom: 1px solid var(--border); }
+.adv-hero h2.hero-eyebrow { font-family: var(--font-text); line-height: 1.45; }
+.adv-figures { gap: 0 var(--space-4); }
+.adv-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); padding: var(--space-6) 0 var(--space-2); }
+.adv-filter { display: flex; align-items: center; gap: var(--space-3); }
+.adv-filter label { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.adv-filter select { min-height: 40px; font-size: 15px; color: var(--muted); border-color: var(--field-border); }
+.adv-filter select.adv-select-strong { color: var(--text); font-weight: 600; border-color: var(--accent); }
+.adv-filters-sep { width: 1px; height: 28px; background: var(--border); }
+.adv-check { display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap); font-size: 15px; font-weight: 600; cursor: pointer; }
+.adv-check input { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; accent-color: var(--accent); }
+.adv-view { margin-left: auto; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.adv-view button { min-height: 36px; border: 0; border-radius: 6px; font-size: 15px; padding: 0 var(--space-4); }
+.adv-note { margin: 0 0 var(--space-6); color: var(--muted); font-size: 13px; }
+.adv-layout { display: grid; gap: var(--space-8); }
+@media (min-width: 1200px) { .adv-layout { grid-template-columns: minmax(0, 1fr) 420px; gap: 40px; } }
+.adv-layout > * { min-width: 0; }
+
+/* Graph: HTML labels in two columns, the SVG between them draws only the edges. */
+.adv-graph { margin: 0; }
+.adv-graph-scroll { overflow-x: auto; }
+.adv-graph-inner { min-width: 610px; padding: 0 0 var(--space-6); }
+.adv-graph-heads, .adv-graph-body { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(150px, 240px) minmax(220px, 1.15fr); }
+.adv-graph-hint { display: none; margin: 0 0 var(--space-3); color: var(--muted); font-size: 13px; }
+@media (max-width: 699px) { .adv-graph-hint { display: block; } }
+/* Tablet: a narrower edge area and smaller labels leave room for full handles and firm names. */
+@media (max-width: 899px) {
+  .adv-graph-heads, .adv-graph-body { grid-template-columns: minmax(240px, 1fr) 130px minmax(220px, 1.15fr); }
+  .adv-graph-col > li { font-size: 15px; }
+}
+@media (max-width: 599px) { .adv-filters-sep { display: none; } .adv-view { margin-left: 0; } }
+.adv-graph-heads { margin-bottom: var(--space-4); color: var(--muted); font-family: var(--font-graph); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+.adv-graph-heads > :first-child { text-align: right; padding-right: 72px; }
+.adv-graph-heads > :last-child { padding-left: 28px; }
+.adv-graph-body { position: relative; }
+.adv-graph-col { position: relative; list-style: none; margin: 0; padding: 0; }
+.adv-graph-col > li { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: var(--space-3); transform: translateY(-50%); font-family: var(--font-graph); font-size: 16px; line-height: 20px; }
+.adv-graph-left > li { justify-content: flex-end; }
+.adv-graph-name { font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.adv-graph-right .adv-graph-name { white-space: normal; }
+.adv-graph-count { font-family: var(--font-graph); font-size: 15px; color: var(--muted); min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
+.adv-graph-left .repeat .adv-graph-count { color: var(--risk-high); font-weight: 600; }
+.adv-graph-dot { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
+.adv-graph-left .adv-graph-dot { margin-right: -7px; }
+.adv-graph-right .adv-graph-dot { margin-left: -7px; }
+.adv-graph-left .repeat .adv-graph-dot { background: var(--risk-high); }
+/* The edge area stretches with its column (tablet); strokes keep their width so thickness still means the count. */
+.adv-graph-edges { overflow: visible; display: block; width: 100%; }
+.adv-graph-edges path { vector-effect: non-scaling-stroke; }
+.adv-edge { cursor: pointer; }
+.adv-edge-line { fill: none; stroke-linecap: round; transition: opacity var(--dur) var(--ease); }
+.adv-edge-hit { fill: none; stroke: transparent; pointer-events: stroke; }
+.adv-edge-repeat .adv-edge-line { stroke: var(--risk-high); opacity: 0.85; }
+.adv-edge-single .adv-edge-line { stroke: var(--slate); opacity: 0.55; }
+.adv-edge-repeat.adv-edge-dim .adv-edge-line { opacity: 0.28; }
+.adv-edge-selected .adv-edge-line { opacity: 0.9; }
+.adv-edge:hover .adv-edge-line { opacity: 1; }
+.adv-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--border); font-size: 14px; color: var(--text); }
+.adv-legend-item { display: inline-flex; align-items: center; gap: var(--space-3); }
+.adv-legend-line { display: inline-block; width: 32px; height: 4px; border-radius: 2px; }
+.adv-legend-repeat { background: var(--risk-high); }
+.adv-legend-single { background: var(--border-strong); }
+
+/* Side table: "Najczęstsi reklamodawcy" */
+.adv-top h3 { margin: 0 0 var(--space-2); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.adv-top-sub { margin: 0 0 var(--space-6); color: var(--muted); font-size: 14px; line-height: 1.4; }
+.adv-top-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.adv-top-table th { padding: 0 var(--space-3) var(--space-3); border-bottom: 1px solid var(--accent); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; white-space: nowrap; }
+.adv-top-table th:first-child, .adv-top-table td:first-child { padding-left: 0; }
+.adv-top-table .num { text-align: center; width: 64px; font-variant-numeric: tabular-nums; }
+.adv-top-table th.num:last-child { color: var(--text); }
+.adv-top-table td { padding: 14px var(--space-3); border-bottom: 1px solid var(--border); font-size: 16px; vertical-align: middle; }
+.adv-top-table tbody tr { cursor: pointer; transition: background-color var(--dur) var(--ease); }
+.adv-top-table tbody tr:hover { background: var(--tint-hover); }
+.adv-top-table tbody tr.selected { background: var(--tint-high); }
+.adv-top-table tbody tr.selected td:first-child { box-shadow: -16px 0 0 var(--tint-high); }
+.adv-top-table tbody tr.selected td:last-child { box-shadow: 16px 0 0 var(--tint-high); }
+.adv-top-handle { font: inherit; font-weight: 500; color: var(--text); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; min-height: 24px; }
+.adv-top-handle:hover { color: var(--link); }
+.adv-top-firms { display: block; margin-top: 2px; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adv-repeat-tag { margin-left: var(--space-2); padding: 1px 7px; vertical-align: 1px; border-radius: var(--radius-pill); background: var(--risk-high-bg); color: var(--risk-high-fg); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.adv-firms-repeat { color: var(--risk-high); font-weight: 600; }
+.adv-top-link { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); margin-top: var(--space-4); color: var(--text); font-weight: 600; }
+.adv-top-link:hover { color: var(--link); }
+
+/* Tabela view */
+.adv-table { width: 100%; min-width: 560px; border-collapse: collapse; }
+.adv-table th { padding: var(--space-3) 10px; border-bottom: 1px solid var(--accent); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; text-align: left; }
+.adv-table td { padding: var(--space-3) 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 14px; }
+.adv-table tbody tr.repeat { background: var(--tint-high); box-shadow: inset 4px 0 0 var(--risk-high); }
+.advertiser-name { font-weight: 600; }
+.firm-list { margin: 0; padding-left: 18px; }
+.firm-list li { padding: 3px 0; }
+.advertiser-count { font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 8px; }
+.badge-repeat { background: var(--risk-high-fg); color: var(--accent-text); white-space: nowrap; }
+
+/* Relation page */
+.adv-relation { padding: var(--space-8) 0; }
+@media (min-width: 1024px) { .adv-relation { padding-top: 56px; } }
+.adv-back { font: inherit; display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0; border: 0; background: none; color: var(--text-2); font-size: 15px; font-weight: 600; cursor: pointer; }
+.adv-back:hover { color: var(--link); }
+.adv-relation .hero-eyebrow { margin: var(--space-2) 0 var(--space-4); }
+.adv-relation-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-4); margin: 0; padding-bottom: var(--space-6); border-bottom: 1px solid var(--border); font-weight: 400; }
+.adv-relation-name { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.adv-relation-arrow { font-size: 26px; color: var(--muted); }
+@media (min-width: 1024px) { .adv-relation-name, .adv-relation-arrow { font-size: 32px; } }
+.adv-relation-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-8); padding: var(--space-6) 0 var(--space-8); }
+.adv-relation-meta p { margin: 0; color: var(--muted); font-size: 15px; }
+.adv-relation-meta strong { color: var(--text); }
+.adv-relation-meta p a { color: var(--muted); font-weight: 400; }
+.adv-relation-meta p a:hover { color: var(--link); }
+.adv-profile { border-color: var(--accent); color: var(--text); font-size: 15px; font-weight: 600; min-height: 40px; }
+.adv-relation-table { width: 100%; min-width: 640px; border-collapse: collapse; }
+.adv-relation-table th { padding: var(--space-3) var(--space-3) var(--space-3) 0; border-bottom: 1px solid var(--accent); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; white-space: nowrap; }
+.adv-relation-table th[aria-sort] { color: var(--text); }
+.adv-relation-table td { padding: 10px var(--space-3) 10px 0; border-bottom: 1px solid var(--border); font-size: 15px; vertical-align: middle; }
+.adv-relation-title-cell { width: 55%; }
+.adv-relation-title-cell .link { font-weight: 500; }
+.row-high .adv-relation-title-cell .link { font-weight: 600; }
+.adv-relation-date { color: var(--muted); font-size: 14px; white-space: nowrap; }
+/* Phone: each finding of the relation is a card (risk and score on top, the title, then platform and time). */
+@media (max-width: 599px) {
+  .adv-relation-table { min-width: 0; display: block; }
+  .adv-relation-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .adv-relation-table tbody { display: flex; flex-direction: column; gap: 10px; }
+  .adv-relation-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: 12px; }
+  .adv-relation-table tbody tr.row-high { border-color: var(--risk-high-border); }
+  .adv-relation-table td { padding: 0; border: 0; }
+  .adv-relation-table .rel-risk { order: 1; }
+  .adv-relation-table .rel-score { order: 2; margin-left: auto; }
+  .adv-relation-table .adv-relation-title-cell { order: 3; flex: 1 0 100%; width: auto; }
+  .adv-relation-table .rel-platform { order: 4; color: var(--muted); font-size: 13px; }
+  .adv-relation-table .rel-platform::after { content: '\00b7'; margin-left: var(--space-2); }
+  .adv-relation-table .adv-relation-date { order: 5; font-size: 13px; }
+}
