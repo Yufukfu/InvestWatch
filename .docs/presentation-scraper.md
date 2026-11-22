@@ -1,6 +1,6 @@
 # Presentation: scraper section (architecture, safety, coverage, extensibility, AI process)
 
-Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into the deck; each `##` below is one slide, with speaker notes under **Notes**. Owner: Adam.
+Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into the deck; each `##` below is one slide, with speaker notes under **Notes**. Owners: see [`.github/CODEOWNERS`](../.github/CODEOWNERS).
 
 Every number was checked on `origin/main` at `a706474` (2026-11-22), against the code, the ADRs, `git` or `gh`; the source of each is named on its slide. Coverage numbers (slide 3) are Damian's recorded run in issue #78 (clean `docker compose up` from `main`, 17 seeded sources, one `POST /api/scans` each); they are not recomputed here. Counts that move (PRs, log rows) were taken at the commit above: refresh them with the commands under slide 5.
 
