@@ -59,7 +59,7 @@ With `BOOTSTRAP_SCAN=false` the `bootstrap` service SHALL exit 0 without reading
 - **THEN** `bootstrap` has no `MINIO_*` variable, uses the app role in `DATABASE_URL`, is on `data` only, and is read-only with all capabilities dropped and `restart: "no"`
 
 ### Requirement: Readiness is verifiable
-`python -m iw_scraper.bootstrap status` SHALL print, as JSON on stdout, per source its state (`scanned`, `failed` with the job error reason, `pending`, or `manual` for a never-run source without a cron) and the counts of documents, findings per module and `calibration_points` per module, and SHALL exit 0 only when every module M1, M2 and M3 has at least one finding.
+`python -m iw_scraper.bootstrap status` SHALL print, as JSON on stdout, per source its state (`scanned`, `failed` with the job error reason, `pending`, or `manual` for a never-run source without a cron) and the counts of documents, findings per module and `calibration_points` per module, and SHALL exit 0 only when every module M1, M2 and M3 has at least one finding and no source is `pending`.
 
 #### Scenario: Complete run
 - **WHEN** documents were analysed and every module has a finding and calibration points

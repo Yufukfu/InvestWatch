@@ -8,9 +8,9 @@
 
 ## 2. Readiness command
 
-- [ ] 2.1 Write the `status` tests first (red): complete run exits 0, pending source or missing module exits 1, blocked source listed as `failed`, cron-less never-run source listed as `manual`, exit 0, DB down exits 2 with no stdout, no write happens; plus a test that runs the queries against the migrated schema from `api/migrations`.
-- [ ] 2.2 Implement `status` (read-only, JSON on stdout); verify the tests are green and the table names match the migration.
-- [ ] 2.3 Mutation check: invert the exit-code rule and drop the module check, both caught; record the line.
+- [x] 2.1 Write the `status` tests first (red): complete run exits 0, pending source or missing module exits 1, blocked source listed as `failed`, cron-less never-run source listed as `manual`, exit 0, DB down exits 2 with no stdout, no write happens; (the throwaway `tests/schema.sql` gains `findings` and `calibration_points`; the proof against the real migrated schema is task 3.2).
+- [x] 2.2 Implement `status` (read-only, JSON on stdout); verify the tests are green and the table and column names match `0001_initial.py`.
+- [x] 2.3 Mutation check: invert the exit-code rule, drop the module check or the pending check, state classification, latest-reason order, active filter, exit 2 on connect failure, CLI routing. mutations: 13 tried, 13 caught (the read-only transaction is a guard no test can turn red without a write attempt; not mutated).
 
 ## 3. Compose service and stack check
 

@@ -1,6 +1,7 @@
 """First-run bootstrap: queue one scan for every source that has a cron and never ran, so a clean `up` fills itself.
 
     python -m iw_scraper.bootstrap          (needs DATABASE_URL and REDIS_URL; BOOTSTRAP_SCAN=false turns it off)
+    python -m iw_scraper.bootstrap status   (needs DATABASE_URL; JSON report, exit 0 ready, 1 not yet, 2 cannot tell)
 
 It writes the `scan_request` the dashboard's rescan writes (`iw:scan-requests`) and exits; the worker does the scans.
 A Redis key per source keeps a rerun, a second `up` or a scale-out from queuing a source twice. A source without a
@@ -9,6 +10,7 @@ cron stays manual (the X and YouTube seed rows, ADR 0109), and one whose first s
 """
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -79,7 +81,79 @@ async def run(environ: Mapping[str, str]) -> None:
     logger.info("first-run bootstrap queued %d scan request(s)", len(enqueued))
 
 
+MODULES = ("M1", "M2", "M3")
+_SOURCES = """
+SELECT s.id::text AS id, s.name, s.url, s.schedule_cron IS NOT NULL AS scheduled, s.last_run_at, s.last_run_status,
+       (SELECT e.reason FROM job_errors e WHERE e.source_id = s.id ORDER BY e.occurred_at DESC LIMIT 1) AS reason
+FROM sources s WHERE s.active ORDER BY s.name, s.id
+"""
+
+
+def _source_state(row: asyncpg.Record) -> str:
+    if row["last_run_status"] == "running":
+        return "pending"
+    if row["last_run_at"] is None:
+        return "pending" if row["scheduled"] else "manual"
+    return "failed" if row["last_run_status"] == "failed" else "scanned"
+
+
+async def collect_status(pool: asyncpg.Pool) -> dict:
+    """Where every active source and every pipeline stage stands, read in one read-only transaction."""
+    async with pool.acquire() as conn, conn.transaction(readonly=True):
+        sources = await conn.fetch(_SOURCES)
+        documents = await conn.fetchval("SELECT count(*) FROM documents")
+        findings = dict(await conn.fetch("SELECT module, count(*) FROM findings GROUP BY module"))
+        points = dict(await conn.fetch("SELECT module, count(*) FROM calibration_points GROUP BY module"))
+    listed = []
+    for row in sources:
+        state = _source_state(row)
+        listed.append({"id": row["id"], "name": row["name"], "url": row["url"], "state": state,
+                       "reason": row["reason"] if state == "failed" else None})
+    counted = {module: findings.get(module, 0) for module in MODULES}
+    missing = [module for module in MODULES if counted[module] == 0]
+    pending = sum(entry["state"] == "pending" for entry in listed)
+    return {
+        "ready": not missing and pending == 0,
+        "pending": pending,
+        "missing_modules": missing,
+        "documents": documents,
+        "findings": counted,
+        "calibration_points": {module: points.get(module, 0) for module in MODULES},
+        "sources": listed,
+    }
+
+
+def exit_code(report: dict) -> int:
+    return 0 if report["ready"] else 1
+
+
+async def status_main(environ: Mapping[str, str]) -> int:
+    """Print the report as JSON; 0 ready, 1 not yet, 2 when the database cannot be read (nothing on stdout)."""
+    dsn = environ.get("DATABASE_URL")
+    if not dsn:
+        sys.stderr.write("DATABASE_URL is not set\n")
+        return 2
+    try:
+        pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1)
+    except (OSError, asyncpg.PostgresError):
+        sys.stderr.write("cannot connect to the database (check DATABASE_URL)\n")
+        return 2
+    try:
+        report = await collect_status(pool)
+    except asyncpg.PostgresError:
+        sys.stderr.write("the database failed while reading the status (check that the schema is migrated)\n")
+        return 2
+    finally:
+        await pool.close()
+    sys.stdout.write(json.dumps(report, indent=2) + "\n")
+    return exit_code(report)
+
+
 def main(argv: list[str]) -> None:
+    if argv[1:] == ["status"]:
+        raise SystemExit(asyncio.run(status_main(os.environ)))
+    if len(argv) > 1:
+        raise SystemExit("usage: python -m iw_scraper.bootstrap [status]")
     configure_logging()
     asyncio.run(run(os.environ))
 
