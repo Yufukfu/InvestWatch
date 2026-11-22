@@ -301,7 +301,7 @@ def test_pipeline_bug_retries_until_max_deliveries(r, store, registry, catalogue
     def boom(*args, **kwargs):
         raise RuntimeError("pipeline bug")
 
-    monkeypatch.setattr(worker_mod, "analyze", boom)
+    monkeypatch.setattr(worker_mod, "analyze_document", boom)
     w = make_worker(r, store, registry, catalogue, max_deliveries=3, claim_min_idle_ms=0)
     w.ensure_group()
     xadd(r)

@@ -2,7 +2,7 @@
 
 Dashboard: findings with filters, trend charts, real-time alerts, threshold calibration panel.
 
-- **Owner:** Kacper
+- **Owners:** [`.github/CODEOWNERS`](../.github/CODEOWNERS)
 - **Stack:** Vite, React 19, TypeScript, Redux Toolkit + RTK Query (generated client), Vitest with MSW as the test-only network fake.
 - **Status:** foundation (app shell, generated client, container), data from the backend only, the trend chart (Recharts, hourly or daily buckets) and the findings workspace: filters, sort and paging in the URL (shareable links), a detail panel with the failed rules and their legal basis, and status change, real-time alerts over Socket.IO (high-risk toasts, live badge), and the threshold calibration panel (preview points of the precision/recall curve, save a module threshold).
 
@@ -27,7 +27,7 @@ In docker the app is served by unprivileged nginx behind the gateway: `docker co
 
 ## API client (contract-first)
 
-`contracts/openapi.yaml` (owner Damian) is the source of truth. The web app never hand-writes requests:
+`contracts/openapi.yaml` is the source of truth. The web app never hand-writes requests:
 
 ```bash
 npm run api:generate     # sync the contract snapshot + regenerate src/api/generated.ts

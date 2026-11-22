@@ -1,6 +1,8 @@
-# dashboard (Kacper's module)
+# dashboard
 
-Frontend: findings table and filters, trend charts, real-time alerts, status changes, and the threshold calibration panel. Kacper also defines the repository structure (team decision), so this directory's layout and stack are Kacper's to confirm.
+Owners: [`.github/CODEOWNERS`](../.github/CODEOWNERS).
+
+Frontend: findings table and filters, trend charts, real-time alerts, status changes, and the threshold calibration panel.
 
 - Data contract and routes: [`.docs/integration-plan.md`](../.docs/integration-plan.md) §4 (`Finding`), §5 (REST), §6 (Socket.IO events).
 - Frontend layering (who imports what, view models, data hooks): [ADR 0204](../.docs/decisions/0204-frontend-architecture.md) and [`.claude/rules/web-dashboard.md`](../.claude/rules/web-dashboard.md).

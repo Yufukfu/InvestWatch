@@ -23,6 +23,7 @@ class Reason(StrEnum):
     STORAGE_ERROR = "storage_error"
     PUBLISH_FAILED = "publish_failed"
     INVALID_REQUEST = "invalid_request"
+    RENDER_FAILED = "render_failed"
 
 
 @dataclass(frozen=True)

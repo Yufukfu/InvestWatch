@@ -1,4 +1,4 @@
-"""GET /findings, GET /findings/{id}, PATCH /findings/{id} (contracts/openapi.yaml, specs/rest-api)."""
+"""GET /findings, GET /findings/{id}, GET /findings/{id}/export, PATCH /findings/{id} (contracts/openapi.yaml, specs/rest-api)."""
 
 from __future__ import annotations
 
@@ -10,13 +10,16 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import exists, func, or_, select, update
 
 from ..db.mapping import document_to_contract, finding_to_contract, format_time
 from ..db.tables import documents, findings
 from ..errors import validation_error
+from ..evidence import HTML_HEADERS, ExportFormat, evidence_pack, render_html
 from ..models import STATUSES, FindingPatch, Module, RiskLevel
 from ..queries import like_pattern, risk_level_expr
+from ..rescan import rescan_state
 
 router = APIRouter()
 log = logging.getLogger("investwatch_api.findings")
@@ -61,6 +64,7 @@ async def list_findings(
     status: str | None = None,
     platform: Annotated[str | None, Query(max_length=32, pattern=TEXT_PARAM)] = None,
     source_id: UUID | None = None,
+    document_id: UUID | None = None,
     risk_level: RiskLevel | None = None,
     score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
     date_from: datetime | None = None,
@@ -83,6 +87,8 @@ async def list_findings(
         conditions.append(findings.c.platform == platform)
     if source_id:
         conditions.append(exists().where(documents.c.id == findings.c.document_id, documents.c.source_id == source_id))
+    if document_id:
+        conditions.append(findings.c.document_id == document_id)
     if risk_level:
         conditions.append(risk == risk_level)
     if score_min is not None:
@@ -112,20 +118,39 @@ async def _finding_row(conn, finding_id: UUID, thresholds: dict):
     return row
 
 
-@router.get("/findings/{finding_id}")
-async def get_finding(finding_id: UUID, request: Request):
+async def finding_detail(request: Request, finding_id: UUID) -> dict:
+    """The GET /findings/{id} body: the finding, its document (with the re-scan state) and screenshot URLs."""
     svc = request.app.state.services
     thresholds = await svc.thresholds.current()
     async with svc.engine.connect() as conn:
         row = await _finding_row(conn, finding_id, thresholds)
         doc = (await conn.execute(select(documents).where(documents.c.id == row["document_id"]))).mappings().first()
+        rescan = await rescan_state(conn, doc) if doc else None
     view = _view(row)
     document = document_to_contract(doc) if doc else None
+    if document is not None:
+        # The contract's only open slot for it (finding.schema.json is closed): scrape_meta.rescan, issue #71.
+        document["scrape_meta"] = {**(document.get("scrape_meta") or {}), "rescan": rescan}
     view["document"] = document
     shots = (document or {}).get("screenshots") or {}
     view["screenshot_urls"] = {vp: f"/api/documents/{row['document_id']}/screenshot/{vp}"
                                for vp, key in shots.items() if key}
     return view
+
+
+@router.get("/findings/{finding_id}")
+async def get_finding(finding_id: UUID, request: Request):
+    return await finding_detail(request, finding_id)
+
+
+@router.get("/findings/{finding_id}/export")
+async def export_finding(finding_id: UUID, request: Request, format: ExportFormat = "json"):
+    """Evidence pack of one finding (issue #70): JSON by default, a printable page with format=html. Read-only."""
+    detail = await finding_detail(request, finding_id)
+    pack = await evidence_pack(detail, request.app.state.services.objects)
+    if format == "html":
+        return HTMLResponse(render_html(pack), headers=HTML_HEADERS)
+    return JSONResponse(pack, headers={"Content-Disposition": f'inline; filename="investwatch-finding-{finding_id}.json"'})
 
 
 async def publish_event(redis, event_type: str, data: dict) -> None:

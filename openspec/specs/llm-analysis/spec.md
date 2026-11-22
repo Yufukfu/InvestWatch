@@ -168,7 +168,7 @@ The judge SHALL cache each fully valid chunk response in Redis under a key deriv
 #### Scenario: Re-scan is free
 - **WHEN** the same document is analyzed twice with the same model and catalogue
 - **THEN** the stub receives requests only during the first analysis and both findings have the same rule results
-- **AND** `content_hash` SHALL be analytics' own preprocessing hash
+- **AND** `content_hash` SHALL be the document's stored value (NFC, `.docs/integration-plan.md` §3), never one analytics computes
 
 #### Scenario: Model swap misses the cache
 - **WHEN** a document is analyzed with `LLM_MODEL=gpt-4o-mini`, then with `LLM_MODEL=gemma3:4b`
@@ -187,6 +187,15 @@ The judge SHALL cache each fully valid chunk response in Redis under a key deriv
 - **WHEN** the Redis client raises a connection error on cache read and write
 - **THEN** the LLM is called, the verdicts are used and the document is not failed
 - **AND** a Redis error SHALL be treated as a cache miss (or a skipped write) and logged; without a Redis client (CLI) no cache is used
+
+#### Scenario: Document without a stored hash
+- **WHEN** a document without `content_hash` is analyzed twice
+- **THEN** both analyses send requests and no cache entry is read or written
+- **AND** documents without a stored hash SHALL never share a cache key
+
+#### Scenario: The stored hash keys the cache
+- **WHEN** two analyses of the same text carry different stored `content_hash` values
+- **THEN** each sends its own request and two cache entries exist
 
 ### Requirement: LLM seam for any module's catalogue
 Any catalogue entry (M1, M2 or M3) SHALL be able to declare `llm: {question, when}`. `run_rules(catalogue, ctx, judge=None, module=…, module_context=…)` SHALL collect the deferred checks, make at most one judge call per module (one request per chunk) and merge the verdicts; without a judge it SHALL behave exactly as rules-only. Adding LLM refinement to an M1/M3 signal SHALL need only a YAML `llm:` block and passing the judge, not a change to its rule class.

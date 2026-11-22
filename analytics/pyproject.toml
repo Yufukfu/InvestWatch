@@ -7,13 +7,13 @@ name = "investwatch-analytics"
 version = "0.1.0"
 description = "InvestWatch analytics: preprocessing, KNF registry matching, UKNF rule engine (M1-M3)."
 requires-python = ">=3.12"
-dependencies = ["pydantic>=2.14,<3", "PyYAML>=6.0,<7", "RapidFuzz>=3.14,<4"]
+dependencies = ["pydantic>=2.14,<3", "PyYAML>=6.0,<7", "RapidFuzz>=3.14,<4", "numpy>=2.2,<3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-investwatch_analytics = ["rules/*.yaml", "knf/*.txt"]
+investwatch_analytics = ["rules/*.yaml", "knf/*.txt", "gate_terms.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

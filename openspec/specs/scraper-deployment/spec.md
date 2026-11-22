@@ -96,8 +96,19 @@ Scraper containers SHALL run as a non-root user with a read-only root filesystem
 - **THEN** the container exits 0 well before the grace period ends
 
 ### Requirement: Audited supply chain
-The scraper's pinned dependencies SHALL be scanned with `pip-audit` and the result recorded in `.docs/security-audit.md` together with the container's credentials, networks and hardening.
+The scraper's pinned dependencies SHALL be scanned with `pip-audit` and the result reported in the PR body's "Security scans" section (ADR 0209, decision 2), while `.docs/security-audit.md` keeps a scraper container section with the container's credentials, networks and hardening.
 
 #### Scenario: Audit recorded
 - **WHEN** the change is ready for review
-- **THEN** `.docs/security-audit.md` has a dated `pip-audit` row for `scraper/requirements.txt` with no unresolved finding and a scraper container section whose claims match `scraper/compose.yaml`
+- **THEN** the PR body's "Security scans" section has the `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt` command, its version and its result with no unresolved finding, and `.docs/security-audit.md` has a scraper container section whose claims match `scraper/compose.yaml`
+
+### Requirement: Module files merge in any order
+`scraper/compose.yaml` SHALL resolve its includes the same way whichever directory is the project directory, so the documented `docker compose -f infra/compose.yaml -f api/compose.yaml -f scraper/compose.yaml` chain and the root `compose.yaml` yield the same scraper services.
+
+#### Scenario: Documented chain
+- **WHEN** `docker compose config` runs with `-f infra/compose.yaml -f api/compose.yaml -f scraper/compose.yaml`
+- **THEN** it exits 0 and the model defines `worker`, `scheduler`, `seed` and `renderer`
+
+#### Scenario: Root file
+- **WHEN** `docker compose config` runs with the root `compose.yaml`
+- **THEN** it exits 0 and the model defines the same four services

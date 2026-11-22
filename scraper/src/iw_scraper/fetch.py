@@ -19,6 +19,7 @@ from urllib.parse import SplitResult, unquote, urljoin, urlsplit
 
 from noble_tls import Client, Session
 
+from iw_scraper.blocking import BLOCK_STATUSES, block_marker
 from iw_scraper.config import DEFAULT_FETCH_MAX_BYTES, DEFAULT_FETCH_TIMEOUT_SECONDS
 from iw_scraper.parsing import HTML_TYPES, content_type_params, to_uri
 from iw_scraper.proxy import ProxyChoice, ProxyRun
@@ -32,24 +33,6 @@ DEFAULT_MAX_BYTES = DEFAULT_FETCH_MAX_BYTES
 MAX_REDIRECTS = 5
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _WEB_SCHEMES = frozenset({"http", "https"})
-_BLOCK_STATUSES = frozenset({403, 429})
-# Challenge pages are small. A large page that merely embeds a captcha widget (a contact or newsletter
-# form) is a real page, and `blocked` would not be retried, so the marker scan skips it.
-_MARKER_SCAN_MAX_BYTES = 20_000
-# Vendor-specific names found in challenge pages. The bare word "captcha" is not a marker: the real KNF
-# page contains it in ordinary text.
-_BLOCK_MARKERS = (
-    b"g-recaptcha",
-    b"h-captcha",
-    b"hcaptcha.com",
-    b"cf-turnstile",
-    b"cf-chl-",
-    b"/cdn-cgi/challenge-platform",
-    b"captcha-delivery.com",
-    b"px-captcha",
-)
-
-
 @dataclass(frozen=True)
 class Identity:
     """A TLS profile (a `noble_tls.Client` member name) and the headers to send, in wire order.
@@ -160,13 +143,6 @@ def _headers_of(response) -> dict[str, str]:
         str(name).lower(): ", ".join(value) if isinstance(value, list) else str(value)
         for name, value in response.headers.items()
     }
-
-
-def _block_marker(body: bytes) -> str | None:
-    if len(body) > _MARKER_SCAN_MAX_BYTES:
-        return None
-    lowered = body.lower()
-    return next((m.decode() for m in _BLOCK_MARKERS if m in lowered), None)
 
 
 def _read_checked_body(path: str, headers: dict[str, str], max_bytes: int, html_only: bool = True) -> bytes:
@@ -291,13 +267,13 @@ async def fetch(
                 current = to_uri(urljoin(current, headers["location"]))
                 continue
             retry_after = headers.get("retry-after")
-            if status in _BLOCK_STATUSES:
+            if status in BLOCK_STATUSES:
                 raise FetchFailure(Reason.BLOCKED, f"HTTP {status}", proxy_id, retry_after, status)
             if not 200 <= status < 300:
                 raise FetchFailure(Reason.HTTP_ERROR, f"HTTP {status}", proxy_id, retry_after, status)
             if not body:
                 raise FetchFailure(Reason.BLOCKED, "empty response body", proxy_id)
-            if marker := _block_marker(body):
+            if marker := block_marker(body):
                 raise FetchFailure(Reason.BLOCKED, f"block page marker: {marker}", proxy_id)
             media_type, _ = content_type_params(headers.get("content-type"))
             return FetchResult(

@@ -1,4 +1,4 @@
-# api/ deployment unit (owner Damian). Included from the root compose.yaml next to infra/compose.yaml, which owns
+# api/ deployment unit. Included from the root compose.yaml next to infra/compose.yaml, which owns
 # the `postgres`, `redis` and `minio-init` services and the `data` and `edge` networks this file uses (so none of
 # them is declared here).
 # Without the root file, run it together with infra: docker compose -f infra/compose.yaml -f api/compose.yaml up
@@ -10,7 +10,9 @@ services:
     build:
       context: ..
       dockerfile: api/Dockerfile
-    image: investwatch/api:${IW_VERSION:-dev}
+    # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
+    pull_policy: build
+    image: investwatch/api:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     environment:
@@ -30,7 +32,7 @@ services:
 
   # REST under /api and Socket.IO under /socket.io on :8000; reached only through the gateway (no host port).
   api:
-    image: investwatch/api:${IW_VERSION:-dev}
+    image: investwatch/api:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["python", "-m", "investwatch_api"]
     restart: unless-stopped
     environment:

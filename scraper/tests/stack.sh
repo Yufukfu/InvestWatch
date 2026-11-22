@@ -17,7 +17,10 @@ TMP=$(mktemp -d)
 RUN_ID="$$"
 PROJECT="iw-stack-$RUN_ID"
 HEALTH_PORT=18099  # not the default 8080, so "refused on the host" cannot hit the gateway or another service
-FILES=(-f "$ROOT/infra/compose.yaml" -f "$ROOT/api/compose.yaml" -f "$ROOT/scraper/compose.yaml")
+# Included, not merged with several -f: the containers run from one project file. The merged -f chain of the docs is
+# checked on its own in the root group.
+printf 'include:\n  - %s\n  - %s\n  - %s\n' "$ROOT/infra/compose.yaml" "$ROOT/api/compose.yaml" "$ROOT/scraper/compose.yaml" >"$TMP/modules.yaml"
+FILES=(-f "$TMP/modules.yaml")
 [ -z "${STACK_ROOT:-}" ] || FILES=(-f "$ROOT/compose.yaml")  # STACK_ROOT=1: run through the root file, as `docker compose up` does
 ENVF="$TMP/stack.env"
 FAILS=0
@@ -130,10 +133,12 @@ networks_and_ports() {
   js '
     for (const s of S) {
       const n = Object.keys(c.services[s].networks || {});
-      if (!n.length || n.some((x) => x !== "data" && x !== "egress")) fail(s + " networks " + n);
+      const allowed = s === "worker" ? ["data", "egress", "render"] : ["data", "egress"];  // only the worker calls the renderer
+      if (!n.length || n.some((x) => !allowed.includes(x))) fail(s + " networks " + n);
       if ((c.services[s].ports || []).length) fail(s + " publishes a port");
     }
     if (!Object.keys(c.services.worker.networks).includes("egress")) fail("worker has no route out")
+    if (!Object.keys(c.services.worker.networks).includes("render")) fail("worker cannot reach the renderer")
     for (const s of ["scheduler", "seed"]) {
       const n = Object.keys(c.services[s].networks).join(",");
       if (n !== "data") fail(s + " fetches nothing and must be on data alone, not " + n);
@@ -178,7 +183,7 @@ group_config() {
   check "secrets have no default" secrets_have_no_default
   check "no admin credential, app role in DATABASE_URL" no_admin_credential
   check "seed holds the database URL only" seed_holds_less
-  check "networks are data and egress, no published port" networks_and_ports
+  check "networks are data, egress and (worker only) render, no published port" networks_and_ports
   check "hardening is declared with limits" hardening_declared
   check "stop grace covers the shutdown deadline" grace_covers_deadline
   check "seed passes the cron argument" seed_cron_argument
@@ -287,13 +292,20 @@ group_run() {
 
 # ------------------------------------------------------------ root group (root compose.yaml)
 
-root_lists_scraper() {
-  docker compose --env-file "$ENVF" -f "$ROOT/compose.yaml" config --services >"$TMP/root-services.txt" || return 1
-  local s; for s in worker scheduler seed; do grep -qx "$s" "$TMP/root-services.txt" || { echo "root compose has no $s"; return 1; }; done
+# The four services of the scraper unit, from the root file or from the documented merge of the module files.
+lists_scraper_services() { # lists_scraper_services <compose -f args...>
+  docker compose --env-file "$ENVF" "$@" config --services >"$TMP/services.txt" || return 1
+  local s; for s in worker scheduler seed renderer; do grep -qx "$s" "$TMP/services.txt" || { echo "no $s in: $*"; return 1; }; done
+}
+root_lists_scraper() { lists_scraper_services -f "$ROOT/compose.yaml"; }
+# scraper/compose.yaml's include resolves against the first -f file's directory (infra/ here), issue #97.
+documented_chain_lists_scraper() {
+  lists_scraper_services -f "$ROOT/infra/compose.yaml" -f "$ROOT/api/compose.yaml" -f "$ROOT/scraper/compose.yaml"
 }
 
 group_root() {
-  check "the root compose.yaml lists worker, scheduler and seed" root_lists_scraper
+  check "the root compose.yaml lists worker, scheduler, seed and renderer" root_lists_scraper
+  check "the documented -f infra -f api -f scraper chain lists the same services" documented_chain_lists_scraper
 }
 
 groups=("$@")

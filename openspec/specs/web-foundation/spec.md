@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The foundation of the dashboard (`web/`, owner Kacper): an API client generated from the OpenAPI contract that talks only to the backend (the api, or the contract mock server run on its own), a Vitest-only network fake, hardened static delivery behind the HTTPS gateway, and per-module deployment through compose. Feature capabilities (findings, trend, alerts, calibration) build on it.
+The foundation of the dashboard (`web/`): an API client generated from the OpenAPI contract that talks only to the backend (the api, or the contract mock server run on its own), a Vitest-only network fake, hardened static delivery behind the HTTPS gateway, and per-module deployment through compose. Feature capabilities (findings, trend, alerts, calibration) build on it.
 
 ## Requirements
 
