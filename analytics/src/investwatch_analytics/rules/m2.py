@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from bisect import bisect_left
+from dataclasses import dataclass
 from functools import cached_property
 
 from ..models import Block, EvidenceLocator, RuleResult
@@ -178,8 +179,60 @@ _YEAR = re.compile(
 )
 
 
+# "year: figure" lists ("2021: 2,1%, 2022: -4,3%") date each figure as well (gold m2-r12-past-performance-compliant).
+_YEAR_TABLE = re.compile(r"(?<![\d.,])((?:19|20)\d{2})\s?:\s?[-+−]?\d")
+NO_PAST_PERFORMANCE = "Materiał nie prezentuje wyników historycznych."
+
+
+class _PastPerformance(Rule):
+    """One past-performance detector for R12a, R12b and R14 (ADR 0315: they never disagree on the trigger).
+
+    A sentence presents past performance with a past marker (or a year <= the fetch year and no future marker)
+    and a return figure: a percentage that is not a fee or tax, or an amount next to return vocabulary. The
+    parameter lists are YAML anchors on R14 (`pp_*`), aliased in R12a and R12b.
+    """
+
+    @cached_property
+    def _pp(self) -> dict:
+        p = self.spec.params
+        return {
+            "figure": compile_patterns(p.get("figure_patterns", [])),
+            "figure_x": compile_patterns(p.get("figure_exclude_patterns", []) + p.get("figure_extra_exclude_patterns", [])),
+            # One alternation per list: one search per sentence instead of one per pattern (timing, test_redos).
+            "amount": _one_of(p.get("amount_patterns", [])),
+            "amount_return": _one_of(p.get("amount_return_patterns", [])),
+            "past": _one_of(p.get("past_patterns", [])),
+            "future": _one_of(p.get("future_patterns", [])),
+            # R15's forecast markers: a forecast dated in the fetch year is R15's, never past performance (ADR 0315).
+            "forecast": _one_of(p.get("forecast_patterns", []) + p.get("forecast_verb_patterns", [])),
+        }
+
+    def is_past_performance(self, sentence: str, fetch_year: int) -> bool:
+        """A return figure AND a past marker. The marker is checked first: it is cheap, while the figure check
+        runs every exclusion over the sentence (adversarial-input timing, tests/test_redos.py)."""
+        p = self._pp
+        if any(m.search(sentence) for m in p["past"]):
+            past = True
+        elif any(f.search(sentence) for f in p["future"] + p["forecast"]):
+            return False
+        else:
+            past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence)) or any(
+                int(y) <= fetch_year for y in _YEAR_TABLE.findall(sentence))
+        if not past:
+            return False
+        if _hits_fast(sentence, p["figure"], p["figure_x"]):
+            return True
+        # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
+        return any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
+
+    def past_performance(self, ctx: Context) -> list:
+        """The past-performance sentences of the document, in order."""
+        fetch_year = ctx.doc.fetched_at.year
+        return [s for s in ctx.pre.sentences if self.is_past_performance(s.text, fetch_year)]
+
+
 @register
-class R14PastPerformanceDisclaimer(Rule):
+class R14PastPerformanceDisclaimer(_PastPerformance):
     """ZASÓB R14: a clear disclaimer must be present; no proximity requirement (unlike R3).
 
     A footnote-only disclaimer passes: its placement is R6's ("ryzyko ukryte w przypisach").
@@ -191,41 +244,16 @@ class R14PastPerformanceDisclaimer(Rule):
     def _p(self) -> dict:
         p = self.spec.params
         return {
-            "figure": compile_patterns(p.get("figure_patterns", [])),
-            "figure_x": compile_patterns(p.get("figure_exclude_patterns", []) + p.get("figure_extra_exclude_patterns", [])),
-            # One alternation per list: one search per sentence instead of one per pattern (timing, test_redos).
-            "amount": _one_of(p.get("amount_patterns", [])),
-            "amount_return": _one_of(p.get("amount_return_patterns", [])),
-            "past": _one_of(p.get("past_patterns", [])),
-            "future": _one_of(p.get("future_patterns", [])),
             "disclaimer": compile_patterns(p.get("disclaimer_patterns", [])),
             "footnote": tuple(p.get("footnote_markers", [])),
         }
 
-    def _is_past_performance(self, sentence: str, fetch_year: int) -> bool:
-        """A return figure AND a past marker. The marker is checked first: it is cheap, while the figure check
-        runs every exclusion over the sentence (adversarial-input timing, tests/test_redos.py)."""
-        p = self._p
-        if any(m.search(sentence) for m in p["past"]):
-            past = True
-        elif any(f.search(sentence) for f in p["future"]):
-            return False
-        else:
-            past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence))
-        if not past:
-            return False
-        if _hits_fast(sentence, p["figure"], p["figure_x"]):
-            return True
-        # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
-        return any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
-
     def evaluate(self, ctx: Context) -> RuleResult:
         p = self._p
         sentences = ctx.pre.sentences
-        fetch_year = ctx.doc.fetched_at.year
-        claims = [s for s in sentences if self._is_past_performance(s.text, fetch_year)]
+        claims = self.past_performance(ctx)
         if not claims:
-            return self.result("not_applicable", None, "Materiał nie prezentuje wyników historycznych.")
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
         disclaimers = [s for s in sentences if any(d.search(s.text) for d in p["disclaimer"])]
         if not disclaimers:
             return self.result(
@@ -522,3 +550,388 @@ class R18SupervisionAsSafety(_SupervisorMention):
                 "Odwołanie do nadzoru sąsiaduje z zapewnieniem o bezpieczeństwie – do weryfikacji.",
             )
         return self.result("pass", sentences[idx[0]].text, "Nadzór nie jest użyty jako argument bezpieczeństwa.")
+
+
+# ---- tax information (R16, analytics-m2-p1-rules) ------------------------------------------------
+
+
+@register
+class R16TaxInformation(Rule):
+    """ZASÓB R16 (art. 44 ust. 7): tax treatment "zależy od indywidualnej sytuacji klienta" and "może ulec zmianie".
+
+    The change part counts only where it is about tax: in the sentence of the individual part, or in a sentence
+    with a tax word or `przepis…` ("Oferta może ulec zmianie" does not). Disclaimer sentences are not a tax
+    reference, so a lone disclaimer is not_applicable (design §7).
+    """
+
+    rule_id = "R16"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "tax": compile_patterns(p.get("tax_patterns", [])),
+            "tax_x": compile_patterns(p.get("tax_exclude_patterns", [])),
+            "individual": compile_patterns(p.get("tax_individual_patterns", [])),
+            "change": compile_patterns(p.get("tax_change_patterns", [])),
+            "context": compile_patterns(p.get("tax_context_patterns", [])),
+            "subject": compile_patterns(p.get("tax_subject_patterns", [])),
+        }
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        texts = [s.text for s in ctx.pre.sentences]
+        individual = [i for i, t in enumerate(texts) if any(x.search(t) for x in p["individual"])]
+        change = [
+            i for i, t in enumerate(texts)
+            if any(c.search(t) for c in p["change"]) and (i in individual or any(c.search(t) for c in p["context"]))
+        ]
+        disclaimer = set(individual) | set(change)
+        # A disclaimer sentence is a tax reference only through what is left once the disclaimer is stripped
+        # ("W IKE nie płacisz podatku Belki, choć przepisy mogą ulec zmianie" is both; group 2 review).
+        stripped = p["individual"] + p["change"] + p["subject"]
+        refs = [
+            i for i, t in enumerate(texts)
+            if R3RiskNextToReturns._hits(t, p["tax"], p["tax_x"] + (stripped if i in disclaimer else []))
+        ]
+        if not refs:
+            return self.result("not_applicable", None, "Materiał nie odwołuje się do traktowania podatkowego.")
+        if individual and change:
+            return self.result(
+                "pass", texts[individual[0]],
+                "Informacja podatkowa z zastrzeżeniem, że traktowanie podatkowe zależy od indywidualnej sytuacji "
+                "klienta i może ulec zmianie.",
+            )
+        missing = []
+        if not individual:
+            missing.append("zależy od indywidualnej sytuacji klienta")
+        if not change:
+            missing.append("może ulec zmianie")
+        quote = texts[(individual or change or refs)[0]]
+        return self.result(
+            "fail", quote,
+            f"Informacja o traktowaniu podatkowym bez pełnego zastrzeżenia – brak informacji, że traktowanie "
+            f"podatkowe {' i '.join(missing)}.",
+        )
+
+
+# ---- forecasts (R15, analytics-m2-p1-rules) -----------------------------------------------------
+
+
+@register
+class R15Forecasts(Rule):
+    """ZASÓB R15 (art. 44 ust. 6): a forecast needs a warning that it is not a reliable indicator of future results.
+
+    Every detected forecast is reported (ADR 0315): a compliant forecast is a pass quoting the forecast, with an
+    explanation that starts with `Wykryto prognozę`. Warning sentences never trigger the rule (design §6).
+    """
+
+    rule_id = "R15"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "performance": compile_patterns(p.get("performance_patterns", [])),
+            "strong": compile_patterns(p.get("forecast_patterns", [])),
+            "verb": compile_patterns(p.get("forecast_verb_patterns", [])),
+            "weak": compile_patterns(p.get("forecast_weak_patterns", [])),
+            "exclude": compile_patterns(p.get("forecast_exclude_patterns", []) + p.get("figure_exclude_patterns", [])),
+            "figure": compile_patterns(p.get("figure_patterns", []) + p.get("amount_patterns", [])),
+            "warning": compile_patterns(p.get("forecast_disclaimer_patterns", [])),
+        }
+
+    def _kind(self, sentence: str, fetch_year: int) -> str | None:
+        """`forecast`, `candidate` (weak marker, no figure) or None."""
+        p = self._p
+        for x in p["exclude"]:
+            sentence = x.sub(" ", sentence)
+        figure = any(f.search(sentence) for f in p["figure"])
+        results = figure or any(v.search(sentence) for v in p["performance"])
+        if not results:
+            return None
+        strong = (
+            any(s.search(sentence) for s in p["strong"])
+            or any(int(a or b) > fetch_year for a, b in _YEAR.findall(sentence))
+            or (figure and any(v.search(sentence) for v in p["verb"]))
+        )
+        weak = any(w.search(sentence) for w in p["weak"])
+        if strong or (weak and figure):
+            return "forecast"
+        return "candidate" if weak else None
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        fetch_year = ctx.doc.fetched_at.year
+        warnings, forecasts, candidates = [], [], []
+        for s in ctx.pre.sentences:
+            if any(w.search(s.text) for w in p["warning"]):
+                warnings.append(s.text)
+                continue
+            kind = self._kind(s.text, fetch_year)
+            if kind == "forecast":
+                forecasts.append(s.text)
+            elif kind == "candidate":
+                candidates.append(s.text)
+        if not forecasts and not candidates:
+            return self.result("not_applicable", None, "Materiał nie zawiera prognoz przyszłych wyników.")
+        if warnings:
+            quote = (forecasts or candidates)[0]
+            return self.result(
+                "pass", quote,
+                f"Wykryto prognozę przyszłych wyników; materiał zawiera ostrzeżenie: „{warnings[0]}”.",
+            )
+        if forecasts:
+            return self.result(
+                "fail", forecasts[0],
+                "Prognoza przyszłych wyników bez ostrzeżenia, że prognozy nie są wiarygodnym wskaźnikiem przyszłych wyników.",
+            )
+        return self.result(
+            "uncertain", candidates[0],
+            "Zdanie może zapowiadać przyszłe wyniki (bez liczby), a materiał nie zawiera ostrzeżenia dotyczącego "
+            "prognoz – do weryfikacji.",
+        )
+
+
+# ---- past performance: period and scope (R12a), currency and costs (R12b) ----------------------
+
+# N months: sub-annual unless N is a multiple of 12 ("12 miesięcy", "24 miesiące" are full periods).
+_MONTHS = re.compile(r"(?<!\d)(\d{1,3})\s{0,3}-?\s{0,3}miesi\w*", re.IGNORECASE)
+_YEAR_RANGE = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*[-–—]\s*((?:19|20)\d{2})(?!\d)")
+_LAST_N_YEARS = re.compile(r"\b(?:ostatni|minion|poprzedni)\w*\s+(\d{1,2})\s+lat\w*|\blast\s+(\d{1,2})\s+years\b", re.IGNORECASE)
+_LAST_N = re.compile(r"\b(?:ostatni|minion|poprzedni)\w*\s+\d{1,3}\s+(?:lat|miesi|rok|kwarta)\w*|\blast\s+\d{1,3}\s+(?:years|months)\b", re.IGNORECASE)
+_DATE = re.compile(r"(?<!\d)\d{1,2}[./]\d{1,2}[./](?:19|20)\d{2}(?!\d)")
+
+_SUB_STATUS = {"fail": "niespełniony", "uncertain": "do weryfikacji"}
+_WORST = {"fail": 2, "uncertain": 1, "pass": 0}
+
+
+@dataclass(frozen=True)
+class SubCheck:
+    name: str
+    status: str  # pass | fail | uncertain
+    detail: str
+    sentence: str | None = None  # the sentence that decided a fail or uncertain, if any
+
+
+@register
+class R12aPeriodAndScope(_PastPerformance):
+    """ZASÓB R12a (art. 44 ust. 4): the last 5 years, full 12-month periods, a reference period and a source.
+
+    Three named sub-checks; the result is the worst one and the explanation names every sub-check that is not
+    `pass`, in a fixed order (design §4). The source markers are shared with R11 (`&source_markers`).
+    """
+
+    rule_id = "R12a"
+    FIVE_YEARS, REFERENCE, SOURCE = "5 lat / 12 mies.", "okres referencyjny", "źródło"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "short": compile_patterns(p.get("short_period_patterns", [])),
+            "five": compile_patterns(p.get("five_year_patterns", [])),
+            "inception": compile_patterns(p.get("inception_patterns", [])),
+            "source": compile_patterns(p.get("source_patterns", [])),
+        }
+
+    def _short(self, text: str) -> bool:
+        if any(s.search(text) for s in self._p["short"]):
+            return True
+        return any(int(n) % 12 for n in _MONTHS.findall(text))
+
+    def _five_years(self, claims: list[str], fetch_year: int) -> bool:
+        years: set[int] = set()
+        for text in claims:
+            if any(f.search(text) for f in self._p["five"]):
+                return True
+            if any(int(a or b) >= 5 for a, b in _LAST_N_YEARS.findall(text)):
+                return True
+            for start, end in _YEAR_RANGE.findall(text):
+                if int(end) - int(start) + 1 >= 5:
+                    return True
+            years |= {int(a or b) for a, b in _YEAR.findall(text) if int(a or b) <= fetch_year}
+            years |= {int(y) for y in _YEAR_TABLE.findall(text) if int(y) <= fetch_year}
+        return len(years) >= 5
+
+    def _since_inception(self, sentence: str, fetch_year: int) -> SubCheck:
+        """Art. 44 ust. 4 lit. b: results since inception only for a product younger than 5 years.
+
+        The launch year in the sentence decides at the fetch date (never asked of the model, which has no reference
+        date; group 7 review): under 5 calendar years pass, over 5 fail, exactly 5 (4 or 5 years old) uncertain, and
+        no year at all uncertain (its reference-period sub-check fails anyway).
+        """
+        lit_b = "(art. 44 ust. 4 lit. b)"
+        starts = [int(a or b) for a, b in _YEAR.findall(sentence) if int(a or b) <= fetch_year]
+        if not starts:
+            return SubCheck(
+                self.FIVE_YEARS, "uncertain",
+                f"wyniki od początku działalności bez daty – dopuszczalne tylko dla produktu istniejącego krócej niż 5 lat {lit_b}",
+                sentence,
+            )
+        start = min(starts)
+        age = fetch_year - start
+        if age < 5:
+            return SubCheck(self.FIVE_YEARS, "pass", "")
+        if age > 5:
+            return SubCheck(
+                self.FIVE_YEARS, "fail",
+                f"produkt istnieje od {start} r., ponad 5 lat – wymagane wyniki za ostatnie 5 lat {lit_b}", sentence,
+            )
+        return SubCheck(
+            self.FIVE_YEARS, "uncertain",
+            f"produkt uruchomiony w {start} r. – nie wiadomo, czy istnieje krócej niż 5 lat {lit_b}", sentence,
+        )
+
+    @staticmethod
+    def _dated(text: str) -> bool:
+        return bool(_YEAR.search(text) or _YEAR_TABLE.search(text) or _YEAR_RANGE.search(text) or _DATE.search(text)
+                    or _LAST_N.search(text))
+
+    def sub_checks(self, ctx: Context, claims: list[str]) -> list[SubCheck]:
+        p = self._p
+        fetch_year = ctx.doc.fetched_at.year
+        short = next((t for t in claims if self._short(t)), None)
+        inception = next((t for t in claims if any(i.search(t) for i in p["inception"])), None)
+        if short is not None:
+            five = SubCheck(self.FIVE_YEARS, "fail", "wynik za okres krótszy niż pełne 12 miesięcy", short)
+        elif self._five_years(claims, fetch_year):
+            five = SubCheck(self.FIVE_YEARS, "pass", "")
+        elif inception is not None:
+            five = self._since_inception(inception, fetch_year)
+        else:
+            five = SubCheck(self.FIVE_YEARS, "fail", "brak wyników za ostatnie 5 lat w pełnych okresach 12-miesięcznych")
+        if any(self._dated(t) for t in claims):
+            reference = SubCheck(self.REFERENCE, "pass", "")
+        else:
+            reference = SubCheck(self.REFERENCE, "fail", "nie wskazano okresu, którego dotyczą wyniki")
+        if any(s.search(ctx.doc.text) for s in p["source"]):
+            source = SubCheck(self.SOURCE, "pass", "")
+        else:
+            source = SubCheck(self.SOURCE, "fail", "nie wskazano źródła danych o wynikach")
+        return [five, reference, source]
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        claims = [s.text for s in self.past_performance(ctx)]
+        if not claims:
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
+        checks = self.sub_checks(ctx, claims)
+        worst = max(checks, key=lambda c: _WORST[c.status]).status
+        if worst == "pass":
+            return self.result(
+                "pass", claims[0],
+                "Wyniki historyczne za ostatnie 5 lat w pełnych okresach 12-miesięcznych, ze wskazanym okresem "
+                "referencyjnym i źródłem.",
+            )
+        open_checks = [c for c in checks if c.status != "pass"]
+        decisive = next((c.sentence for c in open_checks if c.status == worst and c.sentence), None)
+        listed = "; ".join(f"{c.name}: {_SUB_STATUS[c.status]} ({c.detail})" for c in open_checks)
+        return self.result(worst, decisive or claims[0], f"Wyniki historyczne – {listed}.")
+
+
+_DENOMINATED = re.compile(r"\b(?:denominowan\w*|denominated)\b", re.IGNORECASE)
+
+
+@register
+class R12bCurrencyAndCosts(_PastPerformance):
+    """ZASÓB R12b (art. 44 ust. 4): the impact of fees always; a currency warning for non-PLN results only.
+
+    ZASÓB states the currency warning without a condition; art. 44 ust. 4 lit. e requires it only for a
+    currency other than the client's (PLN), so every explanation cites lit. e (Damian, design §5). Rules-only.
+    """
+
+    rule_id = "R12b"
+    LIT_E = "art. 44 ust. 4 lit. e"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "fee": compile_patterns(p.get("fee_patterns", [])),
+            "currency": compile_patterns(p.get("foreign_currency_patterns", [])),
+            "warning": compile_patterns(p.get("currency_warning_patterns", [])),
+        }
+
+    def _foreign(self, text: str) -> bool:
+        return any(c.search(text) for c in self._p["currency"])
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        claims = [s.text for s in self.past_performance(ctx)]
+        if not claims:
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
+        text = ctx.doc.text
+        foreign = next((t for t in claims if self._foreign(t)), None)
+        if foreign is None:  # the product itself is denominated in a foreign currency
+            foreign = next((s.text for s in ctx.pre.sentences if _DENOMINATED.search(s.text) and self._foreign(s.text)), None)
+        fees = any(f.search(text) for f in p["fee"])
+        warned = any(w.search(text) for w in p["warning"])
+        missing = []
+        if not fees:
+            missing.append("informacji o wpływie prowizji, opłat i obciążeń na wyniki")
+        if foreign is not None and not warned:
+            missing.append(f"ostrzeżenia o wpływie zmian kursów walut (wyniki w walucie obcej, {self.LIT_E})")
+        if foreign is None:
+            currency = f"ostrzeżenie walutowe niewymagane – wyniki w PLN ({self.LIT_E})"
+        else:
+            currency = f"ostrzeżenie walutowe zawarte ({self.LIT_E})"
+        if not missing:
+            return self.result("pass", claims[0], f"Wyniki historyczne z informacją o wpływie opłat; {currency}.")
+        quote = foreign if foreign is not None and not warned else claims[0]
+        # Every explanation cites lit. e (spec): unless the missing currency warning already does, add the status.
+        note = "" if foreign is not None and not warned else f"; {currency}"
+        return self.result("fail", quote, f"Wyniki historyczne bez {' ani '.join(missing)}{note}.")
+
+
+# ---- product comparisons (R11, analytics-m2-p1-rules) -------------------------------------------
+
+
+@register
+class R11ProductComparisons(Rule):
+    """ZASÓB R11 (art. 44 ust. 3): a comparison needs its source and its assumptions; only violations are flagged.
+
+    A compliant comparison is a plain pass that quotes it (ADR 0315). The source and the assumptions may stand
+    anywhere, footnotes included (ZASÓB asks whether they are given, not where; placement is R6's). A superlative
+    without a comparator is an implicit comparison that the rules cannot confirm: uncertain, for the LLM (design §3).
+    """
+
+    rule_id = "R11"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "comparison": compile_patterns(p.get("comparison_patterns", []) + p.get("benchmark_patterns", [])),
+            "exclude": compile_patterns(p.get("comparison_exclude_patterns", [])),
+            "superlative": compile_patterns(p.get("superlative_patterns", [])),
+            "source": compile_patterns(p.get("source_patterns", [])),
+            "assumption": compile_patterns(p.get("assumption_patterns", [])),
+        }
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        p = self._p
+        texts = [s.text for s in ctx.pre.sentences]
+        comparisons = [t for t in texts if R3RiskNextToReturns._hits(t, p["comparison"], p["exclude"])]
+        superlatives = [t for t in texts if R3RiskNextToReturns._hits(t, p["superlative"], p["exclude"])]
+        if not comparisons and not superlatives:
+            return self.result("not_applicable", None, "Materiał nie zawiera porównań produktów ani usług.")
+        text = ctx.doc.text
+        source = any(s.search(text) for s in p["source"])
+        assumptions = any(a.search(text) for a in p["assumption"])
+        if not comparisons:
+            if source and assumptions:
+                return self.result("pass", superlatives[0], "Określenie przewagi nad rynkiem ze wskazanym źródłem i założeniami.")
+            return self.result(
+                "uncertain", superlatives[0],
+                "Określenie przewagi nad rynkiem (porównanie domyślne) "
+                + ("bez przyjętych założeń" if source else "bez wskazania źródła informacji") + " – do weryfikacji.",
+            )
+        quote = comparisons[0]
+        if not source:
+            return self.result("fail", quote, "Porównanie z innymi produktami lub usługami bez wskazania źródła informacji.")
+        if not assumptions:
+            return self.result(
+                "uncertain", quote,
+                "Porównanie ze wskazanym źródłem, ale bez przyjętych założeń (okres, kwota, stan na dzień) – do weryfikacji.",
+            )
+        return self.result("pass", quote, "Porównanie ze wskazanym źródłem informacji i przyjętymi założeniami.")
