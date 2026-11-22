@@ -82,10 +82,14 @@ def test_search_does_not_look_into_the_summary(client, store):
     assert items(client, f"q={word}") == []
 
 
-def test_search_matches_firm_name(client):
-    result = items(client, "q=alfa inwestycje")
+def test_search_matches_firm_name(client, store):
+    # "Dom Maklerski" appears only in the firm name, never in a title, excerpt or advertiser
+    expected = {f["id"] for f in store.findings.values()
+                if "Alfa Inwestycje Dom Maklerski" in (f["firm"] or {}).get("name", "")}
 
-    assert result and all("Alfa Inwestycje" in (i["firm"] or {}).get("name", "") for i in result)
+    result = items(client, "q=alfa inwestycje dom maklerski")
+
+    assert expected and {i["id"] for i in result} == expected
 
 
 @pytest.mark.parametrize("sort", ["score", "-score", "detected_at", "-detected_at"])
@@ -121,7 +125,7 @@ def test_no_matches_returns_empty_list(client):
 @pytest.mark.parametrize(
     "query",
     ["module=M9", "page_size=0", "page_size=201", "page=0", "status=approved", "risk_level=extreme",
-     "score_min=1.5", "sort=title", "source_id=not-a-uuid", "date_from=yesterday"],
+     "score_min=1.5", "sort=title", "source_id=not-a-uuid", "document_id=not-a-uuid", "date_from=yesterday"],
 )
 def test_invalid_filter_values_are_422(client, query):
     r = client.get(f"/api/findings?{query}")
@@ -146,3 +150,44 @@ def test_sort_ties_are_broken_by_id(client, store, sort):
     result = items(client, f"sort={sort}&page_size=200")
 
     assert [i["id"] for i in result] == sorted(store.findings)
+
+
+def _shared_document(store) -> str:
+    seen: dict[str, int] = {}
+    for f in store.findings.values():
+        seen[f["document_id"]] = seen.get(f["document_id"], 0) + 1
+    return next(doc for doc, n in seen.items() if n > 1)
+
+
+def test_filter_by_document_returns_all_its_findings(client, store):
+    doc = _shared_document(store)
+
+    r = client.get(f"/api/findings?document_id={doc}").json()
+
+    assert r["total"] == 2
+    assert {i["document_id"] for i in r["items"]} == {doc}
+    assert sorted(i["module"] for i in r["items"]) == ["M1", "M3"]
+
+
+def test_filter_by_document_combines_with_module(client, store):
+    doc = _shared_document(store)
+
+    r = client.get(f"/api/findings?document_id={doc}&module=M3").json()
+
+    assert r["total"] == 1 and [(i["document_id"], i["module"]) for i in r["items"]] == [(doc, "M3")]
+
+
+def test_filter_by_document_combines_with_sort_and_pagination(client, store):
+    doc = _shared_document(store)
+    by_score = sorted((f for f in store.findings.values() if f["document_id"] == doc), key=lambda f: f["score"])
+
+    r = client.get(f"/api/findings?document_id={doc}&sort=score&page=2&page_size=1").json()
+
+    assert r["total"] == 2 and r["page"] == 2 and r["page_size"] == 1
+    assert [i["id"] for i in r["items"]] == [by_score[1]["id"]]
+
+
+def test_filter_by_unknown_document_is_empty(client):
+    r = client.get("/api/findings?document_id=00000000-0000-4000-8000-000000000000")
+
+    assert r.status_code == 200 and r.json()["items"] == [] and r.json()["total"] == 0

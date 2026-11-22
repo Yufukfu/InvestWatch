@@ -36,7 +36,7 @@ def test_list_findings_matches_contract(client):
     assert r.status_code == 200
     assert_response_matches("/findings", "get", r)
     body = r.json()
-    assert body["total"] == 9 and body["page"] == 1 and len(body["items"]) == 9
+    assert body["total"] == 11 and body["page"] == 1 and len(body["items"]) == 11
     assert all(item["risk_level"] in {"high", "medium", "low"} for item in body["items"])
 
 
@@ -125,10 +125,10 @@ def test_read_endpoints_match_contract(client, url, path):
 def test_summary_counts_match_findings(client):
     body = client.get("/api/stats/summary").json()
 
-    assert body["total"] == 9
-    assert sum(body["by_module"].values()) == 9
-    assert sum(body["by_status"].values()) == 9
-    assert sum(body["by_risk_level"].values()) == 9
+    assert body["total"] == 11
+    assert sum(body["by_module"].values()) == 11
+    assert sum(body["by_status"].values()) == 11
+    assert sum(body["by_risk_level"].values()) == 11
 
 
 def test_trend_by_day_aggregates_hourly_points(client):
