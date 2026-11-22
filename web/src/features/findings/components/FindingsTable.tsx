@@ -112,7 +112,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                   <RiskBadge level={f.riskLevel} />
                 </td>
                 <td role="cell" className="col-title">
-                  <button type="button" className="link" onClick={() => onSelect(f.id)}>
+                  <button type="button" className="link" dir="auto" onClick={() => onSelect(f.id)}>
                     {f.title}
                   </button>
                 </td>

@@ -1,6 +1,6 @@
 # Presentation: analytics section (M1/M2/M3, calibration, extensibility)
 
-Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into the deck; each `##` below is one slide, with speaker notes under **Notes**. Owner: Damian.
+Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into the deck; each `##` below is one slide, with speaker notes under **Notes**. Written by Damian.
 
 Numbers come from one run of `python analytics/eval/run.py` on `main` at `c810a140` (2026-11-22 00:02 UTC): rules only, no LLM, gold set SHA-256 `963f834e…`. To refresh them: rerun the command and copy the `at_default_threshold` block of each module and the `strict` block of each rule.
 

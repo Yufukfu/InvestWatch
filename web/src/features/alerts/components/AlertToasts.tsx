@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { isolate } from '../../../format/bidi';
 import { formatScore } from '../../../format/score';
 import type { AlertItem } from '../model';
 
@@ -17,7 +18,8 @@ type Reason = 'pointer' | 'focus';
 // Nothing takes focus on arrival. A toast holds while the pointer is over it or keyboard focus is in it;
 // the two are tracked separately, so leaving one does not release a toast the other still holds.
 // When a toast goes by a button, focus moves first to the next toast (or the region), so it is not lost.
-// Titles are scraped content: text only.
+// Titles are scraped content: text only. The visible title sits alone in a dir="auto" element; inside the
+// aria-label strings it is wrapped by isolate() (FSI ... PDI), since an attribute value has no element.
 export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, onRelease }: Props) {
   const region = useRef<HTMLElement>(null);
   const reasons = useRef(new Map<string, Set<Reason>>());
@@ -73,7 +75,7 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
             className="toast"
             data-id={a.id}
             role="group"
-            aria-label={`Wysokie ryzyko: ${a.title}`}
+            aria-label={`Wysokie ryzyko: ${isolate(a.title)}`}
             onMouseEnter={() => setReason(a.id, 'pointer', true)}
             onMouseLeave={() => setReason(a.id, 'pointer', false)}
             onFocus={() => setReason(a.id, 'focus', true)}
@@ -85,7 +87,9 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
               <span className="risk risk-high">Wysokie ryzyko</span>
               {meta && <span className="toast-meta">{meta}</span>}
             </p>
-            <p className="toast-title">{a.title}</p>
+            <p className="toast-title" dir="auto">
+              {a.title}
+            </p>
             <div className="toast-actions">
               <button
                 type="button"
@@ -100,7 +104,7 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
               <button
                 type="button"
                 className="btn"
-                aria-label={`Zamknij: ${a.title}`}
+                aria-label={`Zamknij: ${isolate(a.title)}`}
                 onClick={() => {
                   focusNeighbour(a.id);
                   onDismiss(a.id);

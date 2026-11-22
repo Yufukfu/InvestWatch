@@ -33,8 +33,9 @@ def _rewrite_refs(node, schemas: dict[str, dict]):
     if isinstance(node, dict):
         out = {k: _rewrite_refs(v, schemas) for k, v in node.items()}
         ref = node.get("$ref")
-        if isinstance(ref, str) and ref in schemas:
-            out["$ref"] = schemas[ref]["$id"]
+        base, _, fragment = ref.partition("#") if isinstance(ref, str) else ("", "", "")
+        if base in schemas:
+            out["$ref"] = schemas[base]["$id"] + (f"#{fragment}" if fragment else "")
         return out
     if isinstance(node, list):
         return [_rewrite_refs(v, schemas) for v in node]

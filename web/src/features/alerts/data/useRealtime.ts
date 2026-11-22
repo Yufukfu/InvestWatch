@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { investWatchApi, type GetFindingsApiArg } from '../../../api/generated';
+import { isolate } from '../../../format/bidi';
 import { setSearchParam } from '../../../url/useUrlSearch';
 import { isUuid } from '../../../url/uuid';
 import type { AlertItem, Connection } from '../model';
@@ -140,7 +141,8 @@ export function useRealtime(): RealtimeState {
       if (!alert) return;
       if (!held.current.has(alert.id)) schedule(alert.id);
       setAlerts((list) => [alert, ...list.filter((a) => a.id !== alert.id)].slice(0, MAX_ALERTS));
-      setAnnouncement(`Wysokie ryzyko: ${alert.title}`);
+      // The title is untrusted: isolated, so a bidi control in it cannot reorder the label.
+      setAnnouncement(`Wysokie ryzyko: ${isolate(alert.title)}`);
     };
     const onUpdated = (payload: unknown) => {
       const p = record(payload);

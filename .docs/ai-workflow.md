@@ -1,6 +1,6 @@
 # AI-Assisted Development Log
 
-This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
+This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry in [`ai-log/`](ai-log/README.md) at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
 
 ## Process
 
@@ -27,7 +27,7 @@ All of it is committed, so the three of us run identical agents. The AI assistan
 
 ## Lifecycle of one change
 
-Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log row, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
+Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log entry, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
 
 ## Controls on generated code
 
@@ -132,3 +132,8 @@ Known limits: review is a practice, not enforced by a hook; the hook reads only 
 | Sun ~11:00 | Adam | A Claude Code session resolved issue #66 autonomously: checked open scraper PRs for overlap first, verified the scraper container section of `security-audit.md` against `scraper/compose.yaml`, wrote a MODIFIED delta for `scraper-deployment` "Audited supply chain" with the CLI's own delta rules, ran `pip-audit` for the PR body | Branch `scraper/scraper-audit-in-pr-body`, spec-only. Docs already followed ADR 0209, so no doc edit was needed. The local `pip-audit` 2.10.1 needed Python 3.14 (not the 3.9 system python). |
 | Sun ~11:30 | Adam | A Claude Code session did the scraper side of issue #78: read Damian's recorded run against the code on `main` (seed files, scan-request consumer, scheduler, retry and job-error paths, merge time of PR #67) instead of restarting the shared stack, and wrote only what the run shows, with "not checked" for the rest | Branch `scraper/demo-rehearsal-evidence`, docs only (`.docs/STATUS.md` scraper evidence, `.docs/status/scraper.md`). The per-source document split, scraper logs and scheduled scans are not in the issue, so they stay open. Found `.docs/status/scraper.md` still calling the renderer PR pending after it merged. |
 | Sun ~03:20 | Adam | A Claude Code session applied the approved `dashboard-redesign` change to `web/` in task groups (test first, mutation check, `iw-reviewer` per commit), then had Sonnet subagents compare production-build screenshots with the Paper exports. The comparison showed the first pass did not look like the mockups (navy header and blue accent where the mockup is white, ink and red), so a fidelity pass (tasks 8a.1-8a.7) followed: sequential for the shared stylesheet, then two agents in parallel, one in a separate git worktree, merged by cherry-pick | Branch `web/dashboard-redesign`, 469 Vitest tests, mutation checks 100% caught (survivors killed with tests or removed as dead code). The first-pass tokens were written from an assumed look instead of the exported JSX; the screenshot review caught it, not the tests. A subagent's bad script index duplicated ~300 lines of `styles.css` (caught by its own report and a duplicate-section check), another wrote tests and code before seeing red (mutation checks were the evidence). Programmatic measurement, not review, found an 8 px overflow at 320 px and 41 px targets; review found one real defect (pager text hidden from screen readers on phone). `App.test.tsx` trend test fails about 1 run in 12 under load (not caused by this change). The Playwright MCP needs a browser extension that is not installed: `playwright-core` from a scratch directory with the cached Chromium worked instead. |
+One file per entry in [`ai-log/`](ai-log/README.md), named `YYYY-MM-DDTHHMM-<who>-<slug>.md`, so the listing reads in time order and parallel PRs never edit the same file ([ADR 0212](decisions/0212-ai-log-one-file-per-entry.md)). How to add one: the `iw-ai-log` skill. The whole log as one table, oldest first:
+
+```sh
+node .claude/skills/iw-ai-log/scripts/ai-log.mjs render
+```

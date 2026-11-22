@@ -48,10 +48,14 @@ function IssueItem({ rule }: { rule: RuleView }) {
         Waga: {SEVERITY_LABEL[rule.severity] ?? rule.severity}
         {rule.method && <> · Metoda: {METHOD_LABEL[rule.method] ?? rule.method}</>}
       </p>
-      {rule.explanation && <p className="rule-explanation">{rule.explanation}</p>}
+      {rule.explanation && (
+        <p className="rule-explanation" dir="auto">
+          {rule.explanation}
+        </p>
+      )}
       {rule.evidence && (
         <blockquote className="rule-evidence">
-          <span className="sr-label">Cytat z materiału: </span>„{rule.evidence}”
+          <span className="sr-label">Cytat z materiału: </span>„<span dir="auto">{rule.evidence}</span>”
         </blockquote>
       )}
       {rule.legalBasis && (
@@ -75,7 +79,12 @@ function RuleGroup({ title, rules }: { title: string; rules: RuleView[] }) {
           <li key={r.ruleId}>
             <span className="rule-id">{r.ruleId}</span> {r.name}
             {r.result === 'pass' && <span className="rule-verdict verdict-pass">{VERDICT.pass}</span>}
-            {r.explanation && <span className="muted"> – {r.explanation}</span>}
+            {r.explanation && (
+              <span className="muted">
+                {' – '}
+                <span dir="auto">{r.explanation}</span>
+              </span>
+            )}
           </li>
         ))}
       </ul>
@@ -140,7 +149,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
           {d.firm && (
             <div className="party" role="group" aria-labelledby="d-firm">
               <p className="party-label" id="d-firm">Firma inwestycyjna</p>
-              <p className="party-name">{d.firm.name}</p>
+              <p className="party-name" dir="auto">{d.firm.name}</p>
               {d.firm.authorized !== undefined && (
                 <p className={d.firm.authorized ? 'flag flag-ok' : 'flag flag-bad'}>
                   {d.firm.authorized ? 'Firma w rejestrze KNF' : 'Firma spoza rejestru KNF'}
@@ -155,14 +164,14 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
           {d.advertiser && (
             <div className="party" role="group" aria-labelledby="d-advertiser">
               <p className="party-label" id="d-advertiser">Podmiot reklamujący</p>
-              <p className="party-name">{d.advertiser.name ?? 'Nadawca bez nazwy'}</p>
+              <p className="party-name" dir="auto">{d.advertiser.name ?? 'Nadawca bez nazwy'}</p>
               {d.advertiser.handle &&
                 (profile ? (
-                  <a href={profile} target="_blank" rel="noopener noreferrer">
+                  <a href={profile} target="_blank" rel="noopener noreferrer" dir="auto">
                     {d.advertiser.handle}
                   </a>
                 ) : (
-                  <p>{d.advertiser.handle}</p>
+                  <p dir="auto">{d.advertiser.handle}</p>
                 ))}
               {d.advertiser.inRegistry === false && <p className="flag flag-bad">Nadawca spoza rejestru KNF</p>}
               {d.advertiser.onWarningList && <p className="flag flag-bad">Na liście ostrzeżeń KNF</p>}
@@ -174,7 +183,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
       {d.summary && (
         <section className="detail-section" aria-labelledby="d-summary">
           <h3 id="d-summary">Dlaczego to zgłoszenie</h3>
-          <p>{d.summary}</p>
+          <p dir="auto">{d.summary}</p>
         </section>
       )}
 
@@ -210,11 +219,17 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
       {(d.excerpt || d.documentText) && (
         <section className="detail-section" aria-labelledby="d-content">
           <h3 id="d-content">Treść materiału</h3>
-          {d.excerpt && <p className="excerpt">{d.excerpt}</p>}
+          {d.excerpt && (
+            <p className="excerpt" dir="auto">
+              {d.excerpt}
+            </p>
+          )}
           {d.documentText && d.documentText !== d.excerpt && (
             <details className="rule-group">
               <summary>Pełna treść</summary>
-              <p className="excerpt">{d.documentText}</p>
+              <p className="excerpt" dir="auto">
+                {d.documentText}
+              </p>
             </details>
           )}
         </section>
@@ -235,7 +250,9 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
   );
 }
 
-// Side panel with the finding detail. Scraped text is rendered as React text only.
+// Side panel with the finding detail. Scraped and model-written text is rendered as React text only,
+// each value alone in a dir="auto" element: an element with dir is a bidi isolate, so a U+202E in a
+// quote cannot reorder the UI text around it (issue #54).
 export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClose, statusEditor }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -334,7 +351,7 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
               </span>
             </p>
           )}
-          <h2 id="detail-title">{detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}</h2>
+          <h2 id="detail-title" dir="auto">{detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}</h2>
         </div>
         <button ref={closeRef} type="button" className="btn" onClick={onClose}>
           Zamknij

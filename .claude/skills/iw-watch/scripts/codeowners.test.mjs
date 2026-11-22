@@ -89,7 +89,7 @@ test('the repository CODEOWNERS routes each module to its owner', () => {
   const rules = parseCodeowners(fs.readFileSync(path.join(ROOT, '.github/CODEOWNERS'), 'utf8'));
   assert.deepEqual(ownerOf(rules, 'scraper/collectors/x.py'), ['hen68']);
   assert.deepEqual(ownerOf(rules, 'web/src/App.tsx'), ['kacpermalczyk']);
-  assert.deepEqual(ownerOf(rules, 'infra/compose.yaml'), [], 'infra/ is shared: no owner');
+  assert.deepEqual(ownerOf(rules, 'infra/compose.yaml'), ['Yufukfu']);
   for (const p of ['analytics/a.py', 'api/main.py', 'contracts/finding.schema.json']) {
     assert.deepEqual(ownerOf(rules, p), ['Yufukfu'], p);
   }
