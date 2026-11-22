@@ -24,11 +24,11 @@ Requested by Damian on 2026-11-22. Feature freeze 08:00, so if time runs short, 
 
 - [x] 4.1 `analytics/eval/gate_check.jsonl` (labelled, no seed repeated) and `analytics/eval/gate_calibrate.py`; run against real `bge-m3`; set the default `GATE_EMBED_MIN_MARGIN`; precision and recall into `design.md` §4 (0.03: P 1.0, R 1.0 on 30 no-hit lines); `tests/test_gate_calibrate.py` pins the set and the sweep: `mutations: 4 tried, 3 caught`, the survivor (`>=` to `>` in the sweep) got a boundary row, then `mutations: 4 tried, 4 caught`
 - [x] 4.2 `eval/run.py` recall unchanged (it calls `analyze` without a gate); `test_eval_thresholds` green (18 passed); full suite 2122 passed, 125 skipped
-- [ ] 4.3 Manual run with `bge-m3`: latency (cold, warm, centroid build), decisions on the mock documents and the demo sources (xtb, comparic, icobench, moneteo, tradingview, ey, KNF warnings page); results in the PR body
+- [x] 4.3 Manual run with `bge-m3` (CLI against a standalone Ollama `bge-m3`, then the real `--profile llm` stack once Docker networks were freed; see follow-ups.md). The run found the rounding mismatch F7, fixed in b47e9102 with a test: `mutations: 1 tried, 1 caught`: latency (cold, warm, centroid build), decisions on the mock documents and the demo sources (xtb, comparic, icobench, moneteo, tradingview, ey, KNF warnings page); results in the PR body
 
 ## 5. Closing
 
-- [ ] 5.1 iw-docs-update: ADR 0314 amendment, `analytics/README.md`, `.docs/analytics-plan.md` §2, `.docs/status/platform.md`, `.env.example` comment if any; `docs-check` clean
-- [ ] 5.2 iw-ai-log entry
-- [ ] 5.3 iw-pr-review; follow-ups.md
-- [ ] 5.4 Archive (last commit)
+- [x] 5.1 iw-docs-update: ADR 0314 amendment, `analytics/README.md`, `.docs/analytics-plan.md` §2, `.docs/status/platform.md`, `.env.example` comment if any; `docs-check` clean
+- [x] 5.2 iw-ai-log entry
+- [x] 5.3 iw-pr-review; follow-ups.md
+- [x] 5.4 Archive (last commit)
