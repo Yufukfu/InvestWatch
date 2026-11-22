@@ -5,6 +5,7 @@ import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import { SummaryPage } from './features/summary/SummaryPage';
 import { ToastSlotProvider } from './ToastSlotProvider';
+import { FINDINGS_SECTION, hasFindingsParams } from './url/section';
 
 // Recharts is the largest dependency; the chart sections load as their own chunks and share it.
 const TrendPage = lazy(() => import('./features/trend/TrendPage').then((m) => ({ default: m.TrendPage })));
@@ -19,11 +20,19 @@ const SECTION_LINKS = [
   { id: 'kalibracja', label: 'Kalibracja' },
 ];
 
-// The overview is current until a link changes the hash; an unknown hash shows it too.
+// The page the hash names. With no valid hash, a link that addresses findings (`?finding=`, a filter) opens the
+// findings page and the hash is written in place (no history entry); anything else shows the overview.
+function currentHash(): string {
+  const hash = window.location.hash.slice(1);
+  if (SECTION_LINKS.some((l) => l.id === hash) || !hasFindingsParams(window.location.search)) return hash;
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${FINDINGS_SECTION}`);
+  return FINDINGS_SECTION;
+}
+
 function useActiveSection(): string {
-  const [hash, setHash] = useState(() => window.location.hash.slice(1));
+  const [hash, setHash] = useState(currentHash);
   useEffect(() => {
-    const onChange = () => setHash(window.location.hash.slice(1));
+    const onChange = () => setHash(currentHash());
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);

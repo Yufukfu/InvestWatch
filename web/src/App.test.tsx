@@ -77,6 +77,39 @@ describe('App (against contract mocks)', () => {
   });
 
   describe('sub-pages', () => {
+    it('opens the detail for a finding link that has no hash, and writes the hash without a history entry', async () => {
+      window.history.replaceState(null, '', `/?finding=${findings.items[0].id}`);
+      const length = window.history.length;
+      renderApp();
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(window.location.hash).toBe('#zgloszenia');
+      expect(window.history.length).toBe(length);
+      const nav = screen.getByRole('navigation', { name: 'Sekcje' });
+      expect(within(nav).getByRole('link', { name: 'Zgłoszenia' })).toHaveAttribute('aria-current', 'location');
+    });
+
+    it('shows the findings table for a filter-only link that has no hash', async () => {
+      window.history.replaceState(null, '', '/?module=M1&sort=-score');
+      renderApp();
+      await screen.findByText(findings.items[0].title);
+      expect(document.querySelector('table.findings')).not.toBeNull();
+      expect(screen.queryByRole('region', { name: 'Podsumowanie' })).toBeNull();
+    });
+
+    it('keeps the page a hash names, even when the query string addresses findings', async () => {
+      window.history.replaceState(null, '', `/?finding=${findings.items[0].id}#kalibracja`);
+      renderApp();
+      expect(await screen.findByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' })).toBeInTheDocument();
+      expect(window.location.hash).toBe('#kalibracja');
+    });
+
+    it('stays on the overview for a query string with no findings parameter', async () => {
+      window.history.replaceState(null, '', '/?utm=x');
+      renderApp();
+      expect(await screen.findByRole('region', { name: 'Podsumowanie' })).toBeInTheDocument();
+      expect(window.location.hash).toBe('');
+    });
+
     it('shows the summary and the trend, and nothing else, on the overview', async () => {
       renderApp();
       expect(await screen.findByRole('region', { name: 'Podsumowanie' })).toBeInTheDocument();
@@ -146,7 +179,8 @@ describe('App (against contract mocks)', () => {
     it('clears the other filters, asks for new high-risk findings and opens the first one', async () => {
       window.history.replaceState(null, '', '/?page=3&module=M2&q=zysk&date_from=2026-11-01&date_to=2026-11-20');
       const seen = recordFindings();
-      renderApp();
+      // The overview is named, otherwise the filters in the URL would open the findings page.
+      renderApp('przeglad');
       fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
       expect(await screen.findByRole('dialog')).toBeInTheDocument();
       expect(window.location.hash).toBe('#zgloszenia');

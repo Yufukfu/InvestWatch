@@ -7,6 +7,8 @@ export type ShortcutTarget = {
   status: FindingStatus;
   url: string | undefined;
   isSaving: boolean;
+  // The editor has unsaved changes: a shortcut would save the status alone and discard the draft.
+  isDirty: boolean;
   setStatus: (status: FindingStatus) => void;
 };
 
@@ -58,7 +60,7 @@ export function useFindingShortcuts({ rows, selectedId, select, targetRef, focus
         return;
       }
       const next = /^[1-5]$/.test(key) ? STATUSES[Number(key) - 1] : undefined;
-      if (next && next !== open.status && !open.isSaving) open.setStatus(next);
+      if (next && next !== open.status && !open.isSaving && !open.isDirty) open.setStatus(next);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

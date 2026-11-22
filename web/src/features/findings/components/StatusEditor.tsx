@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { STATUSES, type FindingStatus } from '../model';
 import { STATUS_LABEL } from './labels';
 
@@ -9,10 +9,12 @@ type Props = {
   isSaving: boolean;
   saved: boolean;
   error: { message: string; detail: string | undefined } | undefined;
+  // True while the form differs from the saved values, so a shortcut does not overwrite the draft.
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 // Any of the five statuses may be chosen; the contract defines no transition graph, the API decides.
-export function StatusEditor({ status, note, onSave, isSaving, saved, error }: Props) {
+export function StatusEditor({ status, note, onSave, isSaving, saved, error, onDirtyChange }: Props) {
   const id = useId();
   const [nextStatus, setNextStatus] = useState<FindingStatus>(status);
   const [text, setText] = useState(note ?? '');
@@ -27,6 +29,11 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
   const nextNote = text.trim() === '' ? null : text.trim();
   const statusChanged = nextStatus !== status;
   const noteChanged = nextNote !== (note ?? null);
+  const dirty = statusChanged || noteChanged;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   return (
     <form

@@ -2,12 +2,12 @@
 
 ## 1. Review fixes
 
-- [ ] 1.1 Write the failing tests first: `?finding=<id>` and a filter-only link with no hash open the findings page (hash rewritten without a history entry), an explicit hash wins; the `3` shortcut with an unsaved note sends no PATCH and keeps the note
-- [ ] 1.2 Implement `hasFindingsParams` and the fallback in `App`, `onDirtyChange` in `StatusEditor` and the guard in the shortcuts
-- [ ] 1.3 Run typecheck, lint, the suite and the build
-- [ ] 1.4 mutations: N tried, N caught
+- [x] 1.1 Write the failing tests first: `?finding=<id>` and a filter-only link with no hash open the findings page (hash rewritten without a history entry), an explicit hash wins; the `3` shortcut with an unsaved note sends no PATCH and keeps the note
+- [x] 1.2 Implement `hasFindingsParams` and the fallback in `App`, `onDirtyChange` in `StatusEditor` and the guard in the shortcuts
+- [x] 1.3 Run typecheck, lint, the suite and the build
+- [x] 1.4 mutations: 8 tried, 8 caught
 
 ## 2. Closing
 
-- [ ] 2.1 Apply `iw-docs-update` and add the AI-log entry
+- [x] 2.1 Apply `iw-docs-update` and add the AI-log entry
 - [ ] 2.2 Run the `iw-pr-review` skill and fix real findings

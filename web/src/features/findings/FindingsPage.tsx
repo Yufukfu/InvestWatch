@@ -26,17 +26,18 @@ function DetailContainer({ id, onClose, onSwitch, focusSwitcher, targetRef }: De
   const d = useFindingDetail(id);
   const change = useStatusChange(id);
   const siblings = useDocumentFindings(d.detail?.documentId);
+  const [isDirty, setDirty] = useState(false);
   const switcher = <ModuleSwitcher options={siblings} currentId={id} onSelect={onSwitch} autoFocus={focusSwitcher} />;
   // The shortcuts act through this detail's own mutation, so an error shows here like a mouse change would.
   const { save, isSaving } = change;
   const status = d.detail?.status;
   const url = safeHttpUrl(d.detail?.url);
   useEffect(() => {
-    targetRef.current = status ? { status, url, isSaving, setStatus: (next) => save({ status: next }) } : null;
+    targetRef.current = status ? { status, url, isSaving, isDirty, setStatus: (next) => save({ status: next }) } : null;
     return () => {
       targetRef.current = null;
     };
-  }, [targetRef, status, url, isSaving, save]);
+  }, [targetRef, status, url, isSaving, isDirty, save]);
   const editor = d.detail && (
     <StatusEditor
       status={d.detail.status}
@@ -45,6 +46,7 @@ function DetailContainer({ id, onClose, onSwitch, focusSwitcher, targetRef }: De
       isSaving={change.isSaving}
       saved={change.saved}
       error={change.error}
+      onDirtyChange={setDirty}
     />
   );
   return <FindingDetailPanel {...d} onClose={onClose} statusEditor={editor} moduleSwitcher={switcher} />;

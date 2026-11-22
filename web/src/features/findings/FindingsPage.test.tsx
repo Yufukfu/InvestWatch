@@ -389,6 +389,25 @@ describe('FindingsPage keyboard shortcuts', () => {
     expect(seen).toHaveLength(requests);
   });
 
+  it('3 with an unsaved note sends nothing and keeps the note', async () => {
+    const { patches, dialog } = await openDetail();
+    const note = within(dialog).getByLabelText('Notatka');
+    fireEvent.change(note, { target: { value: 'do sprawdzenia w poniedziałek' } });
+    within(dialog).getByRole('button', { name: 'Zapisz decyzję' }).focus();
+    press('3');
+    await settle();
+    expect(patches).toEqual([]);
+    expect(note).toHaveValue('do sprawdzenia w poniedziałek');
+  });
+
+  it('3 with an unsaved status choice sends nothing', async () => {
+    const { patches, dialog } = await openDetail();
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Zamknięte' }));
+    press('3');
+    await settle();
+    expect(patches).toEqual([]);
+  });
+
   it('3 sets the open finding to confirmed, and it stays selected', async () => {
     const { patches } = await openDetail();
     press('3');
