@@ -119,4 +119,4 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
   - your own domain file in `.docs/status/` only if the coordinator has not taken it;
   - add the iw-ai-log row;
   - `docs-check` clean.
-- [ ] 9.2 Run the iw-pr-review skill, including iw-reviewer with a regex-safety focus over the new patterns, and fix real findings.
+- [x] 9.2 Run the iw-pr-review skill, including iw-reviewer with a regex-safety focus over the new patterns, and fix real findings. The whole-branch review found one cross-group defect: a forecast dated in the fetch year (`W 2026 roku fundusz wypracuje 8%`) fell through R14's year fallback, so one sentence failed R12a, R12b, R14 and R15 (against ADR 0315). R15's strong markers and future-tense verbs now live in `shared:` (`&forecast_markers`, `&forecast_verbs`, plus `zarobi`, `zyska`) and are future markers of the shared detector too: `mutations: 3 tried, 3 caught`. The three gold-found fixes (year tables, R16 tax inclusion, the comparison-method source) each have an independent test with wording the gold set does not use: `mutations: 5 tried, 5 caught`. Non-blocking items went to `follow-ups.md` (F8-F10).

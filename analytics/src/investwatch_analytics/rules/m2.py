@@ -203,6 +203,8 @@ class _PastPerformance(Rule):
             "amount_return": _one_of(p.get("amount_return_patterns", [])),
             "past": _one_of(p.get("past_patterns", [])),
             "future": _one_of(p.get("future_patterns", [])),
+            # R15's forecast markers: a forecast dated in the fetch year is R15's, never past performance (ADR 0315).
+            "forecast": _one_of(p.get("forecast_patterns", []) + p.get("forecast_verb_patterns", [])),
         }
 
     def is_past_performance(self, sentence: str, fetch_year: int) -> bool:
@@ -211,7 +213,7 @@ class _PastPerformance(Rule):
         p = self._pp
         if any(m.search(sentence) for m in p["past"]):
             past = True
-        elif any(f.search(sentence) for f in p["future"]):
+        elif any(f.search(sentence) for f in p["future"] + p["forecast"]):
             return False
         else:
             past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence)) or any(

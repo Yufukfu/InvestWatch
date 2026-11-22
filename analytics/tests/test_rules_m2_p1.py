@@ -780,3 +780,43 @@ def test_r11_publisher_line_is_not_a_source(registry, catalogue):
 def test_r11_boilerplate_is_not_a_superlative(text, registry, catalogue):
     # Group 6 review: standard broker boilerplate is not an implicit market comparison.
     assert run(text, registry, catalogue)["R11"].result == "not_applicable"
+
+
+# Independent of the gold set: each gold-found fix pinned with wording the gold documents do not use.
+
+
+def test_year_table_independent_wording(registry, catalogue):
+    text = "Wyniki subfunduszu: 2020: 3%, 2021: 5%, 2022: -1%, 2023: 6%, 2024: 4% (źródło: KIID)."
+    results = run(text, registry, catalogue, **FETCHED_2026)
+    assert results["R14"].result == "fail" and results["R14"].evidence == text
+    assert results["R12a"].result == "pass"
+    # Four table years are not five.
+    short = "Wyniki subfunduszu: 2021: 5%, 2022: -1%, 2023: 6%, 2024: 4% (źródło: KIID)."
+    assert run(short, registry, catalogue, **FETCHED_2026)["R12a"].result == "fail"
+
+
+def test_r16_tax_inclusion_independent_wording(registry, catalogue):
+    assert run("Podane stopy zwrotu nie uwzględniają podatków.", registry, catalogue)["R16"].result == "not_applicable"
+    # A real tax claim next to it still triggers R16.
+    text = "Podane stopy zwrotu nie uwzględniają podatków. Na IKZE odliczysz wpłaty od podatku."
+    assert run(text, registry, catalogue)["R16"].result == "fail"
+
+
+def test_r11_comparison_method_independent_wording(registry, catalogue):
+    text = "Opłaty niższe niż w trzech największych bankach (porównanie cenników z 15.09.2026, wpłata 5 000 zł)."
+    assert run(text, registry, catalogue)["R11"].result == "pass"
+    # The method without the date and the amount is a source without assumptions.
+    assert run("Opłaty niższe niż w innych bankach (porównanie cenników).", registry, catalogue)["R11"].result == "uncertain"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["W 2026 roku fundusz wypracuje 8%.", "W 2026 zarobisz 12%.", "W 2026 roku oczekujemy 10% zysku.",
+     "Fundusz zarobi w 2026 r. 7%."],
+    ids=["verb-wypracuje", "verb-zarobisz", "strong-oczekujemy", "verb-zarobi"],
+)
+def test_fetch_year_forecast_is_counted_once(text, registry, catalogue):
+    # Whole-branch review: a forecast dated in the fetch year is R15's alone, never past performance (ADR 0315).
+    results = run(text, registry, catalogue, **FETCHED_2026)
+    assert results["R15"].result == "fail"
+    assert {results[r].result for r in ("R12a", "R12b", "R14")} == {"not_applicable"}

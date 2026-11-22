@@ -195,6 +195,7 @@ The spec requirements stay under the OpenSpec 2.1.1 limit of 500 characters, so 
 - **R11 boilerplate:** the excludes also apply to superlatives, and strip document numbers (`Załącznik nr 1`) and best execution (`polityka najlepszej realizacji zleceń`).
 - **Shared detector, year tables:** `2021: 2,1%` dates its figure like `w 2021 r.` (`_YEAR_TABLE`, years up to the fetch year only); R12a counts those years and treats them as a reference period (gold `m2-r12-past-performance-compliant`).
 - **R16, tax inclusion:** `nie uwzględniają podatku`, `przed opodatkowaniem` describe the results, not tax treatment, and are excluded.
+- **Shared detector, forecasts:** R15's strong markers and future-tense verbs (`&forecast_markers`, `&forecast_verbs` in `shared:`) are future markers of the past-performance detector too, so `W 2026 roku fundusz wypracuje 8%` (fetched in 2026) is R15's alone and never also R12a, R12b and R14 (whole-branch review, ADR 0315).
 - **R12a sub-12-month periods (`short_period_patterns`):** `w ostatnim miesiącu`, `N miesięcy` with N not a multiple of 12 (checked in code), `od początku roku`, `YTD`, `w I…IV kwartale`, a month name, `tygodni…`, `dzienn…`.
 - **R12a 5-year coverage (`five_year_patterns`):** `ostatnich/minionych N lat` with N ≥ 5, `5-letn…`, `pięcioletn…`, `5-year`. In code: a year range of 5 or more calendar years, or 5 or more distinct past years.
 - **R12a since inception (`inception_patterns`):** `od początku działalności`, `od uruchomienia`, `od powstania`, `since inception`.

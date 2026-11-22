@@ -76,6 +76,22 @@ shared:
     - '\bdan\w*\s+(?:\w+\s+)?opublikowan\w*\s+przez\b'
     - '\bporównani\w*\s+(?:\w+\s+){0,2}(?:tabel|cennik|taryf|ofert)\w*'
 
+  # R15's forecast markers (strong ones, and future-tense return verbs): also future markers of the shared
+  # past-performance detector, so a forecast dated in the fetch year is never past performance (ADR 0315).
+  forecast_markers: &forecast_markers
+    - '\bprognoz\w*'
+    - '\bspodziewa\w*'
+    - '\boczekuj(?:emy|e\s+się)\b'
+    - '\boczekiwan\w*'
+    - '\bprzewidu\w*'
+    - '\bszacuj\w*'
+    - '\bw\s+(?:przyszłym|kolejnym|następnym|nadchodzącym)\s+roku\b'
+    - '\bcel\w*\s+(?:\w+\s+)?zwrotu\b'
+    - '\b(?:expect\w*|forecast\w*|projected)\b'
+    - '\btarget\s+returns?\b'
+  forecast_verbs: &forecast_verbs
+    - '\b(?:zarobisz|zarobicie|zarobimy|zyskasz|zyskacie|zyskamy|przyniesie|przyniosą|wypracuje|wypracują|osiągnie|osiągną|wyniesie|wyniosą|zarobi|zyska)\b'
+
 rules:
   - id: R1
     name: Identyfikacja firmy
@@ -297,6 +313,8 @@ rules:
       figure_extra_exclude_patterns: *pp_figure_exclude
       past_patterns: *pp_past
       future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
       # A period shorter than 12 months (N months with N not a multiple of 12 is checked in code).
       short_period_patterns:
         - '\bod\s+początku\s+(?:roku|miesiąca|kwartału|półrocza)\b'
@@ -340,6 +358,8 @@ rules:
       figure_extra_exclude_patterns: *pp_figure_exclude
       past_patterns: *pp_past
       future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
       # A statement of the impact of fees, anywhere in the material.
       fee_patterns:
         - '\bpo\s+(?:potrąceniu|odliczeniu|uwzględnieniu|pomniejszeniu\s+o)\s+(?:\w+\s+){0,2}(?:opłat|prowizj|koszt|obciąż)\w*'
@@ -380,6 +400,8 @@ rules:
       figure_extra_exclude_patterns: *pp_figure_exclude
       past_patterns: *pp_past
       future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
   # ZASÓB R15 (art. 44 ust. 6): "Flaguje w raporcie wykrycie prognozy przyszłych wyników" – every detected
@@ -403,20 +425,9 @@ rules:
         - '\bwzro(?:st|sn|śn)\w*'
         - '\bzar(?:ob|ab)\w*'
         - '\b(?:returns?|performance|growth)\b'
-      forecast_patterns:
-        - '\bprognoz\w*'
-        - '\bspodziewa\w*'
-        - '\boczekuj(?:emy|e\s+się)\b'
-        - '\boczekiwan\w*'
-        - '\bprzewidu\w*'
-        - '\bszacuj\w*'
-        - '\bw\s+(?:przyszłym|kolejnym|następnym|nadchodzącym)\s+roku\b'
-        - '\bcel\w*\s+(?:\w+\s+)?zwrotu\b'
-        - '\b(?:expect\w*|forecast\w*|projected)\b'
-        - '\btarget\s+returns?\b'
+      forecast_patterns: *forecast_markers
       # Strong only together with a figure ("W 2026 zarobisz 12%").
-      forecast_verb_patterns:
-        - '\b(?:zarobisz|zarobicie|zarobimy|zyskasz|zyskacie|zyskamy|przyniesie|przyniosą|wypracuje|wypracują|osiągnie|osiągną|wyniesie|wyniosą)\b'
+      forecast_verb_patterns: *forecast_verbs
       forecast_weak_patterns:
         - '\bbęd(?:zie\w*|ą)\b'
         - '\bmoże\s+(?:przynieść|osiągnąć|wynieść)\b'
