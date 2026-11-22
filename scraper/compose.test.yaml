@@ -40,6 +40,19 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+  # Only for tests/test_e2e_render.py: the real renderer plus the demo pages, address check off (tests_renderer/e2e_server.py).
+  #   docker compose -f scraper/compose.test.yaml --profile e2e up -d --build renderer-e2e
+  renderer-e2e:
+    profiles: [e2e]
+    build:
+      context: ..
+      dockerfile: scraper/Dockerfile
+      target: renderer-test
+    command: ["python", "tests_renderer/e2e_server.py"]
+    shm_size: 256m
+    extra_hosts: ["xtb.demo.test:127.0.0.1", "mbank.demo.test:127.0.0.1"]
+    volumes:
+      - ./tests/fixtures/demo:/app/scraper/tests/fixtures/demo:ro
   test:
     build:
       context: ..

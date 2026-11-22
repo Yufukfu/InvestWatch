@@ -97,6 +97,8 @@ Rule engine: each rule is a class with `applies(doc) → bool` and `evaluate(doc
 | R17 Implying supervisory approval | text + LLM | mention of KNF/ESMA/"supervised" → LLM: does it suggest product approval | **P0** |
 | R18 Supervision as a safety argument | text + LLM | as above + safety words ("bezpieczna", "gwarantowana", "pewna") in the same sentence | **P0** |
 
+Where `blocks` come from (scraper, ADR 0107): a `firm_own` source with `M2` in `target_modules` is rendered at desktop 1440, mobile 390 and tablet 820 px when `SCRAPER_RENDER_ENABLED` is on; `blocks` holds one entry per text block per viewport (`region` is always set, `legal` by placement words such as `footer .legal`, `nota-prawna`, never by content words like `risk`), and `scrape_meta.render` carries `browser_version`, `truncated` or `skipped` (`budget`, `paused`). A document without `blocks` (render off, skipped or failed) means the visual rules return `not_applicable`, never a fabricated block.
+
 For social media content (no `blocks`) the visual rules return `not_applicable`; for images in a post – OCR (`tesseract` / `easyocr`) as P2.
 
 `score_M2 = Σ(weight_r · fail_r) / Σ(weight_r · applicable_r)`, weights: high = 3 (R3, R6, R14, R17, R18), medium = 2, low = 1.
