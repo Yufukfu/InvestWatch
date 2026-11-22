@@ -26,7 +26,7 @@ function firmKey(firm: AdvertiserFinding['firm']): { key: string; name?: string 
   return { key: registryId ?? `name:${name.toLowerCase()}`, name };
 }
 
-const label = (r: AdvertiserRow) => r.name ?? r.handle ?? r.key;
+const label = (r: AdvertiserRow) => r.name ?? r.handle ?? r.contact ?? r.key;
 
 // Groups M1 findings by advertiser and, inside each advertiser, by matched firm. Presentation only:
 // it counts the findings the API returned and derives no score or risk level.
@@ -47,6 +47,7 @@ export function aggregateAdvertisers(findings: readonly AdvertiserFinding[]): Ad
     row.count += 1;
     row.name ??= clean(f.advertiser.name);
     row.handle ??= clean(f.advertiser.handle);
+    row.contact ??= clean(f.advertiser.profileUrl) ?? clean(f.advertiser.website);
     const fk = firmKey(f.firm);
     const firm = row.firmMap.get(fk.key);
     if (firm) firm.count += 1;

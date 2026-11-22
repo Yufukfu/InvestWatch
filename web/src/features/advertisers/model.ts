@@ -21,6 +21,8 @@ export type AdvertiserRow = {
   key: string;
   name?: string;
   handle?: string;
+  // Profile URL, else website: shown as plain text when there is no name and no handle.
+  contact?: string;
   count: number;
   repeat: boolean;
   firms: PromotedFirm[];

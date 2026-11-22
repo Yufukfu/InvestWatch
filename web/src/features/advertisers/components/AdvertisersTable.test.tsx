@@ -70,6 +70,14 @@ describe('AdvertisersTable', () => {
     expect(screen.getAllByText('@b')).toHaveLength(1);
   });
 
+  it('shows the contact as plain text when the advertiser has neither name nor handle', () => {
+    const { container } = render(
+      <AdvertisersTable {...view({ rows: [{ ...single, name: undefined, handle: undefined, contact: 'https://p.example/x' }] })} />,
+    );
+    expect(screen.getByText('https://p.example/x')).toHaveAttribute('dir', 'auto');
+    expect(container.querySelector('a')).toBeNull();
+  });
+
   it('shows the loading, error and empty states', () => {
     const { rerender } = render(<AdvertisersTable {...view({ rows: undefined, isLoading: true })} />);
     expect(screen.getByRole('status')).toHaveTextContent('Ładowanie');

@@ -49,6 +49,11 @@ describe('aggregateAdvertisers', () => {
     expect(rows.map((r) => r.count)).toEqual([2, 2, 2]);
   });
 
+  it('keeps the profile url, else the website, as contact for an advertiser without name or handle', () => {
+    const rows = aggregateAdvertisers([f({ profileUrl: 'https://p/9', website: 'https://w/9' }, X), f({ website: 'https://w/8' }, X), f({ handle: '@h' }, X)]);
+    expect(rows.map((r) => r.contact)).toEqual([undefined, 'https://p/9', 'https://w/8']);
+  });
+
   it('keys a firm by name when it has no registry id', () => {
     const rows = aggregateAdvertisers([f({ handle: '@a' }, { name: 'Firma Z' }), f({ handle: '@a' }, { name: 'firma z', registryId: null })]);
     expect(rows[0].firms).toEqual([{ key: 'name:firma z', name: 'Firma Z', count: 2 }]);

@@ -32,7 +32,7 @@ export function AdvertisersTable({ rows, loaded, total, isLoading, isError }: Ad
                 <tr key={r.key} className={r.repeat ? 'repeat' : undefined}>
                   <td>
                     <div className="advertiser-name" dir="auto">
-                      {r.name ?? r.handle}
+                      {r.name ?? r.handle ?? r.contact}
                     </div>
                     {r.name && r.handle && (
                       <div className="muted" dir="auto">
