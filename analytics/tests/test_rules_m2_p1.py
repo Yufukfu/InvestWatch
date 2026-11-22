@@ -689,7 +689,7 @@ def judged(text: str, registry: Registry, catalogue: Catalogue, judge: FakeJudge
 
 
 def test_llm_blocks_only_on_the_refined_rules(catalogue):
-    assert {s.id for s in catalogue.specs if s.llm is not None} == {"R3", "R11", "R12a", "R15", "R17", "R18"}
+    assert {s.id for s in catalogue.specs if s.llm is not None} == {"R3", "R9", "R11", "R12a", "R15", "R17", "R18"}
     for rule_id in ("R11", "R12a", "R15"):
         assert catalogue.get(rule_id).llm["when"] == "uncertain"
 
