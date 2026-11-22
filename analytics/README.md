@@ -114,7 +114,7 @@ Latest rules-only numbers (M1 and M3: build `main` bb770a0; M2: re-run on `analy
 | Module (gold cases) | Recommended (plateau) | At it | At the old ADR 0305 default | Rules |
 |---|---|---|---|---|
 | M1 (18: 10 / 8) | 0.65 (0.40-0.65) | precision 1.0, recall 0.8, F1 0.889 | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
-| M2 (35: 23 / 12) | 0.1 (0.05-0.1) | precision 0.944, recall 0.739, F1 0.829 | 0.5: F1 0.516 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R11 1.0 / 1.0, R12a 1.0 / 1.0, R12b 1.0 / 1.0, R14 1.0 / 1.0, R15 1.0 / 1.0, R16 1.0 / 1.0, R17 1.0 / 0.33, R18 1.0 / 1.0 (R5, R7-R10, R13 not built) |
+| M2 (35: 23 / 12) | 0.1 (0.05-0.1) | precision 0.947, recall 0.783, F1 0.857 | 0.5: F1 0.357 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R9 1.0 / 0.0 (LLM-first: rules-only never fails; with DeepSeek Flash 1.0 / 1.0), R10 1.0 / 1.0, R11 1.0 / 1.0, R12a 1.0 / 1.0, R12b 1.0 / 1.0, R14 1.0 / 1.0, R15 1.0 / 1.0, R16 1.0 / 1.0, R17 1.0 / 0.33, R18 1.0 / 1.0 (R5, R7, R8, R13 not built) |
 | M3 (18: 10 / 8) | 0.25 (0.25 only); **default 0.4** (gate cap) | at 0.25: precision 0.875, recall 0.7, F1 0.778; at 0.4: precision 1.0, recall 0.4, F1 0.571 | 0.7: F1 0 | S3.1 1.0 / 0.67, S3.2 1.0 / 0.71, S3.8 1.0 / 1.0 |
 
 M3's default is raised to the S3.4 gate cap (0.4, ADR 0308) so capped findings never alert by default; it is re-evaluated once the LLM scores S3.4 (ADR 0316). S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
