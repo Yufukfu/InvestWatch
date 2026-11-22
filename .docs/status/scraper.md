@@ -1,6 +1,6 @@
-# Status: scraper (Adam)
+# Status: scraper
 
-Edit only this file for `scraper/` state. Last updated: 2026-11-22 (Sun).
+Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -52,7 +52,6 @@ Gaps that matter for the demo:
 
 ## Blockers and open decisions
 
-- Kacper must OK the one-line `scraper/compose.yaml` entry in the root `compose.yaml` `include:`.
 - `scraper-v3-render` adds to `scraper/compose.yaml` only the `include` of `compose.renderer.yaml`, the `render` network and the worker's renderer settings, keeping `stop_grace_period` 60 s (ADR 0106); the root `compose.yaml` needs no new line.
 - Wiring (`Ingestor`, `sweep`, `Storage.check_bucket`, the job-error sink) is done in `scraper-orchestration` (`app.py`).
 - Two redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`) and `ingest.errors.redact` (full). Keep the full one and drop the other when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).

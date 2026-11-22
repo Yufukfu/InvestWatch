@@ -1,6 +1,6 @@
-# Status: dashboard (Kacper)
+# Status: dashboard
 
-Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-22 (Sun).
+Covers `web/` and `infra/`; whoever changes them updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -14,6 +14,7 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-22 (Sun
 - Untrusted finding text (change `untrusted-text-plain`, issue #54): model explanations, evidence, summary, title, advertiser name/handle, excerpt and full text are plain React text, each alone in a `dir="auto"` element (a bidi isolate), in the table, the detail and the high-risk toast; tests pin `<img onerror>`, Markdown `javascript:` links, bare URLs and U+202E.
 - Test timing (issue #60): the `web` image build runs lint and `vite build` only; the Vitest suite runs in CI and locally (opt in to the image with `--build-arg WEB_RUN_TESTS=1`). Vitest `testTimeout` is 20 s and Testing Library's `findBy`/`waitFor` default is 5 s (`web/src/test/setup.ts`), so a loaded machine does not turn slow renders into failures.
 - Web rules in `.claude/rules/web-dashboard.md`.
+- `iw-watch --mine` also sends an `approved` notice once per head sha when GitHub's review decision is APPROVED, no check failed and there is no conflict; the Discord notifier pings `IWATCH_DISCORD_USER_ID` with "your PR is approved! You can merge it now". No agent session, no merge.
 - Supply chain ([ADR 0209](../decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): `.github/workflows/security.yml` (change `security-ci`) runs Gitleaks over the full history, OSV-Scanner (online on every PR; offline database by hand and on PRs that change `security.yml`), `pip-audit` and `npm audit` on every PR to `main`, not as a required check. Actions are pinned by SHA and images by digest, enforced by `.github/tests/workflow-pins.test.mjs`. `.gitleaks.toml` allowlists the two mock ids. Still open: SHA pins in `ci.yml` and digests for Postgres, Caddy and the Dockerfile bases.
 - Frontend layering ([ADR 0204](../decisions/0204-frontend-architecture.md)) applied to health, summary, findings and trend, with a lint check on components.
 - `infra/per-project-image-tags` (fix for issue #63, no OpenSpec change): the five built images are tagged `investwatch/<service>:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}` instead of a shared `:dev`, and the building services (`web`, `api-migrate`, `analytics`, `worker`, `renderer`) set `pull_policy: build`, so a plain `up` rebuilds and a failed build stops it instead of starting another checkout's or an older image. `IW_VERSION` still names a release tag. Touches `api/`, `analytics/` and `scraper/` compose files (one line each, owners asked to review). Details: `infra/README.md`, "Image tags".
@@ -21,10 +22,11 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-22 (Sun
 ## Active OpenSpec changes
 
 - web features: `untrusted-text-plain` (issue #54), in review; archived in the same PR. Otherwise none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
-- `agent-watch` (branch `chore/agent-watch`, archived in its PR): the `iw-watch` skill and runner for agent-to-agent hand-offs through GitHub, plus `.github/CODEOWNERS` (owners need the team's OK in review).
+- `agent-watch` merged (PR #48): the `iw-watch` skill and runner, plus `.github/CODEOWNERS`.
+- `codeowners-single-source` (branch `chore/codeowners-single-source`, archived in its PR): `.github/CODEOWNERS` is the only place that names owners ([ADR 0211](../decisions/0211-codeowners-single-source.md)). Docs link to it, and `docs-check` fails on a module without a line there or on a per-person ownership statement in a live doc.
 - `security-ci` (branch `chore/security-ci`, archived in its PR, PR #100): ADR 0209 scans in CI on every PR; current truth in `openspec/specs/supply-chain-scanning/`.
 
 ## Blockers and open decisions
 
-- Compose includes the `api` service (`api/compose.yaml`), and the gateway sends `/api` and `/socket.io` to it (`infra/gateway/Caddyfile`). The `npm run dev` server still proxies to the contract mock server started by hand (see `web/README.md`) until the api has real data; switching the dev server over is Kacper's, before the demo. Team-wide entry in `.docs/STATUS.md`.
+- Compose includes the `api` service (`api/compose.yaml`), and the gateway sends `/api` and `/socket.io` to it (`infra/gateway/Caddyfile`). The `npm run dev` server still proxies to the contract mock server started by hand (see `web/README.md`) until the api has real data; switching the dev server over is Kacper's task, before the demo. Team-wide entry in `.docs/STATUS.md`.
 - Root `README.md` exists; its Quick Start is pending the deployment ADR. Per-service READMEs are stubs.

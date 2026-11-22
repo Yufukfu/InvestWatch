@@ -1,6 +1,6 @@
-# Status: platform (Damian)
+# Status: platform
 
-Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their state. Last updated: 2026-11-22 (Sun).
+Covers `analytics/`, `api/` and `contracts/`; whoever changes them updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -8,6 +8,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - v1 in `contracts/`, required core frozen; ADRs 0301-0305 accepted (PR #3).
 - Mock server for `web/` in `contracts/mock-server/` (REST `http://localhost:8000/api`, Socket.IO `/events`) merged (PR #8, `mock-server` archived).
 - Contract 1.1.0 (`findings-document-filter`, issue #33, team OK): optional `document_id` on `GET /findings` in the contract, `api/` and the mock server, plus a mock post with an M1 and an M3 finding. Kacper re-syncs `web/`'s contract snapshot in his PR.
+- Contract 1.2.0 (`api-finding-export`, issue #70, team OK asked in the PR): read-only `GET /findings/{id}/export`, the evidence pack for UKNF (JSON, or a printable page with `?format=html`, which Kacper's "Eksportuj" button links to). The mock server serves it too (`mock-finding-export`), with `raw` always unavailable.
 
 ### analytics
 - `analytics-post-integration-fixes` (from the 2026-11-21/22 end-to-end runs): pages on `knf.gov.pl`/`gov.pl` route to no module (`official_source`, `OFFICIAL_SOURCE_DOMAINS`); an M3-only document needs an offer signal (S3.3/S3.4/S3.5/S3.8), so service vocabulary alone (EY negative control) is `no_signals`; preprocessing normalizes once. Defaults unchanged; the LLM evaluation numbers went to Damian for a decision.

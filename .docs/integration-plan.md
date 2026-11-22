@@ -4,10 +4,12 @@ Contract version: **v1** (frozen at 14:30 on Saturday; changes only after team a
 
 ## Team and responsibilities
 
-| Person | Module | Owns |
+Who owns which directory: [`.github/CODEOWNERS`](../.github/CODEOWNERS) ([ADR 0211](decisions/0211-codeowners-single-source.md)). The table below is the original work split from the team sync.
+
+| Person | Module | Works on |
 |---|---|---|
 | **Adam** | Scraper | collectors (web + social media), job queue, scheduler, writes to `documents` + objects in MinIO |
-| **Kacper** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel; **repository structure** |
+| **Kacper** | Dashboard | frontend, filters, charts, WebSocket alerts, calibration panel |
 | **Damian** | Analytics + integration | database schema, contracts, REST API + WebSocket gateway, modules M1–M3, firm registry, docker-compose |
 
 Decisions from the team sync:
@@ -15,7 +17,7 @@ Decisions from the team sync:
 - ✅ **Damian builds the REST API** (a thin layer over the same database). Kacper works against mock data matching the contract in section 5 from the start; Adam focuses only on data collection.
 - ✅ **Social media:** we start with **one platform** and add more only if time allows.
 - ✅ **LLM:** accessed through an HTTP API; for the hackathon a hosted OpenAI-compatible model, with local Gemma as the env-only swap target ([ADR 0304](decisions/0304-llm-serving.md), note in section 7).
-- ✅ **Repository structure** is defined by Kacper; the layout below is only the list of services that must exist.
+- ✅ **Repository structure**: a new top-level directory needs the whole team's OK (ADR 0211); the layout below is only the list of services that must exist.
 - ✅ **Spec-driven workflow with OpenSpec** + an AI work log (`.docs/ai-workflow.md`).
 - ⏳ Contracts (sections 3–6) – to be confirmed by Adam and Kacper.
 - ⏳ Rendering metadata from the scraper (`blocks`, screenshots) – to be discussed with Adam later.
@@ -25,21 +27,21 @@ Decisions from the team sync:
 
 ```
                 ┌──────────────┐  XADD iw:documents   ┌──────────────────┐
- scheduler ────▶│  scraper (Adam) │ ───────────────────▶ │  analytics (Damian)   │
+ scheduler ────▶│  scraper     │ ───────────────────▶ │  analytics       │
  (cron/beat)    │ Playwright,  │                      │ preprocessing,   │
                 │ httpx, UA/   │──┐                ┌──│ M1/M2/M3, LLM    │
                 │ proxy rotation  │                │  └────────┬─────────┘
                 └──────────────┘  │ INSERT         │ INSERT    │ PUBLISH iw:events
                                   ▼                ▼           ▼
                       ┌────────────────────┐   ┌──────────┐  ┌────────────────┐
-                      │ PostgreSQL         │   │ MinIO    │  │ api (Damian)        │
+                      │ PostgreSQL         │   │ MinIO    │  │ api            │
                       │ sources, documents,│   │ html,    │  │ FastAPI REST + │
                       │ findings, registry │   │ screens  │  │ Socket.IO      │
                       └─────────▲──────────┘   └──────────┘  └───────┬────────┘
                                 └──────────────── SELECT ────────────┤
                                                                       ▼
                                                             ┌────────────────┐
-                                                            │ dashboard (Kacper)  │
+                                                            │ dashboard      │
                                                             └────────────────┘
                      LLM endpoint (OpenAI-compatible API: hosted, or local Gemma via Ollama) ◀── analytics
 ```
@@ -47,7 +49,7 @@ Decisions from the team sync:
 Services in the root `compose.yaml`, which only `include:`s each module's own `compose.yaml` ([ADR 0202](decisions/0202-deployment-topology.md); single `docker compose up` command):
 `postgres`, `redis`, `minio` (+ one-shot `minio-init`), `gateway` from `infra/`, then the scraper's `worker`, `scheduler` and one-shot `seed` (the `scraper` box in the diagram above), `analytics`, `api`, `web` as each module adds its file (+ `ollama` behind the compose profile `llm`, the local LLM fallback from ADR 0304). Object storage is MinIO built by Chainguard, because upstream no longer publishes images ([ADR 0306](decisions/0306-object-storage-image.md)). How a module joins: [`infra/README.md`](../infra/README.md).
 
-Required service folders (exact layout per Kacper): `scraper` (Adam), `analytics` (Damian), `api` (Damian), `dashboard` (Kacper), `contracts` (Damian – JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
+Required service folders: `scraper`, `analytics`, `api`, `web` (the dashboard), `contracts` (JSON Schema + mock data), `.docs` (plans, ADRs, AI work log), `doc` (UKNF materials in Polish, removed before hand-in), plus `compose.yaml` (include list) and `.env.example` at the root.
 
 ## 2. Integration points
 
@@ -185,6 +187,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 |---|---|---|
 | GET | `/findings` | list; filters: `module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q`. `document_id` (contract 1.1.0) returns every finding of one document, at most one per module, so the detail panel can list M1 and M3 of one post across pages |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
+| GET | `/findings/{id}/export` | evidence pack (case file) for UKNF follow-up, contract 1.2.0, read-only: finding with scores, model and rules, document (URL, `content_hash`, `fetched_at`, text), raw HTML from `iw-raw` with its SHA-256, screenshot URLs, failed rules with legal basis and quotes. JSON by default; `?format=html` is a printable page (the dashboard's "Eksportuj" button links to it) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |

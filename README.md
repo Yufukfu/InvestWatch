@@ -4,15 +4,17 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 
 ## Repository structure
 
-| Folder | Purpose | Owner |
-|---|---|---|
-| [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler | Adam |
-| [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM | Damian |
-| [`web/`](web/) | dashboard | Kacper |
-| [`infra/`](infra/) | shared infrastructure: Postgres, HTTPS gateway | Kacper |
-| [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI), mocks, validator – draft v1 | Damian |
-| [`.docs/`](.docs/) | project documentation (English): plans, decisions, AI work log | all |
-| [`doc/`](doc/) | UKNF challenge materials (Polish), removed before hand-in | – |
+| Folder | Purpose |
+|---|---|
+| [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler |
+| [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM |
+| [`web/`](web/) | dashboard |
+| [`infra/`](infra/) | shared infrastructure: Postgres, Redis, object storage (MinIO), optional Ollama, HTTPS gateway |
+| [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI), mocks, validator – draft v1 |
+| [`.docs/`](.docs/) | project documentation (English): plans, decisions, AI work log |
+| [`doc/`](doc/) | UKNF challenge materials (Polish), removed before hand-in |
+
+Who owns which folder: [`.github/CODEOWNERS`](.github/CODEOWNERS) (GitHub requests their review automatically; shared folders have no owner).
 
 ## Documentation
 

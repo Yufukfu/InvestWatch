@@ -1,4 +1,4 @@
-# api/ deployment unit (owner Damian). Included from the root compose.yaml next to infra/compose.yaml, which owns
+# api/ deployment unit. Included from the root compose.yaml next to infra/compose.yaml, which owns
 # the `postgres`, `redis` and `minio-init` services and the `data` and `edge` networks this file uses (so none of
 # them is declared here).
 # Without the root file, run it together with infra: docker compose -f infra/compose.yaml -f api/compose.yaml up

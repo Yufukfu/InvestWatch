@@ -13,20 +13,21 @@ Docs hold the logic; `CLAUDE.md` files stay short and point at them. Update docs
 |---|---|
 | A contract (`ScrapedDocument`, `Finding`, a REST route, an event) | `contracts/` schema and mocks, `.docs/integration-plan.md` (§3-§6), the OpenSpec change's spec delta, consumers' tests. Needs the whole team and a version bump. |
 | A service's run steps, env vars or definition of done | that service's `README.md` (people and jury: purpose, how to run, config) and `CLAUDE.md` (agents: rules and pointers; no duplication of the README), `.env.example`, and the root README Quick Start once it exists |
-| A new service directory | its own `CLAUDE.md`, a row in the root `CLAUDE.md` services table, a row in `.docs/INDEX.md` |
+| A new service directory | its own `CLAUDE.md`, a line in `.github/CODEOWNERS`, a row in the root `CLAUDE.md` services table, a row in `.docs/INDEX.md` |
 | System behaviour | the OpenSpec change (`/openspec-archive-change` merges it into `openspec/specs/`). Never hand-edit `openspec/specs/`. |
-| Module state, active changes, a module blocker appeared or cleared | your own file in `.docs/status/` (`.docs/status/scraper.md`, `.docs/status/dashboard.md` or `.docs/status/platform.md`): edit only your own, never another owner's (limits merge conflicts) |
+| Module state, active changes, a module blocker appeared or cleared | the file in `.docs/status/` that covers the directories you changed (`.docs/status/scraper.md`, `.docs/status/dashboard.md` or `.docs/status/platform.md`; the map is in `.docs/STATUS.md`), never one for directories you didn't touch (limits merge conflicts) |
+| Who owns which path | `.github/CODEOWNERS` only; other docs link to it and never name an owner (docs-check fails on one) |
 | A milestone moved, or a team-wide decision opened or closed | `.docs/STATUS.md` (the owner of the milestone edits its row) |
 | The process, a skill or a hook | `.claude/SDLC.md` or `.claude/CODE_REVIEW.md`, and `.docs/ai-workflow.md` |
 | A hard-to-reverse choice | an ADR (below) |
-| A change closing, or a milestone | one row in the Log table of `.docs/ai-workflow.md` (`iw-ai-log`) |
+| A change closing, or a milestone | one new entry file in `.docs/ai-log/` (`iw-ai-log`) |
 
 ## Closing a change (the closing tasks in `tasks.md`)
 
 Everything lands in the same PR, before archiving, because nothing goes straight to `main` and there is no "after merge" step:
 
-1. Update docs per the table above, your own `.docs/status/` file (state, active changes, blockers; never another owner's file), and the ADR for any hard-to-reverse choice the change made.
-2. Add the log row with `iw-ai-log`.
+1. Update docs per the table above, the `.docs/status/` file for the directories you changed (state, active changes, blockers), and the ADR for any hard-to-reverse choice the change made.
+2. Add the log entry with `iw-ai-log`.
 3. Run `docs-check` (below) and fix each finding at its source.
 
 Then `iw-pr-review`, then `/openspec-archive-change` as the last commit (see `openspec/config.yaml`).
@@ -52,4 +53,4 @@ node .claude/skills/iw-docs-update/scripts/docs-check.mjs
 node --test ".claude/skills/iw-docs-update/scripts/*.test.mjs"   # only if the script changed
 ```
 
-It fails on a broken relative link or backticked `.md` path, an ADR missing from the index, and a service directory without `CLAUDE.md`. Fix each finding at its source; don't silence it. The service list is `SERVICE_DIRS` in the script; update it if Kacper changes the layout.
+It fails on a broken relative link or backticked `.md` path, an ADR missing from the index, a service directory or `infra/` without `CLAUDE.md` or without an owner in `.github/CODEOWNERS`, and a per-person ownership statement in a live doc (link `CODEOWNERS` instead, [ADR 0211](../../../.docs/decisions/0211-codeowners-single-source.md)). Fix each finding at its source; don't silence it. The service list is `SERVICE_DIRS` in the script; update it when the team adds a directory.
