@@ -8,9 +8,10 @@
 # One image, built once by `worker` only: three services that each build and export the same tag race on Docker's
 # containerd image store ("image ... already exists"). seed and scheduler reuse the image compose builds first.
 # The page renderer (ADR 0107) is its own file, checked by scraper/tests/renderer_stack.sh; the worker joins its
-# internal `render` network below.
+# internal `render` network below. The include path is `../scraper/...`, not bare: with several -f it resolves against
+# the first file's directory (infra/), and `..` is valid from the repo root, infra/, api/ and scraper/ alike (issue #97).
 include:
-  - compose.renderer.yaml
+  - ../scraper/compose.renderer.yaml
 
 x-scraper-image: &scraper-image
   image: investwatch/scraper:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}

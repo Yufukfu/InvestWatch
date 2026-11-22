@@ -1,0 +1,120 @@
+# Investment topic gate vocabulary (analytics-embeddings; ADR 0314; .docs/analytics-plan.md §2 step 2).
+# Data, not code. Matching is case- and diacritic-insensitive (write terms without Polish diacritics) and on
+# word boundaries. A trailing `*` makes a word a stem (`zysk*` matches zysk, zyski, zyskow). A phrase is
+# words separated by one space; each word may be a stem. `prefixes` may precede any stem (zainwestuj).
+# The gate drops a document only when nothing here matches: keep the list broad (recall first).
+version: 1
+prefixes: [za, po, wy]
+terms:
+  # Polish
+  - inwest*
+  - zysk*
+  - zarob*
+  - zarabia*
+  - stop* zwrot*
+  - procent* rocznie
+  - akcj*
+  - akcjonariusz*
+  - obligacj*
+  - gield*
+  - gielda
+  - makler*
+  - broker*
+  - portfel*
+  - fundusz*
+  - lokat*
+  - dywidend*
+  - oszczednos*
+  - pomnoz*
+  - kapital*
+  - krypto*
+  - kryptowalut*
+  - bitcoin*
+  - btc*
+  - eth
+  - ethereum
+  - usdt
+  - altcoin*
+  - stablecoin*
+  - token*
+  - forex*
+  - cfd*
+  - etf*
+  - ike
+  - ikze
+  - dzwigni*
+  - depozyt* zabezpieczaj*
+  - sygnal* tradingow*
+  - trading*
+  - trader*
+  - tradow*
+  - traduj*
+  - pips*
+  - finans*
+  - dochod*
+  - wig
+  - wig20
+  - wig30
+  - mwig40
+  - swig80
+  - gpw
+  - newconnect
+  - notowan*
+  - spolk*
+  - hoss*
+  - bess*
+  - ulokuj*
+  - pomnaz*
+  - transakcj*
+  - walut*
+  - kontrakt* terminow*
+  - opcj* binarn*
+  - doradztw* inwestycyjn*
+  - doradc* finansow*
+  - nadzor* knf
+  - knf
+  - rynek* kapitalow*
+  - instrument* finansow*
+  # Advisory offers (M3, shadow advisory) often carry no market word: keep the gate a superset of M3's cues.
+  - co kupic
+  - co sprzedac
+  - kupuj*
+  - sprzedawaj*
+  - rekomend*
+  - porad*
+  - konsultacj*
+  - subskrypcj*
+  - vip
+  - premium
+  - mentoring*
+  # English
+  - invest*
+  - profit*
+  - stock*
+  - shares
+  - bond*
+  - crypto*
+  - trading
+  - trader*
+  - signal*
+  - dividend*
+  - portfolio*
+  - leverage
+  - "s&p*"
+  - nasdaq*
+  - return*
+  - income
+# Seed phrases per positive class for the (stretch) similarity rescue: centroids = normalized means.
+centroids:
+  investment_offer:
+    - Zainwestuj i zarabiaj co miesiąc bez ryzyka
+    - Gwarantowany zysk z inwestycji, dołącz już dziś
+    - Pomnóż swoje oszczędności dzięki naszej platformie
+  finfluencer:
+    - Moje portfolio i wyniki z tego tygodnia
+    - Darmowe sygnały na dziś, kopiuj moje transakcje
+    - Jak zarobiłem pierwszy milion na giełdzie
+  advisory_service:
+    - Pomogę Ci pomnożyć oszczędności, napisz na priv
+    - Indywidualne doradztwo, które spółki kupić teraz
+    - Zapisz się do grupy VIP z poradami inwestycyjnymi

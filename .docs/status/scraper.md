@@ -50,6 +50,7 @@ Gaps that matter for the demo:
 - `scraper-effectiveness-report` (PR #57)
 - `scraper-sample-import` (PR #56)
 - `scraper-audit-in-pr-body` (issue #66): spec-only delta so `scraper-deployment` says the `pip-audit` result goes in the PR body (ADR 0209); no code or doc edit.
+- `compose-include-chain` (issue #97): `scraper/compose.yaml` includes `../scraper/compose.renderer.yaml`, so the documented `-f infra -f api -f scraper` chain resolves; `stack.sh` root group checks it.
 
 ## Blockers and open decisions
 
