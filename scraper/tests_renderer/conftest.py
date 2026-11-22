@@ -1,7 +1,7 @@
 """A fixture web server and a Chromium that maps the fixture host names to it, so tests need no network.
 
 `source.test`, `third.test` and `other.test` all resolve to the one local server (told apart by the Host header the
-server records). Every other host goes through the real address checker, so private and metadata addresses are
+server records); `internal.test` does too, but the address check refuses it. Every other host goes through the real address checker, so private and metadata addresses are
 refused exactly as in production.
 """
 
@@ -14,9 +14,10 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import async_playwright
 
 from iw_renderer.confine import LAUNCH_ARGS
-from iw_scraper.addresses import AddressChecker
+from iw_scraper.addresses import AddressChecker, AddressRefused
 
 FIXTURE_HOSTS = ("source.test", "third.test", "other.test")
+INTERNAL_HOSTS = ("internal.test",)  # the browser reaches the local server by this name, the address check refuses it
 
 
 class FixtureServer:
@@ -71,6 +72,8 @@ def address_check() -> Callable[[str], Awaitable[str]]:
     real = AddressChecker()
 
     async def check(host: str) -> str:
+        if host in INTERNAL_HOSTS:
+            raise AddressRefused("address not allowed: internal")
         if host in FIXTURE_HOSTS or host == "localhost":
             return "127.0.0.1"
         return await real.check(host)
@@ -80,7 +83,7 @@ def address_check() -> Callable[[str], Awaitable[str]]:
 
 @pytest.fixture
 async def browser():
-    rules = ", ".join(f"MAP {host} 127.0.0.1" for host in FIXTURE_HOSTS)
+    rules = ", ".join(f"MAP {host} 127.0.0.1" for host in (*FIXTURE_HOSTS, *INTERNAL_HOSTS))
     async with async_playwright() as playwright:
         launched = None
         for attempt in range(3):  # Chromium sometimes dies while starting inside a busy container; the service restarts on that

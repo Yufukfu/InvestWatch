@@ -249,3 +249,52 @@ async def test_a_request_for_another_host_than_the_source_is_refused(server, bro
         await render_viewport(browser, elsewhere, address_check)
 
     assert server.hits("other.test") == []
+
+
+def hop(server, host, path, to):
+    server.routes[(host, path)] = (302, {"Location": to}, b"")
+
+
+@pytest.mark.parametrize(
+    "markup",
+    [
+        "<img src='http://third.test:{p}/redir'>",
+        "<link rel=stylesheet href='http://third.test:{p}/redir'>",
+        "<script>fetch('http://third.test:{p}/redir', {{mode: 'no-cors'}})</script>",
+        "<iframe src='http://third.test:{p}/redir'></iframe>",
+    ],
+)
+async def test_a_redirect_of_any_request_to_an_internal_host_fails_the_render(server, browser, address_check, markup):
+    hop(server, "third.test", "/redir", f"http://internal.test:{server.port}/secret")
+    server.serve("internal.test", "/secret", "INTERNAL SECRET CONTENT")
+    server.serve("source.test", "/", markup.format(p=server.port))
+
+    with pytest.raises(RenderRefused, match="address not allowed"):
+        await render_viewport(browser, request_for(server), address_check)
+
+
+async def test_a_redirect_of_a_subresource_to_a_closed_port_fails_the_render(server, browser, address_check):
+    hop(server, "third.test", "/redir", "http://other.test:6379/")
+    server.serve("source.test", "/", f"<img src='http://third.test:{server.port}/redir'>")
+
+    with pytest.raises(RenderRefused, match="port not allowed"):
+        await render_viewport(browser, request_for(server), address_check)
+
+
+async def test_a_later_hop_of_a_longer_chain_is_checked_too(server, browser, address_check):
+    hop(server, "third.test", "/one", f"http://other.test:{server.port}/two")
+    hop(server, "other.test", "/two", f"http://internal.test:{server.port}/secret")
+    server.serve("source.test", "/", f"<img src='http://third.test:{server.port}/one'>")
+
+    with pytest.raises(RenderRefused, match="address not allowed"):
+        await render_viewport(browser, request_for(server), address_check)
+
+
+async def test_a_subresource_redirect_between_public_hosts_is_allowed(server, browser, address_check):
+    hop(server, "third.test", "/redir", f"http://other.test:{server.port}/pixel.gif")
+    server.serve("other.test", "/pixel.gif", "GIF89a", "image/gif")
+    server.serve("source.test", "/", f"<p>x</p><img src='http://third.test:{server.port}/redir'>")
+
+    result = await render_viewport(browser, request_for(server), address_check)
+
+    assert result.status == 200 and server.hits("other.test") == ["other.test/pixel.gif"]

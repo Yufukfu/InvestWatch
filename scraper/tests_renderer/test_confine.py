@@ -223,6 +223,7 @@ async def test_a_third_party_iframe_is_loaded_because_only_the_top_frame_must_st
         "typeof RTCPeerConnection",
         "typeof webkitRTCPeerConnection",
         "typeof WebTransport",
+        "typeof SharedWorker",  # a shared worker's own fetches do not pass through `route` at all
     ],
 )
 async def test_realtime_network_apis_that_the_route_cannot_see_are_gone(server, page, script):
@@ -233,3 +234,14 @@ async def test_realtime_network_apis_that_the_route_cannot_see_are_gone(server, 
     in_frame = await page.evaluate(f"document.getElementById('f').contentWindow.eval({script!r})")
 
     assert (in_page, in_frame) == ("undefined", "undefined")
+
+
+async def test_a_shared_worker_cannot_reach_an_internal_host(server, page):
+    server.serve("internal.test", "/secret", "SECRET")
+    shared = f"new SharedWorker(URL.createObjectURL(new Blob([\"fetch('http://internal.test:{server.port}/secret')\"])))"
+    url = server.serve(SOURCE, "/", f"<script>try {{ {shared} }} catch (e) {{}}</script>")
+
+    await page.goto(url)
+    await settle()
+
+    assert server.hits("internal.test") == []

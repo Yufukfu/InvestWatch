@@ -10,7 +10,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Iterable
 from urllib.parse import urlsplit
 
-from playwright.async_api import BrowserContext, Page, Route, WebSocketRoute
+from playwright.async_api import BrowserContext, Page, Request, Route, WebSocketRoute
 from playwright.async_api import Error as PlaywrightError
 
 from iw_scraper.addresses import AddressRefused
@@ -21,12 +21,14 @@ CONTEXT_OPTIONS = {"service_workers": "block", "accept_downloads": False}  # per
 # `service_workers="block"` only stops a worker from intercepting requests (measured: `register()` still resolves in
 # the headless shell), and a worker's own fetches would bypass the policy, so `navigator.serviceWorker` is removed
 # from every frame, before any page script runs (no instance of the container is left to call `register` on).
+# A SharedWorker's own fetches are not routed either (measured, Playwright 1.59), and a page cannot be stopped from
+# starting one, so the constructor goes with the others.
 # WebRTC (UDP to STUN/ICE hosts) and WebTransport (QUIC) do not pass through `route`, so a page could probe internal
 # hosts or show the real egress address behind a proxy; the constructors are removed from every frame and the
 # launch flags below close the same paths in the browser.
 NO_REALTIME_NETWORK = """
 (() => {
-  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'WebTransport']) {
+  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'WebTransport', 'SharedWorker']) {
     Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false });
   }
 })();
@@ -60,6 +62,23 @@ class RequestPolicy:
         self._ports = frozenset(allowed_ports)
         self.refusals: list[str] = []  # why each refused request was refused, for the render's meta and errors
         self.navigation_refusal: str | None = None  # the first refused navigation: the page may never have loaded
+        self._hops: list[tuple[str, str, bool]] = []  # (url, resource type, is a top-frame navigation) of every redirect hop
+
+    def note_hop(self, request: Request) -> None:
+        """Remember a request that is the target of a redirect: Chromium follows those without asking `route`."""
+        try:
+            navigation = request.is_navigation_request() and request.frame.parent_frame is None
+        except PlaywrightError:  # cannot tell, so judge it as the stricter kind
+            navigation = True
+        self._hops.append((request.url, request.resource_type, navigation))
+
+    async def refused_hop(self) -> str | None:
+        """Why a redirect hop seen so far was not allowed, or `None`. The hop itself may already have been requested."""
+        for url, resource_type, navigation in self._hops:
+            reason = await self.verdict(url, resource_type, is_navigation=navigation)
+            if reason:
+                return reason
+        return None
 
     async def verdict(self, url: str, resource_type: str, *, is_navigation: bool) -> str | None:
         """Why the request must be aborted, or `None` when it may go ahead. The reason never holds a query string."""
@@ -136,6 +155,7 @@ async def confined_page(context: BrowserContext, policy: RequestPolicy) -> Page:
     await context.add_init_script(NO_REALTIME_NETWORK)
     await context.route("**/*", handle)
     await context.route_web_socket("**/*", refuse_websocket)
+    context.on("request", lambda request: policy.note_hop(request) if request.redirected_from else None)
     page = await context.new_page()  # created before the listener, so only later pages (popups) are closed
     context.on("page", lambda extra: _spawn(extra.close()))
     return page

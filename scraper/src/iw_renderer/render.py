@@ -249,6 +249,8 @@ async def _render(
             measured = await measure_blocks(session, request.viewport, request.max_blocks)
         except PlaywrightError as error:
             raise _failure(error) from None
+        if reason := await policy.refused_hop():  # a redirect of any other request: the hop is checked, not routed
+            raise RenderRefused(reason)
         return RenderResult(
             status=response.status, final_url=page.url, png=png, truncated=truncated or measured.truncated,
             blocks=measured.blocks,

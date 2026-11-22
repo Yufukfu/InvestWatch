@@ -80,7 +80,7 @@ The scraper SHALL call the renderer once per viewport, in the order `desktop`, `
 - **THEN** the `mobile` blocks reflect the mobile layout, not the desktop markup scaled down
 
 ### Requirement: The browser is confined
-Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host's site SHALL be refused without replacing the page. Chromium follows redirects without asking the interceptor (measured, ADR 0107), so every hop of the first navigation's redirect chain SHALL be checked after the load, and a render whose chain left the site or reached a non-public address SHALL fail and keep nothing of the page it landed on. Downloads, new pages, service workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
+Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host's site SHALL be refused without replacing the page. Chromium follows redirects without asking the interceptor (measured, ADR 0107), so every redirect hop of every request the browser makes (the first navigation, subresources, fetches and frames) SHALL be checked after the load against the same address and port rules (a navigation hop also against the source site), and a render with a hop that left the site, reached a non-public address or a closed port SHALL fail and keep nothing of the page it landed on. Downloads, new pages, service workers, shared workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
 
 #### Scenario: Private address from the page
 - **WHEN** the page's script or stylesheet references `http://169.254.169.254/` or a name that resolves to a private range
@@ -93,6 +93,10 @@ Every request the browser makes SHALL be intercepted and checked. A request SHAL
 #### Scenario: Redirect away
 - **WHEN** the first navigation is redirected to another registrable domain
 - **THEN** the render fails with `render_failed`, and no screenshot or block of the page it landed on is produced
+
+#### Scenario: Redirect of a subresource
+- **WHEN** an image, stylesheet, fetch or iframe of the page is redirected to a non-public address or a port outside `ALLOWED_PORTS`, at any hop of its chain
+- **THEN** the render fails with `blocked_target` and no screenshot or block is produced, and a redirect between public hosts is followed
 
 #### Scenario: Third-party styles and fonts
 - **WHEN** the page loads CSS, fonts and images from a public CDN host
