@@ -58,3 +58,10 @@ On `finding.high_risk` the dashboard SHALL show a toast with the label `Wysokie 
 #### Scenario: Limits
 - **WHEN** six different high-risk events arrive, and one of them twice
 - **THEN** four toasts are visible, newest first, with no duplicate id, and each disappears after 20 seconds unless dismissed earlier
+
+### Requirement: Toast title has its own direction
+The toast title SHALL be rendered as plain text in an element that holds only the title and has `dir="auto"`, so a bidi control in the title cannot reorder the toast's labels.
+
+#### Scenario: Right-to-left override in a title
+- **WHEN** a high-risk alert's title contains U+202E
+- **THEN** the title element has `dir="auto"`, its text is exactly the title, and `Wysokie ryzyko` and the buttons are outside it
