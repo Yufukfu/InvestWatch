@@ -19,14 +19,14 @@ Docs hold the logic; `CLAUDE.md` files stay short and point at them. Update docs
 | A milestone moved, or a team-wide decision opened or closed | `.docs/STATUS.md` (the owner of the milestone edits its row) |
 | The process, a skill or a hook | `.claude/SDLC.md` or `.claude/CODE_REVIEW.md`, and `.docs/ai-workflow.md` |
 | A hard-to-reverse choice | an ADR (below) |
-| A change closing, or a milestone | one row in the Log table of `.docs/ai-workflow.md` (`iw-ai-log`) |
+| A change closing, or a milestone | one new entry file in `.docs/ai-log/` (`iw-ai-log`) |
 
 ## Closing a change (the closing tasks in `tasks.md`)
 
 Everything lands in the same PR, before archiving, because nothing goes straight to `main` and there is no "after merge" step:
 
 1. Update docs per the table above, your own `.docs/status/` file (state, active changes, blockers; never another owner's file), and the ADR for any hard-to-reverse choice the change made.
-2. Add the log row with `iw-ai-log`.
+2. Add the log entry with `iw-ai-log`.
 3. Run `docs-check` (below) and fix each finding at its source.
 
 Then `iw-pr-review`, then `/openspec-archive-change` as the last commit (see `openspec/config.yaml`).
