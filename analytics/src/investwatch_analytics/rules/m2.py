@@ -257,7 +257,8 @@ class _PastPerformance(Rule):
             return False
         else:
             past = any(int(a or b) <= fetch_year for a, b in _YEAR.findall(sentence)) or any(
-                int(y) <= fetch_year for y in _YEAR_TABLE.findall(sentence))
+                int(y) <= fetch_year for y in _YEAR_TABLE.findall(sentence)) or any(
+                int(end) <= fetch_year for _, end in _YEAR_RANGE.findall(sentence))  # "2021-2025" (R13 gold)
         if not past:
             return False
         if _hits_fast(sentence, p["figure"], p["figure_x"]):

@@ -206,8 +206,22 @@ rules:
       risk_exclude_patterns: *risk_exclude_patterns
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
-  # R5 (P1, not built here): not_applicable with "brak informacji o ryzyku" when the material has none (ZASÓB).
-  - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
+  # ZASÓB R5 "kontrastu, przesłonięcia przez inne elementy oraz czytelności": per viewport a risk block that is
+  # visible and has WCAG contrast >= min_contrast passes; `visible: false` or lower contrast fails; unknown colours
+  # are uncertain. Visual (rules/m2_visual.py): not_applicable without `blocks`; not_applicable with "brak
+  # informacji o ryzyku" when the material has none (ZASÓB). Occlusion: not reported by the renderer yet.
+  - id: R5
+    name: Ekspozycja i kontrast ryzyka
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565
+    implemented: true
+    params:
+      min_contrast: 4.5
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
   # ZASÓB R6 "ryzyko ukryte w przypisach": a risk block only in the footer / legal region or a footnote and
   # not in the viewport on load. Visual: not_applicable without `blocks`, never pass. Viewports desktop,
   # mobile, tablet; the worst one is reported. `visible` is R5's, `requires_interaction` is R7's.
@@ -224,9 +238,35 @@ rules:
       risk_override_patterns: *risk_override_patterns
       risk_exclude_patterns: *risk_exclude_patterns
       footnote_markers: *footnote_markers
-  # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
-  - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
-  - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
+  # ZASÓB R7 "wymaga rozwinięcia, kliknięcia linku lub przejścia na inną warstwę": per viewport, fail when every
+  # risk block has `requires_interaction: true`. Visual (rules/m2_visual.py): not_applicable without `blocks`,
+  # without risk information ("brak informacji o ryzyku", ZASÓB) or without interaction metadata.
+  - id: R7
+    name: Dostępność za 1 kliknięciem
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565
+    implemented: true
+    params:
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
+  # ZASÓB R8 "czy tekst nie jest ucinany lub skalowany poniżej czytelności" (desktop, tablet, telefon): per rendered
+  # viewport the warning is visible, unclipped and >= min_font_px; missing in one viewport while another has it
+  # fails. One rendered viewport: a clean result is uncertain. Visual (rules/m2_visual.py).
+  - id: R8
+    name: Responsywność
+    severity: low
+    legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565
+    implemented: true
+    params:
+      min_font_px: 12
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
   # ZASÓB R9: "ostrzeżenie o ryzyku … językiem zrozumiałym dla przeciętnego odbiorcy grupy docelowej" (rules/m2_text.py).
   # LLM-first: the rules only raise a signal on the warning sentences (average length, jargon hits and share) and
   # never fail; the LLM rates 1-5 and R9 fails only at <= 2 with a verified quote. not_applicable with "brak
@@ -422,6 +462,8 @@ rules:
         - '\b(?:opłat|prowizj|koszt|obciąż)\w*\s+(?:\w+\s+){0,3}(?:obniżaj|pomniejszaj|zmniejszaj|wpływaj)\w*'
         - '\b(?:net|gross)\s+of\s+(?:fees|charges|costs)\b'
         - '\b(?:before|after|excluding|including)\s+(?:all\s+)?(?:fees|charges|costs)\b'
+        # "po opłatach" / "po wszystkich kosztach" = after fees (analytics-m2-visual-rules: the gold R13 page, once detected)
+        - '\bpo\s+(?:wszystkich\s+)?(?:opłat|prowizj|koszt|obciąż)\w*'
       # Checked in the past-performance sentences; a sentence anywhere that also says "denominowany" counts too.
       foreign_currency_patterns:
         - '\b(?:EUR|USD|CHF|GBP|JPY)\b'
@@ -432,8 +474,24 @@ rules:
         - '\bryzyk\w*\s+(?:\w+\s+)?walutow\w*'
         - '\bcurrency\s+(?:fluctuations?|risk)\b'
         - '\bexchange\s+rates?\b'
-  # R13: visual, needs `blocks` (font size, position in the viewport; #29).
-  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: art. 44 ust. 4 lit. a rozp. del. 2017/565, implemented: false}
+  # ZASÓB R13 "czy wyniki historyczne nie stanowią najbardziej wyeksponowanego elementu informacji": per viewport a
+  # past-performance block (a detector sentence, or a headline restating one's return figure) with the largest font,
+  # or first and above the dominant size, fails. Visual (rules/m2_visual.py); the shared `pp_*` detector (ADR 0315).
+  - id: R13
+    name: Dominacja wyników historycznych
+    severity: low
+    legal_basis: art. 44 ust. 4 lit. a rozp. del. 2017/565
+    implemented: true
+    params:
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      amount_return_patterns: *pp_amount_return
+      figure_exclude_patterns: *return_figure_exclude
+      figure_extra_exclude_patterns: *pp_figure_exclude
+      past_patterns: *pp_past
+      future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
   # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
   # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").
   - id: R14
