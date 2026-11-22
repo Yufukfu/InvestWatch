@@ -74,6 +74,11 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--green-text', '--tint-hover'],
   ['--accent-text', '--link'],
   ['--accent-text', '--link-strong'],
+  ['--accent-text', '--toast-bg'],
+  ['--toast-meta', '--toast-bg'],
+  ['--toast-ghost', '--toast-bg'],
+  ['--toast-bg', '--accent-text'],
+  ['--toast-bg', '--toast-ghost'],
 ];
 
 // Non-text parts (control borders, focus ring, slider) need 3:1.
@@ -83,6 +88,9 @@ const NON_TEXT_PAIRS: Array<[string, string]> = [
   ['--focus', '--surface'],
   ['--focus', '--bg'],
   ['--accent', '--surface'],
+  ['--toast-line', '--toast-bg'],
+  ['--risk-high', '--toast-bg'],
+  ['--accent-text', '--toast-bg'],
 ];
 
 describe('design tokens', () => {
