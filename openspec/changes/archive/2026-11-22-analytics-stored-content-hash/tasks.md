@@ -16,5 +16,5 @@
 
 ## 4. Closing
 
-- [ ] 4.1 Apply iw-docs-update and add the iw-ai-log row
-- [ ] 4.2 Run iw-pr-review and fix real findings
+- [x] 4.1 Apply iw-docs-update and add the iw-ai-log row (docs-check ok)
+- [x] 4.2 Run iw-pr-review and fix real findings (iw-reviewer, security folded in, on ade784f5..471c5ac0: no blocking findings; test-diff-check: no weakened tests)
