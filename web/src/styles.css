@@ -369,13 +369,20 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 .trend-note { color: var(--muted); margin: 8px 0 0; }
 .trend-table { margin: 0; }
 .trend-table[open] { flex-basis: 100%; order: 4; }
-.trend-table summary { cursor: pointer; display: flex; align-items: center; min-height: var(--tap); color: var(--link); font-size: 13px; font-weight: 600; list-style: none; }
+.trend-table summary { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: var(--tap); padding: 0 var(--space-4); border: 1px solid var(--control-border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; font-weight: 600; list-style: none; }
 .trend-table summary::-webkit-details-marker { display: none; }
-.trend-table summary { gap: 6px; }
-.trend-table summary::after { content: '→'; }
-.trend-table table { border-collapse: collapse; margin-top: 8px; }
-.trend-table th, .trend-table td { padding: 2px 12px 2px 0; text-align: right; }
-.trend-table th[scope='row'], .trend-table th[scope='col']:first-child { text-align: left; }
+.trend-table summary::after { content: '↓'; color: var(--muted); transition: transform 0.15s; }
+.trend-table[open] summary::after { transform: rotate(180deg); }
+.trend-table summary:hover { border-color: var(--accent); }
+.trend-table table { width: 100%; border-collapse: collapse; margin-top: var(--space-3); border-top: 2px solid var(--accent); font-variant-numeric: tabular-nums; }
+.trend-table caption { text-align: left; padding: var(--space-3) 0; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.trend-table th, .trend-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); font-size: 13px; }
+.trend-table thead th { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.trend-table tbody td { font-family: var(--font-mono); }
+.trend-table tbody th { font-weight: 500; }
+.trend-table tbody tr:hover { background: var(--surface-2); }
+.trend-table th[scope='row'], .trend-table th[scope='col']:first-child { text-align: left; padding-left: 0; }
+.trend-table td:last-child, .trend-table th:last-child { padding-right: 0; }
 
 /* Finding detail: a side panel over the page; full width on phones. */
 .detail-layer { position: relative; z-index: 10; }
