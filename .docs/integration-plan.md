@@ -183,7 +183,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/findings` | list; filters: `module, status, platform, source_id, risk_level, score_min, date_from, date_to, q` |
+| GET | `/findings` | list; filters: `module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q`. `document_id` (contract 1.1.0) returns every finding of one document, at most one per module, so the detail panel can list M1 and M3 of one post across pages |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |

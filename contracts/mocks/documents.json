@@ -313,6 +313,44 @@
     }
   },
   {
+    "id": "22adccca-7226-5d29-8029-48ce11cdf441",
+    "source_id": "bcfc4098-ffd1-5584-abbc-6c9118b38bf4",
+    "platform": "instagram",
+    "source_kind": "third_party",
+    "url": "https://www.instagram.com/p/MOCK0005/",
+    "canonical_url": "https://www.instagram.com/p/MOCK0005/",
+    "fetched_at": "2026-11-21T12:00:00Z",
+    "published_at": "2026-11-21T09:00:00Z",
+    "http_status": 200,
+    "lang": "pl",
+    "title": null,
+    "text": "Załóż rachunek w Alfa Inwestycje DM z moim kodem MAREK100 i odbierz 100 zł na start 💸 Moi subskrybenci wiedzą więcej: w tym tygodniu kupuję akcje spółki Przykład S.A., a CFD na złoto sprzedaję. Pełna lista sygnałów w grupie premium za 149 zł/mies. – link w bio!",
+    "content_hash": "de46f464c43f5612c40a69eef86b53e703010d4e9cab3442bb5a5d1446848a63",
+    "author": {
+      "name": "Marek Trader",
+      "handle": "@marek_trader",
+      "profile_url": "https://www.instagram.com/marek_trader/",
+      "followers": 67400
+    },
+    "links": [
+      {
+        "href": "https://alfa-inwestycje.example.com/rachunek?ref=MAREK100",
+        "text": "link w bio",
+        "rel": null
+      }
+    ],
+    "media": [],
+    "html_object_key": null,
+    "screenshots": null,
+    "blocks": [],
+    "scrape_meta": {
+      "scraper": "api",
+      "user_agent": "Mozilla/5.0 (mock)",
+      "proxy": null,
+      "duration_ms": 1500
+    }
+  },
+  {
     "id": "007bbcee-0737-5c6d-b9b4-ce56fcbfa8e4",
     "source_id": "0613f5c0-7837-58a1-a5ea-f8f2fffcb8f6",
     "platform": "web",

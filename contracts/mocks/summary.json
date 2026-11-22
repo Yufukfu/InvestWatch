@@ -1,23 +1,23 @@
 {
-  "total": 9,
+  "total": 11,
   "by_module": {
-    "M1": 3,
+    "M1": 4,
     "M2": 3,
-    "M3": 3
+    "M3": 4
   },
   "by_status": {
-    "new": 3,
+    "new": 5,
     "in_review": 2,
     "confirmed": 1,
     "false_positive": 2,
     "closed": 1
   },
   "by_platform": {
-    "instagram": 4,
+    "instagram": 6,
     "web": 5
   },
   "by_risk_level": {
-    "high": 6,
+    "high": 8,
     "medium": 0,
     "low": 3
   },

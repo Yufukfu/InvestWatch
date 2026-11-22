@@ -63,9 +63,9 @@ CLAIM_MIN_IDLE_MS=90000
    LLM_MAX_CHUNKS=2                      # fewer calls on long pages
    ```
 
-   `OLLAMA_MODEL=gemma3:4b` and `OLLAMA_CONTEXT_LENGTH=8192` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
+   `OLLAMA_MODELS="gemma3:4b bge-m3"`, `OLLAMA_CONTEXT_LENGTH=8192`, `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
 
-2. Pull the model once (about 3.3 GB), then start the stack with the profile:
+2. Pull the models once (`gemma3:4b` about 3.3 GB, `bge-m3` for embeddings about 1.2 GB), then start the stack with the profile:
 
    ```bash
    docker compose --profile llm up ollama-pull
