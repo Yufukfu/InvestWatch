@@ -157,6 +157,8 @@ button.link:hover { color: #1e40af; }
 .module-switch-btn:hover { background: var(--surface-2); }
 .module-switch-btn[aria-current="true"] { border: 2px solid var(--accent); background: #e8efff; cursor: default; }
 .module-switch-module { font-weight: 700; }
+.detail-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.detail-actions a.btn { text-decoration: none; }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 16px; margin: 16px 0 8px; }
 .facts dt { color: var(--muted); font-size: 15px; font-weight: 600; }
 .facts dd { margin: 2px 0 0; }

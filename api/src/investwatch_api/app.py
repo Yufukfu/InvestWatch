@@ -83,11 +83,12 @@ def create_app(services_factory: ServicesFactory = services_from_env) -> FastAPI
             await relay.stop()
             await services.close()
 
-    api = FastAPI(title="InvestWatch API", version="1.2.0", lifespan=lifespan)
+    api = FastAPI(title="InvestWatch API", version="1.3.0", lifespan=lifespan)
     api.state.sio = sio
     errors.install(api)
     if origins:
-        api.add_middleware(CORSMiddleware, allow_origins=list(origins), allow_methods=["*"], allow_headers=["*"])
+        api.add_middleware(CORSMiddleware, allow_origins=list(origins), allow_methods=["*"], allow_headers=["*"],
+                           expose_headers=["Content-Disposition", "X-Total-Count", "X-Export-Truncated"])
 
     @api.get("/api/health")
     async def health(request: Request):

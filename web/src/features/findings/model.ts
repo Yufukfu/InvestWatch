@@ -99,6 +99,8 @@ export type FindingDetail = {
   screenshotUrl?: string;
   pipelineVersion?: string;
   llm?: string | null;
+  // Printable evidence pack (GET /findings/{id}/export?format=html) under the app's API base.
+  exportUrl?: string;
 };
 
 // One finding of the open material, as the detail's module switcher offers it (issue #33).
