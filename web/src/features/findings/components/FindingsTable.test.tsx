@@ -65,7 +65,7 @@ describe('FindingsTable', () => {
 
   it('shows the detection time in UTC and the module name', () => {
     render(<FindingsTable {...props} rows={[row()]} />);
-    expect(screen.getByText('21.11.2026, 15:00 UTC')).toBeInTheDocument();
+    expect(screen.getByText('21.11.2026 · 15:00')).toBeInTheDocument();
     expect(screen.getByText('M2')).toHaveAttribute('title', 'Zgodność reklam');
   });
 
@@ -197,7 +197,35 @@ describe('FindingsTable', () => {
   it('renders the score and the detection time in the monospace class', () => {
     render(<FindingsTable {...props} rows={[row({ score: 0.93 })]} />);
     expect(screen.getByText('0,93').closest('.score')).toHaveClass('mono');
-    expect(screen.getByText(/2026/).closest('td')).toHaveClass('mono');
+    expect(screen.getByText('21.11.2026 · 15:00').closest('td')).toHaveClass('mono');
+  });
+
+  it('shows the detection time in UTC as day.month.year · hour:minute and says so on hover', () => {
+    render(<FindingsTable {...props} rows={[row({ detectedAt: '2026-01-05T08:07:00Z' })]} />);
+    const time = screen.getByText('05.01.2026 · 08:07');
+    expect(time.tagName).toBe('TIME');
+    expect(time).toHaveAttribute('datetime', '2026-01-05T08:07:00Z');
+    expect(time).toHaveAttribute('title', 'Czas UTC');
+  });
+
+  it('reads the time as UTC whatever the browser zone is, and shows an unparsable value as it came', () => {
+    render(<FindingsTable {...props} rows={[row({ id: 'late', detectedAt: '2026-01-05T23:30:00Z' }), row({ id: 'bad', detectedAt: 'not-a-time' })]} />);
+    expect(screen.getByText('05.01.2026 · 23:30')).toBeInTheDocument();
+    expect(screen.getByText('not-a-time')).toBeInTheDocument();
+  });
+
+  it('marks each row with its risk level, so the score bar can take the level colour', () => {
+    render(
+      <FindingsTable
+        {...props}
+        rows={[
+          row({ id: 'm', title: 'Średnie', riskLevel: 'medium' }),
+          row({ id: 'l', title: 'Niskie', riskLevel: 'low' }),
+        ]}
+      />,
+    );
+    expect(screen.getByText('Średnie').closest('tr')).toHaveClass('row-medium');
+    expect(screen.getByText('Niskie').closest('tr')).toHaveClass('row-low');
   });
 
   it('keeps table roles explicit, so the card layout on a phone is still a table for assistive technology', () => {

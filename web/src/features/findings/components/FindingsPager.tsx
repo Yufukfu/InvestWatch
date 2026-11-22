@@ -15,13 +15,13 @@ export function FindingsPager({ page, pageSize, total, onPage, onPageSize }: Pro
   return (
     <nav className="pager" aria-label="Stronicowanie">
       <button type="button" className="btn" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Poprzednia strona">
-        ‹ Poprzednia
+        ← Poprzednia
       </button>
       <span className="pager-pos" aria-live="polite">
         Strona {page} z {pages}
       </span>
       <button type="button" className="btn" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Następna strona">
-        Następna ›
+        Następna →
       </button>
       <span className="pager-size">
         <label htmlFor={`${id}-size`}>Na stronie</label>

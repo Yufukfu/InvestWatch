@@ -1,6 +1,6 @@
 import { formatScore } from '../../../format/score';
 import type { FindingRow, FindingSort } from '../model';
-import { findingsCount, formatUtc, MODULE_LABEL, platformLabel, STATUS_LABEL } from './labels';
+import { findingsCount, formatDetected, MODULE_LABEL, platformLabel, STATUS_LABEL } from './labels';
 import { RiskBadge } from './RiskBadge';
 
 type Props = {
@@ -82,7 +82,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                 key={f.id}
                 role="row"
                 aria-current={f.id === selectedId ? 'true' : undefined}
-                className={[f.id === selectedId && 'selected', f.riskLevel === 'high' && 'row-high'].filter(Boolean).join(' ') || undefined}
+                className={[f.id === selectedId && 'selected', f.riskLevel && `row-${f.riskLevel}`].filter(Boolean).join(' ') || undefined}
               >
                 <td role="cell" className="col-risk">
                   <RiskBadge level={f.riskLevel} />
@@ -109,7 +109,11 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                 <td role="cell" className="col-status">
                   <span className={`status status-${f.status}`}>{STATUS_LABEL[f.status] ?? f.status}</span>
                 </td>
-                <td role="cell" className="col-date mono">{formatUtc(f.detectedAt)}</td>
+                <td role="cell" className="col-date mono">
+                  <time dateTime={f.detectedAt} title="Czas UTC">
+                    {formatDetected(f.detectedAt)}
+                  </time>
+                </td>
               </tr>
             ))}
           </tbody>
