@@ -21,9 +21,9 @@
 
 ## 4. A removal is not a failed run
 
-- [ ] 4.1 Test first (`scraper/tests/test_jobs_gone.py`, real Redis): a `gone` job ends `ok` with `documents = 0`, is not requeued, clears its attempt counter and `sources.last_run_status = ok`; five `gone` jobs do not pause the domain while five 503s still do (the pause requirement is in `web-collection`)
-- [ ] 4.2 Collector returns a result with no error for `gone`; no change to `jobs.py` unless 4.1 shows one is needed
-- [ ] 4.3 Mutation check — mutations: N tried, N caught
+- [x] 4.1 Test first (`scraper/tests/test_jobs_gone.py`, real Redis): a `gone` job ends `ok` with `documents = 0`, is not requeued, clears its attempt counter and `sources.last_run_status = ok`; five `gone` jobs do not pause the domain while five 503s still do (the pause requirement is in `web-collection`)
+- [x] 4.2 Collector returns a result with no error for `gone` (done in 3.2); 4.1 showed no change to `jobs.py` is needed
+- [x] 4.3 Mutation check — mutations: 5 tried, 5 caught
 
 ## 5. End to end and the derivation for Damian
 
