@@ -16,7 +16,7 @@ A YouTube source SHALL have a URL of the form `https://www.youtube.com/@<handle>
 - **THEN** no request is made and a job error with reason `invalid_request` is recorded
 
 ### Requirement: Newest videos, bounded
-A run SHALL read the channel's video list once, take the newest `YOUTUBE_MAX_VIDEOS` videos (default 10), skip videos that already have a stored document, and request one watch page per remaining video through the shared fetch layer, one at a time. The list page SHALL be requested through the shared fetch layer too; when the list cannot be read there (for example a consent redirect to another host), the run SHALL end with the job error reason `parse_error` naming "no readable video list".
+A run SHALL read the channel's video list once through the shared fetch layer, take the channel id and the newest `YOUTUBE_MAX_VIDEOS` video ids (default 10) from it, skip videos whose permalink already has a stored document, and request one watch page per remaining video, one at a time, each after the per-domain wait.
 
 #### Scenario: Default cap
 - **WHEN** a channel has 200 videos and `YOUTUBE_MAX_VIDEOS` is unset
@@ -27,11 +27,15 @@ A run SHALL read the channel's video list once, take the newest `YOUTUBE_MAX_VID
 - **THEN** no watch page is requested
 
 #### Scenario: List behind a consent page
-- **WHEN** the channel page answers with a redirect to `consent.youtube.com`
+- **WHEN** the channel page redirects to `consent.youtube.com`, a host the URL guard does not allow
+- **THEN** the run ends with the fetch layer's job error reason `blocked_target`, no document is emitted and no watch page is requested
+
+#### Scenario: List without video ids
+- **WHEN** the channel page is fetched but holds no video ids
 - **THEN** no document is emitted and one job error with reason `parse_error` and the detail "no readable video list" is recorded
 
 ### Requirement: One document per video
-The collector SHALL emit one document per video that is playable, with `url` `https://www.youtube.com/watch?v=<id>`, `platform` `youtube`, `source_kind` from the source row, `title` the video title, `published_at` the publish date in UTC ISO-8601, `lang` null, `canonical_url` equal to `url`, and `text` the title, the description and the transcript (when there is one) joined by blank lines, with the title first. `scrape_meta.video_id` SHALL hold the video id and `scrape_meta.transcript` SHALL be `caption`, `none` or `failed`.
+The collector SHALL emit one document per playable video, with `url` `https://www.youtube.com/watch?v=<id>`, `platform` `youtube`, `source_kind` from the source row, `title` the video title, `published_at` the publish date in UTC ISO-8601, `lang` null, `canonical_url` equal to `url`, and `text` the title, the description and the transcript (when there is one) joined by blank lines. `scrape_meta.video_id` SHALL hold the video id and `scrape_meta.transcript` SHALL be `caption`, `none` or `failed`. `html` SHALL hold the video's player data (details, microformat and caption track list) as JSON, without `visitorData` or any token.
 
 #### Scenario: Video with transcript
 - **WHEN** a video has the title `Film jubileuszowy…`, a description and a transcript
@@ -39,60 +43,76 @@ The collector SHALL emit one document per video that is playable, with `url` `ht
 
 #### Scenario: Video without caption track
 - **WHEN** a video has no caption track
-- **THEN** the document contains the title and the description and `scrape_meta.transcript` is `none`
+- **THEN** the document holds the title and the description and `scrape_meta.transcript` is `none`
 
 #### Scenario: Unplayable video
 - **WHEN** a watch page reports the video as unavailable, private or age-restricted
 - **THEN** no document is emitted for it, the count is logged and it is not a job error
 
+#### Scenario: Stored html holds no tokens
+- **WHEN** a video is stored
+- **THEN** its `html` parses as JSON and contains no `visitorData` key
+
 #### Scenario: Same video collected again
-- **WHEN** the same video is collected in two runs with unchanged text
-- **THEN** one document exists for it
+- **WHEN** the same video is collected in two runs
+- **THEN** one document exists for it, and its transcript is not requested again
 
 ### Requirement: Author comes from the source URL
-Every document SHALL carry `author` with `handle` the source URL's handle with a leading `@`, `profile_url` `https://www.youtube.com/@<handle>`, `name` the channel name from the watch page's own fields and `followers` null. `handle` and `profile_url` SHALL come from the source URL and never from the video's text.
+Every document SHALL carry `author` with `handle` the source URL's handle with a leading `@`, `profile_url` `https://www.youtube.com/@<handle>`, `name` the channel name from the watch page's player data and `followers` null. `handle` and `profile_url` SHALL come from the source URL. A video whose channel id differs from the channel id read from the list page SHALL be skipped and counted.
 
 #### Scenario: Author is a trusted argument
 - **WHEN** a video is ingested
 - **THEN** the author reaches ingest as its `author` argument and the page dict has no `author` key
 
 #### Scenario: Video of another channel in the list
-- **WHEN** a watch page's channel differs from the source's channel
+- **WHEN** a watch page's channel id differs from the list page's channel id
 - **THEN** that video is skipped with a logged count
 
 ### Requirement: Transcript through a dedicated proxy
-The collector SHALL request the transcript of a video through the caption library with the proxy `YT_TRANSCRIPT_PROXY` (an HTTP proxy URL, env only, never logged), preferring the original-language track and then any available track. A run SHALL request at most one transcript per video and SHALL stop requesting transcripts for the rest of the run after the first block or IP refusal. A missing `YT_TRANSCRIPT_PROXY` SHALL skip transcripts entirely (not a job error): `scrape_meta.transcript` is `none` and the run logs that transcripts are off.
+The collector SHALL request the transcript of a video once, through the proxy `YT_TRANSCRIPT_PROXY` (an HTTP proxy URL), preferring the original-language track and then any available track. A transcript, however it ends, SHALL be final: the video is not requested again. A missing `YT_TRANSCRIPT_PROXY` SHALL skip transcripts without a job error, log that transcripts are off and set `scrape_meta.transcript` to `none`.
 
 #### Scenario: Proxy configured
 - **WHEN** `YT_TRANSCRIPT_PROXY` is set and a video has a Polish caption track
 - **THEN** the transcript is requested once through that proxy and its text is part of the document
 
+#### Scenario: Original language first
+- **WHEN** a video has a Polish and an English caption track
+- **THEN** the Polish track is used
+
+#### Scenario: Captions disabled or missing
+- **WHEN** the library reports that the video has no usable transcript
+- **THEN** `scrape_meta.transcript` is `none` and the document is stored
+
 #### Scenario: Proxy not configured
 - **WHEN** `YT_TRANSCRIPT_PROXY` is unset
-- **THEN** no transcript request is made and the documents carry title and description only
+- **THEN** no transcript request is made, a log line says transcripts are off and the documents carry title and description only
 
-#### Scenario: Block on the first transcript
-- **WHEN** the first transcript request is refused with an IP block or a rate limit
-- **THEN** no further transcript is requested in the run, that video's `scrape_meta.transcript` is `failed` and the other videos are still collected without a transcript
+#### Scenario: Block on a transcript
+- **WHEN** a transcript request is refused with an IP block or a rate limit
+- **THEN** that video's `scrape_meta.transcript` is `failed`, no further transcript is requested in the run, and the remaining videos are collected with `none`
 
-#### Scenario: Proxy credentials stay secret
-- **WHEN** a transcript request fails with any error
-- **THEN** no log line, job error or exception text contains the proxy URL, host or credentials
+#### Scenario: Other transcript failure
+- **WHEN** a transcript request fails with a proxy timeout or an unknown library error
+- **THEN** that video's `scrape_meta.transcript` is `failed` and the next video's transcript is still requested
 
 ### Requirement: Failures never produce a document
-A failure (a watch page that cannot be read, a missing player response) SHALL end the run or skip the video with a job error from the closed reason set and SHALL NOT emit a document with empty `text`. A block on the shared fetch layer ends the run and is not retried.
+A watch page without readable player data SHALL be skipped and counted in the log. If every watch page of a run is skipped as unreadable, the run SHALL record one job error with reason `parse_error`. A block on a list or watch page ends the run with the fetch layer's job error and no retry in the same run. A document with empty `text` SHALL never be emitted.
 
-#### Scenario: Unreadable watch page
-- **WHEN** a watch page has no readable player response
-- **THEN** that video is skipped with a job error `parse_error` and the run goes on with the next video
+#### Scenario: One unreadable watch page
+- **WHEN** one watch page has no player data
+- **THEN** that video is skipped with a logged count and the run goes on with the next video
+
+#### Scenario: Every watch page unreadable
+- **WHEN** no watch page of the run has player data
+- **THEN** no document is emitted and one job error with reason `parse_error` is recorded
 
 #### Scenario: Block on a watch page
 - **WHEN** a watch page is answered as a block
 - **THEN** the run ends, documents already stored stay and no further watch page is requested
 
-### Requirement: YouTube channels are seeded inactive
-This change SHALL provide a YouTube `sources` row for `https://www.youtube.com/@UKNFpolska` through the seed mechanism (idempotent by URL, never overwriting), with `platform = youtube`, `active = false` and a schedule.
+### Requirement: The YouTube channel is seeded without a schedule
+This change SHALL provide a YouTube `sources` row for `https://www.youtube.com/@UKNFpolska` through the seed mechanism (idempotent by URL, never overwriting), with `platform = youtube`, `source_kind = unknown`, `target_modules = [M1]` and no `schedule_cron`.
 
 #### Scenario: Seeding twice
 - **WHEN** the seed runs twice against the same database
-- **THEN** the channel has exactly one `sources` row and it is inactive
+- **THEN** the channel has exactly one `sources` row, with no schedule
