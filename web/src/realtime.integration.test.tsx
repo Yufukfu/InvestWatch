@@ -6,6 +6,7 @@ import { AlertsPage } from './features/alerts/AlertsPage';
 import { FindingsPage } from './features/findings/FindingsPage';
 import detail from './test/fixtures/finding-detail.json';
 import findings from './test/fixtures/findings.json';
+import { iso } from './test/iso';
 import { server } from './test/setup';
 import { storeWrapper } from './test/store';
 import { ToastSlotProvider } from './ToastSlotProvider';
@@ -62,11 +63,11 @@ describe('alerts and the findings workspace together', () => {
     act(() =>
       fake.fire('finding.high_risk', { id: detail.id, module: detail.module, score: detail.score, title: detail.title, url: detail.url, platform: 'web' }),
     );
-    const toast = screen.getByRole('group', { name: `Wysokie ryzyko: ${detail.title}` });
+    const toast = screen.getByRole('group', { name: `Wysokie ryzyko: ${iso(detail.title)}` });
     fireEvent.click(within(toast).getByRole('button', { name: 'Pokaż' }));
     expect(await screen.findByRole('heading', { level: 2, name: detail.title })).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: `Wysokie ryzyko: ${detail.title}` })).toBeNull();
+    expect(screen.queryByRole('group', { name: `Wysokie ryzyko: ${iso(detail.title)}` })).toBeNull();
   });
 
   it('while the detail dialog is open, a new high-risk alert is announced and reachable inside the dialog', async () => {
@@ -82,8 +83,8 @@ describe('alerts and the findings workspace together', () => {
     act(() => fake.fire('finding.high_risk', { id, module: 'M3', score: 0.88, title: 'Nowy w dialogu', url: detail.url, platform: 'web' }));
     const region = within(dialog).getByRole('region', { name: 'Alerty' });
     expect(region.closest('[inert]')).toBeNull();
-    expect(region.querySelector('[aria-live="polite"]')).toHaveTextContent(/^Wysokie ryzyko: Nowy w dialogu$/);
-    expect(within(dialog).getByRole('group', { name: 'Wysokie ryzyko: Nowy w dialogu' })).toBeInTheDocument();
+    expect(region.querySelector('[aria-live="polite"]')?.textContent).toBe(`Wysokie ryzyko: ${iso('Nowy w dialogu')}`);
+    expect(within(dialog).getByRole('group', { name: `Wysokie ryzyko: ${iso('Nowy w dialogu')}` })).toBeInTheDocument();
   });
 
   it('the app mounts the alerts in its header: a high-risk event shows a toast there', async () => {
@@ -92,6 +93,6 @@ describe('alerts and the findings workspace together', () => {
     act(() =>
       fake.fire('finding.high_risk', { id: detail.id, module: 'M1', score: 0.91, title: 'Alert z nagłówka', url: detail.url, platform: 'web' }),
     );
-    expect(screen.getByRole('group', { name: 'Wysokie ryzyko: Alert z nagłówka' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: `Wysokie ryzyko: ${iso('Alert z nagłówka')}` })).toBeInTheDocument();
   });
 });

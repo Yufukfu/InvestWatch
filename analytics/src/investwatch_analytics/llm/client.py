@@ -134,8 +134,12 @@ class ChatClient:
             raise
         except Exception:  # noqa: BLE001 - a deeply nested body raises RecursionError, not ValueError
             raise LlmMalformed("message content is not JSON") from None
+        if isinstance(parsed, list):
+            # Hosted gemma-4-26b-a4b-it often drops the wrapper object and answers the bare item list
+            # (analytics-llm-bare-array). Every item still goes through the judge's validation and quote check.
+            parsed = {"results": parsed}
         if not isinstance(parsed, dict):
-            raise LlmMalformed("message content is not a JSON object")
+            raise LlmMalformed("message content is not a JSON object or array")
         if not isinstance(parsed.get("results"), list):
             raise LlmMalformed("message content has no `results` list")
         return parsed
