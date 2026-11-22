@@ -22,6 +22,7 @@ const injectedRtkApi = api
             status: queryArg.status,
             platform: queryArg.platform,
             source_id: queryArg.sourceId,
+            document_id: queryArg.documentId,
             risk_level: queryArg.riskLevel,
             score_min: queryArg.scoreMin,
             date_from: queryArg.dateFrom,
@@ -165,6 +166,8 @@ export type GetFindingsApiArg = {
   status?: string;
   platform?: string;
   sourceId?: string;
+  /** Only the findings of this document (at most one per module). Combines with the other filters and pagination. Added in 1.1.0 */
+  documentId?: string;
   riskLevel?: "high" | "medium" | "low";
   scoreMin?: number;
   dateFrom?: string;
