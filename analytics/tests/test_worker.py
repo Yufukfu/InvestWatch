@@ -531,7 +531,7 @@ def test_main_exits_non_zero_on_bad_registry(tmp_path, capsys):
 
 
 @pytest.mark.skipif(not redis_test_url(), reason="TEST_REDIS_URL / IW_TEST_REDIS_URL not set")
-def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue, caplog):
+def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue, caplog, monkeypatch):
     real = redis.Redis.from_url(redis_test_url(), decode_responses=True)
     stream = f"{STREAM}:test:{uuid.uuid4().hex[:8]}"
     try:
@@ -542,15 +542,12 @@ def test_real_redis_autoclaim_and_delivery_count(store, registry, catalogue, cap
         real.xreadgroup(GROUP, "dead", {stream: ">"}, count=1)  # delivery 1 by a consumer that dies
         import investwatch_analytics.worker as worker_mod
 
-        real_analyze = worker_mod.analyze
-        worker_mod.analyze = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bug"))
-        try:
+        with monkeypatch.context() as m:  # restored before the healthy message below
+            m.setattr(worker_mod, "analyze_document", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bug")))
             with caplog.at_level(logging.INFO):
                 w.run_once()  # claimed: delivery 2 < 3 -> retry_later
                 assert real.xpending(stream, GROUP)["pending"] == 1
                 w.run_once()  # claimed: delivery 3 -> max_deliveries_exceeded, acked
-        finally:
-            worker_mod.analyze = real_analyze
         assert real.xpending(stream, GROUP)["pending"] == 0
         assert [(rec.outcome, rec.deliveries) for rec in caplog.records if hasattr(rec, "deliveries")] == [
             ("retry_later", 2), ("max_deliveries_exceeded", 3)]
