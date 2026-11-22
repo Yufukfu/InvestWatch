@@ -4,7 +4,11 @@
 services:
   web:
     build: .
-    image: investwatch/web:${IW_VERSION:-dev}
+    # Tag per compose project (issue #63): two checkouts never run each other's image. IW_VERSION names a release.
+    # pull_policy: build rebuilds on every `up` (cached layers), so a failed build stops `up` instead of starting
+    # the last image; `--no-build` is the explicit way to start the existing one.
+    pull_policy: build
+    image: investwatch/web:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     restart: unless-stopped
     read_only: true
     tmpfs:

@@ -19,14 +19,36 @@ Edit only this file for `scraper/` state. Last updated: 2026-11-22 (Sun).
 
 - Social R&D (ADR 0109, docs-only PR): X tweets are collectable with a dedicated account's cookies (Playwright reading the page's GraphQL); YouTube metadata works anonymously through our fetch layer; YouTube transcripts work through audio plus local Whisper (residential proxy, Node 22, PO token server), not through the caption URL (429 from the home IP). Specs `scraper-social-youtube` (metadata only) and `scraper-social-x` follow.
 
+## Demo rehearsal (issue #78)
+
+Source: Damian's recorded run in the issue (clean `docker compose up` from `main` c810a14, one `POST /api/scans` per seeded source, all 202), read against the code; I did not rerun the stack. Since c810a14 scraper code changed on `main` only for the renderer (PR #67, merged 00:24Z, after the run, off by default) and refactors made for it (`blocking.py`, `addresses.py`; not checked as behaviour-neutral), so the run's scraper is the current one without rendering, as far as that check goes.
+
+What the scraper did:
+
+- Sources: 17 seeded = 13 web (12 in `seeds/sources.toml` plus the KNF row `seed.py` inserts) and 4 Telegram channels (`seeds/telegram.toml`). The `seed` one-shot gates `worker` and `scheduler` in `scraper/compose.yaml`, so the rows existed before the scans.
+- Jobs: 17 scan requests became 17 manual jobs (`scan_requests.py` enqueues `execute_job` with id `scan-<message id>`): 13 web, 4 Telegram. A Telegram job pages the channel until `SOCIAL_MAX_POSTS` (default 40) posts were seen. The run stored 50-55 per channel, more than 40, so a third page was read; the live page size is not recorded.
+- Documents: 223 on `iw:documents`, from all 17 sources (Damian). Web pages gave 1 each (13), so the 4 channels gave 210 by difference (50-55 each, Damian). The per-source split is not in the issue.
+- Errors and retries: 0 `job_errors` (Damian). A transient failure records a job error on every attempt (`jobs.py`), so none means no failed attempt and no retry, apart from a requeue after a lost Redis or database connection (`jobs.py`), which records none. Deferrals (a `Retry-After` or failure pause) leave no job error and were not checked.
+- Not checked: scraper logs and `scan.*` events (not quoted in the issue), timings, and `python -m iw_scraper.report` output.
+
+Scheduler and cron: not checked. The run used manual scan requests only. The `scheduler` enqueues a source only when its cron matches one of the last five minutes (`scheduler.py`), crons are UTC (KNF `0 */6 * * *` by default, `SCRAPER_SEED_CRON`; web daily or weekly from 06:00; Telegram `15`, `25`, `35`, `45` past every sixth hour), so whether a slot fell inside the run is unknown. `tests/stack.sh` asserts the scheduler stays up, not that a scheduled scan lands documents. A scheduled-scan check needs a run where a source's cron falls due while the scheduler is up (for example `SCRAPER_SEED_CRON="*/5 * * * *"` for the KNF row), with the resulting documents or `scan.*` events recorded.
+
+Gaps that matter for the demo:
+
+- No `blocks` or `screenshots` on any document: the run had no renderer. With `SCRAPER_RENDER_ENABLED=true` the five `firm_own` M2 pages (3 XTB, 2 mBank) are rendered; that path is tested on demo pages, not on the live stack, and not through analytics. Damian's table lists M2 rules R2, R3, R14 and R18 (uncertain) only; no visual R4-R8 or R13 appears there (my reading of the table).
+- Telegram volume: 210 of 223 documents are channel posts, and they drive the low M1 noise on the controls (Rare Crypto Signals 26, KDP 17; Damian). Rule matching is analytics; the scraper stores every post with text.
+- The M3 false positive (Grant Thornton control) and the hosted-LLM outage are analytics findings, not scraper ones.
+- Re-running the same sources creates no new documents (dedup by `content_hash`), so a second rehearsal shows the scan events but no new findings; use a fresh database or a changed page for a live demo of a scan.
+
 ## Active OpenSpec changes
 
-- `scraper-v3-render` (PR pending): isolated Playwright renderer service, per-viewport screenshots and `blocks` for `firm_own` + `M2` sources, off by default (`SCRAPER_RENDER_ENABLED`);
+- `scraper-v3-render` (merged, PR #67, 2026-11-22 00:24Z): isolated Playwright renderer service, per-viewport screenshots and `blocks` for `firm_own` + `M2` sources, off by default (`SCRAPER_RENDER_ENABLED`);
 - `scraper-source-discovery` (`python -m iw_scraper.discover`: inactive candidate sources from stored links, ADR 0108; implemented, in review);
 - `scraper-stack` (PR #52); `scraper-orchestration`, `scraper-author-provenance`, `scraper-v2-sources` and `content-hash-definition` are merged (PRs #38, #49, #41, #43, #44)
 - `scraper-effectiveness-report` (PR #57)
 - `scraper-sample-import` (PR #56)
 - `scraper-audit-in-pr-body` (issue #66): spec-only delta so `scraper-deployment` says the `pip-audit` result goes in the PR body (ADR 0209); no code or doc edit.
+- `compose-include-chain` (issue #97): `scraper/compose.yaml` includes `../scraper/compose.renderer.yaml`, so the documented `-f infra -f api -f scraper` chain resolves; `stack.sh` root group checks it.
 
 ## Blockers and open decisions
 
