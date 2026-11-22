@@ -39,7 +39,7 @@ describe('App (against contract mocks)', () => {
 
   it('renders the trend section (lazy-loaded) between summary and findings', async () => {
     renderApp();
-    const trend = await screen.findByRole('region', { name: 'Trend zgłoszeń' }, { timeout: 4000 });
+    const trend = await screen.findByRole('region', { name: 'Trend zgłoszeń' });
     const summaryRegion = await screen.findByRole('region', { name: 'Podsumowanie' });
     expect(summaryRegion.compareDocumentPosition(trend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const findingsTable = document.querySelector('table.findings');
@@ -49,8 +49,8 @@ describe('App (against contract mocks)', () => {
 
   it('mounts the calibration panel (lazy-loaded) after the findings', async () => {
     renderApp();
-    const heading = await screen.findByRole('heading', { name: 'Kalibracja progów' }, { timeout: 4000 });
-    expect(await screen.findByRole('slider', { name: 'Próg dla M2' }, { timeout: 4000 })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: 'Kalibracja progów' });
+    expect(await screen.findByRole('slider', { name: 'Próg dla M2' })).toBeInTheDocument();
     const findingsTable = document.querySelector('table.findings');
     expect(findingsTable).not.toBeNull();
     expect(findingsTable!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
