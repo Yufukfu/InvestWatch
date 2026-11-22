@@ -18,3 +18,5 @@ The recommended M2 threshold moved from 0.1 to 0.05, so `tests/test_eval_thresho
 | R5 "przesłonięcia przez inne elementy": the renderer reports no overlap between blocks, so occlusion by a banner or a cookie layer is not checked | new-item (renderer: an `occluded` flag per block) |
 | `tests/test_rules.py` exact implemented list and the "Catalogue is complete" scenario are also edited by the R9/R10 text-rules change; whichever merges second resolves a one-line conflict | docs |
 | `test_eval_thresholds` red until the M2 default moves to 0.05 (or the gold changes) | docs (Damian decides) |
+| Detector: a rate or fee in a dated sentence (`Oprocentowanie lokaty 6% w 2025 r.`, `... 2025-2026`) reads as past performance; the single-year form already did before this change, the range only extends it (R13 review) | new-item (fee/rate exclusions for `pp_figure_exclude`) |
+| A range ending in the fetch year (`2025-2026` in Nov 2026) may be a running offer, not past results; treated like `w 2026 r.` today | wont-fix (product call, same as the single year) |

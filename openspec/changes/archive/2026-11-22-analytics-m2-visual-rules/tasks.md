@@ -34,5 +34,5 @@ Order R5, then R7, R8 and R13 (feature freeze Sun 08:00). If time runs short, sh
 
 - [x] 5.1 Run `eval/run.py --module M2` again; record per-rule P/R and M2 at 0.1 next to the baseline in `follow-ups.md`; leave `test_eval_thresholds` as it is if the best threshold moved, and report.
 - [x] 5.2 Docs: `.docs/analytics-plan.md` §5, `.docs/status/` for analytics, the AI log entry, `docs-check` clean.
-- [ ] 5.3 `iw-reviewer` pass on the whole diff; fix verified findings.
-- [ ] 5.4 Archive the change as the last commit; push and open the PR to `main`.
+- [x] 5.3 `iw-reviewer` pass on the whole diff; fix verified findings.
+- [x] 5.4 Archive the change as the last commit; push and open the PR to `main`.
