@@ -156,6 +156,13 @@ Each untrusted value listed above SHALL be shown in an element that holds only t
 - **WHEN** a row's title contains U+202E
 - **THEN** the title button has `dir="auto"` and its text is exactly the title
 
+### Requirement: Server error detail has its own direction
+When a status change is rejected and the API returns its own error text, that text SHALL be shown alone in an element with `dir="auto"` (and `lang="en"`), outside the Polish label `Odpowiedź serwera:`, so a bidi control in it cannot reorder the label.
+
+#### Scenario: Right-to-left override in the server detail
+- **WHEN** the API rejects a status change with an error text that contains U+202E
+- **THEN** the text is shown in an element with `dir="auto"` whose text is exactly the error text, and `Odpowiedź serwera:` is outside that element
+
 ### Requirement: Export a finding's evidence pack
 The finding detail SHALL offer an `Eksportuj` link that opens the printable evidence pack of that finding, `GET /findings/{id}/export?format=html` (contracts 1.2.0), under the app's API base URL, in a new tab. The link SHALL be shown only while that finding's detail is loaded, and it SHALL be keyboard-reachable inside the modal detail.
 

@@ -151,15 +151,18 @@ The generated mocks SHALL contain at least one document that has findings from t
 - **THEN** `findings.json` has exactly one `document_id` shared by two findings, one with `module` M1 and one with M3, and `python contracts/validate.py` exits 0
 
 ### Requirement: Serve the finding evidence pack
-The mock server SHALL serve `GET /api/findings/{id}/export` as in `contracts/openapi.yaml` 1.2.0: for `format=json` (the default) a pack whose `finding`, `document` and `screenshot_urls` equal the mock `GET /api/findings/{id}` body, whose `failed_rules` are the finding's rules with `result` `fail`, and whose `raw.available` is false with `unavailable_reason` `not_found` when the mock document has an `html_object_key` and `no_key` otherwise; for `format=html` the same content as a printable page with every value HTML-escaped and a `Content-Security-Policy` that allows no scripts. An unknown id SHALL return 404 in both formats and a malformed id or `format` SHALL return 422.
+The mock server SHALL serve `GET /api/findings/{id}/export` as in `contracts/openapi.yaml` 1.2.0: a JSON pack for `format=json` (the default) and a printable HTML page with the same content for `format=html`. An unknown id SHALL return 404 in both formats and a malformed id or `format` SHALL return 422.
 
 #### Scenario: JSON pack of a mock finding
 - **WHEN** the dashboard calls `GET /api/findings/{id}/export` for any mock finding
 - **THEN** the response is 200, validates against `contracts/openapi.yaml` and matches that finding's detail
+- **AND** the pack's `finding`, `document` and `screenshot_urls` SHALL equal the mock `GET /api/findings/{id}` body, and its `failed_rules` SHALL be the finding's rules with `result` `fail`
+- **AND** `raw.available` SHALL be false, with `unavailable_reason` `not_found` when the mock document has an `html_object_key` and `no_key` otherwise
 
 #### Scenario: Printable page
 - **WHEN** the dashboard opens `GET /api/findings/{id}/export?format=html`
 - **THEN** the response is 200 `text/html` with a CSP starting `default-src 'none'`
+- **AND** every value on the page SHALL be HTML-escaped and the `Content-Security-Policy` SHALL allow no scripts
 
 #### Scenario: Unknown finding
 - **WHEN** a client calls the export with a well-formed UUID that is not a mock finding
