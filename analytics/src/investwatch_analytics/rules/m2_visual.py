@@ -7,12 +7,14 @@ first on ties), as R4 and R6 do. Missing rendering data is never a pass. The blo
 from __future__ import annotations
 
 import math
+import re
 
 from ..models import Block, RuleResult
 from .engine import Context, register
-from .m2 import NO_BLOCKS, VIEWPORTS, _RiskWarnings, locator_for
+from .m2 import NO_BLOCKS, NO_RENDER_METADATA, VIEWPORTS, _RiskWarnings, locator_for
 
 _SEVERITY = {"fail": 3, "uncertain": 2, "pass": 1}
+_HEX = re.compile(r"#[0-9a-fA-F]{6}")  # the contract's colour format; anything else is an unknown colour
 
 Verdict = tuple[str, Block, str]  # (result, block, explanation)
 
@@ -67,7 +69,8 @@ class R5RiskContrast(_RiskWarnings):
     def _state(self, b: Block, min_contrast: float) -> Verdict:
         if not b.visible:
             return "fail", b, f"Ostrzeżenie o ryzyku jest niewidoczne na stronie ({b.viewport})."
-        if b.color is None or b.background_color is None:
+        if not (isinstance(b.color, str) and _HEX.fullmatch(b.color)
+                and isinstance(b.background_color, str) and _HEX.fullmatch(b.background_color)):
             return "uncertain", b, f"Brak danych o kolorach ostrzeżenia o ryzyku – kontrast do weryfikacji ({b.viewport})."
         ratio = contrast_ratio(b.color, b.background_color)
         shown = f"{_trunc(ratio)}:1 ({b.color} na {b.background_color}, {b.viewport})"
@@ -86,5 +89,54 @@ class R5RiskContrast(_RiskWarnings):
                 verdicts.append(best([self._state(b, min_contrast) for b in risk]))
         if not verdicts:
             return self.no_risk_result(ctx)
+        result, b, why = worst(verdicts)
+        return self.result(result, self.warning_quote(ctx, b), why, locator_for(b))
+
+
+# ---- R7 one-click availability -----------------------------------------------------------------
+
+
+@register
+class R7OneClick(_RiskWarnings):
+    """ZASÓB R7: "czy wyświetlanie informacji o ryzyku wymaga rozwinięcia, kliknięcia linku lub przejścia na inną
+    warstwę". Reads only `requires_interaction`; visibility is R5's, placement R6's."""
+
+    rule_id = "R7"
+
+    @staticmethod
+    def _state(b: Block) -> Verdict | None:
+        if b.requires_interaction is False:
+            return "pass", b, "Ostrzeżenie o ryzyku jest dostępne bez dodatkowego kliknięcia."
+        if b.requires_interaction is True:
+            return "fail", b, (
+                "Ostrzeżenie o ryzyku wymaga rozwinięcia, kliknięcia lub przejścia na inną warstwę "
+                f"({b.viewport})."
+            )
+        return None
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        if not ctx.doc.blocks:
+            return self.result("not_applicable", None, NO_BLOCKS)
+        verdicts = []
+        any_risk = False
+        for vp in VIEWPORTS:
+            risk = [b for b in ctx.doc.blocks if b.viewport == vp and self.is_warning(b.text)]
+            any_risk |= bool(risk)
+            states = [self._state(b) for b in risk]
+            known = [st for st in states if st is not None]
+            if not known:
+                continue  # no interaction metadata in this viewport
+            verdict = best(known)
+            if verdict[0] == "fail" and len(known) < len(states):
+                b = next(b for b, st in zip(risk, states) if st is None)
+                verdict = "uncertain", b, (
+                    "Ostrzeżenie o ryzyku wymaga kliknięcia, a dla innego wystąpienia brak danych, czy jest dostępne "
+                    f"bez kliknięcia ({b.viewport})."
+                )
+            verdicts.append(verdict)
+        if not any_risk:
+            return self.no_risk_result(ctx)
+        if not verdicts:
+            return self.result("not_applicable", None, NO_RENDER_METADATA)
         result, b, why = worst(verdicts)
         return self.result(result, self.warning_quote(ctx, b), why, locator_for(b))

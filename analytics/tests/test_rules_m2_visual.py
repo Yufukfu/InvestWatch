@@ -74,7 +74,7 @@ def page(risk_desktop: dict | None = None, risk_mobile: dict | None = None) -> l
 
 def test_catalogue_implements_the_visual_rules(catalogue):
     implemented = {s.id for s in catalogue.implemented}
-    assert {"R5"} <= implemented
+    assert {"R5", "R7"} <= implemented
 
 
 # ---- R5 exposure and contrast ------------------------------------------------------------------
@@ -113,8 +113,9 @@ def test_r5_one_exposed_warning_per_viewport_is_enough(registry, catalogue):
 
 
 @pytest.mark.parametrize("field", ["color", "background"])
-def test_r5_unknown_colours_are_uncertain(registry, catalogue, field):
-    r = run(TEXT, registry, catalogue, blocks=page(risk_desktop={field: None}))["R5"]
+@pytest.mark.parametrize("value", [None, "#fff", "rgb(0, 0, 0)"])
+def test_r5_unknown_colours_are_uncertain(registry, catalogue, field, value):
+    r = run(TEXT, registry, catalogue, blocks=page(risk_desktop={field: value}))["R5"]
     assert r.result == "uncertain"
 
 
@@ -157,3 +158,56 @@ def test_r5_evidence_is_the_warning_sentence_inside_the_block(registry, catalogu
     r = run(TEXT, registry, catalogue, blocks=blocks)["R5"]
     assert r.result == "fail"
     assert r.evidence == RISK
+
+
+# ---- R7 one-click availability -----------------------------------------------------------------
+
+
+def test_r7_gold_risk_behind_click_fails(registry, catalogue):
+    r = run_gold("m2-r7-risk-behind-click", registry, catalogue)["R7"]
+    assert r.result == "fail"
+    assert r.evidence == RISK.replace("kapitału", "zainwestowanego kapitału")
+    assert r.evidence_locator.viewport == "desktop"
+    assert "kliknięcia" in r.explanation
+
+
+def test_r7_warning_on_the_page_passes(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page())["R7"]
+    assert r.result == "pass"
+    assert r.evidence == RISK
+
+
+def test_r7_behind_click_on_mobile_only_fails_on_mobile(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page(risk_mobile={"interaction": True}))["R7"]
+    assert r.result == "fail"
+    assert r.evidence_locator.viewport == "mobile"
+
+
+def test_r7_one_reachable_warning_is_enough(registry, catalogue):
+    blocks = page() + [block(RISK, interaction=True)]
+    assert run(TEXT, registry, catalogue, blocks=blocks)["R7"].result == "pass"
+
+
+def test_r7_without_interaction_metadata_is_not_applicable(registry, catalogue):
+    blocks = page(risk_desktop={"interaction": None}, risk_mobile={"interaction": None})
+    r = run(TEXT, registry, catalogue, blocks=blocks)["R7"]
+    assert r.result == "not_applicable"
+    assert "brak metadanych renderowania" in r.explanation.lower()
+
+
+def test_r7_partly_unknown_interaction_is_uncertain(registry, catalogue):
+    blocks = page(risk_desktop={"interaction": True}) + [block(RISK, interaction=None)]
+    assert run(TEXT, registry, catalogue, blocks=blocks)["R7"].result == "uncertain"
+
+
+def test_r7_unknown_viewport_does_not_hide_a_failing_one(registry, catalogue):
+    blocks = page(risk_desktop={"interaction": None}, risk_mobile={"interaction": True})
+    assert run(TEXT, registry, catalogue, blocks=blocks)["R7"].result == "fail"
+
+
+def test_r7_without_blocks_or_risk_is_not_applicable(registry, catalogue):
+    r = run(TEXT, registry, catalogue)["R7"]
+    assert r.result == "not_applicable" and "renderowaniu" in r.explanation
+    r = run(f"{HEAD}. Reklama.", registry, catalogue, blocks=[block(HEAD, size=32)])["R7"]
+    assert r.result == "not_applicable"
+    assert "brak informacji o ryzyku" in r.explanation.lower()

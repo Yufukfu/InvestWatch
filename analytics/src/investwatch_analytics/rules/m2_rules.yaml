@@ -238,8 +238,20 @@ rules:
       risk_override_patterns: *risk_override_patterns
       risk_exclude_patterns: *risk_exclude_patterns
       footnote_markers: *footnote_markers
-  # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
-  - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
+  # ZASÓB R7 "wymaga rozwinięcia, kliknięcia linku lub przejścia na inną warstwę": per viewport, fail when every
+  # risk block has `requires_interaction: true`. Visual (rules/m2_visual.py): not_applicable without `blocks`,
+  # without risk information ("brak informacji o ryzyku", ZASÓB) or without interaction metadata.
+  - id: R7
+    name: Dostępność za 1 kliknięciem
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565
+    implemented: true
+    params:
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
   # R9: LLM-first (no rules signal, analytics-m2-p1-rules follow-up F2); not_applicable with "brak informacji o
   # ryzyku" without risk information.

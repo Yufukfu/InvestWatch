@@ -14,9 +14,9 @@ Order R5, then R7, R8 and R13 (feature freeze Sun 08:00). If time runs short, sh
 
 ## 2. R7 one-click availability
 
-- [ ] 2.1 Write the failing tests for every R7 scenario.
-- [ ] 2.2 Implement R7. Tests green.
-- [ ] 2.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 2.1 Write the failing tests for every R7 scenario.
+- [x] 2.2 Implement R7. Tests green.
+- [x] 2.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 7 tried, 7 caught` (the `false`/`true` tests, the partly-unknown downgrade, the per-viewport skip, the no-risk and no-blocks guards; first run one survivor, the no-blocks explanation is now asserted). R5 review fix (a colour outside `#rrggbb` is unknown, not a crash): `mutations: 1 tried, 1 caught`.
 
 ## 3. R8 responsiveness
 
