@@ -8,6 +8,13 @@ const alert = (over: Partial<AlertItem> = {}): AlertItem => ({ id: 'a', title: '
 const handlers = () => ({ onOpen: vi.fn(), onDismiss: vi.fn(), onHold: vi.fn(), onRelease: vi.fn() });
 
 describe('AlertToasts', () => {
+  it('bidi-isolates the title in the toast and Zamknij labels', () => {
+    const title = 'abc \u202Edef';
+    render(<AlertToasts alerts={[alert({ title })]} announcement="" {...handlers()} />);
+    const toast = screen.getByRole('group', { name: `Wysokie ryzyko: \u2068${title}\u2069` });
+    expect(within(toast).getByRole('button', { name: `Zamknij: \u2068${title}\u2069` })).toBeInTheDocument();
+  });
+
   it('reads the announcement from the hook in a polite live line that is always present', () => {
     const { container, rerender } = render(<AlertToasts alerts={[]} announcement="" {...handlers()} />);
     const region = screen.getByRole('region', { name: 'Alerty' });
@@ -37,7 +44,7 @@ describe('AlertToasts', () => {
     fireEvent.mouseLeave(toast);
     expect(h.onRelease).toHaveBeenLastCalledWith('x');
     const show = screen.getByRole('button', { name: 'Pokaż' });
-    const close = screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' });
+    const close = screen.getByRole('button', { name: 'Zamknij: \u2068Płatne sygnały\u2069' });
     fireEvent.focus(show);
     expect(h.onHold).toHaveBeenCalledTimes(2);
     fireEvent.blur(show, { relatedTarget: close });
@@ -72,7 +79,7 @@ describe('AlertToasts', () => {
     const h = handlers();
     const { rerender } = render(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
     fireEvent.mouseEnter(screen.getByRole('group'));
-    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: \u2068Płatne sygnały\u2069' }));
     expect(h.onDismiss).toHaveBeenCalledWith('x');
     rerender(<AlertToasts alerts={[]} announcement="" {...h} />);
     rerender(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
@@ -105,20 +112,20 @@ describe('AlertToasts', () => {
     const [first, second] = screen.getAllByRole('group');
     fireEvent.click(within(second).getByRole('button', { name: 'Pokaż' }));
     expect(h.onOpen).toHaveBeenLastCalledWith('b');
-    fireEvent.click(within(first).getByRole('button', { name: 'Zamknij: Pierwszy' }));
+    fireEvent.click(within(first).getByRole('button', { name: 'Zamknij: \u2068Pierwszy\u2069' }));
     expect(h.onDismiss).toHaveBeenLastCalledWith('a');
   });
 
   it('gives each close button its own accessible name', () => {
     render(<AlertToasts alerts={[alert({ id: 'a', title: 'Pierwszy' }), alert({ id: 'b', title: 'Drugi' })]} announcement="" {...handlers()} />);
-    expect(screen.getByRole('button', { name: 'Zamknij: Pierwszy' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Zamknij: Drugi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zamknij: \u2068Pierwszy\u2069' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zamknij: \u2068Drugi\u2069' })).toBeInTheDocument();
   });
 
   it('moves focus to the next toast when one is dismissed, not to the body', () => {
     render(<AlertToasts alerts={[alert({ id: 'a', title: 'Pierwszy' }), alert({ id: 'b', title: 'Drugi' })]} announcement="" {...handlers()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Pierwszy' }));
-    const rest = screen.getByRole('group', { name: 'Wysokie ryzyko: Drugi' });
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: \u2068Pierwszy\u2069' }));
+    const rest = screen.getByRole('group', { name: 'Wysokie ryzyko: \u2068Drugi\u2069' });
     expect(rest.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(within(rest).getByRole('button', { name: 'Pokaż' }));
   });
@@ -126,12 +133,12 @@ describe('AlertToasts', () => {
   it('moves focus to the next toast when one is opened, so the detail has a place to return to', () => {
     render(<AlertToasts alerts={[alert({ id: 'a', title: 'Pierwszy' }), alert({ id: 'b', title: 'Drugi' })]} announcement="" {...handlers()} />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Pokaż' })[0]);
-    expect(screen.getByRole('group', { name: 'Wysokie ryzyko: Drugi' }).contains(document.activeElement)).toBe(true);
+    expect(screen.getByRole('group', { name: 'Wysokie ryzyko: \u2068Drugi\u2069' }).contains(document.activeElement)).toBe(true);
   });
 
   it('moves focus to the toast region when the last toast goes', () => {
     render(<AlertToasts alerts={[alert({ id: 'a' })]} announcement="" {...handlers()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: \u2068Płatne sygnały\u2069' }));
     expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Alerty' }));
   });
 

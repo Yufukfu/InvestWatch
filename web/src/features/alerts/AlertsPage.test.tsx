@@ -45,7 +45,7 @@ describe('AlertsPage', () => {
     vi.useFakeTimers();
     render(<AlertsPage />, { wrapper: storeWrapper() });
     act(() => fake.fire('finding.high_risk', payload('00000000-0000-4000-8000-000000000001', 'Pod kursorem')));
-    const toast = screen.getByRole('group', { name: 'Wysokie ryzyko: Pod kursorem' });
+    const toast = screen.getByRole('group', { name: 'Wysokie ryzyko: \u2068Pod kursorem\u2069' });
     fireEvent.mouseEnter(toast);
     act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByText('Pod kursorem')).toBeInTheDocument();

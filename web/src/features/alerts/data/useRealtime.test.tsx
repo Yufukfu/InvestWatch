@@ -229,12 +229,18 @@ describe('useRealtime', () => {
       fake.fire('finding.high_risk', { ...brief, id: uid(1), title: 'Stary' });
       fake.fire('finding.high_risk', { ...brief, id: uid(2), title: 'Nowy' });
     });
-    expect(result.current.announcement).toBe('Wysokie ryzyko: Nowy');
+    expect(result.current.announcement).toBe('Wysokie ryzyko: \u2068Nowy\u2069');
     act(() => result.current.dismiss(uid(2)));
-    expect(result.current.announcement).toBe('Wysokie ryzyko: Nowy');
+    expect(result.current.announcement).toBe('Wysokie ryzyko: \u2068Nowy\u2069');
     expect(result.current.alerts.map((a) => a.id)).toEqual([uid(1)]);
     act(() => result.current.open(uid(1)));
-    expect(result.current.announcement).toBe('Wysokie ryzyko: Nowy');
+    expect(result.current.announcement).toBe('Wysokie ryzyko: \u2068Nowy\u2069');
+  });
+
+  it('bidi-isolates the title in the announcement', () => {
+    const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1), title: 'abc \u202Edef' }));
+    expect(result.current.announcement).toBe('Wysokie ryzyko: \u2068abc \u202Edef\u2069');
   });
 
   it('does not alert on finding.created', () => {

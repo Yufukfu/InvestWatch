@@ -64,6 +64,16 @@ describe('StatusEditor', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Zapisano.');
   });
 
+  it('shows the server detail in its own direction, apart from the label', () => {
+    const detail = 'invalid \u202Estatus';
+    render(<StatusEditor {...base} error={{ message: 'serwer odrzucił tę wartość.', detail }} onSave={vi.fn()} />);
+    const span = screen.getByText(detail);
+    expect(span).toHaveAttribute('dir', 'auto');
+    expect(span).toHaveAttribute('lang', 'en');
+    expect(span.textContent).toBe(detail);
+    expect(span).not.toHaveTextContent('Odpowiedź serwera:');
+  });
+
   it('submits with the keyboard (form submit)', () => {
     const onSave = vi.fn();
     render(<StatusEditor {...base} onSave={onSave} />);

@@ -68,7 +68,9 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
           {error && <p>Nie udało się zapisać zmiany: {error.message}</p>}
           {error?.detail && (
             <p className="muted">
-              Odpowiedź serwera: <span lang="en">{error.detail}</span>
+              Odpowiedź serwera: <span lang="en" dir="auto">
+                {error.detail}
+              </span>
             </p>
           )}
         </div>

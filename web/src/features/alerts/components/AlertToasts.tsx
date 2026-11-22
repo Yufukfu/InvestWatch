@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { isolate } from '../../../format/bidi';
 import { formatScore } from '../../../format/score';
 import type { AlertItem } from '../model';
 
@@ -17,7 +18,7 @@ type Reason = 'pointer' | 'focus';
 // Nothing takes focus on arrival. A toast holds while the pointer is over it or keyboard focus is in it;
 // the two are tracked separately, so leaving one does not release a toast the other still holds.
 // When a toast goes by a button, focus moves first to the next toast (or the region), so it is not lost.
-// Titles are scraped content: text only.
+// Titles are scraped content: text only, isolated from the labels around them (`dir`, or `isolate` in strings).
 export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, onRelease }: Props) {
   const region = useRef<HTMLElement>(null);
   const reasons = useRef(new Map<string, Set<Reason>>());
@@ -73,7 +74,7 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
             className="toast"
             data-id={a.id}
             role="group"
-            aria-label={`Wysokie ryzyko: ${a.title}`}
+            aria-label={`Wysokie ryzyko: ${isolate(a.title)}`}
             onMouseEnter={() => setReason(a.id, 'pointer', true)}
             onMouseLeave={() => setReason(a.id, 'pointer', false)}
             onFocus={() => setReason(a.id, 'focus', true)}
@@ -102,7 +103,7 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
               <button
                 type="button"
                 className="btn"
-                aria-label={`Zamknij: ${a.title}`}
+                aria-label={`Zamknij: ${isolate(a.title)}`}
                 onClick={() => {
                   focusNeighbour(a.id);
                   onDismiss(a.id);
