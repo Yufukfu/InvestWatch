@@ -27,6 +27,8 @@ DEFAULT_TERMS = Path(__file__).with_name("gate_terms.yaml")
 #: regex cost on hostile 2 MB input (measured ~0.6 s worst case at this size).
 MAX_GATE_CHARS = 200_000
 _KEYS = {"version", "terms", "prefixes", "centroids"}
+#: Reserved seed class: the embedding rescue compares the on-topic classes against it (analytics-embedding-gate).
+OFF_TOPIC_CLASS = "off_topic"
 _POLISH_EXTRA = str.maketrans({"ł": "l", "Ł": "l"})  # NFD does not decompose ł
 
 
@@ -93,6 +95,8 @@ def load_terms(path: str | Path | None = None) -> GateTerms:
     for name, seeds in centroids.items():
         if not isinstance(seeds, list) or not seeds or not all(isinstance(s, str) and s.strip() for s in seeds):
             raise _fail(p, f"centroids.{name}", "must be a non-empty list of seed phrases")
+    if centroids and (OFF_TOPIC_CLASS not in centroids or len(centroids) < 2):
+        raise _fail(p, "centroids", f"needs the `{OFF_TOPIC_CLASS}` class and at least one on-topic class")
     return GateTerms(pattern=_compile([t.strip() for t in terms], [strip_diacritics(x.strip()) for x in prefixes]),
                      centroids={str(k): list(v) for k, v in centroids.items()})
 
@@ -100,14 +104,17 @@ def load_terms(path: str | Path | None = None) -> GateTerms:
 @dataclass(frozen=True)
 class GateDecision:
     passed: bool
-    reason: str  # dictionary | off_topic | bypassed_firm_own | gate_disabled
+    reason: str  # dictionary | embedding | off_topic | bypassed_firm_own | gate_disabled
     dict_hits: int
-    similarity: float | None = None  # set only by the (stretch) similarity rescue
+    similarity: float | None = None  # highest cosine to an on-topic centroid, set only on the embedding path
     embedder: str | None = None
+    #: dictionary | embedding | dictionary_only_fallback; None when the gate did not judge (bypass, disabled).
+    path: str | None = None
+    margin: float | None = None  # on-topic minus off-topic cosine, set only on the embedding path
 
     def log_extra(self) -> dict[str, Any]:
-        return {"reason": self.reason, "dict_hits": self.dict_hits, "similarity": self.similarity,
-                "embedder": self.embedder}
+        return {"reason": self.reason, "dict_hits": self.dict_hits, "gate_path": self.path,
+                "similarity": self.similarity, "margin": self.margin, "embedder": self.embedder}
 
 
 def evaluate(normalized_text: str, *, source_kind: str, firm_matched: bool, terms: GateTerms,
@@ -118,13 +125,22 @@ def evaluate(normalized_text: str, *, source_kind: str, firm_matched: bool, term
         return GateDecision(True, "bypassed_firm_own", 0, embedder=embedder)
     text = strip_diacritics(normalized_text[:MAX_GATE_CHARS])
     hits = sum(1 for _ in terms.pattern.finditer(text)) + int(firm_matched)
-    return GateDecision(hits > 0, "dictionary" if hits else "off_topic", hits, embedder=embedder)
+    return GateDecision(hits > 0, "dictionary" if hits else "off_topic", hits, embedder=embedder, path="dictionary")
 
 
 def count_decision(client: Any, decision: GateDecision) -> None:
-    """HINCRBY `iw:stats:gate` passed | dropped | bypassed; a Redis error is logged, never raised."""
+    """HINCRBY `iw:stats:gate` passed | dropped | bypassed, plus `path_<path>` for a judged document and `rescued`
+    for an embedding pass (analytics-embedding-gate), in one round trip; a Redis error is logged, never raised."""
+    fields = [_COUNTER_FIELD.get(decision.reason, "passed")]
+    if decision.path:
+        fields.append(f"path_{decision.path}")
+    if decision.passed and decision.reason == "embedding":
+        fields.append("rescued")
     try:
-        client.hincrby(STATS_KEY, _COUNTER_FIELD.get(decision.reason, "passed"), 1)
+        pipe = client.pipeline(transaction=False)
+        for name in fields:
+            pipe.hincrby(STATS_KEY, name, 1)
+        pipe.execute()
     except Exception as exc:  # noqa: BLE001 - a counter must never fail a document
         log.warning("gate counter not updated", extra={"reason": "gate_counter_unavailable",
                                                        "error": type(exc).__name__})
