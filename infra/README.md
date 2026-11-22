@@ -89,7 +89,7 @@ Behind the root README's "Hardware requirements" (origin/main `ba32bd27`, 2026-1
 - **CPU.** The sum of the CPU limits: 8.5 for the default stack, `ollama` adds 4.0. The services rarely peak at the same time, hence the lower minimum.
 - **Disk, default stack.** `docker image ls` after `docker compose build` on arm64: `renderer` 954 MB (Chromium), `api` 267 MB, `scraper` 250 MB, `analytics` 250 MB, `web` 55 MB, `postgres` 291 MB, `minio` 160 MB, `redis` 119 MB, `caddy` 63 MB: 2.4 GB. The build stages pull `node:22-alpine` (164 MB) and `python:3.13-slim` (144 MB) and leave build cache. Data volumes start empty and grow with scraped pages and screenshots.
 - **Disk, `llm` profile.** Ollama image: 2.9 GB compressed on arm64, 3.4 GB on amd64 (sum of layer sizes in the registry manifest of the pinned digest; unpacked it is larger). Models, from the published manifests on `registry.ollama.ai`: `gemma3:4b` 3.35 GB, `bge-m3` 1.16 GB ([#65](https://github.com/Yufukfu/InvestWatch/issues/65)). Both stay loaded at once (`OLLAMA_MAX_LOADED_MODELS=2`), so their 4.5 GB of weights plus the context cache sit inside the 6 GiB `ollama` limit.
-- **Speed on CPU** ([`analytics/.env.example`](analytics/.env.example)): warm `bge-m3` took 4-12 s per document on a loaded 16-core CPU, a cold load 37 s.
+- **Speed on CPU** ([`analytics/.env.example`](../analytics/.env.example)): warm `bge-m3` took 4-12 s per document on a loaded 16-core CPU, a cold load 37 s.
 
 ## Development helpers
 
