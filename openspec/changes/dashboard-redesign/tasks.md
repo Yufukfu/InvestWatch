@@ -56,6 +56,7 @@ The first screenshot review (8.3) found the built look diverges from the mockups
 - [x] 8a.4 Phone and tablet: hamburger menu, `Filtry n` button with removable filter chips, bordered finding cards, tablet four-column list with the meta line under the title (mutations: 18 tried, 18 caught)
 - [x] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` / `Zgodne` tags, status radio pills, navy toast, labelled proportion bar and selection markers (mutations: 37 tried, 37 caught)
 - [ ] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real
+- [x] 8a.7 Components sheet states: shortcut chips, connection banner, empty state and skeleton rows (mutations: 28 tried, 28 caught)
 
 ## 8. Responsive evidence
 
