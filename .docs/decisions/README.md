@@ -25,6 +25,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0208](0208-dashboard-realtime-socketio-client.md) | Dashboard real-time client: socket.io-client, one connection owned by the alerts feature | accepted (takes effect when the `realtime-alerts` PR merges) |
 | [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted (takes effect when the PR merges) |
 | [0210](0210-unattended-pr-watcher.md) | An unattended PR watcher runs sandboxed agent sessions and publishes from the runner | accepted (takes effect when PR #48 merges; needs Adam's and Damian's approval) |
+| [0212](0212-ai-log-one-file-per-entry.md) | AI log: one file per entry in `.docs/ai-log/`, table rendered on demand (replaces the `merge=union` table) | accepted (takes effect when the PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
@@ -37,6 +38,9 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0308](0308-m3-s34-gate.md) | M3 gate: a recommendation of instruments alone lifts the 0.4 cap ("may indicate" advice, personalisation unconfirmed) | accepted (takes effect when PR #35 merges) |
 | [0311](0311-knf-registry-source-and-ids.md) | KNF registry: HTML lists parsed by a manual loader, committed `registry/knf.csv`, uuid5 firm ids | accepted (takes effect when the `analytics-knf-registry` PR merges) |
 | [0312](0312-gold-set-evaluation.md) | Gold-set evaluation feeds the calibration panel: fictional eval registry, strict/review readings, idempotent default-stack run, labels plus gold in the API | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
+| [0313](0313-embeddings-model-and-serving.md) | Embeddings: `bge-m3` on the local `ollama` service through OpenAI-compatible `/v1/embeddings`, env-only, no hosted default (depends on [0304](0304-llm-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
+| [0314](0314-topic-gate-and-near-duplicates.md) | Topic gate (dictionary or embedding, drop only when both say no) and near-dups (MinHash, analyzed and grouped, never dropped) (depends on [0313](0313-embeddings-model-and-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
+| [0315](0315-m2-art44-element-ownership.md) | M2: one owner rule per art. 44 element (count once); R15 reports every detected forecast, R11 flags only violations | accepted (takes effect when the `analytics-m2-p1-rules` PR merges) |
 | [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
 | [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted (takes effect when the `analytics-llm-p0` PR merges) |
 

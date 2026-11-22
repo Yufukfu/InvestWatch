@@ -110,3 +110,4 @@ Run it before merging any change to `contracts/`.
 |---|---|
 | 1.0.0 | v1 as frozen on Sat 14:30 (ADR 0301) |
 | 1.1.0 | optional `document_id` on `GET /findings`; mocks gain one Instagram post with an M1 and an M3 finding (11 findings, 10 documents). Additive, agreed by the whole team (issue #33, OpenSpec change `findings-document-filter`) |
+| 1.2.0 | new read-only path `GET /findings/{id}/export` (evidence pack, JSON or `format=html`). Additive: no existing path, schema or mock changes (issue #70, OpenSpec change `api-finding-export`; team OK asked in the PR) |

@@ -1,6 +1,6 @@
 # AI-Assisted Development Log
 
-This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
+This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry in [`ai-log/`](ai-log/README.md) at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
 
 ## Process
 
@@ -27,7 +27,7 @@ All of it is committed, so the three of us run identical agents. The AI assistan
 
 ## Lifecycle of one change
 
-Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log row, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
+Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log entry, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
 
 ## Controls on generated code
 
@@ -125,3 +125,8 @@ Known limits: review is a practice, not enforced by a hook; the hook reads only 
 | Sun ~01:10 | Damian | A Claude Code side session of the analytics coordination implemented issue #65: `ollama-pull` loops over `OLLAMA_MODELS` (default `gemma3:4b bge-m3`), `ollama` gets `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m`, through the OpenSpec change `infra-ollama-bge-m3` | Branch `infra/ollama-pull-bge-m3`. It also found that the issue's manual fallback (`docker compose exec ollama ollama pull bge-m3`) cannot work, because the serving `ollama` is on the internal `data` network only; the README says to rerun `ollama-pull` instead. Models not pulled. |
 | Sun ~01:10 | Damian | A Claude Code side session wrote the analytics slide content for the hand-in PDF (#77, #74): ran `python analytics/eval/run.py` on `main` for the gold-set numbers, took the add-a-rule example from the real R14 commit `45bd8fee`, and summarised the PR #69 LLM swap runbook | Docs only (`.docs/presentation-analytics.md`). Every number is copied from the run's JSON, with its commit and gold-set hash, and the slides say the set is synthetic and the run rules-only. The rules-only run explains why LLM-backed signals (S1.5, S3.3, S3.4) show strict recall 0, which a reader would otherwise take as a broken rule |
 | Sun ~02:00 | Damian | The same side session, asked by the coordinator after the #92 evaluation, applied `analytics-llm-bare-array`. Before writing code it confirmed the cause with a debug run that saved only the message content of each LLM reply (never the request, headers or key): 5 of 8 `gemma-4-26b-a4b-it` replies were bare result arrays. It then wrote failing tests first and ran a scripted mutation check and a subagent review | The cause was checked, not guessed. Two mutants survived the first run (a scalar wrapped like an array, a removed object guard), and the tests now pin the exception type and message. Two older tests deliberately pinned 'array → malformed' and were changed as the spec delta says |
+One file per entry in [`ai-log/`](ai-log/README.md), named `YYYY-MM-DDTHHMM-<who>-<slug>.md`, so the listing reads in time order and parallel PRs never edit the same file ([ADR 0212](decisions/0212-ai-log-one-file-per-entry.md)). How to add one: the `iw-ai-log` skill. The whole log as one table, oldest first:
+
+```sh
+node .claude/skills/iw-ai-log/scripts/ai-log.mjs render
+```

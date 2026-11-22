@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: InvestWatch API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     REST API between the `api` service (owner: C) and the dashboard (owner: B).
     Real-time events are delivered over Socket.IO (namespace `/events`), see `schemas/events.schema.json`.
@@ -96,6 +96,62 @@ paths:
           content:
             application/json:
               schema: { $ref: './schemas/finding.schema.json' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /findings/{id}/export:
+    parameters:
+      - $ref: '#/components/parameters/id'
+    get:
+      tags: [findings]
+      summary: Evidence pack (case file) of one finding
+      description: |
+        Read-only case file for supervisory follow-up (issue #70): the finding with its scores, model and rules,
+        the document as stored (URL, `content_hash`, `fetched_at`, text), the raw HTML from object storage
+        (`iw-raw`, key `html_object_key`) with its SHA-256, the screenshot URLs and the failed rules with their
+        legal basis and verified quotes. `format=html` returns the same content as a printable page in Polish,
+        with all scraped text escaped. Added in 1.2.0.
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, html], default: json } }
+      responses:
+        '200':
+          description: The evidence pack (JSON), or a printable HTML page when `format=html`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [export_version, generated_at, finding, document, raw, screenshot_urls, failed_rules]
+                properties:
+                  export_version: { type: string, const: '1' }
+                  generated_at: { type: string, format: date-time }
+                  finding: { $ref: './schemas/finding.schema.json' }
+                  document:
+                    description: The stored document; null when the row is gone
+                    oneOf:
+                      - $ref: './schemas/scraped-document.schema.json'
+                      - type: 'null'
+                  raw:
+                    type: object
+                    description: Raw HTML from object storage. `available` is false when there is no key, no object or the store is down
+                    required: [object_key, available]
+                    properties:
+                      object_key: { type: [string, 'null'] }
+                      available: { type: boolean }
+                      unavailable_reason: { type: [string, 'null'], enum: [no_key, not_found, store_down, null] }
+                      sha256: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
+                      size_bytes: { type: [integer, 'null'], minimum: 0 }
+                      truncated: { type: boolean, description: true when `html` holds only the first 2 MB }
+                      html: { type: [string, 'null'] }
+                  screenshot_urls:
+                    type: object
+                    description: API URLs for the screenshots, keyed by viewport (as on the finding detail)
+                    additionalProperties: { type: string }
+                  failed_rules:
+                    type: array
+                    description: The finding's rules with `result` fail, in stored order
+                    items: { $ref: './schemas/finding.schema.json#/$defs/rule_result' }
+            text/html:
+              schema: { type: string }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
 

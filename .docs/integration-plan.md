@@ -185,6 +185,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 |---|---|---|
 | GET | `/findings` | list; filters: `module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q`. `document_id` (contract 1.1.0) returns every finding of one document, at most one per module, so the detail panel can list M1 and M3 of one post across pages |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
+| GET | `/findings/{id}/export` | evidence pack (case file) for UKNF follow-up, contract 1.2.0, read-only: finding with scores, model and rules, document (URL, `content_hash`, `fetched_at`, text), raw HTML from `iw-raw` with its SHA-256, screenshot URLs, failed rules with legal basis and quotes. JSON by default; `?format=html` is a printable page (the dashboard's "Eksportuj" button links to it) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |
@@ -204,7 +205,7 @@ Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/soc
 | Event | Payload | When |
 |---|---|---|
 | `finding.created` | `{ id, module, score, title, url, platform }` | every new finding |
-| `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert |
+| `finding.high_risk` | same | published by analytics when `score` ≥ the module threshold in Redis `iw:settings:thresholds` at creation time (ADR 0305) → toast/alert. At most one per near-duplicate group and module: a near-identical copy still gets `finding.created` but no second alert (ADR 0314) |
 | `finding.updated` | `{ id, status }` | published by the API on `iw:events` after `PATCH /findings/{id}` commits (status or note change; sync between tabs) |
 | `scan.started` / `scan.finished` | `{ source_id, documents, status }`: `documents` = new documents of that job (integer or null), `status` = `ok\|partial\|failed` or null ([`events.schema.json`](../contracts/schemas/events.schema.json)) | scan progress bar |
 
