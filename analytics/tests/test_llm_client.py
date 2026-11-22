@@ -182,7 +182,8 @@ def test_per_call_timeout_overrides_setting(stub_llm):
 
 @pytest.mark.parametrize("reply", [
     Reply(content='{"results": [{"rule_id": "R17", "result": "fail"'),     # truncated JSON
-    Reply(content='[{"rule_id": "R17", "result": "fail"}]'),               # array, not an object
+    Reply(content='"R17 fail"'),                                            # a string, not an object or array
+    Reply(content='null'),                                                  # null (a bare array is accepted: bare-array)
     Reply(content='{"verdicts": []}'),                                      # no results list
     Reply(content='{"results": "R17 fail"}'),                               # results not a list
     Reply(content=None),                                                    # no content

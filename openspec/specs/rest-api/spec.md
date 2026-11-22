@@ -2,9 +2,7 @@
 
 ## Purpose
 Serve the REST API of `contracts/openapi.yaml` v1 under `/api` from the shared database, Redis and MinIO, so the dashboard behaves the same against the real API as against the mocks. Owned by `api/`.
-
 ## Requirements
-
 ### Requirement: Contract-conformant responses
 Every route SHALL be served under the `/api` prefix, and every 2xx, 404 and 422 response body SHALL validate against the matching response schema in `contracts/openapi.yaml` (the finding and document parts of `GET /findings/{id}` are validated separately, see design open question 1). Error bodies SHALL have the shape `{"error": string, "details"?: any}`.
 
@@ -99,11 +97,16 @@ The API SHALL compute `risk_level` for every finding it returns, and for the `ri
 #### Scenario: Page gone on re-scan
 - **WHEN** the newest later fetch has `http_status` 404 or 410, or a `job_errors` row `HTTP 404`/`HTTP 410` for the page is newer than the last fetch
 - **THEN** `rescan.state` is `removed`
-- **AND** `state` SHALL be `removed` if a `job_errors` row for the page (same `source_id`, `url` equal to the page key or the document's `url`, `reason` `http_error`, `detail` `HTTP 404` or `HTTP 410`) is newer than the last fetch of the page, or if the newest later fetch has `http_status` 404 or 410
+- **AND** `state` SHALL be `removed` if a `job_errors` row for the page (`reason` `gone` or `http_error`, `detail` `HTTP 404` or `HTTP 410`) is newer than the last fetch of the page, or if the newest later fetch has `http_status` 404 or 410
+- **AND** "for the page" SHALL be the same `source_id` when the document is on platform `web` and has a `source_id` (a web source is one page, and the row's `url` is the source URL as entered, which a redirect makes differ from the document's URL); otherwise the same `source_id` (null matches null) and `url` equal to the page key or the document's `url`
+
+#### Scenario: Removed page of a redirecting web source
+- **WHEN** a web source's URL redirects, its documents hold the final URL, and a later `job_errors` row `reason` `gone`, `detail` `HTTP 404`, `url` the source URL as entered has that `source_id`
+- **THEN** `rescan.state` is `removed` for the findings of those documents
 - **AND** `latest_document_id` SHALL be null when the state comes from a job error, and `checked_at` SHALL be the time of the observation the state comes from
 
 #### Scenario: Unrelated rows do not count
-- **WHEN** the later document is another page or another source, or the job error is older than the last fetch, is not a 404/410, or names another source
+- **WHEN** the later document is another page or another source, or the job error is older than the last fetch, is not a 404/410, has another `reason`, names another source, or (outside `web`) names another page of the same source
 - **THEN** they do not change `rescan.state`
 
 #### Scenario: Page returns to earlier text
@@ -344,3 +347,4 @@ For labels, `confirmed` SHALL be a positive and `false_positive` a negative; oth
 #### Scenario: Unknown format
 - **WHEN** a client calls `GET /api/findings/{id}/export?format=pdf`
 - **THEN** the response is 422 naming `format`
+
