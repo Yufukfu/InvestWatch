@@ -15,6 +15,11 @@ function toAdvertiserFinding(f: Finding): AdvertiserFinding {
       website: f.advertiser.website,
     },
     firm: f.firm && { name: f.firm.name, registryId: f.firm.registry_id },
+    title: f.title,
+    platform: f.platform,
+    score: f.score,
+    riskLevel: f.risk_level ?? undefined,
+    detectedAt: f.detected_at,
   };
 }
 
@@ -39,9 +44,15 @@ export function useAdvertisers(): AdvertisersView {
     [data1, data2, data3],
   );
   const rows = useMemo(() => aggregateAdvertisers(items), [items]);
+  // M1 only, deduped by id (a finding can move between pages while they load).
+  const findings = useMemo(() => {
+    const seen = new Set<string>();
+    return items.filter((f) => f.module === 'M1' && !seen.has(f.id) && Boolean(seen.add(f.id)));
+  }, [items]);
 
   return {
     rows: isError || !complete ? undefined : rows,
+    findings: isError || !complete ? undefined : findings,
     loaded: isError || !complete ? 0 : items.length,
     total: isError ? undefined : data1?.total,
     isLoading: !isError && !complete,

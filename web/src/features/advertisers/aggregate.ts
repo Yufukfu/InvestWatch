@@ -1,6 +1,4 @@
-import { REPEAT_MIN, type AdvertiserFinding, type AdvertiserRow, type PromotedFirm } from './model';
-
-const NO_FIRM = 'none';
+import { NO_FIRM, REPEAT_MIN_FINDINGS, REPEAT_MIN_FIRMS, type AdvertiserFinding, type AdvertiserRow, type PromotedFirm } from './model';
 
 function clean(v: string | null | undefined): string | undefined {
   const t = v?.trim();
@@ -8,7 +6,7 @@ function clean(v: string | null | undefined): string | undefined {
 }
 
 // Identity of an advertiser: handle, else profile URL, else website, else name (case-insensitive).
-function advertiserKey(a: NonNullable<AdvertiserFinding['advertiser']>): string | undefined {
+export function advertiserKey(a: NonNullable<AdvertiserFinding['advertiser']>): string | undefined {
   const handle = clean(a.handle);
   if (handle) return `h:${handle.toLowerCase()}`;
   const profile = clean(a.profileUrl);
@@ -19,7 +17,7 @@ function advertiserKey(a: NonNullable<AdvertiserFinding['advertiser']>): string 
   return name ? `n:${name.toLowerCase()}` : undefined;
 }
 
-function firmKey(firm: AdvertiserFinding['firm']): { key: string; name?: string } {
+export function firmKey(firm: AdvertiserFinding['firm']): { key: string; name?: string } {
   const name = clean(firm?.name);
   if (!firm || !name) return { key: NO_FIRM };
   const registryId = clean(firm.registryId);
@@ -27,6 +25,14 @@ function firmKey(firm: AdvertiserFinding['firm']): { key: string; name?: string 
 }
 
 const label = (r: AdvertiserRow) => r.name ?? r.handle ?? r.contact ?? r.key;
+
+// The short label of an advertiser in the graph and the side table: the handle first, as in the mockup.
+export const advertiserLabel = (r: Pick<AdvertiserRow, 'handle' | 'name' | 'contact' | 'key'>) => r.handle ?? r.name ?? r.contact ?? r.key;
+
+// 2+ distinct matched firms, or 5+ findings (matched or not).
+export function isRepeat(count: number, firms: readonly PromotedFirm[]): boolean {
+  return count >= REPEAT_MIN_FINDINGS || firms.filter((f) => f.key !== NO_FIRM).length >= REPEAT_MIN_FIRMS;
+}
 
 // Groups M1 findings by advertiser and, inside each advertiser, by matched firm. Presentation only:
 // it counts the findings the API returned and derives no score or risk level.
@@ -56,10 +62,29 @@ export function aggregateAdvertisers(findings: readonly AdvertiserFinding[]): Ad
   return [...rows.values()]
     .map(({ firmMap, ...row }) => ({
       ...row,
-      repeat: row.count >= REPEAT_MIN,
+      repeat: isRepeat(row.count, [...firmMap.values()]),
       firms: [...firmMap.values()].sort(
         (a, b) => b.count - a.count || Number(a.key === NO_FIRM) - Number(b.key === NO_FIRM) || (a.name ?? '').localeCompare(b.name ?? '', 'pl'),
       ),
     }))
     .sort((a, b) => b.count - a.count || label(a).localeCompare(label(b), 'pl'));
+}
+
+// The findings of one advertiser, for one firm key (NO_FIRM = no matched firm) or for every firm when
+// `firm` is undefined. M1 only, deduped by id, newest first (by `detectedAt`).
+export function relationFindings(findings: readonly AdvertiserFinding[], advertiser: string, firm?: string): AdvertiserFinding[] {
+  const seen = new Set<string>();
+  const out: AdvertiserFinding[] = [];
+  for (const f of findings) {
+    if (f.module !== 'M1' || seen.has(f.id) || !f.advertiser) continue;
+    seen.add(f.id);
+    if (advertiserKey(f.advertiser) !== advertiser) continue;
+    if (firm !== undefined && firmKey(f.firm).key !== firm) continue;
+    out.push(f);
+  }
+  const time = (f: AdvertiserFinding) => {
+    const t = Date.parse(f.detectedAt ?? '');
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return out.sort((a, b) => time(b) - time(a));
 }

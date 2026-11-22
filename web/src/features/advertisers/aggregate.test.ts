@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateAdvertisers } from './aggregate';
+import { aggregateAdvertisers, relationFindings } from './aggregate';
 import type { AdvertiserFinding } from './model';
 
 let n = 0;
@@ -29,12 +29,29 @@ describe('aggregateAdvertisers', () => {
     expect(rows[0].name).toBe('A');
   });
 
-  it('marks an advertiser as repeat from 2 findings, not at 1', () => {
-    const rows = aggregateAdvertisers([f({ handle: '@a' }, X), f({ handle: '@a' }, X), f({ handle: '@b' }, X)]);
+  it('marks an advertiser as repeat from 2 distinct matched firms, not at 1', () => {
+    const rows = aggregateAdvertisers([f({ handle: '@a' }, X), f({ handle: '@a' }, Y), f({ handle: '@b' }, X), f({ handle: '@b' }, X)]);
     expect(rows.map((r) => [r.handle, r.repeat])).toEqual([
       ['@a', true],
       ['@b', false],
     ]);
+  });
+
+  it('does not count findings without a firm as a second firm', () => {
+    const rows = aggregateAdvertisers([f({ handle: '@a' }, X), f({ handle: '@a' }, null)]);
+    expect(rows[0].repeat).toBe(false);
+  });
+
+  it('marks an advertiser as repeat from 5 findings, not at 4', () => {
+    const five = aggregateAdvertisers([1, 2, 3, 4, 5].map(() => f({ handle: '@five' }, X)));
+    const four = aggregateAdvertisers([1, 2, 3, 4].map(() => f({ handle: '@four' }, null)));
+    expect(five[0].repeat).toBe(true);
+    expect(four[0].repeat).toBe(false);
+  });
+
+  it('counts findings without a firm towards the 5-finding rule', () => {
+    const rows = aggregateAdvertisers([1, 2, 3, 4, 5].map(() => f({ handle: '@a' }, null)));
+    expect(rows[0].repeat).toBe(true);
   });
 
   it('falls back to profile url, website, then name for the advertiser key', () => {
@@ -84,5 +101,20 @@ describe('aggregateAdvertisers', () => {
   it('breaks count ties by name so the order is stable', () => {
     const rows = aggregateAdvertisers([f({ name: 'Zenon', handle: '@z' }, X), f({ name: 'Adam', handle: '@y' }, X)]);
     expect(rows.map((r) => r.name)).toEqual(['Adam', 'Zenon']);
+  });
+});
+
+describe('relationFindings', () => {
+  it('returns the findings of one advertiser, optionally for one firm, newest first, deduped', () => {
+    const a1 = f({ handle: '@a' }, X, { detectedAt: '2026-11-20T10:00:00Z' });
+    const a2 = f({ handle: '@A' }, X, { detectedAt: '2026-11-21T10:00:00Z' });
+    const a3 = f({ handle: '@a' }, Y, { detectedAt: '2026-11-19T10:00:00Z' });
+    const a4 = f({ handle: '@a' }, null, { detectedAt: '2026-11-18T10:00:00Z' });
+    const b = f({ handle: '@b' }, X);
+    const all = [a1, a2, a3, a4, b, { ...a1 }];
+    expect(relationFindings(all, 'h:@a', 'rx').map((x) => x.id)).toEqual([a2.id, a1.id]);
+    expect(relationFindings(all, 'h:@a', 'none').map((x) => x.id)).toEqual([a4.id]);
+    expect(relationFindings(all, 'h:@a').map((x) => x.id)).toEqual([a2.id, a1.id, a3.id, a4.id]);
+    expect(relationFindings(all, 'h:@nobody')).toEqual([]);
   });
 });

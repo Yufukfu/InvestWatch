@@ -52,7 +52,9 @@ describe('useAdvertisers', () => {
     // Findings from all three pages are grouped (ids differ per page).
     const marek = result.current.rows?.find((r) => r.name === 'Marek Trader');
     expect(marek?.count).toBe(3);
-    expect(marek?.repeat).toBe(true);
+    // One firm and 3 findings: below both repeat thresholds (2 firms, 5 findings).
+    expect(marek?.repeat).toBe(false);
+    expect(result.current.findings).toHaveLength(3 * findings.items.filter((it) => it.module === 'M1').length);
   });
 
   it('fetches exactly two pages when total is just over one page', async () => {
