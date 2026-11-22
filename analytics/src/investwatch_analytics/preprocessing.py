@@ -52,12 +52,20 @@ def normalize(text: str) -> str:
 
 
 def content_hash(text: str) -> str:
-    return hashlib.sha256(normalize(text).encode("utf-8")).hexdigest()
+    return _hash_of_normalized(normalize(text))
+
+
+def _hash_of_normalized(norm: str) -> str:
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
 def guess_language(text: str) -> str | None:
     """`pl` or `en` by Polish diacritics and stopwords; None for empty text."""
-    norm = normalize(text).lower()
+    return _language_of_normalized(normalize(text))
+
+
+def _language_of_normalized(norm: str) -> str | None:
+    norm = norm.lower()
     if not norm:
         return None
     words = re.findall(r"[a-ząćęłńóśźż]+", norm)
@@ -115,11 +123,12 @@ class Preprocessed:
 
 
 def preprocess(text: str) -> Preprocessed:
+    # NFKC once: hash and language derive from the same normalized text (three passes took ~26 s on 2 MB of 'ﬁ').
     norm = normalize(text)
     return Preprocessed(
         original=text,
         normalized=norm,
-        content_hash=content_hash(text),
-        lang=guess_language(text),
+        content_hash=_hash_of_normalized(norm),
+        lang=_language_of_normalized(norm),
         sentences=split_sentences(text),
     )

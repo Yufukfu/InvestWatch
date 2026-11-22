@@ -16,9 +16,9 @@ Each group is one commit, and its first task is the failing test. No test calls 
 
 ## 3. NFKC once (~30 min)
 
-- [ ] 3.1 Failing tests: `unicodedata.normalize` is called exactly once per `preprocess`; equivalence with the field-by-field functions on every mock and on 200 seeded random texts; linear growth on 100k against 400k `ﬁ`
-- [ ] 3.2 `preprocess` normalizes once, through private helpers for the hash and the language; tests green
-- [ ] 3.3 Mutation check
+- [x] 3.1 Failing tests: `unicodedata.normalize` is called exactly once per `preprocess`; equivalence with the field-by-field functions on every mock and on 200 seeded random texts; linear growth on 100k against 400k `ﬁ`
+- [x] 3.2 `preprocess` normalizes once, through private helpers for the hash and the language; tests green
+- [x] 3.3 Mutation check; `mutations: 8 tried, 7 caught`. The survivor is a quadratic term of n²/1000 character scans, which stays under the linear cost at 400k characters, so no ratio test can see it without flaking. The same mutant at n²/20 is caught (ratio 15.8 against the bound of 8); measured ratios on the real code are 4.1-5.6 under load
 
 ## 4. Evaluation with the LLM (~1 h, mostly waiting)
 
