@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { SectionBoundary } from './SectionBoundary';
 import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
@@ -19,19 +19,30 @@ const SECTION_LINKS = [
   { id: 'kalibracja', label: 'Kalibracja' },
 ];
 
+// The first section is current until a link changes the hash; the sections are anchors, so the hash is the state.
+function useActiveSection(): string {
+  const [hash, setHash] = useState(() => window.location.hash.slice(1));
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash.slice(1));
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return SECTION_LINKS.some((l) => l.id === hash) ? hash : SECTION_LINKS[0].id;
+}
+
 export function App() {
+  const active = useActiveSection();
   return (
     <ToastSlotProvider>
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand">
-            <span className="brand-eyebrow">NARZĘDZIE NADZORCZE</span>
             <h1>InvestWatch</h1>
-            <span className="brand-sub">Monitoring ryzykownych treści inwestycyjnych</span>
+            <span className="brand-tagline">NARZĘDZIE NADZORCZE</span>
           </div>
           <nav className="app-nav" aria-label="Sekcje">
             {SECTION_LINKS.map((l) => (
-              <a key={l.id} href={`#${l.id}`}>
+              <a key={l.id} href={`#${l.id}`} aria-current={l.id === active ? 'location' : undefined}>
                 {l.label}
               </a>
             ))}

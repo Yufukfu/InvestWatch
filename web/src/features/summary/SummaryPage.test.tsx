@@ -12,10 +12,10 @@ describe('SummaryPage', () => {
   it('renders the counts from the API', async () => {
     render(<SummaryPage />, { wrapper: storeWrapper() });
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(region).toHaveTextContent(`${summary.total} zgłoszeń`);
-    expect(region).toHaveTextContent(`${summary.by_risk_level.high} wysokiego ryzyka`);
-    expect(region).toHaveTextContent(`${summary.by_status.new} nowych`);
-    expect(region).toHaveTextContent(`M1 ${summary.by_module.M1}`);
+    expect(region).toHaveTextContent(`${summary.total} zgłoszeń, z czego ${summary.by_risk_level.high} wysokiego ryzyka`);
+    expect(region).toHaveTextContent(/PRZEGLĄD · \d{2}\.\d{2}\.\d{4}/);
+    expect(region).toHaveTextContent(`${summary.by_status.new}Nowe, bez decyzji`);
+    expect(region).toHaveTextContent(`${summary.by_module.M1}M1 · Finfluencerzy`);
   });
 
   it('renders nothing once the request has failed', async () => {

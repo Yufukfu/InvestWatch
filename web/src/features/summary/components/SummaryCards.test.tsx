@@ -15,37 +15,41 @@ const SUMMARY = {
 
 describe('SummaryCards (hero)', () => {
   it('shows the total and the high-risk count as figures with their labels, without a store', () => {
-    render(<SummaryCards summary={SUMMARY} onStartTriage={vi.fn()} />);
+    render(<SummaryCards summary={SUMMARY} asOf="22.11.2026" onStartTriage={vi.fn()} />);
     const region = screen.getByRole('region', { name: 'Podsumowanie' });
-    expect(within(region).getByText('72').parentElement).toHaveTextContent('72 zgłoszeń');
-    expect(within(region).getByText('10', { selector: '.hero-value' }).parentElement).toHaveTextContent(
-      '10 wysokiego ryzyka',
+    expect(region).toHaveTextContent('PRZEGLĄD · 22.11.2026');
+    expect(within(region).getByText('72', { selector: '.hero-value' }).parentElement).toHaveTextContent(
+      '72 zgłoszeń, z czego 10 wysokiego ryzyka',
     );
-    expect(region).toHaveTextContent('31 nowych');
   });
 
-  it('lists the count of every module by its text label', () => {
-    render(<SummaryCards summary={SUMMARY} onStartTriage={vi.fn()} />);
-    const list = screen.getByRole('list', { name: 'Zgłoszenia według modułów' });
+  it('lists the new findings and every module with its name, the count first', () => {
+    render(<SummaryCards summary={SUMMARY} asOf="22.11.2026" onStartTriage={vi.fn()} />);
+    const list = screen.getByRole('list', { name: 'Wskaźniki' });
     const items = within(list).getAllByRole('listitem');
-    expect(items.map((li) => li.textContent)).toEqual(['M1 40', 'M2 22', 'M3 10']);
+    expect(items.map((li) => li.textContent)).toEqual([
+      '31Nowe, bez decyzji',
+      '40M1 · Finfluencerzy',
+      '22M2 · Zgodność reklam',
+      '10M3 · Usługi bez zezwolenia',
+    ]);
   });
 
   it('offers triage as a button named without any count, and reports the click', () => {
     const onStartTriage = vi.fn();
-    render(<SummaryCards summary={SUMMARY} onStartTriage={onStartTriage} />);
+    render(<SummaryCards summary={SUMMARY} asOf="22.11.2026" onStartTriage={onStartTriage} />);
     const button = screen.getByRole('button', { name: 'Rozpocznij triage' });
     fireEvent.click(button);
     expect(onStartTriage).toHaveBeenCalledTimes(1);
   });
 
   it('offers no triage when there are no high-risk findings', () => {
-    render(<SummaryCards summary={{ ...SUMMARY, highRisk: 0 }} onStartTriage={vi.fn()} />);
+    render(<SummaryCards summary={{ ...SUMMARY, highRisk: 0 }} asOf="22.11.2026" onStartTriage={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /triage/i })).toBeNull();
   });
 
   it('renders nothing without data', () => {
-    const { container } = render(<SummaryCards summary={undefined} onStartTriage={vi.fn()} />);
+    const { container } = render(<SummaryCards summary={undefined} asOf="22.11.2026" onStartTriage={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

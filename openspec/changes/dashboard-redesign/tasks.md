@@ -46,6 +46,17 @@
 - [x] 7.2 Implement `useFindingShortcuts` and the shortcut legend disclosure
 - [x] 7.3 mutations: 25 tried, 25 caught (1 equivalent: dead selectedId guard removed)
 
+## 8a. Fidelity pass to the Paper mockups
+
+The first screenshot review (8.3) found the built look diverges from the mockups in `design/` (navy header and blue accent where the mockup is white and ink with red only for risk). Each item is checked against the exported JSX before it is changed.
+
+- [x] 8a.1 Tokens, header and hero: white header with the `NARZĘDZIE NADZORCZE` tagline and an underlined active tab, ink for selected controls, red only for high risk and the triage action, flat white sections with dividers, 24-28px section headings with a subtitle, the `PRZEGLĄD · date` eyebrow, 96px hero figures on one row and a four-up KPI strip (Nowe, M1, M2, M3) (mutations: 13 tried, 13 caught)
+- [ ] 8a.2 Filters and findings table: plain label row and ink pills, uppercase table headers, plain title text, score bar coloured by risk, `dd.mm.rrrr · hh:mm` dates, `Strona n z m` pager
+- [ ] 8a.3 Trend chart: ink solid, blue dashed and teal dotted lines, mono ticks, two-line legend with counts, `Godzina | Dzień` segmented control
+- [ ] 8a.4 Phone and tablet: hamburger menu, `Filtry n` button with removable filter chips, bordered finding cards, tablet four-column list with the meta line under the title
+- [ ] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` tags, navy toast, labelled proportion bar and selection markers
+- [ ] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real
+
 ## 8. Responsive evidence
 
 - [ ] 8.1 Build the production bundle and serve it with the contract mock server; capture every section, plus the open detail, a toast and the calibration panel, at 320, 375, 768, 1024, 1280 and 1440px with Chrome DevTools against the contract mock server (`web/README.md`) and save them under `.docs/screens/dashboard-redesign/`; export the Paper desktop, tablet and mobile artboards to `.docs/screens/dashboard-redesign/design/`

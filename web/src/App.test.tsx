@@ -34,12 +34,13 @@ describe('App (against contract mocks)', () => {
   it('renders the summary counts next to the findings', async () => {
     renderApp();
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(region).toHaveTextContent(`${summary.total} zgłoszeń`);
+    expect(region).toHaveTextContent(`${summary.total} zgłoszeń, z czego`);
   });
 
   it('labels the tool and links the header to the three sections', async () => {
     renderApp();
     expect(screen.getByText('NARZĘDZIE NADZORCZE')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'InvestWatch' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Sekcje' });
     const links = within(nav).getAllByRole('link');
     expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
@@ -47,6 +48,11 @@ describe('App (against contract mocks)', () => {
       ['Zgłoszenia', '#zgloszenia'],
       ['Kalibracja', '#kalibracja'],
     ]);
+    // The first section is current until the user follows another link.
+    expect(links.map((a) => a.getAttribute('aria-current'))).toEqual(['location', null, null]);
+    fireEvent.click(links[2]);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(links.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'location']));
     // Each anchor points at an element that exists as soon as the app is rendered, even before data arrives.
     for (const id of ['przeglad', 'zgloszenia', 'kalibracja']) {
       expect(document.getElementById(id), id).not.toBeNull();
