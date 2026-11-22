@@ -72,3 +72,29 @@ def test_the_queue_defaults_match_the_web_collection_spec(monkeypatch):
     settings = QueueSettings.from_env()
 
     assert (settings.failure_threshold, settings.domain_cooldown, settings.max_retry_after) == (5, 600.0, 300.0)
+
+
+def test_social_max_posts_defaults_to_two_pages(monkeypatch):
+    from iw_scraper.config import social_max_posts
+
+    monkeypatch.delenv("SOCIAL_MAX_POSTS", raising=False)
+
+    assert social_max_posts() == 40
+
+
+def test_social_max_posts_is_read_as_a_whole_number(monkeypatch):
+    from iw_scraper.config import social_max_posts
+
+    monkeypatch.setenv("SOCIAL_MAX_POSTS", "60")
+
+    assert social_max_posts() == 60
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "many", "2.5", ""])
+def test_social_max_posts_refuses_anything_else(monkeypatch, value):
+    from iw_scraper.config import social_max_posts
+
+    monkeypatch.setenv("SOCIAL_MAX_POSTS", value)
+
+    with pytest.raises(ValueError, match="SOCIAL_MAX_POSTS"):
+        social_max_posts()
