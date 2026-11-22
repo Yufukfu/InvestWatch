@@ -11,6 +11,7 @@ Covers `analytics/`, `api/` and `contracts/`; whoever changes them updates this 
 - Contract 1.2.0 (`api-finding-export`, issue #70, team OK asked in the PR): read-only `GET /findings/{id}/export`, the evidence pack for UKNF (JSON, or a printable page with `?format=html`, which Kacper's "Eksportuj" button links to). The mock server serves it too (`mock-finding-export`), with `raw` always unavailable.
 
 ### analytics
+- `analytics-llm-bare-array` (stacked on #92): a bare JSON array answer is read as `{"results": …}` instead of being dropped as malformed. 11 of 27 `gemma-4-26b-a4b-it` answers in the #92 evaluation were bare arrays.
 - `analytics-post-integration-fixes` (from the 2026-11-21/22 end-to-end runs): pages on `knf.gov.pl`/`gov.pl` route to no module (`official_source`, `OFFICIAL_SOURCE_DOMAINS`); an M3-only document needs an offer signal (S3.3/S3.4/S3.5/S3.8), so service vocabulary alone (EY negative control) is `no_signals`; preprocessing normalizes once. Defaults unchanged; the LLM evaluation numbers went to Damian for a decision.
 - `analytics-skeleton` merged (PR #10): pure pipeline, registry, M2 rules R1-R3, CLI. No worker, storage or events yet.
 - Both of Kacper's reviews fixed in `analytics-skeleton-review-fixes` and `analytics-skeleton-review-2-fixes`.

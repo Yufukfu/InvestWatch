@@ -205,7 +205,7 @@ def test_short_text_is_one_request_per_call(stub_llm):
 @pytest.mark.parametrize("reply, status, reason", [
     (Reply(status=500), "unavailable", "llm_unavailable"),
     (Reply(content='{"results": [{"rule_id": "R17", "result": "fail"'), "malformed", "llm_malformed"),
-    (Reply(content='[{"rule_id": "R17", "result": "fail"}]'), "malformed", "llm_malformed"),
+    (Reply(content='"R17 fail"'), "malformed", "llm_malformed"),  # a bare array is accepted (analytics-llm-bare-array)
 ])
 def test_failures_degrade(stub_llm, caplog, reply, status, reason):
     caplog.set_level(logging.INFO)
