@@ -21,6 +21,24 @@ Adam's review of PR #39 (`findings-explorer`, reviewed at 9386d63) requested cha
 
 Out of scope: a REST backend in `docker compose up` (team-wide, see `.docs/STATUS.md`); calibration and alerts (PRs #40, #45, which receive these fixes by merge).
 
+### Review round 2
+
+Round 2 review of PR #39 by @hen68 (CHANGES_REQUESTED, https://github.com/Yufukfu/InvestWatch/pull/39#pullrequestreview-6008262488) left three blocking items in the findings detail and its tests:
+
+1. A failed refetch after a status save changed the element type at the body slot, so React remounted the body and the status editor and focus fell to `BODY`, outside the dialog.
+2. A test in `useFindings.test.tsx` ended while its request was still in flight, so it leaked into the next test under shuffled order.
+3. The inert-lift-before-focus test could not fail, because jsdom ignores `inert`.
+
+No requirement changes for this round: the behaviour is the one already in `web-findings`; the round makes its guards and tests hold.
+
+- **Detail panel keeps a stable tree:** the alert slot and the body slot are always the same two children, so a failed refetch shows the inline alert without remounting the body or the status editor.
+- **Tests:**
+  - a save with the refetch failing keeps focus inside the dialog;
+  - the panel lifts `inert` from the page before it restores focus to the opener (spy on `focus`, check the attribute at call time);
+  - the settled-search history test waits for its request to finish.
+
+Out of scope for round 2: the non-blocking pager fix (Enter on a disabled `Następna`/`Poprzednia` button) and the `App.test.tsx` timezone flake; both are reported in the review reply and not changed in this round.
+
 Module: `web/` (Kacper). No contract, REST route or event changes.
 
 ## Capabilities
@@ -32,5 +50,5 @@ Module: `web/` (Kacper). No contract, REST route or event changes.
 
 ## Impact
 
-- Code: `web/src/features/findings/**`, `web/src/url/` is not on this branch (findings data hook only), `web/src/styles.css`, `web/.oxlintrc.json`, tests.
+- Code: `web/src/features/findings/**`, `web/src/url/` is not on this branch (findings data hook only), `web/src/styles.css`, `web/.oxlintrc.json`, tests. Round 2: `web/src/features/findings/components/FindingDetailPanel.tsx`, `FindingDetailPanel.test.tsx`, `web/src/features/findings/data/useFindings.test.tsx`.
 - Docs: `.docs/status/dashboard.md`, AI log row, a note in the archived `findings-explorer/tasks.md`.

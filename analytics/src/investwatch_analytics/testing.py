@@ -103,9 +103,16 @@ class NoopPublisher(Publisher):
         super().__init__(clock)
         self._fixed = dict(DEFAULT_THRESHOLDS if thresholds is None else thresholds)
         self.sent: list[dict[str, Any]] = []
+        self.claimed: set[tuple[str, str]] = set()
 
     def _thresholds(self) -> Mapping[str, float]:
         return self._fixed
+
+    def _claim(self, group_id: str, module: str) -> bool:
+        if (group_id, module) in self.claimed:
+            return False
+        self.claimed.add((group_id, module))
+        return True
 
     def _send_one(self, event: dict[str, Any]) -> None:
         self.sent.append(event)
