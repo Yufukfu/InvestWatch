@@ -15,11 +15,11 @@ No test calls a real LLM (`stub_llm` only). Task 2.1 makes live calls; it is a m
 
 ## 2. Evaluation (~30 min, mostly waiting)
 
-- [ ] 2.1 `eval/run.py --llm` with `gemma-4-26b-a4b-it` (`LLM_BREAKER_FAILURES=1000`), key never printed: the OK count of the calls and M1/M2/M3 P/R/F1 at the defaults, sent to the coordinator; defaults unchanged
+- [x] 2.1 `eval/run.py --llm` with `gemma-4-26b-a4b-it` (`LLM_BREAKER_FAILURES=1000`), key never printed: the OK count of the calls and M1/M2/M3 P/R/F1 at the defaults, sent to the coordinator; defaults unchanged. 2026-11-22 01:03 UTC: 28 calls; 14 OK (5 before the fix), 12 returned 503, 2 timed out, 0 malformed (11 before). M1 n=18: P/R/F1 1.000/1.000/1.000, best 0.80, plateau [0.40, 0.80]. M2 n=35: 1.000/0.609/0.757, best 0.10. M3 n=18: 1.000/0.400/0.571, best 0.25. All four M3 calls failed (503 or timeout), so M3 equals rules-only and the result says nothing about the LLM's M3 verdicts
 
 ## 3. Closing
 
-- [ ] 3.1 Docs (`iw-docs-update`), the domain status file, `docs-check` clean
-- [ ] 3.2 AI log row (`iw-ai-log`)
-- [ ] 3.3 Final review (`iw-pr-review`)
-- [ ] 3.4 Archive the change (last commit)
+- [x] 3.1 Docs (`iw-docs-update`), the domain status file, `docs-check` clean
+- [x] 3.2 AI log row (`iw-ai-log`)
+- [x] 3.3 Final review (`iw-pr-review`): one `iw-reviewer` pass with `security: yes` over the whole change (it is a single group); no blocking findings
+- [x] 3.4 Archive the change (last commit)
