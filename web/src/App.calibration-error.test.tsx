@@ -25,6 +25,6 @@ describe('App when the calibration chunk fails to load', () => {
     expect(await screen.findByText('Nie udało się wczytać panelu kalibracji.')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Kalibracja progów' })).toBeNull();
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(region).toHaveTextContent(`${summary.total}Wszystkie zgłoszenia`);
+    expect(region).toHaveTextContent(`${summary.total} zgłoszeń`);
   });
 });

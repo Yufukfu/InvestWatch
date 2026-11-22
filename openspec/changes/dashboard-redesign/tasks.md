@@ -10,9 +10,9 @@
 
 ## 2. Header, hero summary and navigation
 
-- [ ] 2.1 Update the `SummaryCards`/`App` tests first: header shows `NARZĘDZIE NADZORCZE` and three anchor links, the hero shows `72` and `10` from the summary with the labels `zgłoszeń` and `wysokiego ryzyka`, the module counts are listed
-- [ ] 2.2 Restyle the header, live and health badges (green live dot), hero and module counts; anchors scroll to the section ids
-- [ ] 2.3 mutations: N tried, N caught
+- [x] 2.1 Update the `SummaryCards`/`App` tests first: header shows `NARZĘDZIE NADZORCZE` and three anchor links, the hero shows `72` and `10` from the summary with the labels `zgłoszeń` and `wysokiego ryzyka`, the module counts are listed
+- [x] 2.2 Restyle the header, live and health badges (green live dot), hero and module counts; anchors scroll to the section ids
+- [x] 2.3 mutations: 12 tried, 12 caught
 
 ## 3. Trend and findings table, filters and phone cards
 

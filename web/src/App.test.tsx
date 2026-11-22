@@ -34,7 +34,24 @@ describe('App (against contract mocks)', () => {
   it('renders the summary counts next to the findings', async () => {
     renderApp();
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(region).toHaveTextContent(`${summary.total}Wszystkie zgłoszenia`);
+    expect(region).toHaveTextContent(`${summary.total} zgłoszeń`);
+  });
+
+  it('labels the tool and links the header to the three sections', async () => {
+    renderApp();
+    expect(screen.getByText('NARZĘDZIE NADZORCZE')).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Sekcje' });
+    const links = within(nav).getAllByRole('link');
+    expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Przegląd', '#przeglad'],
+      ['Zgłoszenia', '#zgloszenia'],
+      ['Kalibracja', '#kalibracja'],
+    ]);
+    // Each anchor points at an element that exists as soon as the app is rendered, even before data arrives.
+    for (const id of ['przeglad', 'zgloszenia', 'kalibracja']) {
+      expect(document.getElementById(id), id).not.toBeNull();
+    }
+    await screen.findByRole('region', { name: 'Podsumowanie' });
   });
 
   it('renders the trend section (lazy-loaded) between summary and findings', async () => {

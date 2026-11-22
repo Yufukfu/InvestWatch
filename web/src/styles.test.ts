@@ -61,6 +61,8 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--live-fg', '--live-bg'],
   ['--offline-fg', '--offline-bg'],
   ['--risk-high-fg', '--surface'],
+  ['--risk-high', '--surface'],
+  ['--header-text', '--live-bg'],
   ['--green-text', '--surface'],
 ];
 
