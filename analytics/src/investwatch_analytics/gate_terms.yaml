@@ -104,17 +104,32 @@ terms:
   - nasdaq*
   - return*
   - income
-# Seed phrases per positive class for the (stretch) similarity rescue: centroids = normalized means.
+# Seed lines for the embedding rescue (analytics-embedding-gate; design §2): one centroid per class (normalized mean
+# of its seed vectors). A no-hit document passes when max cos(on-topic class) - cos(off_topic) >= GATE_EMBED_MIN_MARGIN.
+# `off_topic` is reserved and required, and its lines must have no dictionary hit. Short synthetic lines only (no
+# scraped or personal data). Keep eval/gate_check.jsonl disjoint from these lines.
 centroids:
   investment_offer:
-    - Zainwestuj i zarabiaj co miesiąc bez ryzyka
-    - Gwarantowany zysk z inwestycji, dołącz już dziś
     - Pomnóż swoje oszczędności dzięki naszej platformie
+    - Twoje pieniądze mogą pracować dla Ciebie, zacznij od 250 zł
+    - Pasywny dochód co tydzień, wystarczy wpłacić niewielką kwotę
+    - Nasz system automatycznie handluje za Ciebie i zarabia nawet w nocy
   finfluencer:
-    - Moje portfolio i wyniki z tego tygodnia
     - Darmowe sygnały na dziś, kopiuj moje transakcje
-    - Jak zarobiłem pierwszy milion na giełdzie
+    - Wszedłem w pozycję long na złocie, cel 2500 dolarów
+    - Pokazuję mój wynik z tego tygodnia, plus 18 procent na koncie
+    - Kupiłem dziś bitcoina na dołku, kto jest ze mną
   advisory_service:
     - Pomogę Ci pomnożyć oszczędności, napisz na priv
     - Indywidualne doradztwo, które spółki kupić teraz
-    - Zapisz się do grupy VIP z poradami inwestycyjnymi
+    - Dołącz do zamkniętej grupy na Telegramie z codziennymi typami
+    - Mentor finansowy, pierwsza konsultacja za darmo
+  off_topic:
+    - Wczoraj Legia wygrała z Lechem 2:1 po golu w doliczonym czasie
+    - Przepis na szybki sernik bez pieczenia z owocami
+    - Jutro w Warszawie deszcz i silny wiatr, temperatura do 8 stopni
+    - Promocja w sklepie, druga para butów za pół ceny
+    - Rząd przyjął projekt ustawy o ochronie zwierząt domowych
+    - Recenzja nowego smartfona, świetny aparat i słaba bateria
+    - Koncert zespołu odbędzie się w sobotę w hali widowiskowej
+    - Jak posadzić tulipany jesienią, wskazówki dla działkowców

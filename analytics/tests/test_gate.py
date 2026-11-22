@@ -125,7 +125,8 @@ def test_gate_disabled_drops_nothing():
 def test_log_fields_have_figures_and_no_text():
     d = gate("Przepis na sernik babci")
     extra = d.log_extra()
-    assert extra == {"reason": "off_topic", "dict_hits": 0, "similarity": None, "embedder": None}
+    assert extra == {"reason": "off_topic", "dict_hits": 0, "gate_path": "dictionary", "similarity": None,
+                     "margin": None, "embedder": None}
 
 
 # ---- terms file -------------------------------------------------------------------------------
@@ -137,7 +138,7 @@ def write(tmp_path, data) -> str:
     return str(p)
 
 
-VALID = {"version": 1, "terms": ["zysk*"], "prefixes": ["za"], "centroids": {"offer": ["Zarabiaj"]}}
+VALID = {"version": 1, "terms": ["zysk*"], "prefixes": ["za"], "centroids": {"offer": ["Zarabiaj"], "off_topic": ["Mecz"]}}
 
 
 def test_valid_custom_file(tmp_path):

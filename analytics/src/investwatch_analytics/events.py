@@ -29,7 +29,7 @@ EVENTS_CHANNEL = "iw:events"
 THRESHOLDS_KEY = "iw:settings:thresholds"
 #: Defaults per module when the key or its value is missing or invalid. A copy of analytics/eval/thresholds.json,
 #: the best-F1 thresholds of the gold-set evaluation (ADR 0316, superseding ADR 0305's values); a test pins it.
-DEFAULT_THRESHOLDS: dict[str, float] = {"M1": 0.65, "M2": 0.1, "M3": 0.4}
+DEFAULT_THRESHOLDS: dict[str, float] = {"M1": 0.75, "M2": 0.1, "M3": 0.4}
 
 Clock = Callable[[], datetime]
 #: Same lifetime as the near-dup group keys (NEARDUP_TTL_S default).
