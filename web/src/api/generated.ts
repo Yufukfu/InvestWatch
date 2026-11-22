@@ -35,6 +35,40 @@ const injectedRtkApi = api
         }),
         providesTags: ["findings"],
       }),
+      getFindingsExport: build.query<
+        GetFindingsExportApiResponse,
+        GetFindingsExportApiArg
+      >({
+        query: (queryArg) => ({
+          url: `/findings/export`,
+          params: {
+            module: queryArg["module"],
+            status: queryArg.status,
+            platform: queryArg.platform,
+            source_id: queryArg.sourceId,
+            document_id: queryArg.documentId,
+            risk_level: queryArg.riskLevel,
+            score_min: queryArg.scoreMin,
+            date_from: queryArg.dateFrom,
+            date_to: queryArg.dateTo,
+            q: queryArg.q,
+            sort: queryArg.sort,
+            format: queryArg.format,
+          },
+        }),
+        providesTags: ["findings"],
+      }),
+      postFindingsBulkStatus: build.mutation<
+        PostFindingsBulkStatusApiResponse,
+        PostFindingsBulkStatusApiArg
+      >({
+        query: (queryArg) => ({
+          url: `/findings/bulk-status`,
+          method: "POST",
+          body: queryArg.body,
+        }),
+        invalidatesTags: ["findings"],
+      }),
       getFindingsById: build.query<
         GetFindingsByIdApiResponse,
         GetFindingsByIdApiArg
@@ -189,6 +223,40 @@ export type GetFindingsApiArg = {
   sort?: "detected_at" | "-detected_at" | "score" | "-score";
   page?: number;
   pageSize?: number;
+};
+export type GetFindingsExportApiResponse =
+  /** status 200 CSV attachment */ string;
+export type GetFindingsExportApiArg = {
+  module?: "M1" | "M2" | "M3";
+  /** Comma-separated list */
+  status?: string;
+  platform?: string;
+  sourceId?: string;
+  documentId?: string;
+  riskLevel?: "high" | "medium" | "low";
+  scoreMin?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  q?: string;
+  sort?: "detected_at" | "-detected_at" | "score" | "-score";
+  format?: "csv";
+};
+export type PostFindingsBulkStatusApiResponse =
+  /** status 200 Per-item results */ {
+    updated: number;
+    not_found: number;
+    results: {
+      id: string;
+      result: "updated" | "not_found";
+      /** The updated finding with `risk_level`; null when not found */
+      finding: Finding | null;
+    }[];
+  };
+export type PostFindingsBulkStatusApiArg = {
+  body: {
+    ids: string[];
+    status: "new" | "in_review" | "confirmed" | "false_positive" | "closed";
+  };
 };
 export type GetFindingsByIdApiResponse =
   /** status 200 Mock `mocks/finding-detail.json` */ Finding & {
@@ -402,6 +470,13 @@ export type GetStatsSummaryApiResponse =
       [key: string]: number;
     };
     last_scan_at?: string | null;
+    /** M2 findings (`total`) and those matched to a KNF register entry, i.e. with `firm.registry_id`
+    set (`registry_matched`), for the dashboard's coverage strip. Added in 1.3.0.
+     */
+    m2_coverage?: {
+      total: number;
+      registry_matched: number;
+    };
   };
 export type GetStatsSummaryApiArg = void;
 export type GetCalibrationApiResponse =
@@ -586,6 +661,10 @@ export type Finding = {
     embedder?: string | null;
   } | null;
 };
+export type Error = {
+  error: string;
+  details?: any;
+};
 export type Uuid2 = string;
 export type Platform =
   | "web"
@@ -617,10 +696,6 @@ export type Block = {
     | ("main" | "header" | "footer" | "legal" | "aside" | "overlay" | null);
   /** Text is cut off at this viewport. */
   overflow_clipped?: boolean | null;
-};
-export type Error = {
-  error: string;
-  details?: any;
 };
 export type ScrapedDocument = {
   id: Uuid2;
@@ -733,6 +808,9 @@ export type SourceInput = {
 export const {
   useGetFindingsQuery,
   useLazyGetFindingsQuery,
+  useGetFindingsExportQuery,
+  useLazyGetFindingsExportQuery,
+  usePostFindingsBulkStatusMutation,
   useGetFindingsByIdQuery,
   useLazyGetFindingsByIdQuery,
   usePatchFindingsByIdMutation,

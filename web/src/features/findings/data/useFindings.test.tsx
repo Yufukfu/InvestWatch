@@ -34,7 +34,23 @@ describe('useFindings', () => {
       riskLevel: first.risk_level,
       status: first.status,
       detectedAt: first.detected_at,
+      documentId: first.document_id,
+      url: first.url,
+      host: 'alfa-inwestycje.example.com',
     });
+  });
+
+  it.each([
+    ['https://example.com/post/1?x=<b>', 'example.com'],
+    ['http://Example.COM:8080/a', 'example.com'],
+    ['javascript:alert(1)', undefined],
+    ['not a url', undefined],
+  ])('maps the host of %s', async (url, host) => {
+    server.use(http.get('http://localhost/api/findings', () => HttpResponse.json({ ...findings, items: [{ ...findings.items[0], url }] })));
+    const { result } = renderHook(() => useFindings(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.rows).toBeDefined());
+    expect(result.current.rows?.[0].host).toBe(host);
+    expect(result.current.rows?.[0].url).toBe(url);
   });
 
   it('sends the filters from the URL on the first request', async () => {

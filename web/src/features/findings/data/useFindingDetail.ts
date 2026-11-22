@@ -1,10 +1,13 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useGetFindingsByIdQuery, type GetFindingsByIdApiResponse } from '../../../api/generated';
+import { config } from '../../../config';
 import type { FindingDetail } from '../model';
+import { parseRescan } from './rescan';
 
 function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
   return {
     id: f.id,
+    documentId: f.document_id,
     module: f.module,
     title: f.title,
     summary: f.summary,
@@ -43,6 +46,9 @@ function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
     screenshotUrl: f.screenshot_urls?.desktop,
     pipelineVersion: f.model?.pipeline_version,
     llm: f.model?.llm,
+    // A navigation, not an RTK Query fetch: the api renders the printable page (contracts 1.2.0).
+    exportUrl: `${config.apiBaseUrl}/findings/${encodeURIComponent(f.id)}/export?format=html`,
+    rescan: parseRescan(f.document?.scrape_meta),
   };
 }
 
