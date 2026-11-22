@@ -210,12 +210,12 @@ def test_analysis_error_counts_and_skips_the_document():
 def test_real_build_on_this_base_has_m2_catalogue():
     build = load_build()
     assert build.catalogues["M2"]["R1"] is True
-    # The build mirrors the catalogue's `implemented` flags (no rule id hard-coded: R5 was built in
-    # analytics-m2-visual-rules).
+    # The build mirrors the catalogue's `implemented` flags (no rule id hard-coded: the last ones, R5, R7,
+    # R8, R9, R10 and R13, were built in analytics-m2-visual-rules and analytics-m2-text-rules).
     from investwatch_analytics.rules.engine import Catalogue
 
     assert build.catalogues["M2"] == {s.id: s.implemented for s in Catalogue.load().specs}
-    assert False in build.catalogues["M2"].values()
+    assert all(build.catalogues["M2"].values())  # all 18 rules (19 entries) are built
 
 
 def test_real_pipeline_scores_an_m2_document():

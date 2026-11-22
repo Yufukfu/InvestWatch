@@ -3,6 +3,7 @@ import logging
 import re
 import string
 import uuid
+from urllib.parse import urlsplit, urlunsplit
 
 import asyncpg
 
@@ -77,6 +78,24 @@ def redact(detail: str) -> str:
     return detail[:_MAX_DETAIL]
 
 
+def _drop_userinfo(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+        host = parts.netloc.rpartition("@")[2]
+    except ValueError:  # not a parseable URL: `redact` alone still masks userinfo, at the cost of the scheme
+        return url
+    return urlunsplit(parts._replace(netloc=host))
+
+
+def _stored_url(url: str | None) -> str | None:
+    """The URL as stored in `job_errors.url`: no userinfo, cut to the detail cap, then redacted like the detail.
+
+    The cut comes before `redact` because that drops a whitespace-free input over its bound entirely; a secret
+    cut short by it only gets shorter, and the name that marks a query secret is masked wherever it survives.
+    """
+    return None if url is None else redact(_drop_userinfo(url)[:_MAX_DETAIL])
+
+
 _MIN_KNOWN_SECRET = 4  # a shorter value would mask ordinary words; real cookies and proxy parts are longer
 
 
@@ -117,9 +136,10 @@ async def record_error(pool: asyncpg.Pool, error: JobError) -> None:
     log.warning(json.dumps({"event": "job_error", "reason": error.reason.value, "source_id": logged_id, "detail": detail}))
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO job_errors (id, source_id, reason, detail) VALUES ($1, $2, $3, $4)",
+            "INSERT INTO job_errors (id, source_id, url, reason, detail) VALUES ($1, $2, $3, $4, $5)",
             uuid.uuid4(),  # ids have no server default (integration-plan §7)
             source_uuid,
+            _stored_url(error.url),
             error.reason.value,
             detail,
         )

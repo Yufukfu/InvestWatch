@@ -24,7 +24,7 @@ from ..preprocessing import Preprocessed
 from ..registry import FirmMatch, Registry
 
 if TYPE_CHECKING:
-    from ..llm.judge import LlmJudge
+    from ..llm.judge import LlmJudge, LlmVerdict
 
 DEFAULT_CATALOGUE = Path(__file__).with_name("m2_rules.yaml")
 #: Shipped catalogue per module (M1/M3 signals: change analytics-m1-m3).
@@ -61,6 +61,8 @@ KNOWN_PARAMS = {
     "tax_subject_patterns",
     # analytics-m2-visual-rules (R5, R8)
     "min_contrast", "min_font_px",
+    # analytics-m2-text-rules (R9)
+    "jargon_patterns", "max_avg_sentence_words", "max_jargon_share", "min_jargon_hits",
 }
 # M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
 # the plain string lists below must hold non-empty strings.
@@ -86,6 +88,9 @@ class RuleSpec:
     params: dict[str, Any] = field(default_factory=dict)
     weight: float = 0.0  # M1/M3 only: the signal's weight in σ(bias + Σ w·x)
     llm: dict[str, str] | None = None  # {question, when}; None = never sent to the LLM
+    # M2 only: a rules-only `uncertain` carries no evidence of an infringement and is left out of the score; only
+    # an LLM verdict counts (R9, change analytics-m2-text-rules). The finding still lists the result.
+    llm_only_uncertain: bool = False
 
 
 @dataclass(frozen=True)
@@ -115,6 +120,10 @@ class Rule:
         if llm is None or result.result == "not_applicable":
             return False
         return llm["when"] == "always" or result.result == "uncertain"
+
+    def accept_llm_verdict(self, verdict: "LlmVerdict") -> "LlmVerdict":
+        """Narrow an LLM verdict before it replaces the rules-only result; the default keeps it (R9 overrides)."""
+        return verdict
 
     def evidence_fields(self, ctx: Context) -> list[str]:
         """Document fields an evidence quote may come from; the text only, unless a signal quotes metadata."""
@@ -221,7 +230,7 @@ class Catalogue:
 
     @classmethod
     def load(cls, path: Path | None = None, *, module: str = "M2") -> "Catalogue":
-        from . import m1, m2, m2_visual, m3  # noqa: F401  (registers the rule classes)
+        from . import m1, m2, m2_text, m2_visual, m3  # noqa: F401  (registers the rule classes)
 
         path = path or DEFAULT_CATALOGUE
         if module not in _ID_PREFIX:
@@ -258,9 +267,13 @@ class Catalogue:
                 raise CatalogueError(f"{path}: {rule_id} needs a numeric `weight`")
             params = _check_params(path, rule_id, entry.get("params") or {})
             llm = _check_llm(path, rule_id, entry.get("llm"))
+            llm_only_uncertain = entry.get("llm_only_uncertain", False)
+            if not isinstance(llm_only_uncertain, bool):
+                raise CatalogueError(f"{path}: {rule_id} llm_only_uncertain must be true or false")
             seen.add(rule_id)
             specs.append(RuleSpec(rule_id, entry["name"], entry["severity"], entry.get("legal_basis"),
-                                  implemented, params, weight=float(weight) if signals else 0.0, llm=llm))
+                                  implemented, params, weight=float(weight) if signals else 0.0, llm=llm,
+                                  llm_only_uncertain=llm_only_uncertain))
         return cls(specs, module=module, bias=float(bias) if signals else 0.0)
 
 
@@ -321,6 +334,14 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
             raise CatalogueError(f"{path}: {rule_id} {key} must be a WCAG contrast ratio in [1, 21]")
         if key == "min_font_px" and (isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a positive number")
+        if key in ("max_avg_sentence_words", "min_jargon_hits") and (
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a positive integer")
+        if key == "max_jargon_share" and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a number in (0, 1]")
         if key == "hiding_regions" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key.endswith("_patterns") or key == "labels":
@@ -391,6 +412,7 @@ def _refine(
         verdict = outcome.verdicts.get(spec.id)
         if verdict is None:
             continue  # no valid verdict: the rules-only result stands
+        verdict = _RULES[spec.id](spec).accept_llm_verdict(verdict)
         before = out[index]
         update = {"result": verdict.result, "evidence": verdict.evidence, "explanation": verdict.explanation,
                   "method": "hybrid" if before.evidence is not None else "llm"}

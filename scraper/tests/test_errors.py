@@ -21,6 +21,46 @@ async def test_each_reason_is_stored(pool, reason):
     assert [r["reason"] for r in stored] == [reason.value]
 
 
+async def stored_urls(pool):
+    async with pool.acquire() as conn:
+        return [r["url"] for r in await conn.fetch("SELECT url FROM job_errors")]
+
+
+async def test_error_without_url_stores_null(pool):
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 500", None))
+    assert await stored_urls(pool) == [None]
+
+
+async def test_url_is_stored_on_the_row(pool):
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", None, url="https://example.com/ad/1"))
+    assert await stored_urls(pool) == ["https://example.com/ad/1"]
+
+
+@pytest.mark.parametrize(
+    "url,secret",
+    [
+        ("https://user:hunter2@example.com/ad", "hunter2"),
+        ("https://example.com/ad?access_token=abc123def&page=2", "abc123def"),
+        ("https://example.com/ad?api_key=k-999", "k-999"),
+    ],
+)
+async def test_url_credentials_are_not_recorded(pool, url, secret):
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", None, url=url))
+    stored = await stored_urls(pool)
+    assert secret not in stored[0]
+    assert stored[0].startswith("https://")
+
+
+async def test_long_url_is_capped(pool):
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", None, url="https://example.com/" + "a" * 5000))
+    assert len((await stored_urls(pool))[0]) == 300
+
+
+async def test_detail_is_still_redacted_when_a_url_is_given(pool):
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "password=hunter2", None, url="https://example.com/ad"))
+    assert "hunter2" not in (await rows(pool))[0]["detail"]
+
+
 async def test_source_id_may_be_null_or_unknown(pool):
     await record_error(pool, JobError(Reason.INVALID_REQUEST, "no such source", None))
     await record_error(pool, JobError(Reason.INVALID_REQUEST, "unknown source", str(uuid.uuid4())))

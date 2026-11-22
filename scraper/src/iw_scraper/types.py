@@ -32,6 +32,7 @@ class JobError:
     reason: Reason
     detail: str
     source_id: str | None = None
+    url: str | None = None
 
     def __post_init__(self) -> None:
         # a plain string must not slip past the closed set
