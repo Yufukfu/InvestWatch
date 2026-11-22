@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { investWatchApi, type GetFindingsApiArg } from '../../../api/generated';
 import { isolate } from '../../../format/bidi';
+import { FINDINGS_SECTION, goToSection } from '../../../url/section';
 import { setSearchParam } from '../../../url/useUrlSearch';
 import { isUuid } from '../../../url/uuid';
 import type { AlertItem, Connection } from '../model';
@@ -113,6 +114,7 @@ export function useRealtime(): RealtimeState {
   const open = useCallback(
     (id: string) => {
       setSearchParam('finding', id);
+      goToSection(FINDINGS_SECTION);
       dismiss(id);
     },
     [dismiss],

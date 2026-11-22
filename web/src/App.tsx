@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { SectionBoundary } from './SectionBoundary';
 import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
@@ -12,14 +12,14 @@ const CalibrationPage = lazy(() =>
   import('./features/calibration/CalibrationPage').then((m) => ({ default: m.CalibrationPage })),
 );
 
-// In-page anchors: the targets are wrappers rendered at once, so a link works before the data or a lazy chunk arrives.
+// Sub-pages: the hash picks the one page that is rendered; the header stays on every page.
 const SECTION_LINKS = [
   { id: 'przeglad', label: 'Przegląd' },
   { id: 'zgloszenia', label: 'Zgłoszenia' },
   { id: 'kalibracja', label: 'Kalibracja' },
 ];
 
-// The first section is current until a link changes the hash; the sections are anchors, so the hash is the state.
+// The overview is current until a link changes the hash; an unknown hash shows it too.
 function useActiveSection(): string {
   const [hash, setHash] = useState(() => window.location.hash.slice(1));
   useEffect(() => {
@@ -30,6 +30,39 @@ function useActiveSection(): string {
   return SECTION_LINKS.some((l) => l.id === hash) ? hash : SECTION_LINKS[0].id;
 }
 
+const PAGES: Record<string, ReactNode> = {
+  przeglad: (
+    <div className="stack">
+      <SummaryPage />
+      <SectionBoundary
+        fallback={
+          <p className="trend-state" role="alert">
+            Nie udało się pobrać danych trendu.
+          </p>
+        }
+      >
+        <Suspense fallback={<p className="trend-state" role="status">Ładowanie wykresu…</p>}>
+          <TrendPage />
+        </Suspense>
+      </SectionBoundary>
+    </div>
+  ),
+  zgloszenia: <FindingsPage />,
+  kalibracja: (
+    <SectionBoundary
+      fallback={
+        <p className="trend-state" role="alert">
+          Nie udało się wczytać panelu kalibracji.
+        </p>
+      }
+    >
+      <Suspense fallback={<p className="trend-state" role="status">Ładowanie kalibracji…</p>}>
+        <CalibrationPage />
+      </Suspense>
+    </SectionBoundary>
+  ),
+};
+
 export function App() {
   const active = useActiveSection();
   const navId = useId();
@@ -37,6 +70,16 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   // Where the connection-lost banner is drawn: above the page content, outside the header row.
   const [bannerNode, setBannerNode] = useState<HTMLElement | null>(null);
+  // A page change starts at the top with focus on the page, not on the link that was followed; the first render does not move focus.
+  const mainRef = useRef<HTMLElement>(null);
+  const shown = useRef(active);
+  useEffect(() => {
+    if (shown.current === active) return;
+    shown.current = active;
+    window.scrollTo(0, 0);
+    mainRef.current?.focus({ preventScroll: true });
+  }, [active]);
+  const page = PAGES[active];
   return (
     <ToastSlotProvider>
       <header className="app-header">
@@ -70,37 +113,8 @@ export function App() {
       </header>
       <div className="app">
         <div ref={setBannerNode} className="banner-slot" />
-        <main>
-          <div id="przeglad" className="stack">
-            <SummaryPage />
-            <SectionBoundary
-              fallback={
-                <p className="trend-state" role="alert">
-                  Nie udało się pobrać danych trendu.
-                </p>
-              }
-            >
-              <Suspense fallback={<p className="trend-state" role="status">Ładowanie wykresu…</p>}>
-                <TrendPage />
-              </Suspense>
-            </SectionBoundary>
-          </div>
-          <div id="zgloszenia">
-            <FindingsPage />
-          </div>
-          <div id="kalibracja">
-            <SectionBoundary
-              fallback={
-                <p className="trend-state" role="alert">
-                  Nie udało się wczytać panelu kalibracji.
-                </p>
-              }
-            >
-              <Suspense fallback={<p className="trend-state" role="status">Ładowanie kalibracji…</p>}>
-                <CalibrationPage />
-              </Suspense>
-            </SectionBoundary>
-          </div>
+        <main ref={mainRef} tabIndex={-1}>
+          {page}
         </main>
       </div>
     </ToastSlotProvider>

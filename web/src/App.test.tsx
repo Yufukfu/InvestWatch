@@ -11,7 +11,9 @@ import { makeStore } from './test/store';
 vi.mock('socket.io-client', async () => (await import('./test/inertSocket')).inertSocketModule);
 
 // A fresh store per test so RTK Query cache does not leak between scenarios.
-function renderApp() {
+// `page` is the hash of the sub-page to start on; without it the overview shows (an empty hash).
+function renderApp(page?: string) {
+  if (page) window.location.hash = page;
   const store = makeStore();
   return render(
     <Provider store={store}>
@@ -22,7 +24,7 @@ function renderApp() {
 
 describe('App (against contract mocks)', () => {
   it('renders findings from the generated client as plain text', async () => {
-    renderApp();
+    renderApp('zgloszenia');
     expect(await screen.findByText(findings.items[0].title)).toBeInTheDocument();
     expect(await screen.findByText('System działa')).toBeInTheDocument();
     // Scoped: the trend section has its own data table.
@@ -72,30 +74,59 @@ describe('App (against contract mocks)', () => {
     fireEvent.click(links[2]);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     await waitFor(() => expect(links.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'location']));
-    // Each anchor points at an element that exists as soon as the app is rendered, even before data arrives.
-    for (const id of ['przeglad', 'zgloszenia', 'kalibracja']) {
-      expect(document.getElementById(id), id).not.toBeNull();
-    }
-    await screen.findByRole('region', { name: 'Podsumowanie' });
   });
 
-  it('renders the trend section (lazy-loaded) between summary and findings', async () => {
-    renderApp();
-    const trend = await screen.findByRole('region', { name: 'Trend zgłoszeń' });
-    const summaryRegion = await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(summaryRegion.compareDocumentPosition(trend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const findingsTable = document.querySelector('table.findings');
-    expect(findingsTable).not.toBeNull();
-    expect(trend.compareDocumentPosition(findingsTable!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
+  describe('sub-pages', () => {
+    it('shows the summary and the trend, and nothing else, on the overview', async () => {
+      renderApp();
+      expect(await screen.findByRole('region', { name: 'Podsumowanie' })).toBeInTheDocument();
+      expect(await screen.findByRole('region', { name: 'Trend zgłoszeń' })).toBeInTheDocument();
+      expect(document.querySelector('table.findings')).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' })).toBeNull();
+    });
 
-  it('mounts the calibration panel (lazy-loaded) after the findings', async () => {
-    renderApp();
-    const heading = await screen.findByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' });
-    expect(await screen.findByRole('slider', { name: 'Próg dla M2' })).toBeInTheDocument();
-    const findingsTable = document.querySelector('table.findings');
-    expect(findingsTable).not.toBeNull();
-    expect(findingsTable!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    it('shows only the findings on #zgloszenia', async () => {
+      renderApp('zgloszenia');
+      await screen.findByText(findings.items[0].title);
+      expect(screen.queryByRole('region', { name: 'Podsumowanie' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Trend zgłoszeń' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' })).toBeNull();
+    });
+
+    it('shows only the calibration panel on #kalibracja', async () => {
+      renderApp('kalibracja');
+      expect(await screen.findByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' })).toBeInTheDocument();
+      expect(await screen.findByRole('slider', { name: 'Próg dla M2' })).toBeInTheDocument();
+      expect(document.querySelector('table.findings')).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Podsumowanie' })).toBeNull();
+    });
+
+    it('falls back to the overview for an unknown hash', async () => {
+      renderApp('nieznana');
+      expect(await screen.findByRole('region', { name: 'Podsumowanie' })).toBeInTheDocument();
+      const nav = screen.getByRole('navigation', { name: 'Sekcje' });
+      expect(within(nav).getByRole('link', { name: 'Przegląd' })).toHaveAttribute('aria-current', 'location');
+    });
+
+    it('switches page when a header link is followed, and moves focus to the main region at the top', async () => {
+      const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+      renderApp();
+      await screen.findByRole('region', { name: 'Podsumowanie' });
+      const nav = screen.getByRole('navigation', { name: 'Sekcje' });
+      window.location.hash = 'kalibracja';
+      expect(await screen.findByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Podsumowanie' })).toBeNull();
+      expect(within(nav).getByRole('link', { name: 'Kalibracja' })).toHaveAttribute('aria-current', 'location');
+      expect(screen.getByRole('main')).toHaveFocus();
+      expect(scrollTo).toHaveBeenCalledWith(0, 0);
+      scrollTo.mockRestore();
+    });
+
+    it('does not steal focus on the first render', async () => {
+      renderApp('kalibracja');
+      await screen.findByRole('slider', { name: 'Próg dla M2' });
+      expect(screen.getByRole('main')).not.toHaveFocus();
+    });
   });
 
   describe('triage', () => {
@@ -118,6 +149,7 @@ describe('App (against contract mocks)', () => {
       renderApp();
       fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
       expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(window.location.hash).toBe('#zgloszenia');
       const last = seen.at(-1)!;
       expect(last.get('status')).toBe('new');
       expect(last.get('risk_level')).toBe('high');
@@ -176,7 +208,7 @@ describe('App (against contract mocks)', () => {
         HttpResponse.json({ ...findings, items: [{ ...findings.items[0], title: payload }] }),
       ),
     );
-    renderApp();
+    renderApp('zgloszenia');
     expect(await screen.findByText(payload)).toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
   });
@@ -194,7 +226,7 @@ describe('App (against contract mocks)', () => {
       http.get('http://localhost/api/findings', () => HttpResponse.error()),
       http.get('http://localhost/api/stats/summary', () => HttpResponse.error()),
     );
-    renderApp();
+    renderApp('zgloszenia');
     expect(await screen.findByText('Brak połączenia z API')).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
   });

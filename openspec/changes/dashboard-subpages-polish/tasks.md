@@ -2,10 +2,10 @@
 
 ## 1. Sub-pages
 
-- [ ] 1.1 Write the failing tests first: per-hash rendering in `App.test.tsx` (only the active page's content in the document, unknown hash falls back), focus and scroll on change, triage and toast action switching to `#zgloszenia`
-- [ ] 1.2 Implement the page switch in `App.tsx`, a `goToSection` helper in `web/src/url/`, and use it in `useStartTriage` and the realtime `open`
+- [x] 1.1 Write the failing tests first: per-hash rendering in `App.test.tsx` (only the active page's content in the document, unknown hash falls back), focus and scroll on change, triage and toast action switching to `#zgloszenia`
+- [x] 1.2 Implement the page switch in `App.tsx`, a `goToSection` helper in `web/src/url/`, and use it in `useStartTriage` and the realtime `open`
 - [ ] 1.3 Run typecheck, lint and the suite; check in the browser that back/forward and shared links work
-- [ ] 1.4 mutations: N tried, N caught
+- [x] 1.4 mutations: 8 tried, 8 caught
 
 ## 2. UI polish
 

@@ -41,6 +41,7 @@ describe('AlertsPage', () => {
     expect(screen.getByText('Obietnica 18% zysku')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Pokaż' }));
     expect(window.location.search).toBe('?finding=94f686c6-70c3-5ec9-9b6f-c97032c380c6');
+    expect(window.location.hash).toBe('#zgloszenia');
     expect(screen.queryByText('Obietnica 18% zysku')).toBeNull();
   });
 

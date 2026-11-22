@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useGetFindingsQuery, type Finding } from '../../../api/generated';
 import type { FindingFilters, FindingRow } from '../model';
 import { hasTriageFlag, parseFilters, parseSelected, serializeUrl, toQueryArg, triageUrl, withFilter } from './findingsUrl';
+import { FINDINGS_SECTION, goToSection } from '../../../url/section';
 import { useUrlSearch } from '../../../url/useUrlSearch';
 
 // The generated DTO stops here. `module` and `status` are assigned from the generated unions, so a
@@ -84,5 +85,8 @@ export function useFindings(): FindingsState {
 // The summary's triage action: show the new high-risk findings and open the first one (see the effect above).
 export function useStartTriage(): () => void {
   const [, push] = useUrlSearch();
-  return useCallback(() => push(triageUrl()), [push]);
+  return useCallback(() => {
+    push(triageUrl());
+    goToSection(FINDINGS_SECTION);
+  }, [push]);
 }
