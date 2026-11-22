@@ -21,4 +21,4 @@
 ## 4. Closing tasks
 
 - [x] 4.1 Apply the iw-docs-update skill (`.docs/integration-plan.md` §5 filter list, `contracts/README.md` version note, `api/README.md` if it lists filters, `.docs/status/platform.md`; docs-check clean) and add the iw-ai-log row
-- [ ] 4.2 Run the iw-pr-review skill (one iw-reviewer pass including security, because a contract changes) and fix real findings
+- [x] 4.2 Run the iw-pr-review skill (one iw-reviewer pass including security, because a contract changes) and fix real findings
