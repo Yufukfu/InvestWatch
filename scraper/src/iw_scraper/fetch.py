@@ -9,11 +9,14 @@ Facts about the client (`noble-tls` over the Go `tls-client`, ADR 0101) that sha
 """
 
 import logging
+import math
 import os
 import re
 import tempfile
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import SplitResult, unquote, urljoin, urlsplit
 
@@ -163,6 +166,7 @@ async def _request_once(
     timeout: float,
     max_bytes: int,
     html_only: bool = True,
+    cookies: Mapping[str, str] | None = None,
 ) -> tuple[int, dict[str, str], bytes]:
     try:
         parts = urlsplit(url)
@@ -191,6 +195,8 @@ async def _request_once(
                 allow_redirects=False,
                 timeout_milliseconds=int(timeout * 1000),
                 proxy=choice.url if choice else None,
+                # a header, not the library's `cookies=`: that builds domain-less jar entries the client never sends
+                headers={"cookie": "; ".join(f"{name}={value}" for name, value in cookies.items())} if cookies else None,
                 request_host_override=host_override,
                 stream_output_path=path,
             )
@@ -214,6 +220,7 @@ async def _request_through_proxies(
     timeout: float,
     max_bytes: int,
     html_only: bool = True,
+    cookies: Mapping[str, str] | None = None,
 ) -> tuple[int, dict[str, str], bytes, ProxyChoice | None]:
     """One request, each time through the proxy the run picks. A 407 cools that proxy and tries another."""
     while True:  # every 407 cools one more proxy, so the picks run out in at most len(proxies) rounds
@@ -221,7 +228,7 @@ async def _request_through_proxies(
         if isinstance(choice, Deferral):
             raise FetchDeferred(choice)
         try:
-            return (*await _request_once(session, url, choice, guard, timeout, max_bytes, html_only), choice)
+            return (*await _request_once(session, url, choice, guard, timeout, max_bytes, html_only, cookies), choice)
         except ProxyAuthFailure:
             proxies.penalize(choice)
         except FetchFailure as failure:
@@ -248,10 +255,12 @@ async def fetch(
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_bytes: int = DEFAULT_MAX_BYTES,
     session: Session | None = None,
+    cookies: Mapping[str, str] | None = None,
 ) -> FetchResult:
     """Request `url` once, following up to `MAX_REDIRECTS` redirects hop by hop. Never retries.
 
-    A `session` passed in is the run's: it is shared with `check_robots` and its owner closes it.
+    A `session` passed in is the run's: it is shared with `check_robots` and its owner closes it. `cookies` are sent
+    with this fetch only, on the shared session as well (the session's headers come from the identity it was built with).
     """
     owned = session is None
     session = session or _new_session(identity)
@@ -260,7 +269,7 @@ async def fetch(
         proxy_id = None
         for _ in range(MAX_REDIRECTS + 1):
             status, headers, body, choice = await _request_through_proxies(
-                session, current, proxy, guard, timeout, max_bytes
+                session, current, proxy, guard, timeout, max_bytes, cookies=cookies
             )
             proxy_id = choice.identifier if choice else None
             if status in _REDIRECT_STATUSES and "location" in headers:
@@ -288,3 +297,23 @@ async def fetch(
     finally:
         if owned:
             await close_session(session)
+
+
+_MAX_DIGITS = 15  # more digits than this is beyond any cap; `int()` also refuses 4300+ digits
+
+
+def retry_after_seconds(header: str | None, now: datetime) -> float | None:
+    """A `Retry-After` header (delay seconds or an HTTP date) as seconds from `now`; None when unusable."""
+    if not header:
+        return None
+    value = header.strip()
+    if value.isascii() and value.isdigit():
+        return float(int(value)) if len(value) <= _MAX_DIGITS else None
+    try:
+        moment = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    seconds = (moment - now).total_seconds()
+    return max(0.0, seconds) if math.isfinite(seconds) else None
