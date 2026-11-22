@@ -48,6 +48,10 @@
   --toast-meta: #aeb6c4;
   --toast-ghost: #e4e7ec;
   --toast-line: #7b8499;
+  /* Callout and banner: amber with a left accent */
+  --callout-bg: #fff6dd;
+  --callout-line: #b7791f;
+  --callout-text: #5a3a00;
   /* Health and connection badges */
   --badge-degraded-bg: #fff1c2;
   --badge-degraded-fg: #6b4e00;
@@ -448,27 +452,35 @@ kbd { font-family: var(--font-mono); font-size: 14px; font-weight: 600; min-widt
 .segmented { display: flex; gap: 4px; flex-wrap: wrap; }
 .segmented button { font: inherit; min-height: var(--tap); min-width: var(--tap); padding: 0 var(--space-4); border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); cursor: pointer; }
 .segmented button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-.threshold-row { display: grid; grid-template-columns: auto minmax(160px, 1fr) auto auto; align-items: center; gap: 12px; margin: 12px 0; }
-.threshold-row label { font-weight: 600; }
-.threshold-row input[type='range'] { accent-color: var(--accent); width: 100%; min-height: var(--tap); padding: 0; border: 0; }
-.threshold-selected { font-family: var(--font-display); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-@media (max-width: 600px) { .threshold-row { grid-template-columns: 1fr auto; } .threshold-row input[type='range'] { grid-column: 1 / -1; } }
-.proportion { margin: var(--space-4) 0; }
-.proportion-bar { display: flex; gap: 2px; height: 16px; border-radius: var(--radius-pill); overflow: hidden; background: var(--risk-none-bg); }
-.proportion-bar > .seg { flex-basis: 0; min-width: 0; }
-.seg-tp { background: var(--green); }
-.seg-fn { background: var(--amber); }
-.seg-fp { background: var(--accent); }
-.seg-tn { background: var(--slate); }
-.proportion-legend { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-family: var(--font-mono); font-weight: 600; }
-.proportion-legend li { display: flex; align-items: center; gap: 6px; }
-.seg-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 8px 0 16px; }
-@media (max-width: 599px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.metric { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
-.metric-label { color: var(--muted); font-weight: 600; }
-.metric-value { font-family: var(--font-display); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.metric-before { color: var(--muted); }
+.calibration-title { display: grid; gap: 6px; }
+.calibration .panel-header { align-items: flex-end; }
+.calibration .panel-header h2 { font-size: 40px; line-height: 48px; letter-spacing: -0.03em; }
+@media (max-width: 599px) { .calibration .panel-header h2 { font-size: 28px; line-height: 34px; } }
+.threshold-row { display: grid; grid-template-columns: auto minmax(160px, 1fr) auto auto; align-items: center; gap: var(--space-6); margin: var(--space-4) 0; padding: 20px 0; border-block: 1px solid var(--border); }
+.threshold-row label { font-size: 14px; font-weight: 600; }
+.threshold-row input[type='range'] { accent-color: var(--link); width: 100%; min-height: var(--tap); padding: 0; border: 0; }
+.threshold-selected { font-family: var(--font-display); font-size: 40px; line-height: 40px; letter-spacing: -0.03em; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--link); }
+.threshold-row .muted { font-size: 13px; }
+@media (max-width: 600px) { .threshold-row { grid-template-columns: 1fr auto; gap: var(--space-3); } .threshold-row input[type='range'] { grid-column: 1 / -1; } }
+.proportion { margin: var(--space-4) 0 14px; }
+.proportion-bar { list-style: none; margin: 0; padding: 0; display: flex; height: 44px; border-radius: var(--radius-sm); overflow: hidden; background: var(--border); }
+.proportion-bar > .seg { flex-basis: 0; min-width: 44px; display: flex; align-items: center; padding-left: 14px; overflow: hidden; white-space: nowrap; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.seg-tp { background: var(--accent); color: var(--accent-text); }
+.seg-fn { background: var(--risk-high); color: var(--accent-text); }
+.seg-fp { background: var(--amber); color: var(--accent-text); }
+.seg-tn { background: var(--border); color: var(--accent); }
+.metrics { display: flex; flex-wrap: wrap; gap: var(--space-4) 0; margin: 14px 0 var(--space-6); }
+.metric { flex: 0 0 176px; display: grid; gap: 2px; align-content: start; padding: 0; }
+.metric:nth-child(5) { border-left: 1px solid var(--border); padding-left: 32px; flex-basis: 208px; }
+@media (max-width: 899px) { .metric, .metric:nth-child(5) { flex: 1 1 40%; border-left: 0; padding-left: 0; } }
+.metric-label { color: var(--muted); font-size: 13px; font-weight: 600; }
+.metric-label.metric-fp { color: var(--amber); font-size: 12px; }
+.metric-label.metric-fn { color: var(--risk-high); font-size: 12px; }
+.metric-value { font-family: var(--font-display); font-size: 32px; line-height: 38px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.metric-before { color: var(--muted); font-size: 13px; }
 .calibration-plot { width: 100%; }
-.calibration-save { margin-top: 16px; display: grid; gap: 10px; }
-.warning { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--risk-medium-bg); color: var(--risk-medium-fg); font-weight: 600; }
+.calibration-save { margin-top: var(--space-6); display: grid; gap: 10px; }
+.calibration-callout, .conn-banner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3) var(--space-6); padding: 18px 20px; border-left: 5px solid var(--callout-line); border-radius: 6px; background: var(--callout-bg); color: var(--callout-text); }
+.calibration-callout p, .conn-banner p { margin: 0; font-size: 14px; line-height: 21px; font-weight: 600; flex: 1 1 280px; }
+.calibration-buttons { display: flex; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+.calibration-buttons .btn { font-size: 13px; font-weight: 600; padding: 0 20px; }

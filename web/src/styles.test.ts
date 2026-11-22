@@ -79,6 +79,11 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--toast-ghost', '--toast-bg'],
   ['--toast-bg', '--accent-text'],
   ['--toast-bg', '--toast-ghost'],
+  ['--callout-text', '--callout-bg'],
+  ['--link', '--callout-bg'],
+  ['--amber', '--surface'],
+  ['--accent', '--border'],
+  ['--text', '--callout-bg'],
 ];
 
 // Non-text parts (control borders, focus ring, slider) need 3:1.

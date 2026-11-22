@@ -91,7 +91,7 @@ describe('App (against contract mocks)', () => {
 
   it('mounts the calibration panel (lazy-loaded) after the findings', async () => {
     renderApp();
-    const heading = await screen.findByRole('heading', { name: 'Kalibracja progów' });
+    const heading = await screen.findByRole('heading', { name: 'Ile alarmów, a ile przeoczeń?' });
     expect(await screen.findByRole('slider', { name: 'Próg dla M2' })).toBeInTheDocument();
     const findingsTable = document.querySelector('table.findings');
     expect(findingsTable).not.toBeNull();
