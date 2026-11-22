@@ -20,9 +20,9 @@ Order R5, then R7, R8 and R13 (feature freeze Sun 08:00). If time runs short, sh
 
 ## 3. R8 responsiveness
 
-- [ ] 3.1 Write the failing tests for every R8 scenario and the `min_font_px` check.
-- [ ] 3.2 Implement R8. Tests green.
-- [ ] 3.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 3.1 Write the failing tests for every R8 scenario and the `min_font_px` check.
+- [x] 3.2 Implement R8. Tests green.
+- [x] 3.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 14 tried, 14 caught` (0 px, the 12 px boundary, clipped `true` and `null`, the visibility filter, the missing-viewport quote and locator, the one-viewport downgrade, worst viewport, best block, the no-risk and no-blocks guards; `min_font_px` bound and bool guard).
 
 ## 4. R13 dominance and the year-range detector
 

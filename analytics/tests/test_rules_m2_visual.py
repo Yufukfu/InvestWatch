@@ -74,7 +74,7 @@ def page(risk_desktop: dict | None = None, risk_mobile: dict | None = None) -> l
 
 def test_catalogue_implements_the_visual_rules(catalogue):
     implemented = {s.id for s in catalogue.implemented}
-    assert {"R5", "R7"} <= implemented
+    assert {"R5", "R7", "R8"} <= implemented
 
 
 # ---- R5 exposure and contrast ------------------------------------------------------------------
@@ -211,3 +211,82 @@ def test_r7_without_blocks_or_risk_is_not_applicable(registry, catalogue):
     r = run(f"{HEAD}. Reklama.", registry, catalogue, blocks=[block(HEAD, size=32)])["R7"]
     assert r.result == "not_applicable"
     assert "brak informacji o ryzyku" in r.explanation.lower()
+
+
+# ---- R8 responsiveness -------------------------------------------------------------------------
+
+
+def test_r8_gold_missing_on_mobile_fails(registry, catalogue):
+    r = run_gold("m2-r8-risk-missing-on-mobile", registry, catalogue)["R8"]
+    assert r.result == "fail"
+    assert r.evidence_locator.viewport == "mobile"
+    assert "mobile" in r.explanation
+    assert r.evidence == RISK.replace("kapitału", "zainwestowanego kapitału")  # quoted from the other viewport
+
+
+def test_r8_gold_small_font_fails(registry, catalogue):
+    r = run_gold("m2-r4-small-risk-font", registry, catalogue)["R8"]
+    assert r.result == "fail"
+    assert "9 px" in r.explanation and "12 px" in r.explanation
+
+
+def test_r8_hidden_on_every_viewport_fails(registry, catalogue):
+    assert run_gold("m2-r7-risk-behind-click", registry, catalogue)["R8"].result == "fail"
+
+
+def test_r8_clipped_mobile_warning_fails(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page(risk_mobile={"clipped": True}))["R8"]
+    assert r.result == "fail"
+    assert r.evidence_locator.viewport == "mobile"
+    assert r.evidence == RISK
+
+
+def test_r8_font_boundary(registry, catalogue):
+    assert run(TEXT, registry, catalogue, blocks=page(risk_mobile={"size": 12}))["R8"].result == "pass"
+    assert run(TEXT, registry, catalogue, blocks=page(risk_mobile={"size": 11.5}))["R8"].result == "fail"
+
+
+def test_r8_responsive_warning_passes(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page())["R8"]
+    assert r.result == "pass"
+    assert r.evidence == RISK
+
+
+def test_r8_one_readable_block_per_viewport_is_enough(registry, catalogue):
+    blocks = page() + [block(RISK, viewport="mobile", size=8, clipped=True)]
+    assert run(TEXT, registry, catalogue, blocks=blocks)["R8"].result == "pass"
+
+
+def test_r8_unknown_clipping_is_uncertain(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page(risk_mobile={"clipped": None}))["R8"]
+    assert r.result == "uncertain"
+
+
+def test_r8_one_viewport_only(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page(risk_mobile=False)[:1] + [block(RISK)])["R8"]
+    assert r.result == "uncertain"
+    assert "jednym widoku" in r.explanation
+    small = [block(HEAD, size=32), block(RISK, size=9)]
+    assert run(TEXT, registry, catalogue, blocks=small)["R8"].result == "fail"
+
+
+def test_r8_without_blocks_or_risk_is_not_applicable(registry, catalogue):
+    r = run(TEXT, registry, catalogue)["R8"]
+    assert r.result == "not_applicable" and "renderowaniu" in r.explanation
+    r = run(f"{HEAD}. Reklama.", registry, catalogue, blocks=[block(HEAD, size=32)])["R8"]
+    assert r.result == "not_applicable"
+    assert "brak informacji o ryzyku" in r.explanation.lower()
+
+
+@pytest.mark.parametrize("bad", ["min_font_px: 0", "min_font_px: -1", "min_font_px: x", "min_font_px: true"])
+def test_r8_bad_min_font_px_fails_at_load(tmp_path, bad):
+    text = CATALOGUE.read_text(encoding="utf-8")
+    assert text.count("min_font_px: 12") == 1
+    p = tmp_path / "m2.yaml"
+    p.write_text(text.replace("min_font_px: 12", bad), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="R8 min_font_px"):
+        Catalogue.load(p)
+
+
+def test_r8_zero_px_warning_is_uncertain(registry, catalogue):
+    assert run(TEXT, registry, catalogue, blocks=page(risk_mobile={"size": 0}))["R8"].result == "uncertain"

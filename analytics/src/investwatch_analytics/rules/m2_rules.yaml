@@ -252,7 +252,21 @@ rules:
       risk_exclude_patterns: *risk_exclude_patterns
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
-  - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
+  # ZASÓB R8 "czy tekst nie jest ucinany lub skalowany poniżej czytelności" (desktop, tablet, telefon): per rendered
+  # viewport the warning is visible, unclipped and >= min_font_px; missing in one viewport while another has it
+  # fails. One rendered viewport: a clean result is uncertain. Visual (rules/m2_visual.py).
+  - id: R8
+    name: Responsywność
+    severity: low
+    legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565
+    implemented: true
+    params:
+      min_font_px: 12
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
   # R9: LLM-first (no rules signal, analytics-m2-p1-rules follow-up F2); not_applicable with "brak informacji o
   # ryzyku" without risk information.
   - {id: R9, name: Zrozumiałość, severity: low, legal_basis: art. 44 ust. 2 lit. d rozp. del. 2017/565, implemented: false}

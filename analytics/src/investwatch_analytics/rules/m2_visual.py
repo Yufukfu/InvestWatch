@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 import re
 
-from ..models import Block, RuleResult
+from ..models import Block, EvidenceLocator, RuleResult
 from .engine import Context, register
 from .m2 import NO_BLOCKS, NO_RENDER_METADATA, VIEWPORTS, _RiskWarnings, locator_for
 
@@ -140,3 +140,58 @@ class R7OneClick(_RiskWarnings):
             return self.result("not_applicable", None, NO_RENDER_METADATA)
         result, b, why = worst(verdicts)
         return self.result(result, self.warning_quote(ctx, b), why, locator_for(b))
+
+
+# ---- R8 responsiveness -------------------------------------------------------------------------
+
+
+@register
+class R8Responsiveness(_RiskWarnings):
+    """ZASÓB R8: on desktop, tablet and phone, "czy tekst nie jest ucinany lub skalowany poniżej czytelności".
+
+    Per rendered viewport: the warning must be visible (missing there while another viewport has it fails), and
+    one visible risk block must be unclipped and at least `min_font_px`. One rendered viewport cannot show
+    responsiveness: a defect still fails, a clean result is uncertain."""
+
+    rule_id = "R8"
+
+    def _state(self, b: Block, min_px: float) -> Verdict:
+        where = f"({b.viewport})"
+        if b.font_size_px <= 0:
+            return "uncertain", b, f"Ostrzeżenie o ryzyku ma nieczytelny rozmiar czcionki (0 px) w danych renderowania {where}."
+        if b.font_size_px < min_px:
+            return "fail", b, (
+                f"Ostrzeżenie o ryzyku przeskalowane poniżej czytelności: {_px(b.font_size_px)} px, wymagane "
+                f"co najmniej {_px(min_px)} px {where}."
+            )
+        if b.overflow_clipped is True:
+            return "fail", b, f"Ostrzeżenie o ryzyku jest ucięte (tekst wychodzi poza widoczny obszar) {where}."
+        if b.overflow_clipped is None:
+            return "uncertain", b, f"Brak danych, czy ostrzeżenie o ryzyku nie jest ucięte {where}."
+        return "pass", b, "Ostrzeżenie o ryzyku jest czytelne i nieucięte we wszystkich widokach."
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        if not ctx.doc.blocks:
+            return self.result("not_applicable", None, NO_BLOCKS)
+        min_px = float(self.spec.params.get("min_font_px", 12))
+        rendered = [vp for vp in VIEWPORTS if any(b.viewport == vp for b in ctx.doc.blocks)]
+        risk = {vp: [b for b in ctx.doc.blocks if b.viewport == vp and self.is_warning(b.text)] for vp in rendered}
+        anywhere = [b for vp in rendered for b in risk[vp]]
+        if not anywhere:
+            return self.no_risk_result(ctx)
+        verdicts: list[tuple[str, Block, str, EvidenceLocator]] = []
+        for vp in rendered:
+            visible = [b for b in risk[vp] if b.visible]
+            if not visible:
+                b = (risk[vp] or anywhere)[0]  # quote the warning that is missing here
+                verdicts.append(("fail", b, f"Ostrzeżenie o ryzyku nie jest widoczne w widoku {vp}.",
+                                 locator_for(b) if b.viewport == vp else EvidenceLocator(viewport=vp)))
+                continue
+            result, b, why = best([self._state(b, min_px) for b in visible])
+            verdicts.append((result, b, why, locator_for(b)))
+        result, b, why, locator = max(verdicts, key=lambda v: _SEVERITY[v[0]])
+        if result == "pass" and len(rendered) == 1:
+            result, why = "uncertain", (
+                f"Strona wyrenderowana tylko w jednym widoku ({rendered[0]}) – nie można ocenić responsywności."
+            )
+        return self.result(result, self.warning_quote(ctx, b), why, locator)
