@@ -30,5 +30,5 @@
 
 ## 5. Closing
 
-- [ ] 5.1 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `.docs/INDEX.md`, ADR if any), run `docs-check`, and add the `iw-ai-log` entry; comment on issue #74 with what was done and what stays open
+- [x] 5.1 Apply the `iw-docs-update` skill (docs, `.docs/status/dashboard.md`, `.docs/INDEX.md`, ADR if any), run `docs-check`, and add the `iw-ai-log` entry; comment on issue #74 with what was done and what stays open
 - [ ] 5.2 Run the `iw-pr-review` skill and fix real findings

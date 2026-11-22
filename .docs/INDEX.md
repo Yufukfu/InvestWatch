@@ -29,6 +29,8 @@
 | Work on the analytics pipeline, rules R1-R18, LLM layer or calibration | [analytics-plan.md](analytics-plan.md) §2, §5, §7, §8 |
 | Know which module a document goes to, or change the M1/M3 signals (S1.x, S3.x) | [../analytics/README.md](../analytics/README.md) "Modules and routing", then [../openspec/specs/m1-third-party-signals/spec.md](../openspec/specs/m1-third-party-signals/spec.md), [../openspec/specs/m3-unauthorized-advice-signals/spec.md](../openspec/specs/m3-unauthorized-advice-signals/spec.md) and [decisions/0308-m3-s34-gate.md](decisions/0308-m3-s34-gate.md) |
 | Add or relabel a gold-set document, run the evaluation | [../analytics/eval/README.md](../analytics/eval/README.md), then [../analytics/README.md](../analytics/README.md) "Gold-set evaluation" |
+| Scale `worker` or `analytics`, or see which services must stay at one replica | [../infra/README.md](../infra/README.md#scale-out) |
+| Get the architecture diagram and scale-out slides for the hand-in PDF | [presentation-architecture.md](presentation-architecture.md) |
 | Get the analytics slide content for the hand-in PDF (M1/M2/M3, gold-set numbers, add-a-rule example, LLM swap) | [presentation-analytics.md](presentation-analytics.md) |
 | Read the UKNF challenge and the 18 rules | the Polish materials in [../doc/](../doc/) (read-only, removed before hand-in) |
 | Use or change a contract (a change needs the whole team and a version bump) | [../contracts/README.md](../contracts/README.md), [../contracts/CLAUDE.md](../contracts/CLAUDE.md), [integration-plan.md](integration-plan.md) §3-§6 |
