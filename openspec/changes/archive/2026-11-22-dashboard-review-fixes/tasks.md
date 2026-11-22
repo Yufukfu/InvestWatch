@@ -10,4 +10,4 @@
 ## 2. Closing
 
 - [x] 2.1 Apply `iw-docs-update` and add the AI-log entry
-- [ ] 2.2 Run the `iw-pr-review` skill and fix real findings
+- [x] 2.2 Run the `iw-pr-review` skill and fix real findings (iw-reviewer on `01efdcdd..9aae3065`, merge resolution and fixes: no blocking findings)

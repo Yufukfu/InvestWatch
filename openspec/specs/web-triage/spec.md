@@ -77,3 +77,10 @@ Shortcuts SHALL be ignored while a text field, select or text area has focus, an
 #### Scenario: Typing is not a shortcut
 - **WHEN** the user types `1` in the search field
 - **THEN** the character is entered and no status change is sent
+
+### Requirement: Status shortcuts never discard unsaved edits
+The `1`-`5` status shortcuts SHALL do nothing while the status editor of the open finding has unsaved changes (a status choice or a note that differs from the saved values).
+
+#### Scenario: Unsaved note
+- **WHEN** the analyst has typed a note, moved focus to `Zapisz decyzję` and presses `3`
+- **THEN** no request is sent and the note stays in the editor
