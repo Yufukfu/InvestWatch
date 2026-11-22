@@ -25,11 +25,11 @@
 
 ## 4. YouTube collector (cut if gate 1.2 fails)
 
-- [ ] 4.1 Test first (`scraper/tests/test_social_youtube.py`, fixtures from 1.3): URL validation; video ids and channel id from the channel fixture capped by `YOUTUBE_MAX_VIDEOS`; consent redirect ends as `blocked_target`; a page with no ids is `parse_error` "no readable video list"; watch fixture gives title, description, publish date, channel name and caption track list; unplayable, wrong-channel and unreadable pages skipped, every page unreadable is one `parse_error`; a block ends the run
-- [ ] 4.2 `known_urls` lookup on the Postgres store behind a protocol, with a test against the test PostgreSQL (stored videos skipped, a stored video with transcript `failed` or `none` stays skipped)
-- [ ] 4.3 `social/youtube.py` list and watch parsers and the document build (scrubbed JSON `html`, `scrape_meta.video_id`, author from the URL, `transcript = none` until group 5)
-- [ ] 4.4 `social/youtube.py` flow (sequential watch requests with the per-domain wait, skip known, ingest loop) and its registration
-- [ ] 4.5 Mutation check — mutations: N tried, N caught
+- [x] 4.1 Test first (`scraper/tests/test_social_youtube.py`, fixtures from 1.3): URL validation; video ids and channel id from the channel fixture capped by `YOUTUBE_MAX_VIDEOS`; consent redirect ends as `blocked_target`; a page with no ids is `parse_error` "no readable video list"; watch fixture gives title, description, publish date, channel name and caption track list; unplayable, wrong-channel and unreadable pages skipped, every page unreadable is one `parse_error`; a block ends the run
+- [x] 4.2 `known_urls` lookup on the Postgres store behind a protocol, with a test against the test PostgreSQL (stored videos skipped, a stored video with transcript `failed` or `none` stays skipped)
+- [x] 4.3 `social/youtube.py` list and watch parsers and the document build (scrubbed JSON `html`, `scrape_meta.video_id`, author from the URL, `transcript = none` until group 5)
+- [x] 4.4 `social/youtube.py` flow (sequential watch requests with the per-domain wait, skip known, ingest loop) and its registration
+- [x] 4.5 Mutation check — mutations: 19 tried, 19 caught
 
 ## 5. Transcripts (cut with group 4)
 
