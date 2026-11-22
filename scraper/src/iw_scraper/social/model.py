@@ -4,7 +4,7 @@ A collector module (one per platform, registered by host in `registry`) turns on
 Nothing here knows a platform: the platform's name and profile URL travel in the `Channel`.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -108,7 +108,8 @@ class FlowContext:
     session: Any = None
     proxy: Any = None
     check_robots: Callable[[], Awaitable[Any]] | None = None  # None when allowed, else the `blocked` AttemptResult
-    fetch: Callable[[str], Awaitable[Any]] | None = None  # the shared fetch, after one `wait_turn`
+    fetch: Callable[..., Awaitable[Any]] | None = None  # `(url, cookie=None)`: the shared fetch, after one `wait_turn`
+    known_urls: Callable[[Sequence[str]], Awaitable[set[str]]] | None = None  # which permalinks have a document
 
 
 # a dedicated flow returns one attempt's `AttemptResult`; failures it cannot map itself it raises as `FetchFailure`

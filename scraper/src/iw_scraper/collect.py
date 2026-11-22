@@ -5,6 +5,7 @@ between attempts: a failure becomes an `AttemptResult`, and a `Retry-After` is p
 Request starts are spaced by the shared `DomainLimiter`, once before `robots.txt` and once before the page.
 """
 
+import dataclasses
 import logging
 import math
 import time
@@ -159,7 +160,10 @@ class Collector:
             return _failed(source.id, Reason.BLOCKED, verdict.detail)
         return None
 
-    async def _fetch_page(self, url: str, identity, session, proxy, guard, domain: str):
+    async def _fetch_page(self, url: str, identity, session, proxy, guard, domain: str, cookie: str | None = None):
+        if cookie is not None:  # one cookie for this request only: the run's identity itself is never changed
+            headers = tuple(pair for pair in identity.headers if pair[0].lower() != "cookie")
+            identity = dataclasses.replace(identity, headers=headers + (("cookie", cookie),))
         await self._limiter.wait_turn(domain)
         return await self._stages.fetch(
             url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
@@ -202,7 +206,8 @@ class Collector:
             wait_turn=lambda: self._limiter.wait_turn(domain), max_posts=self._social_max_posts,
             identity=identity, session=session, proxy=proxy,
             check_robots=lambda: self._check_robots(source, identity, session, proxy, guard, domain),
-            fetch=lambda url: self._fetch_page(url, identity, session, proxy, guard, domain),
+            fetch=lambda url, cookie=None: self._fetch_page(url, identity, session, proxy, guard, domain, cookie),
+            known_urls=self._store.known_urls,
         )
 
     async def _collect_social(self, source: Source, identity, session, proxy, guard, domain: str) -> AttemptResult:

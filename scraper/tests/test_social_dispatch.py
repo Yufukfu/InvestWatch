@@ -1,11 +1,14 @@
 """`Collector.run_source` dispatching a registration with no page parser to its flow by platform: a fetch-path flow
 (identity, session, proxy and the robots check come from the shared layer) and a home-IP flow (none of them)."""
 
+import dataclasses
+
 import pytest
 
 from conftest import FakeSourceStore, make_source
 from iw_scraper.collect import Collector
 from iw_scraper.fetch import FetchFailure
+from iw_scraper.identities import draw_identity
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.ratelimit import host_key
 from iw_scraper.robots import RobotsVerdict
@@ -75,6 +78,55 @@ async def test_fetch_path_flow_gets_the_runs_identity_session_proxy_and_robots_c
     assert h.calls == ["rotation", "started", "wait", "robots", "wait", "fetch", "close"]
     assert seen["identity"] is h.identity and seen["session"] is not None and seen["proxy"] is not None
     assert seen["body"] == b"<html>ok</html>"
+
+
+async def test_fetch_path_flow_can_add_one_cookie_to_the_identity_of_a_single_request(monkeypatch):
+    h = Harness({URL: page(URL, b"<html>ok</html>")})
+    h.identity = draw_identity()
+
+    async def flow(ctx):
+        await ctx.fetch(URL, cookie="SOCS=CAI")
+        await ctx.fetch(URL)
+        return AttemptResult(documents=1)
+
+    register(monkeypatch, flow)
+
+    await run(make(h), h)
+
+    sent = [dict(identity.headers).get("cookie") for _, identity, _ in h.fetched]
+    assert sent == ["SOCS=CAI", None]
+    assert "cookie" not in dict(h.identity.headers)  # the run's identity itself is never changed
+
+
+async def test_an_added_cookie_replaces_any_cookie_header_of_the_identity(monkeypatch):
+    h = Harness({URL: page(URL, b"<html>ok</html>")})
+    h.identity = dataclasses.replace(draw_identity(), headers=draw_identity().headers + (("Cookie", "old=1"),))
+
+    async def flow(ctx):
+        await ctx.fetch(URL, cookie="SOCS=CAI")
+        return AttemptResult(documents=1)
+
+    register(monkeypatch, flow)
+
+    await run(make(h), h)
+
+    sent = [value for name, value in h.fetched[0][1].headers if name.lower() == "cookie"]
+    assert sent == ["SOCS=CAI"]
+
+
+async def test_fetch_path_flow_can_ask_the_store_which_urls_are_known(monkeypatch):
+    h = Harness({})
+    asked = []
+
+    async def flow(ctx):
+        asked.append(await ctx.known_urls(["https://flows.example/a"]))
+        return AttemptResult(documents=0)
+
+    register(monkeypatch, flow)
+
+    await run(make(h), h)
+
+    assert asked == [set()]  # the fake store knows no document
 
 
 async def test_fetch_path_flow_robots_refusal_is_a_blocked_error_and_no_page_is_requested(monkeypatch):

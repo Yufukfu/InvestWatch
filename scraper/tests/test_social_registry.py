@@ -113,3 +113,13 @@ def test_x_is_registered_as_a_home_ip_flow_for_its_own_platform():
     assert (found.parse, found.flow, found.platform, found.home_ip) == (None, x.flow, "x", True)
     assert found.valid_url is x.valid_url
     assert registry.accepts("x", "https://x.com/uknf") and not registry.accepts("other", "https://x.com/uknf")
+
+
+def test_youtube_is_registered_as_a_flow_on_the_fetch_path_for_its_own_platform():
+    from iw_scraper.social import youtube
+
+    found = registry.for_url("https://www.youtube.com/@UKNFpolska")
+
+    assert (found.parse, found.flow, found.platform, found.home_ip) == (None, youtube.flow, "youtube", False)
+    assert found.valid_url is youtube.valid_url
+    assert registry.accepts("youtube", "https://www.youtube.com/@UKNFpolska")
