@@ -21,6 +21,7 @@ All firms, people, handles and URLs in the mocks are **fictional**. Mock file â†
 |---|---|
 | `findings.json` | `GET /api/findings` |
 | `finding-detail.json` | `GET /api/findings/{id}` |
+| `findings.json` + `documents.json` | `GET /api/findings/{id}/export` (built from the detail; `raw` is always unavailable, the mock server has no raw objects) |
 | `summary.json` | `GET /api/stats/summary` |
 | `trend.json` | `GET /api/stats/trend` |
 | `calibration-M1.json`, `-M2`, `-M3` | `GET /api/calibration?module=â€¦` |
