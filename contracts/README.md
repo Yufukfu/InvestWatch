@@ -103,3 +103,10 @@ Run it before merging any change to `contracts/`.
 2. Update the schema, `openapi.yaml`, the mock generator and regenerate mocks.
 3. `python contracts/validate.py` must pass.
 4. Breaking changes bump the version (`v2`) in the stream message `schema` field.
+
+## Versions
+
+| `openapi.yaml` `info.version` | Change |
+|---|---|
+| 1.0.0 | v1 as frozen on Sat 14:30 (ADR 0301) |
+| 1.1.0 | optional `document_id` on `GET /findings`; mocks gain one Instagram post with an M1 and an M3 finding (11 findings, 10 documents). Additive, agreed by the whole team (issue #33, OpenSpec change `findings-document-filter`) |

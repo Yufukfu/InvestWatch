@@ -274,8 +274,10 @@ def test_mass_signals_without_llm(mock, registry, cat):
 
 def test_has_advisory():
     assert not m3.has_advisory([rr("S3.1", "fail"), rr("S3.6", "fail"), rr("S3.2", "pass")])
-    for sid in ("S3.2", "S3.3", "S3.4", "S3.5", "S3.8"):
+    for sid in ("S3.3", "S3.4", "S3.5", "S3.8"):
         assert m3.has_advisory([rr("S3.1", "fail"), rr(sid, "uncertain")])
+    # analytics-post-integration-fixes: service vocabulary alone is no offer (EY negative control)
+    assert not m3.has_advisory([rr("S3.1", "fail"), rr("S3.2", "uncertain")])
     assert not m3.has_advisory([rr("S3.2", "not_applicable")])
 
 

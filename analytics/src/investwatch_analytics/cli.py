@@ -23,7 +23,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import logging_setup
-from .config import ConfigError, LlmSettings, Settings
+from .config import ConfigError, LlmSettings, Settings, official_source_domains
 from .llm import build_judge
 from .models import ScrapedDocument
 from .pipeline import analyze, default_signal_catalogues
@@ -48,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         llm_settings = LlmSettings.from_env()
+        official_source_domains()  # routing reads it per document: a bad value stops here, not per document
     except ConfigError as exc:
         log.error("invalid configuration", extra={"error": str(exc)})
         return 2

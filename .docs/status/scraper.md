@@ -1,6 +1,6 @@
 # Status: scraper
 
-Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-21 (Sat).
+Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -17,6 +17,8 @@ Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEO
 
 - `scraper-v2-sources` (12 vetted M1/M2/M3 web sources in `scraper/seeds/sources.toml`, validated and idempotent seed loader, host-guard test, opt-in live check) is implemented and tested, stacked on `scraper-orchestration` (PR #38). The opt-in live check passed for all 12 pages on 2026-11-21 (HTTP 200, no redirect, robots allowed, text present). M3 positives come from `scraper-v2-social` (Telegram channels) and the icobench list page; naming a business from the KNF warnings list is an optional, human-only follow-up.
 
+- Social R&D (ADR 0109, docs-only PR): X tweets are collectable with a dedicated account's cookies (Playwright reading the page's GraphQL); YouTube metadata works anonymously through our fetch layer; YouTube transcripts work through audio plus local Whisper (residential proxy, Node 22, PO token server), not through the caption URL (429 from the home IP). Specs `scraper-social-youtube` (metadata only) and `scraper-social-x` follow.
+
 ## Active OpenSpec changes
 
 - `scraper-v3-render` (PR pending): isolated Playwright renderer service, per-viewport screenshots and `blocks` for `firm_own` + `M2` sources, off by default (`SCRAPER_RENDER_ENABLED`);
@@ -24,6 +26,7 @@ Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEO
 - `scraper-stack` (PR #52); `scraper-orchestration`, `scraper-author-provenance`, `scraper-v2-sources` and `content-hash-definition` are merged (PRs #38, #49, #41, #43, #44)
 - `scraper-effectiveness-report` (PR #57)
 - `scraper-sample-import` (PR #56)
+- `scraper-audit-in-pr-body` (issue #66): spec-only delta so `scraper-deployment` says the `pip-audit` result goes in the PR body (ADR 0209); no code or doc edit.
 
 ## Blockers and open decisions
 

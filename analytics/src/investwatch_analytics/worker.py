@@ -26,7 +26,8 @@ from typing import Any
 import redis
 
 from . import logging_setup
-from .config import ConfigError, LlmSettings, Settings, WorkerSettings, registry_provenance, uses_seed_registry
+from .config import (ConfigError, LlmSettings, Settings, WorkerSettings, official_source_domains, registry_provenance,
+                     uses_seed_registry)
 from .llm import build_judge
 from .events import Publisher, RedisPublisher
 from .health import start_health_server
@@ -291,6 +292,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         worker_settings = WorkerSettings.from_env(env)
         settings = Settings.from_env(env)
         llm_settings = LlmSettings.from_env(env, claim_min_idle_ms=worker_settings.claim_min_idle_ms)
+        official_source_domains(env)  # routing reads it per document: a bad value stops startup, not every document
         # Mode only: never the URL (it could carry a host the operator considers private) or the key.
         log.info("llm configured", extra={"llm_mode": llm_settings.mode, "llm_model": llm_settings.model or None})
         registry = Registry.from_csv(settings.registry_csv)
