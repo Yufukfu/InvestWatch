@@ -10,10 +10,11 @@ import asyncio
 import re
 
 from iw_scraper.fetch import FetchFailure
+from iw_scraper.timeout_session import TimeoutSession
 from iw_scraper.types import Reason
 
 _VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
-TRANSCRIPT_TIMEOUT = 15.0  # seconds; the library sets none, and a stalled proxy would hold the run to the queue's deadline
+TRANSCRIPT_TIMEOUT = 15.0  # seconds; the library sets none, so `TimeoutSession` does and `wait_for` backs it up
 _TIMEOUT_NAMES = ("Timeout", "ReadTimeout", "ConnectTimeout")
 
 
@@ -39,12 +40,14 @@ def map_library_error(error: Exception) -> FetchFailure | None:
     return FetchFailure(Reason.PARSE_ERROR, f"the transcript answer could not be read ({type(error).__name__})")
 
 
-def _fetch_sync(video_id: str, language: str, proxy_url: str, api_factory) -> str | None:
+def _fetch_sync(video_id: str, language: str, proxy_url: str, api_factory, timeout: float) -> str | None:
     if api_factory is None:
         from youtube_transcript_api import YouTubeTranscriptApi as api_factory
     from youtube_transcript_api.proxies import GenericProxyConfig
 
-    api = api_factory(proxy_config=GenericProxyConfig(http_url=proxy_url, https_url=proxy_url))
+    api = api_factory(
+        proxy_config=GenericProxyConfig(http_url=proxy_url, https_url=proxy_url), http_client=TimeoutSession(timeout)
+    )
     snippets = api.fetch(video_id, languages=[language])
     return " ".join(" ".join(snippet.text for snippet in snippets).split()) or None
 
@@ -56,7 +59,7 @@ async def fetch_transcript(
     if not _VIDEO_ID.fullmatch(video_id):
         raise FetchFailure(Reason.INVALID_REQUEST, "not a YouTube video id")
     try:
-        return await asyncio.wait_for(asyncio.to_thread(_fetch_sync, video_id, language, proxy_url, api_factory), timeout)
+        return await asyncio.wait_for(asyncio.to_thread(_fetch_sync, video_id, language, proxy_url, api_factory, timeout), timeout)
     except Exception as error:  # every library failure, whatever its type; the original stays out of the chain
         failure = map_library_error(error)
         if failure is None:

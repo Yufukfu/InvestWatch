@@ -209,15 +209,15 @@ def make_flow(*, max_videos=youtube_max_videos, transcript=fetch_transcript, pro
             _log.info("youtube transcripts are off: YT_TRANSCRIPT_PROXY is not set")
 
         async def transcribe(video: Video) -> tuple[str, str]:
-            """The transcript text and its status: `caption`, `none` or `failed`; a block ends transcripts for the run."""
+            """The transcript text and its status: `caption`, `none` or `failed`; a block or a timeout ends transcripts for the run."""
             nonlocal transcript_proxy
             if transcript_proxy is None or not video.tracks:
                 return "", "none"
             try:
                 text = ((await transcript(video.video_id, _language(video.tracks), transcript_proxy)) or "").strip()
             except FetchFailure as failure:
-                if failure.reason is Reason.BLOCKED:
-                    transcript_proxy = None  # a blocked proxy is not tried again in this run
+                if failure.reason in (Reason.BLOCKED, Reason.TIMEOUT):
+                    transcript_proxy = None  # a blocked or stalled proxy is not tried again in this run
                 _log.info("youtube transcript of %s failed: %s", video.video_id, failure.reason.value)
                 return "", "failed"
             return text, "caption" if text else "none"

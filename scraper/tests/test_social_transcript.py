@@ -1,7 +1,9 @@
 """YouTube transcripts: the flow's use of an injected transcript function (language choice, final outcomes, block
 and failure rules, no proxy) and the adapter over `youtube-transcript-api` against a fake client."""
 
+import asyncio
 import logging
+import socket
 import threading
 
 import pytest
@@ -126,10 +128,18 @@ async def test_a_block_marks_that_video_failed_and_stops_transcripts_for_the_run
     assert result.documents == 3 and result.error is None  # the documents are stored; the block is not a job error
 
 
+async def test_a_timeout_marks_that_video_failed_and_stops_transcripts_for_the_run():
+    ids = channel_ids()[:3]
+    h, fn = Harness(pages_with_tracks(ids, "pl")), Recorder(FetchFailure(Reason.TIMEOUT, "slow"))
+    result = await run(h, fn)
+    assert metas(h) == ["failed", "none", "none"] and len(fn.calls) == 1
+    assert result.documents == 3 and result.error is None
+
+
 async def test_another_failure_marks_that_video_failed_and_the_next_transcript_is_still_requested():
     ids = channel_ids()[:3]
     h = Harness(pages_with_tracks(ids, "pl"))
-    fn = Recorder(FetchFailure(Reason.TIMEOUT, "slow"), "dalszy tekst")
+    fn = Recorder(FetchFailure(Reason.HTTP_ERROR, "failed"), "dalszy tekst")
     await run(h, fn)
     assert metas(h) == ["failed", "caption", "caption"] and len(fn.calls) == 3
 
@@ -180,9 +190,10 @@ class FakeApi:
 
     def __init__(self, result):
         self.result, self.config, self.calls, self.thread = result, None, [], None
+        self.http_client = None
 
-    def factory(self, *, proxy_config):
-        self.config = proxy_config
+    def factory(self, *, proxy_config, http_client=None):
+        self.config, self.http_client = proxy_config, http_client
         return self
 
     def fetch(self, video_id, languages=("en",)):
@@ -274,3 +285,44 @@ async def test_a_malformed_video_id_is_refused_before_the_library_is_called(vide
     with pytest.raises(FetchFailure) as caught:
         await adapter(api, video_id=video_id)
     assert caught.value.reason is Reason.INVALID_REQUEST and api.calls == []
+
+
+async def test_the_library_is_given_a_session_that_bounds_every_request(monkeypatch):
+    api = FakeApi([Snippet("tekst")])
+    await transcript.fetch_transcript("JLShF0trXZI", "pl", PROXY, api_factory=api.factory, timeout=7.0)
+    sent = []
+    monkeypatch.setattr(requests.Session, "request", lambda self, method, url, **kw: sent.append(kw) or None)
+    api.http_client.get("https://www.youtube.com/watch?v=x")
+    api.http_client.post("https://www.youtube.com/youtubei/v1/player", json={})
+    api.http_client.get("https://www.youtube.com/api/timedtext", timeout=3)
+    assert [kw["timeout"] for kw in sent] == [7.0, 7.0, 3]
+
+
+async def test_a_proxy_that_accepts_and_stalls_ends_the_library_thread_not_only_the_wait():
+    """The real library against a proxy that never answers: the worker thread itself must end (a leaked one holds the
+    proxy and the default executor, which every MinIO call shares)."""
+    from youtube_transcript_api import YouTubeTranscriptApi
+
+    done = threading.Event()
+
+    class Watched:
+        def __init__(self, **kwargs):
+            self.api = YouTubeTranscriptApi(**kwargs)
+
+        def fetch(self, *args, **kwargs):
+            try:
+                return self.api.fetch(*args, **kwargs)
+            finally:
+                done.set()
+
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(5)
+    stalled_proxy = f"http://127.0.0.1:{server.getsockname()[1]}"
+    try:
+        with pytest.raises(FetchFailure) as caught:
+            await transcript.fetch_transcript("JLShF0trXZI", "pl", stalled_proxy, api_factory=Watched, timeout=0.3)
+        assert caught.value.reason is Reason.TIMEOUT
+        assert await asyncio.to_thread(done.wait, 5), "the library call is still running after the timeout"
+    finally:
+        server.close()
