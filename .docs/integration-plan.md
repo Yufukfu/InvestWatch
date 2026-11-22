@@ -186,11 +186,13 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 | Method | Path | Description |
 |---|---|---|
 | GET | `/findings` | list; filters: `module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q`. `document_id` (contract 1.1.0) returns every finding of one document, at most one per module, so the detail panel can list M1 and M3 of one post across pages |
+| GET | `/findings/export` | report export (contract 1.3.0, issue #115): the same filters and `sort` as `/findings`, no pagination, as a CSV attachment (UTF-8 with BOM) of at most 10 000 rows; `X-Total-Count`, `X-Export-Truncated`; cells that look like formulas get a `'` prefix. The dashboard's "Eksportuj raport" links to it with the current filters |
+| POST | `/findings/bulk-status` | `{ "ids": [...1-200 unique], "status": "..." }` (contract 1.3.0, issue #115): the PATCH status change for every existing id in one transaction, one `finding.updated` each; `{updated, not_found, results: [{id, result: updated\|not_found, finding}]}` in request order |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
 | GET | `/findings/{id}/export` | evidence pack (case file) for UKNF follow-up, contract 1.2.0, read-only: finding with scores, model and rules, document (URL, `content_hash`, `fetched_at`, text), raw HTML from `iw-raw` with its SHA-256, screenshot URLs, failed rules with legal basis and quotes. JSON by default; `?format=html` is a printable page (the dashboard's "Eksportuj" button links to it) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
-| GET | `/stats/summary` | counts per module / status / platform |
+| GET | `/stats/summary` | counts per module / status / platform; `m2_coverage: {total, registry_matched}` (contract 1.3.0): M2 findings and those with `firm.registry_id` set, for the coverage strip |
 | GET | `/calibration` | `?module=M2` → curve: `[{ "threshold": 0.5, "tp": 12, "fp": 4, "fn": 2, "tn": 30, "precision": 0.75, "recall": 0.86 }]` |
 | GET / PUT | `/settings/thresholds` | `{ "M1": 0.6, "M2": 0.5, "M3": 0.7 }` – changing a threshold recomputes `risk_level`. Stored by the API in Redis key `iw:settings:thresholds` as a JSON string of exactly this shape (defaults written when missing: the gold-set evaluation's best-F1 thresholds, today 0.65 / 0.1 / 0.4, ADR 0316); analytics reads the same key (ADR 0305) |
 | GET / POST / PATCH | `/sources` | list and edit sources |

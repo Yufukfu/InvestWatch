@@ -31,9 +31,11 @@
 | Add or relabel a gold-set document, run the evaluation | [../analytics/eval/README.md](../analytics/eval/README.md), then [../analytics/README.md](../analytics/README.md) "Gold-set evaluation" |
 | Run the analytics part of the hand-in demo (documents per module, expected findings, click path, LLM cache, fallback if Gemini is down) | [demo-analytics.md](demo-analytics.md) |
 | Get the analytics slide content for the hand-in PDF (M1/M2/M3, gold-set numbers, add-a-rule example, LLM swap) | [presentation-analytics.md](presentation-analytics.md) |
+| Get the dashboard and architecture slides, the live demo click-by-click or the 3-minute video script | [presentation-dashboard.md](presentation-dashboard.md) |
+| Hand in the project: title, description (PL/EN), PDF slide order, what is still left for humans | [hand-in.md](hand-in.md) |
 | Read the UKNF challenge and the 18 rules | the Polish materials in [../doc/](../doc/) (read-only, removed before hand-in) |
 | Use or change a contract (a change needs the whole team and a version bump) | [../contracts/README.md](../contracts/README.md), [../contracts/CLAUDE.md](../contracts/CLAUDE.md), [integration-plan.md](integration-plan.md) §3-§6 |
-| Scan dependencies, vet a new package, fix a vulnerability, or keep a secret out of git | [supply-chain.md](supply-chain.md), results in [security-audit.md](security-audit.md), why in [decisions/0209-supply-chain-scanning.md](decisions/0209-supply-chain-scanning.md) |
+| Scan dependencies, vet a new package, fix a vulnerability, or keep a secret out of git; read or bump the PR security scans (`.github/workflows/security.yml`) | [supply-chain.md](supply-chain.md) (§5 for the CI jobs), results in [security-audit.md](security-audit.md), why in [decisions/0209-supply-chain-scanning.md](decisions/0209-supply-chain-scanning.md) |
 | Find out why we chose X, or record a decision | [decisions/README.md](decisions/README.md) |
 | See what the system does now, or what is in flight | [../openspec/specs/](../openspec/specs/), [../openspec/changes/](../openspec/changes/) |
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |

@@ -1,0 +1,27 @@
+# Gitleaks config (ADR 0209): the default rules plus reviewed false positives only.
+# Each allowlist entry names the file and the reason. Add one only after checking the hit is not a secret.
+#
+# The entry sits on the rule, not in a top-level [[allowlists]]: in Gitleaks v8.28.0 a top-level entry with
+# `paths` skips the whole file whatever `condition` says, so it would also hide a real key added to that file.
+# Checked with a scratch copy of the mock file plus a credential-shaped line (security-ci, tasks 2.1).
+title = "InvestWatch"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Mock document ids in the mock generator (lines like key=\"m2-...\"), not credentials. Only lines of that exact shape in that one file are skipped."
+condition = "AND"
+paths = ['''^contracts/mocks/generate_mocks\.py$''']
+regexTarget = "line"
+regexes = ['''^\s*key="m\d-[a-z0-9-]+",''']
+
+[[rules.allowlists]]
+description = "UUID v5 firm keys in web test fixtures (lines like key: '<uuid>',), not credentials. First hit: web/src/features/advertisers/data/useAdvertisers.test.tsx, commit b14d0b53 (PR #129). Only a line whose value is exactly a UUID, in a web test file, is skipped."
+condition = "AND"
+paths = ['''^web/src/.+\.test\.tsx?$''']
+regexTarget = "line"
+regexes = ['''^\s*(\{\s*)?key:\s*'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',''']

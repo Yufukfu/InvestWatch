@@ -151,17 +151,35 @@ The generated mocks SHALL contain at least one document that has findings from t
 - **THEN** `findings.json` has exactly one `document_id` shared by two findings, one with `module` M1 and one with M3, and `python contracts/validate.py` exits 0
 
 ### Requirement: Serve the finding evidence pack
-The mock server SHALL serve `GET /api/findings/{id}/export` as in `contracts/openapi.yaml` 1.2.0: for `format=json` (the default) a pack whose `finding`, `document` and `screenshot_urls` equal the mock `GET /api/findings/{id}` body, whose `failed_rules` are the finding's rules with `result` `fail`, and whose `raw.available` is false with `unavailable_reason` `not_found` when the mock document has an `html_object_key` and `no_key` otherwise; for `format=html` the same content as a printable page with every value HTML-escaped and a `Content-Security-Policy` that allows no scripts. An unknown id SHALL return 404 in both formats and a malformed id or `format` SHALL return 422.
+The mock server SHALL serve `GET /api/findings/{id}/export` as in `contracts/openapi.yaml` 1.2.0: a JSON pack for `format=json` (the default) and a printable HTML page with the same content for `format=html`. An unknown id SHALL return 404 in both formats and a malformed id or `format` SHALL return 422.
 
 #### Scenario: JSON pack of a mock finding
 - **WHEN** the dashboard calls `GET /api/findings/{id}/export` for any mock finding
 - **THEN** the response is 200, validates against `contracts/openapi.yaml` and matches that finding's detail
+- **AND** the pack's `finding`, `document` and `screenshot_urls` SHALL equal the mock `GET /api/findings/{id}` body, and its `failed_rules` SHALL be the finding's rules with `result` `fail`
+- **AND** `raw.available` SHALL be false, with `unavailable_reason` `not_found` when the mock document has an `html_object_key` and `no_key` otherwise
 
 #### Scenario: Printable page
 - **WHEN** the dashboard opens `GET /api/findings/{id}/export?format=html`
 - **THEN** the response is 200 `text/html` with a CSP starting `default-src 'none'`
+- **AND** every value on the page SHALL be HTML-escaped and the `Content-Security-Policy` SHALL allow no scripts
 
 #### Scenario: Unknown finding
 - **WHEN** a client calls the export with a well-formed UUID that is not a mock finding
 - **THEN** the response is 404 with an error body
+
+### Requirement: Serve bulk status, report export and M2 coverage
+The mock server SHALL serve `POST /api/findings/bulk-status`, `GET /api/findings/export` and `m2_coverage` in `GET /api/stats/summary` as contract 1.3.0 defines them, on its in-memory data. The bulk change SHALL update the stored findings and emit one `finding.updated` event per updated finding. The export SHALL apply the same filters and sort as the mock's `GET /api/findings`. The coverage SHALL count the stored M2 findings.
+
+#### Scenario: Bulk change in mock mode
+- **WHEN** the dashboard sends a bulk change for two mock findings and one unknown id
+- **THEN** the response validates against `contracts/openapi.yaml`, both findings have the new status on `GET /api/findings/{id}`, and two `finding.updated` events are emitted
+
+#### Scenario: Export in mock mode
+- **WHEN** the dashboard calls `GET /api/findings/export?module=M2`
+- **THEN** the response is a CSV whose rows are the mock M2 findings
+
+#### Scenario: Bad bulk body in mock mode
+- **WHEN** the dashboard sends a bulk change with a repeated id
+- **THEN** the response is 422 and no finding changes
 

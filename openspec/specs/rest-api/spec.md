@@ -2,9 +2,7 @@
 
 ## Purpose
 Serve the REST API of `contracts/openapi.yaml` v1 under `/api` from the shared database, Redis and MinIO, so the dashboard behaves the same against the real API as against the mocks. Owned by `api/`.
-
 ## Requirements
-
 ### Requirement: Contract-conformant responses
 Every route SHALL be served under the `/api` prefix, and every 2xx, 404 and 422 response body SHALL validate against the matching response schema in `contracts/openapi.yaml` (the finding and document parts of `GET /findings/{id}` are validated separately, see design open question 1). Error bodies SHALL have the shape `{"error": string, "details"?: any}`.
 
@@ -99,11 +97,16 @@ The API SHALL compute `risk_level` for every finding it returns, and for the `ri
 #### Scenario: Page gone on re-scan
 - **WHEN** the newest later fetch has `http_status` 404 or 410, or a `job_errors` row `HTTP 404`/`HTTP 410` for the page is newer than the last fetch
 - **THEN** `rescan.state` is `removed`
-- **AND** `state` SHALL be `removed` if a `job_errors` row for the page (same `source_id`, `url` equal to the page key or the document's `url`, `reason` `http_error`, `detail` `HTTP 404` or `HTTP 410`) is newer than the last fetch of the page, or if the newest later fetch has `http_status` 404 or 410
+- **AND** `state` SHALL be `removed` if a `job_errors` row for the page (`reason` `gone` or `http_error`, `detail` `HTTP 404` or `HTTP 410`) is newer than the last fetch of the page, or if the newest later fetch has `http_status` 404 or 410
+- **AND** "for the page" SHALL be the same `source_id` when the document is on platform `web` and has a `source_id` (a web source is one page, and the row's `url` is the source URL as entered, which a redirect makes differ from the document's URL); otherwise the same `source_id` (null matches null) and `url` equal to the page key or the document's `url`
+
+#### Scenario: Removed page of a redirecting web source
+- **WHEN** a web source's URL redirects, its documents hold the final URL, and a later `job_errors` row `reason` `gone`, `detail` `HTTP 404`, `url` the source URL as entered has that `source_id`
+- **THEN** `rescan.state` is `removed` for the findings of those documents
 - **AND** `latest_document_id` SHALL be null when the state comes from a job error, and `checked_at` SHALL be the time of the observation the state comes from
 
 #### Scenario: Unrelated rows do not count
-- **WHEN** the later document is another page or another source, or the job error is older than the last fetch, is not a 404/410, or names another source
+- **WHEN** the later document is another page or another source, or the job error is older than the last fetch, is not a 404/410, has another `reason`, names another source, or (outside `web`) names another page of the same source
 - **THEN** they do not change `rescan.state`
 
 #### Scenario: Page returns to earlier text
@@ -344,3 +347,41 @@ For labels, `confirmed` SHALL be a positive and `false_positive` a negative; oth
 #### Scenario: Unknown format
 - **WHEN** a client calls `GET /api/findings/{id}/export?format=pdf`
 - **THEN** the response is 422 naming `format`
+
+### Requirement: Bulk status change
+`POST /api/findings/bulk-status` SHALL accept a body `{ids, status}` with 1 to 200 unique UUIDs and one status, and nothing else. In one transaction it SHALL apply to every existing id the same change as `PATCH /api/findings/{id}` with `{status}`. It SHALL return 200 with `results`, one entry per requested id in request order: `{id, result: "updated", finding}` (the finding with `risk_level`) or `{id, result: "not_found", finding: null}`, and the counts `updated` and `not_found`. After the commit it SHALL publish one `finding.updated` event `{id, status}` per updated finding. A publish failure SHALL be logged and SHALL NOT change the response.
+
+#### Scenario: Mixed ids
+- **WHEN** an analyst sends `{"ids": [a, missing, b], "status": "confirmed"}` where `a` and `b` exist
+- **THEN** the response is 200 with results in the order `a`, `missing`, `b`, `updated: 2` and `not_found: 1`, both rows have `status: "confirmed"` and a later `updated_at`, and two `finding.updated` events are published
+
+#### Scenario: Invalid bodies
+- **WHEN** the body has no ids, more than 200 ids, a repeated id, a malformed id, an unknown or null status, or an extra key such as `note`
+- **THEN** the response is 422, nothing is stored and no event is published
+
+### Requirement: Report export of the findings list
+`GET /api/findings/export` SHALL accept the same filters and `sort` as `GET /api/findings`, with the same validation, and `format=csv` (the default and only format). It SHALL return 200 `text/csv; charset=utf-8` with a UTF-8 BOM, a `Content-Disposition: attachment` filename, one header row and one row per matching finding in sort order, at most 10 000 rows. `X-Total-Count` SHALL hold the number of matches, and `X-Export-Truncated` SHALL be `true` when rows were cut and `false` otherwise. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return SHALL get a `'` prefix.
+
+#### Scenario: Same filters as the list
+- **WHEN** a client calls `GET /api/findings/export?module=M2&status=new` and `GET /api/findings?module=M2&status=new&page_size=200`
+- **THEN** the CSV rows are the list's items in the same order, with the same id, module, status, risk level and score
+
+#### Scenario: Formula in scraped text
+- **WHEN** a finding's title is `=HYPERLINK("http://x")`
+- **THEN** the title cell is `'=HYPERLINK("http://x")`
+
+#### Scenario: Invalid filter
+- **WHEN** a client calls `GET /api/findings/export?status=archived` or `GET /api/findings/export?format=pdf`
+- **THEN** the response is 422
+
+### Requirement: M2 coverage counts
+`GET /api/stats/summary` SHALL also return `m2_coverage` with `total`, the number of M2 findings, and `registry_matched`, the number of M2 findings whose `firm.registry_id` is not null. The other summary fields SHALL be unchanged.
+
+#### Scenario: Matched and unmatched M2 findings
+- **WHEN** there are three M2 findings, two with a `firm.registry_id` and one with `firm: null`, and one M1 finding with a `firm.registry_id`
+- **THEN** `m2_coverage` is `{"total": 3, "registry_matched": 2}`
+
+#### Scenario: Empty database
+- **WHEN** there are no findings
+- **THEN** `m2_coverage` is `{"total": 0, "registry_matched": 0}`
+

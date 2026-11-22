@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { iso } from '../../test/iso';
 import { storeWrapper } from '../../test/store';
 import { AlertsPage } from './AlertsPage';
 
@@ -45,7 +46,7 @@ describe('AlertsPage', () => {
     vi.useFakeTimers();
     render(<AlertsPage />, { wrapper: storeWrapper() });
     act(() => fake.fire('finding.high_risk', payload('00000000-0000-4000-8000-000000000001', 'Pod kursorem')));
-    const toast = screen.getByRole('group', { name: 'Wysokie ryzyko: Pod kursorem' });
+    const toast = screen.getByRole('group', { name: `Wysokie ryzyko: ${iso('Pod kursorem')}` });
     fireEvent.mouseEnter(toast);
     act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByText('Pod kursorem')).toBeInTheDocument();
