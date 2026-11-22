@@ -61,6 +61,7 @@ Covers `analytics/`, `api/` and `contracts/`; whoever changes them updates this 
 - `OLLAMA_CONTEXT_LENGTH=8192` (default, override in `.env`) on the `ollama` service for the stage-2 LLM change: issue #32, branch `chore/ollama-context-length` (`infra-compose-review-fixes` follow-up 3).
 - `ollama-pull` pulled nothing until change `infra-ollama-pull-models-var` (found in the #74 rehearsal): its list was in `OLLAMA_MODELS`, which Ollama reads as its model directory. The list is now `OLLAMA_PULL_MODELS`.
 - `ollama-pull` pulls the model list (originally `OLLAMA_MODELS`, default `gemma3:4b bge-m3`, `bge-m3` for `analytics-embeddings`, ADR 0313); `ollama` keeps both loaded (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`): issue #65, change `infra-ollama-bge-m3`, branch `infra/ollama-pull-bge-m3`.
+- `./scripts/init-env.sh --local-llm` (branch `chore/local-llm-one-command`, light path, no OpenSpec change): one command for the free open-model path (`LLM_*` for Ollama, `EMBED_BASE_URL`, `COMPOSE_PROFILES=llm`), so a plain `docker compose up --build` starts Ollama and pulls gemma3:4b and bge-m3; covered by `infra/tests/smoke.sh env`. Gemma 4 exists in Ollama (`gemma4:e2b-it-qat`, 4.3 GB) and is selectable with `LOCAL_LLM_MODEL`, but is not measured. Not yet measured: a gemma3:4b gold-set run and CPU latency. On an 8 GB Docker VM shared with other stacks `llama-server` was killed while loading the model, so that run needs a machine with about 8 GB free for Docker.
 
 ## Active OpenSpec changes
 

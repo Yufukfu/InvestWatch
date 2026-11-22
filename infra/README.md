@@ -52,7 +52,7 @@ networks:
 - Infrastructure secrets come only from variables in the root `.env.example`. Never use the MinIO root user or `iw_admin` in a service, except a migration step (Alembic in `api`, [ADR 0303](../.docs/decisions/0303-database-schema-ownership.md)).
 - Runtime setup belongs to the consumer: analytics creates its consumer group (`XGROUP CREATE iw:documents analytics $ MKSTREAM`), and `api` writes the default thresholds ([ADR 0305](../.docs/decisions/0305-threshold-storage.md)). The scraper's job queue uses the same Redis, db 0, keys prefixed `iw:scraper:`.
 - Redis runs `noeviction` with `maxmemory 128mb`: when it is full, every write fails instead of silently dropping data. The scraper therefore caps the stream when it publishes: `XADD iw:documents MAXLEN ~ 10000 * document_id <uuid> schema v1` (approximate trimming is cheap; 10 000 is an example, sized so unconsumed entries stay far below the cap). Analytics acknowledges entries (`XACK`) as it processes them.
-- Local LLM: `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama` (any non-empty value).
+- Local LLM: `./scripts/init-env.sh --local-llm` writes `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama` (any non-empty value), `EMBED_BASE_URL` and `COMPOSE_PROFILES=llm` (see "Local LLM").
 - Running one module alone joins the same networks only with the stack's project name: `docker compose -p investwatch --env-file .env -f web/compose.yaml up`.
 
 ## Scale-out
@@ -99,16 +99,33 @@ The consumer list also keeps the names of replicas that were stopped or replaced
 
 ## Local LLM (optional)
 
+One command, free open models, no key, no external API (the brief's "Ollama/vLLM" path, [ADR 0304](../.docs/decisions/0304-llm-serving.md)):
+
+```bash
+./scripts/init-env.sh --local-llm    # a fresh .env with random secrets AND the local-model lines
+docker compose up --build            # starts ollama, pulls gemma3:4b and bge-m3 (several GB, once), analytics uses them
+```
+
+`--local-llm` writes `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama`, `OLLAMA_PULL_MODELS`, `EMBED_BASE_URL=http://ollama:11434/v1` and `COMPOSE_PROFILES=llm`, which is what makes a plain `up` include the `llm` profile. It never overwrites an existing `.env` (it says so and that the flag was not applied: move the file aside, or add those lines by hand), prints no secret, and without the flag the script behaves as before (`LLM_*` empty, no profile). `LOCAL_LLM_MODEL=<ollama tag> ./scripts/init-env.sh --local-llm` picks another model (see Gemma 4 below).
+
+Memory: the local model needs the Docker VM to have roughly 8 GB free for it alone. On an 8 GB VM already running other stacks, `llama-server` was SIGKILLed while loading `gemma3:4b` (the container peaked at 1.75 GiB, well under its 6 GiB limit, so the VM itself ran out) and the first `bge-m3` call timed out at the 15 s default on a cold load. Give Docker 12 GB or more, and raise `LLM_TIMEOUT_S`, `LLM_DOC_BUDGET_S` and `CLAIM_MIN_IDLE_MS` (CPU calls are slower than the hosted ones; not yet measured here).
+
+While `ollama-pull` is still downloading, analytics runs rules-only (`model.llm = null`) and its circuit breaker closes again once Ollama answers; pre-pull before a demo with the second command below.
+
 ```bash
 docker compose --profile llm up -d          # adds ollama and pulls gemma3:4b and bge-m3 (several GB, Docker Hub)
 docker compose --profile llm up --exit-code-from ollama-pull ollama-pull # pre-pull before a demo; plain `up` exits 0 even if the pull fails
 ```
 
-A plain `docker compose up` starts neither and downloads nothing.
+Without `COMPOSE_PROFILES=llm` (the default `.env`), a plain `docker compose up` starts neither and downloads nothing.
 
 `ollama` runs with `OLLAMA_CONTEXT_LENGTH=8192` (override in `.env`). The OpenAI-compatible `/v1` endpoint cannot set the context length per request, and a stage-2 chunk (`analytics-llm-p0`, ADR 0304) is about 3k tokens plus the prompt. Ollama's own default context depends on the version and can be smaller, which truncates the input without an error to the client.
 
 `ollama-pull` pulls every model in `OLLAMA_PULL_MODELS` (space-separated, default `gemma3:4b bge-m3`; override in `.env`; not `OLLAMA_MODELS`, which Ollama reads as its model storage directory) and exits non-zero on the first failure. `bge-m3` (about 1.2 GB) serves `/v1/embeddings` for `analytics-embeddings` (ADR 0313); it is local only, with no hosted fallback. Without it analytics still runs with embeddings off. To add it to an existing volume, rerun `docker compose --profile llm up ollama-pull` (already pulled models are only checked). `docker compose exec ollama ollama pull bge-m3` does not work: the serving `ollama` is on `data` only, without internet. `ollama` keeps both models loaded side by side (`OLLAMA_MAX_LOADED_MODELS=2`) for 30 minutes after the last request (`OLLAMA_KEEP_ALIVE=30m`), so stage 2 and the embeddings do not evict each other on every document.
+
+### Gemma 4 locally (untested here)
+
+Gemma 4 is in the Ollama library ([tags](https://ollama.com/library/gemma4/tags), checked 2026-11-22): `gemma4:e2b-it-qat` 4.3 GB, `gemma4:e2b` 4.6 GB, `gemma4:e4b-it-qat` 6.1 GB, `gemma4:e4b` 6.6 GB (all 128K context), then `12b` (7.2-8.0 GB), `26b-a4b` (16 GB+) and `31b` (19 GB+). The smallest, `e2b-it-qat`, is the one that could fit the table below: `LOCAL_LLM_MODEL=gemma4:e2b-it-qat ./scripts/init-env.sh --local-llm` writes `LLM_MODEL` and `OLLAMA_PULL_MODELS` for it. Two caveats: its 4.3 GB plus `bge-m3` (1.16 GB) leave almost nothing of the 6 GiB `ollama` limit for the context, so also set `OLLAMA_MAX_LOADED_MODELS=1` or raise the limit; and the default stays `gemma3:4b` because the prompts, timeouts and the gold-set numbers were measured on it, not on Gemma 4. The hosted Gemma 4 ([ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)) is the Gemma 4 path the project has used so far.
 
 ## Resource sizing
 
@@ -138,4 +155,4 @@ sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keyc
 
 ## Secrets
 
-`./scripts/init-env.sh` creates `.env` (mode 600) with a random value for every empty `*_PASSWORD` and `*_SECRET_KEY` in `.env.example`. Run again, it keeps the existing `.env` and exits 0. It never fills `LLM_BASE_URL`, `LLM_MODEL` or `LLM_API_KEY`: set the hosted LLM yourself (ADR 0304). Compose refuses to start without them. `.env` is git-ignored and blocked by the commit hook. Hand-set secrets must be URL-safe; they are embedded in connection URLs.
+`./scripts/init-env.sh` creates `.env` (mode 600) with a random value for every empty `*_PASSWORD` and `*_SECRET_KEY` in `.env.example`. Run again, it keeps the existing `.env` and exits 0. Without a flag it never fills `LLM_BASE_URL`, `LLM_MODEL` or `LLM_API_KEY`: set the hosted LLM yourself (ADR 0304). `--local-llm` fills them for the bundled Ollama (see "Local LLM"); the values are public constants, not secrets. Compose refuses to start without them. `.env` is git-ignored and blocked by the commit hook. Hand-set secrets must be URL-safe; they are embedded in connection URLs.
