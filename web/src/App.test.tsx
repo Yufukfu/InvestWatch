@@ -3,7 +3,6 @@ import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { config } from './config';
 import findings from './test/fixtures/findings.json';
 import summary from './test/fixtures/summary.json';
 import { server } from './test/setup';
@@ -45,16 +44,12 @@ describe('App (against contract mocks)', () => {
     const toggle = screen.getByRole('button', { name: 'Menu' });
     const nav = screen.getByRole('navigation', { name: 'Sekcje' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    const exportRegion = screen.getByRole('group', { name: 'Eksport raportu' });
-    expect(toggle.getAttribute('aria-controls')?.split(' ')).toEqual([nav.id, exportRegion.id]);
+    expect(toggle).toHaveAttribute('aria-controls', nav.id);
     expect(nav.id).not.toBe('');
-    expect(exportRegion.id).not.toBe('');
-    expect(exportRegion).not.toHaveClass('header-export-open');
     expect(nav).not.toHaveClass('app-nav-open');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(nav).toHaveClass('app-nav-open');
-    expect(exportRegion).toHaveClass('header-export-open');
     fireEvent.click(within(nav).getByRole('link', { name: 'Zgłoszenia' }));
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(nav).not.toHaveClass('app-nav-open');
@@ -282,74 +277,3 @@ describe('App (against contract mocks)', () => {
     expect(screen.queryByRole('region', { name: 'Podsumowanie' })).toBeNull();
   });
 });
-
-describe('Eksportuj raport in the header', () => {
-  const exportLink = () => within(screen.getByRole('banner')).getByRole('link', { name: /^Eksportuj raport/ });
-
-  it('on the findings page exports the current URL filters, and follows a filter change', async () => {
-    window.history.replaceState(null, '', '/?module=M2&risk_level=high&sort=-score&page=2#zgloszenia');
-    renderApp('zgloszenia');
-    await screen.findByText(findings.items[0].title);
-    expect(screen.getAllByRole('link', { name: /Eksportuj raport/ })).toHaveLength(1);
-    expect(exportLink()).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?module=M2&risk_level=high&sort=-score`);
-    expect(exportLink()).toHaveAttribute('download');
-    expect(screen.getByRole('banner')).toHaveTextContent(/CSV, maks\. 10\s000 wierszy/);
-    expect(screen.getByRole('banner')).not.toHaveTextContent(/bez filtrów/);
-    fireEvent.change(screen.getByLabelText('Moduł'), { target: { value: 'M3' } });
-    await waitFor(() =>
-      expect(exportLink()).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?module=M3&risk_level=high&sort=-score`),
-    );
-  });
-
-  it('warns when the findings list total is above the cap, and not at the cap', async () => {
-    let total = 12000;
-    server.use(http.get('http://localhost/api/findings', () => HttpResponse.json({ ...findings, total })));
-    const first = renderApp('zgloszenia');
-    expect(await within(screen.getByRole('banner')).findByText(/tylko pierwsze 10\s000 z 12\s000/)).toBeInTheDocument();
-    first.unmount();
-    total = 10000;
-    renderApp('zgloszenia');
-    await screen.findByText(findings.items[0].title);
-    expect(screen.getByRole('banner')).not.toHaveTextContent(/tylko pierwsze/);
-  });
-
-  it('drops the truncation warning when a later list request fails', async () => {
-    server.use(
-      http.get('http://localhost/api/findings', ({ request }) =>
-        new URL(request.url).searchParams.get('module') ? HttpResponse.error() : HttpResponse.json({ ...findings, total: 12000 }),
-      ),
-    );
-    renderApp('zgloszenia');
-    expect(await within(screen.getByRole('banner')).findByText(/tylko pierwsze/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Moduł'), { target: { value: 'M3' } });
-    await screen.findByText('Nie udało się pobrać zgłoszeń.');
-    expect(screen.getByRole('banner')).not.toHaveTextContent(/tylko pierwsze/);
-  });
-
-  it('on another page exports every finding with the default filters and says so', async () => {
-    let listCalls = 0;
-    server.use(
-      http.get('http://localhost/api/findings', () => {
-        listCalls += 1;
-        return HttpResponse.json({ ...findings, total: 12000 });
-      }),
-    );
-    window.history.replaceState(null, '', '/?module=M2#przeglad');
-    renderApp('przeglad');
-    await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(exportLink()).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?sort=-detected_at`);
-    expect(screen.getByRole('banner')).toHaveTextContent(/Wszystkie zgłoszenia, bez filtrów/);
-    expect(screen.getByRole('banner')).not.toHaveTextContent(/tylko pierwsze/);
-    expect(listCalls).toBe(0);
-  });
-
-  it('stays available with the current filters when the list fails', async () => {
-    server.use(http.get('http://localhost/api/findings', () => HttpResponse.error()));
-    window.history.replaceState(null, '', '/?module=M1#zgloszenia');
-    renderApp('zgloszenia');
-    await screen.findByText('Nie udało się pobrać zgłoszeń.');
-    expect(exportLink()).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?module=M1&sort=-detected_at`);
-    expect(screen.getByRole('banner')).toHaveTextContent(/CSV, maks\. 10\s000 wierszy/);
-  });
-});
-

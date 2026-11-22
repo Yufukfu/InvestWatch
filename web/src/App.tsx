@@ -3,7 +3,6 @@ import { SectionBoundary } from './SectionBoundary';
 import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
 import { FindingsPage } from './features/findings/FindingsPage';
-import { ReportExport } from './features/findings/ReportExport';
 import { SummaryPage } from './features/summary/SummaryPage';
 import { ToastSlotProvider } from './ToastSlotProvider';
 import { FINDINGS_SECTION, hasFindingsParams } from './url/section';
@@ -94,7 +93,6 @@ const PAGES: Record<string, ReactNode> = {
 export function App() {
   const active = useActiveSection();
   const navId = useId();
-  const exportId = useId();
   // Only meaningful below 600px, where the CSS hides the section links until the menu button opens them.
   const [menuOpen, setMenuOpen] = useState(false);
   // Where the connection-lost banner is drawn: above the page content, outside the header row.
@@ -131,21 +129,12 @@ export function App() {
             <AlertsPage bannerNode={bannerNode} />
             <HealthPage />
           </div>
-          {/* Below 600px this sits in the menu behind the ☰ button, with the section links. */}
-          <div
-            id={exportId}
-            role="group"
-            aria-label="Eksport raportu"
-            className={menuOpen ? 'export-report header-export header-export-open' : 'export-report header-export'}
-          >
-            <ReportExport onFindingsPage={active === FINDINGS_SECTION} />
-          </div>
           <button
             type="button"
             className="nav-toggle"
             aria-label="Menu"
             aria-expanded={menuOpen}
-            aria-controls={`${navId} ${exportId}`}
+            aria-controls={navId}
             onClick={() => setMenuOpen((o) => !o)}
           >
             <span aria-hidden="true">☰</span>

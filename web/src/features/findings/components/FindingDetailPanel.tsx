@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatScore } from '../../../format/score';
 import { useAlertSlot } from '../../../alertSlot';
 import type { FindingDetail, RuleView, Severity } from '../model';
-import { RuleGrid } from './RuleGrid';
 import {
   detectedParts,
   METHOD_LABEL,
@@ -192,8 +191,6 @@ function Body({ d, statusEditor, moduleSwitcher }: { d: FindingDetail; statusEdi
           <p dir="auto">{d.summary}</p>
         </section>
       )}
-
-      {d.module === 'M2' && <RuleGrid rules={d.rules} />}
 
       <section className="detail-section" aria-labelledby="d-issues">
         <h3 id="d-issues">
