@@ -320,7 +320,9 @@ class Preprocessing:
 
 def preprocessing_from_env(env: Mapping[str, str], *, claim_min_idle_ms: int,
                            llm_settings: LlmSettings) -> Preprocessing:
-    # The embedding call runs after the LLM's worst case (budget + 3 s connect, ADR 0310): both before XAUTOCLAIM.
+    # One document's wall time: the LLM's worst case (budget + 3 s connect, ADR 0310) plus one embedding call; the sum
+    # must end before XAUTOCLAIM. (The embedding runs first, inside the judge's budget window, so a slow embedder can
+    # leave the LLM less time on that document: follow-ups R46.)
     llm_worst_s = llm_settings.doc_budget_s + 3 if llm_settings.enabled else 0
     embed = EmbedSettings.from_env(env, claim_min_idle_ms=claim_min_idle_ms, llm_doc_budget_s=llm_worst_s)
     try:
