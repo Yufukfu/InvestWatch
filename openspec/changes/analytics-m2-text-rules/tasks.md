@@ -4,9 +4,9 @@ Scope approved by Damian ("dokładamy brakujące reguły, start"). R10 first, th
 
 ## 1. Per-sentence language and R10
 
-- [ ] 1.1 Failing tests (`tests/test_rules_m2_text.py`): `sentence_language` on eurotrade pl / en, `Ryzyko!` and `Reklama.` `None`, sentences and offsets unchanged on the preprocessing fixtures; R10 eurotrade `fail`, bank `pass`, bilingual `pass`, no warning `not_applicable` with "brak informacji o ryzyku", English legal block does not set the main language, unknown language `uncertain`
-- [ ] 1.2 `preprocessing.sentence_language`, `rules/m2_text.py` R10, catalogue entry `implemented: true` with the warning aliases, engine import; existing catalogue-list tests updated; tests green
-- [ ] 1.3 Mutation check
+- [x] 1.1 Failing tests (`tests/test_rules_m2_text.py`): `sentence_language` on eurotrade pl / en, `Ryzyko!` and `Reklama.` `None`, sentences and offsets unchanged on the preprocessing fixtures; R10 eurotrade `fail`, bank `pass`, bilingual `pass`, no warning `not_applicable` with "brak informacji o ryzyku", English legal block does not set the main language, unknown language `uncertain`
+- [x] 1.2 `preprocessing.sentence_language`, `rules/m2_text.py` R10, catalogue entry `implemented: true` with the warning aliases, engine import; existing catalogue-list tests updated; tests green
+- [x] 1.3 Mutation check. `mutations: 13 tried, 13 caught` (visible filter, footer/legal exclusion, warning blocks excluded, first viewport only, length weighting, block→sentence and sentence→document-guess fallbacks, warnings excluded from the sentence majority, unknown-language uncertain, no-warning branch, minimum signal 2→3, tie → None, diacritic words). The tie test first used a 1:1 tie under the minimum and let the tie mutant survive; it now uses 2:2. Gold rules-only: R10 strict P/R 1.0/1.0 (1 fail, 6 pass); M2 at 0.1 F1 0.829 → 0.857, recommended threshold unchanged (0.1)
 
 ## 2. R9 comprehensibility (LLM-first)
 

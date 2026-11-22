@@ -219,7 +219,7 @@ class Catalogue:
 
     @classmethod
     def load(cls, path: Path | None = None, *, module: str = "M2") -> "Catalogue":
-        from . import m1, m2, m3  # noqa: F401  (registers the rule classes)
+        from . import m1, m2, m2_text, m3  # noqa: F401  (registers the rule classes)
 
         path = path or DEFAULT_CATALOGUE
         if module not in _ID_PREFIX:
