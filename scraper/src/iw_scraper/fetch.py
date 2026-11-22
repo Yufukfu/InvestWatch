@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import tempfile
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import SplitResult, unquote, urljoin, urlsplit
@@ -163,6 +163,7 @@ async def _request_once(
     timeout: float,
     max_bytes: int,
     html_only: bool = True,
+    cookies: Mapping[str, str] | None = None,
 ) -> tuple[int, dict[str, str], bytes]:
     try:
         parts = urlsplit(url)
@@ -191,6 +192,8 @@ async def _request_once(
                 allow_redirects=False,
                 timeout_milliseconds=int(timeout * 1000),
                 proxy=choice.url if choice else None,
+                # a header, not the library's `cookies=`: that builds domain-less jar entries the client never sends
+                headers={"cookie": "; ".join(f"{name}={value}" for name, value in cookies.items())} if cookies else None,
                 request_host_override=host_override,
                 stream_output_path=path,
             )
@@ -214,6 +217,7 @@ async def _request_through_proxies(
     timeout: float,
     max_bytes: int,
     html_only: bool = True,
+    cookies: Mapping[str, str] | None = None,
 ) -> tuple[int, dict[str, str], bytes, ProxyChoice | None]:
     """One request, each time through the proxy the run picks. A 407 cools that proxy and tries another."""
     while True:  # every 407 cools one more proxy, so the picks run out in at most len(proxies) rounds
@@ -221,7 +225,7 @@ async def _request_through_proxies(
         if isinstance(choice, Deferral):
             raise FetchDeferred(choice)
         try:
-            return (*await _request_once(session, url, choice, guard, timeout, max_bytes, html_only), choice)
+            return (*await _request_once(session, url, choice, guard, timeout, max_bytes, html_only, cookies), choice)
         except ProxyAuthFailure:
             proxies.penalize(choice)
         except FetchFailure as failure:
@@ -248,10 +252,12 @@ async def fetch(
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     max_bytes: int = DEFAULT_MAX_BYTES,
     session: Session | None = None,
+    cookies: Mapping[str, str] | None = None,
 ) -> FetchResult:
     """Request `url` once, following up to `MAX_REDIRECTS` redirects hop by hop. Never retries.
 
-    A `session` passed in is the run's: it is shared with `check_robots` and its owner closes it.
+    A `session` passed in is the run's: it is shared with `check_robots` and its owner closes it. `cookies` are sent
+    with this fetch only, on the shared session as well (the session's headers come from the identity it was built with).
     """
     owned = session is None
     session = session or _new_session(identity)
@@ -260,7 +266,7 @@ async def fetch(
         proxy_id = None
         for _ in range(MAX_REDIRECTS + 1):
             status, headers, body, choice = await _request_through_proxies(
-                session, current, proxy, guard, timeout, max_bytes
+                session, current, proxy, guard, timeout, max_bytes, cookies=cookies
             )
             proxy_id = choice.identifier if choice else None
             if status in _REDIRECT_STATUSES and "location" in headers:

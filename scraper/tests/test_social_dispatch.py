@@ -1,8 +1,6 @@
 """`Collector.run_source` dispatching a registration with no page parser to its flow by platform: a fetch-path flow
 (identity, session, proxy and the robots check come from the shared layer) and a home-IP flow (none of them)."""
 
-import dataclasses
-
 import pytest
 
 from conftest import FakeSourceStore, make_source
@@ -80,7 +78,7 @@ async def test_fetch_path_flow_gets_the_runs_identity_session_proxy_and_robots_c
     assert seen["body"] == b"<html>ok</html>"
 
 
-async def test_fetch_path_flow_can_add_one_cookie_to_the_identity_of_a_single_request(monkeypatch):
+async def test_fetch_path_flow_can_send_one_cookie_with_a_single_request(monkeypatch):
     h = Harness({URL: page(URL, b"<html>ok</html>")})
     h.identity = draw_identity()
 
@@ -93,25 +91,9 @@ async def test_fetch_path_flow_can_add_one_cookie_to_the_identity_of_a_single_re
 
     await run(make(h), h)
 
-    sent = [dict(identity.headers).get("cookie") for _, identity, _ in h.fetched]
-    assert sent == ["SOCS=CAI", None]
+    assert [kw.get("cookies") for kw in h.fetch_kwargs] == [{"SOCS": "CAI"}, None]
     assert "cookie" not in dict(h.identity.headers)  # the run's identity itself is never changed
-
-
-async def test_an_added_cookie_replaces_any_cookie_header_of_the_identity(monkeypatch):
-    h = Harness({URL: page(URL, b"<html>ok</html>")})
-    h.identity = dataclasses.replace(draw_identity(), headers=draw_identity().headers + (("Cookie", "old=1"),))
-
-    async def flow(ctx):
-        await ctx.fetch(URL, cookie="SOCS=CAI")
-        return AttemptResult(documents=1)
-
-    register(monkeypatch, flow)
-
-    await run(make(h), h)
-
-    sent = [value for name, value in h.fetched[0][1].headers if name.lower() == "cookie"]
-    assert sent == ["SOCS=CAI"]
+    assert all(identity is h.identity for _, identity, _ in h.fetched)
 
 
 async def test_fetch_path_flow_can_ask_the_store_which_urls_are_known(monkeypatch):

@@ -5,7 +5,6 @@ between attempts: a failure becomes an `AttemptResult`, and a `Retry-After` is p
 Request starts are spaced by the shared `DomainLimiter`, once before `robots.txt` and once before the page.
 """
 
-import dataclasses
 import logging
 import math
 import time
@@ -161,12 +160,13 @@ class Collector:
         return None
 
     async def _fetch_page(self, url: str, identity, session, proxy, guard, domain: str, cookie: str | None = None):
-        if cookie is not None:  # one cookie for this request only: the run's identity itself is never changed
-            headers = tuple(pair for pair in identity.headers if pair[0].lower() != "cookie")
-            identity = dataclasses.replace(identity, headers=headers + (("cookie", cookie),))
+        # one cookie `name=value` for this request only: it goes to `fetch` as a cookie, because the run's shared
+        # session keeps the headers of the identity it was opened with
+        cookies = {cookie.partition("=")[0]: cookie.partition("=")[2]} if cookie else None
         await self._limiter.wait_turn(domain)
         return await self._stages.fetch(
-            url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
+            url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session,
+            **({"cookies": cookies} if cookies else {}),
         )
 
     async def _collect(
