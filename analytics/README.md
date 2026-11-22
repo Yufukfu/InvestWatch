@@ -14,12 +14,13 @@ A document gives at most one finding per module ([`modules/router.py`](src/inves
 
 | Who publishes | Registry | Module |
 |---|---|---|
+| the supervisor or an official register (page or author profile host on `knf.gov.pl`, `uknf.gov.pl`, `gov.pl` or a subdomain; `OFFICIAL_SOURCE_DOMAINS` replaces the list) | — | nothing (`official_source`): it warns about firms, it does not advertise them |
 | a registered firm (the page host or the author's profile host is its domain; any platform; a handle alone is not enough) | — | M2 for that firm |
 | a foreign firm without a Polish branch (`foreign_no_branch`), its own material | — | nothing (`out_of_scope_m2_foreign_no_branch`): M2 is for firms registered in Poland, including Polish branches |
 | `firm_own` source | firm named or page on a firm domain | M2 |
-| `firm_own` source | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| `firm_own` source | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`); service vocabulary alone is no offer |
 | a third party | firm named in the text or linked | M1 (a foreign firm without a Polish branch only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
-| a third party | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| a third party | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`) |
 
 Before routing to a module, the topic gate drops a `third_party` or `unknown` document that has no investment signal: no term of [`gate_terms.yaml`](src/investwatch_analytics/gate_terms.yaml) and no registry firm. The drop is logged as `off_topic` with `dict_hits`, never with text, and counted in Redis `iw:stats:gate` (`passed`, `dropped`, `bypassed`). `firm_own` documents are never gated. A near-duplicate (MinHash Jaccard ≥ 0.8 over word 5-shingles) is analyzed as usual. Its summary names the original's URL, and it fires no second `finding.high_risk` for its group and module ([ADR 0314](../.docs/decisions/0314-topic-gate-and-near-duplicates.md)).
 
@@ -143,6 +144,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 |---|---|---|
 | `REGISTRY_CSV` | `registry/knf.csv` (the real KNF register snapshot; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | firm registry, files and refresh in [`registry/README.md`](registry/README.md) |
 | `LOG_LEVEL` | `INFO` | log level |
+| `OFFICIAL_SOURCE_DOMAINS` | `knf.gov.pl,uknf.gov.pl,gov.pl` | comma-separated domains (subdomains included) whose pages never become findings (`official_source`); a value replaces the default; a malformed entry stops the worker and the CLI with exit 2 |
 | `DATABASE_URL` | worker: required | Postgres, app role (`postgresql://iw_app:...@postgres:5432/investwatch`) |
 | `REDIS_URL` | worker: required | Redis (`redis://:<password>@redis:6379/0`) |
 | `WORKER_CONSUMER` | hostname | consumer name in the group `analytics` |

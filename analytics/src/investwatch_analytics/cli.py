@@ -23,7 +23,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import logging_setup
-from .config import ConfigError, EmbedSettings, GateSettings, LlmSettings, Settings
+from .config import ConfigError, EmbedSettings, GateSettings, LlmSettings, Settings, official_source_domains
 from .embeddings import build_embedder
 from .gate import GateTermsError
 from .llm import build_judge
@@ -53,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
         llm_settings = LlmSettings.from_env()
         embed_settings = EmbedSettings.from_env()
         gate = Gate.from_settings(GateSettings.from_env())
+        official_source_domains()  # routing reads it per document: a bad value stops here, not per document
     except (ConfigError, GateTermsError) as exc:
         log.error("invalid configuration", extra={"error": str(exc)})
         return 2

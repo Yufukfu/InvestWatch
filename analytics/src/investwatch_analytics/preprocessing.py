@@ -56,7 +56,11 @@ def normalize(text: str) -> str:
 
 def guess_language(text: str) -> str | None:
     """`pl` or `en` by Polish diacritics and stopwords; None for empty text."""
-    norm = normalize(text).lower()
+    return _language_of_normalized(normalize(text))
+
+
+def _language_of_normalized(norm: str) -> str | None:
+    norm = norm.lower()
     if not norm:
         return None
     words = re.findall(r"[a-ząćęłńóśźż]+", norm)
@@ -113,10 +117,11 @@ class Preprocessed:
 
 
 def preprocess(text: str) -> Preprocessed:
+    # NFKC once: the language guess reuses this normalized text (repeated passes took ~26 s on 2 MB of 'ﬁ').
     norm = normalize(text)
     return Preprocessed(
         original=text,
         normalized=norm,
-        lang=guess_language(text),
+        lang=_language_of_normalized(norm),
         sentences=split_sentences(text),
     )

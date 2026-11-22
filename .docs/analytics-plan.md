@@ -118,6 +118,8 @@ For social media content (no `blocks`) the visual rules return `not_applicable`;
 | S3.7 | entity on the KNF public warnings list | registry (bonus) |
 
 Hard gate: no S3.4 ⇒ `score` capped at 0.4 (financial "education" or personalization alone is not advice; Art. 76 needs a recommendation concerning instruments). Changed from "no S3.4 and no S3.3" by `analytics-m1-m3`. Plain crypto-assets are outside Art. 2 (signal S3.8, capped). The LLM gets the definition from annex 3 in the system prompt and must return a quote of the recommendation.
+No offer, no finding: an M3-only document needs S3.3, S3.4, S3.5 or S3.8; S3.1, S3.2 and S3.6 only weigh in the score of an offer (`analytics-post-integration-fixes`, after EY's family-office page scored 0.269 on vocabulary alone). Pages of the supervisor and official registers (`knf.gov.pl`, `gov.pl`) are never M1 advertisers or M3 publishers (reason `official_source`).
+
 Output matches the UKNF requirement: **entity data, offer content, URL**.
 
 ## 7. LLM layer
