@@ -2,12 +2,12 @@
 
 Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into the deck; each `##` below is one slide, with speaker notes under **Notes**. Written by Damian.
 
-Numbers come from two runs of the gold-set evaluation, gold set SHA-256 `963f834e…`, pipeline 0.1.0:
+Numbers come from gold-set evaluation runs on `main` at `61238394` (2026-11-22 05:10 UTC, all 18 M2 rules), gold set SHA-256 `963f834e…`, pipeline 0.1.0:
 
-- **rules only:** `python analytics/eval/run.py` on `main` at `dd30d668` (2026-11-22 03:45 UTC), no LLM, no database;
-- **with LLM:** `python analytics/eval/run.py --llm` on `main` at `0434553b` (same analytics code), hosted DeepSeek Flash (`deepseek-flash`).
+- **rules only:** `python analytics/eval/run.py`, no LLM, no database;
+- **with LLM:** `python analytics/eval/run.py --llm`, hosted DeepSeek Flash (`deepseek-flash`), run twice. M1 and M3 gave the same numbers both times. M2 did not: the LLM is not deterministic, so the slides give both M2 runs (run A, run B).
 
-Per-rule and per-signal numbers are rules-only (`strict`). Thresholds are the hand-in defaults M1 0.75, M2 0.1, M3 0.4. To refresh them: rerun both commands and copy the `at_default_threshold` block (or the matching `points` entry) of each module and the `strict` block of each rule.
+Per-rule and per-signal numbers are rules-only (`strict`). Thresholds are the hand-in defaults M1 0.75, M2 0.05, M3 0.4. To refresh them: rerun both commands and copy the `at_default_threshold` block (or the matching `points` entry) of each module and the `strict` block of each rule.
 
 **The gold set is synthetic.** 69 documents written by us from the challenge criteria (67 `synthetic`, 2 built around phrasings that ZASÓB quotes itself), with fictional firms and handles. It measures how well the rules follow our reading of the criteria, not real-world prevalence. UKNF provided no sample ads (`doc/` is everything); no real samples will arrive before the hand-in (#73, closed as not planned). Real samples could later go in as `origin: uknf-sample` lines with no code change.
 
@@ -54,16 +54,17 @@ Seven weighted signals, `score = σ(bias + Σ weight · signal)`:
 
 Each rule is a class plus a YAML catalogue entry (name, severity, legal basis, dictionaries). Visual rules read render metadata of page blocks (font size, region, viewport); on social posts without blocks they are `not_applicable`.
 
-- 12 of 18 rules implemented, P0 and P1: **R1** firm identification, **R2** ad label, **R3** risk next to return claims, **R4** risk font size, **R6** risk hidden in footer/footnotes, **R11** product comparisons, **R12** past performance (two sub-checks: R12a period and scope, R12b currency and costs), **R14** past-performance disclaimer, **R15** forecasts, **R16** tax information, **R17** implying KNF approval, **R18** supervision as a safety argument.
+- All 18 of 18 rules implemented: **R1** firm identification, **R2** ad label, **R3** risk next to return claims, **R4** risk font size, **R5** risk prominence and contrast, **R6** risk hidden in footer/footnotes, **R7** risk one click away, **R8** risk visible on mobile, **R9** plain language (LLM-first), **R10** language consistency, **R11** product comparisons, **R12** past performance (two sub-checks: R12a period and scope, R12b currency and costs), **R13** past performance dominating the message, **R14** past-performance disclaimer, **R15** forecasts, **R16** tax information, **R17** implying KNF approval, **R18** supervision as a safety argument.
 - `score = Σ weight·fail / Σ weight·applicable`, high-severity rules weigh 3.
-- The other 6 (R5, R7, R8, R9, R10, R13) are already in the catalogue and the gold set (`not_implemented`), so their numbers appear the moment a rule lands.
+- **R9 is LLM-first:** rules-only it never fails, and its `uncertain` does not count to the score (`llm_only_uncertain`), so a rules-only finding is not diluted by a check only the model can decide.
 
-**Gold set (synthetic, 35 docs, 14 hard cases), threshold 0.1:**
+**Gold set (synthetic, 35 docs, 14 hard cases), threshold 0.05:**
 
 | Run | Precision | Recall | F1 | TP / FP / FN / TN |
 |---|---|---|---|---|
-| with DeepSeek Flash | **1.00** | **0.74** | **0.85** | 17 / 0 / 6 / 12 |
-| rules only | 0.94 | 0.74 | 0.83 | 17 / 1 / 6 / 11 |
+| with DeepSeek Flash, run A | **1.00** | **0.96** | **0.98** | 22 / 0 / 1 / 12 |
+| with DeepSeek Flash, run B | 0.92 | 0.96 | 0.94 | 22 / 2 / 1 / 10 |
+| rules only | 0.95 | 0.91 | 0.93 | 21 / 1 / 2 / 11 |
 
 | Rule | Precision | Recall | F1 | Gold fails |
 |---|---|---|---|---|
@@ -71,17 +72,23 @@ Each rule is a class plus a YAML catalogue entry (name, severity, legal basis, d
 | R2 | 1.00 | 0.67 | 0.80 | 3 |
 | R3 | 0.78 | 1.00 | 0.88 | 7 |
 | R4 | 1.00 | 0.50 | 0.67 | 2 |
+| R5 | 1.00 | 1.00 | 1.00 | 2 |
 | R6 | 1.00 | 1.00 | 1.00 | 2 |
+| R7 | 1.00 | 1.00 | 1.00 | 1 |
+| R8 | 1.00 | 1.00 | 1.00 | 3 |
+| R9 | 1.00 | 0 | 0 | 1 |
+| R10 | 1.00 | 1.00 | 1.00 | 1 |
 | R11 | 1.00 | 1.00 | 1.00 | 1 |
 | R12a | 1.00 | 1.00 | 1.00 | 1 |
 | R12b | 1.00 | 1.00 | 1.00 | 2 |
+| R13 | 1.00 | 1.00 | 1.00 | 1 |
 | R14 | 1.00 | 1.00 | 1.00 | 1 |
 | R15 | 1.00 | 1.00 | 1.00 | 1 |
 | R16 | 1.00 | 1.00 | 1.00 | 1 |
 | R17 | 1.00 | 0.33 | 0.50 | 3 |
 | R18 | 1.00 | 1.00 | 1.00 | 2 |
 
-**Notes:** 6 of the 23 gold positives violate only rules not built yet (R5, R7-R10, R13), as many as the misses at 0.1; that is where recall comes from next. The LLM removes the one false positive but does not add recall, because the rules it backs are already built. Per-rule counts are small (1-7 fails each), so read them as "the rule behaves as specified", not as a statistic.
+**Notes:** With all 18 rules built, rules-only recall rose from 0.74 to 0.91. The default moved from 0.1 to 0.05 because one failing rule now weighs less in `Σ weight·fail / Σ weight·applicable` (ADR 0319); at the old 0.1 rules-only recall would be 0.83. The LLM adds recall where the rules defer: R9 (rules-only recall 0 → 1.00 with DeepSeek) and R17 (0.33 → 1.00 in run A, 0.67 in run B). Run B also had 2 false positives that run A did not, so the LLM's precision on M2 is 0.92-1.00 between runs. Per-rule counts are small (1-7 fails each), so read them as "the rule behaves as specified", not as a statistic.
 
 ---
 
@@ -106,16 +113,17 @@ Art. 76 advice = a recommendation to buy, sell or hold specific instruments, bas
 ## 5. Calibration: thresholds are measured, not chosen
 
 - Every `docker compose up` runs the evaluation once and stores the threshold curve; the dashboard's calibration panel shows it, plus the labels analysts add from the alert view.
-- Default thresholds are measured on the gold set: M1 0.75 (best F1 with DeepSeek Flash, plateau 0.75-0.80), M2 0.1 (best F1 rules-only and with DeepSeek), M3 0.4 (the S3.4 gate cap). A rule or gold-set change that moves them fails a test until they are re-measured.
+- Default thresholds are measured on the gold set ([ADR 0316](decisions/0316-default-thresholds-from-evaluation.md), [ADR 0318](decisions/0318-hosted-llm-deepseek-flash.md), [ADR 0319](decisions/0319-m2-default-threshold-005.md)): M1 0.75 (best F1 with DeepSeek Flash, plateau 0.75-0.80), M2 0.05 (best F1 rules-only and with DeepSeek, the only point on the plateau), M3 0.4 (the S3.4 gate cap). M2 is low by design: its score is the weighted share of failing rules among the applicable ones, so every rule that applies and passes lowers the score of a material with one real violation; the old 0.1 would miss 2 more positives (rules-only, ADR 0319). A rule or gold-set change that moves them fails a test until they are re-measured.
 - Moving the M2 threshold (demo):
 
-| M2 threshold | Precision (rules / DeepSeek) | Recall | F1 (rules / DeepSeek) | Alerts (TP+FP, rules / DeepSeek) |
+| M2 threshold | Precision (rules / DeepSeek A / B) | Recall (rules / DeepSeek) | F1 (rules / DeepSeek A / B) | Alerts (TP+FP, rules / DeepSeek A / B) |
 |---|---|---|---|---|
-| 0.10 (default) | 0.94 / 1.00 | 0.74 | 0.83 / 0.85 | 18 / 17 |
+| 0.05 (default) | 0.95 / 1.00 / 0.92 | 0.91 / 0.96 | 0.93 / 0.98 / 0.94 | 22 / 22 / 24 |
+| 0.10 | 0.95 / 1.00 / 0.91 | 0.83 / 0.87 | 0.88 / 0.93 / 0.89 | 20 / 20 / 22 |
 | 0.25 | 1.00 | 0.61 | 0.76 | 14 |
-| 0.40 | 1.00 | 0.48 | 0.65 | 11 |
+| 0.40 | 1.00 | 0.30 | 0.47 | 7 |
 
-**Notes:** Gold set: 69 synthetic documents, about a third hard cases by design, labels written from the criteria before running the rules (a disagreement becomes a rule follow-up, never a relabel). From 0.25 up, both runs give the same numbers. The numbers are honest about what is missing: 12 of 18 M2 rules, no real samples, and the LLM numbers are for one hosted model (DeepSeek Flash); local Gemma is not measured on the gold set.
+**Notes:** Gold set: 69 synthetic documents, about a third hard cases by design, labels written from the criteria before running the rules (a disagreement becomes a rule follow-up, never a relabel). From 0.25 up, all three runs give the same numbers. The numbers are honest about what is missing: no real samples, R9 scores only with the LLM, the LLM is not deterministic (M2 precision 0.92-1.00 over two runs), and the LLM numbers are for one hosted model (DeepSeek Flash); local Gemma is not measured on the gold set.
 
 ---
 

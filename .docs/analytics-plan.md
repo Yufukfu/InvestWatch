@@ -81,23 +81,23 @@ Rule engine: each rule is a class with `applies(doc) → bool` and `evaluate(doc
 | R2 Ad labeling | text | dictionary ("reklama", "materiał marketingowy", "informacja promocyjna") | **P0** |
 | R3 Risk information next to returns | text + LLM | detect return claims (regex `\d+ ?%`, "zysk", "zarobisz", "zwrot") → look for a risk warning within ±N sentences / the same block; the LLM decides ambiguous cases | **P0** |
 | R4 Risk font size | visual | `font_size_px` of the risk block vs. the length-weighted median; fail < 0.75× | **P0** |
-| R5 Exposure and contrast | visual | WCAG contrast ratio from `color`/`background_color`; fail < 4.5:1; `visible=false` | P1 |
+| R5 Exposure and contrast | visual | per viewport, a risk block with WCAG contrast ≥ `min_contrast` 4.5:1 from `color`/`background_color` passes; `visible=false` or lower contrast fails; unknown colours uncertain | P1 |
 | R6 Hiding risk | visual | risk block only in `region ∈ {footer, legal}` or a footnote (`*`, `¹`), not `in_viewport_on_load` | **P0** |
-| R7 One-click availability | visual | risk block with `requires_interaction=true` | P1 |
-| R8 Responsiveness | visual | compare risk blocks across viewports: missing on mobile, `overflow_clipped`, font < 12 px | P1 |
+| R7 One-click availability | visual | every risk block of a viewport has `requires_interaction=true` | P1 |
+| R8 Responsiveness | visual | per rendered viewport: risk warning missing (present in another viewport), `overflow_clipped`, or font < `min_font_px` 12; one viewport only → uncertain | P1 |
 | R9 Comprehensibility | text + LLM | sentence length, jargon (term list), LLM score 1–5 with rationale | P2 |
 | R10 Language consistency | text | warning language ≠ language of the main message | **P0** |
 | R11 Product comparisons | text + LLM | detect comparisons ("lepsze niż", "vs", "najtańszy") → is a source/assumption given | P2 |
 | R12a Past performance – period | text | detect past performance → 5 years / full 12-month periods, reference period and source | P1 |
 | R12b Past performance – currency, costs | text | currency warning + impact of fees/commissions | P1 |
-| R13 Dominance of past performance | visual | the past-performance block has the largest font / is first in the viewport | P2 |
+| R13 Dominance of past performance | visual | a past-performance block (shared detector sentence, or a headline restating its figure) has the largest font, or is first and above the dominant size | P2 |
 | R14 Warning next to past performance | text | "wyniki historyczne nie są gwarancją / wiarygodnym wskaźnikiem…" | **P0** |
 | R15 Forecasts | text + LLM | detect forecasts (future tense + number/%), require a warning; always flag a forecast | P1 |
 | R16 Tax information | text | mention of tax/IKE/IKZE/"bez podatku Belki" → is there a disclaimer about the individual situation | P1 |
 | R17 Implying supervisory approval | text + LLM | mention of KNF/ESMA/"supervised" → LLM: does it suggest product approval | **P0** |
 | R18 Supervision as a safety argument | text + LLM | as above + safety words ("bezpieczna", "gwarantowana", "pewna") in the same sentence | **P0** |
 
-Built (2026-11-22): R1-R4, R6, R9, R10, R11, R12a, R12b, R14-R18 (R9 and R10 in change `analytics-m2-text-rules`: R10 rules-only with a per-sentence language guess; R9 LLM-first, rules only raise `uncertain` on long sentences or jargon in the warning and the LLM's 1-5 rating decides, `fail` only at 2 or lower with a verified quote; R11, R12a, R12b, R15, R16 in change `analytics-m2-p1-rules`: rules-first, R11, R12a and R15 with an `llm:` block for their uncertain case). One owner rule per art. 44 element, R15 reports every forecast and R11 only violations ([ADR 0315](decisions/0315-m2-art44-element-ownership.md)). Not built: R13 is visual and needs `blocks` (#29), like R5, R7 and R8.
+Built (2026-11-22): all 18 rules, R1-R18 with R12a and R12b. R5, R7, R8 and R13 are the visual rules of change `analytics-m2-visual-rules` (`rules/m2_visual.py`, read from the renderer's `blocks`; `not_applicable` without them, worst viewport decides). R9 and R10 in change `analytics-m2-text-rules`: R10 rules-only with a per-sentence language guess; R9 LLM-first, rules only raise `uncertain` on long sentences or jargon in the warning and the LLM's 1-5 rating decides, `fail` only at 2 or lower with a verified quote; R11, R12a, R12b, R15, R16 in change `analytics-m2-p1-rules`: rules-first, R11, R12a and R15 with an `llm:` block for their uncertain case. One owner rule per art. 44 element, R15 reports every forecast and R11 only violations ([ADR 0315](decisions/0315-m2-art44-element-ownership.md)).
 
 Where `blocks` come from (scraper, ADR 0107): a `firm_own` source with `M2` in `target_modules` is rendered at desktop 1440, mobile 390 and tablet 820 px when `SCRAPER_RENDER_ENABLED` is on; `blocks` holds one entry per text block per viewport (`region` is always set, `legal` by placement words such as `footer .legal`, `nota-prawna`, never by content words like `risk`), and `scrape_meta.render` carries `browser_version`, `truncated` or `skipped` (`budget`, `paused`). A document without `blocks` (render off, skipped or failed) means the visual rules return `not_applicable`, never a fabricated block.
 
@@ -138,7 +138,7 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 - **Gold set** (change `analytics-eval-calibration`, ADR 0312): `analytics/eval/gold.jsonl`, one line per document: `{ id, origin, basis, hard_case?, document, expect: { M2: { label, rules: { R3: "fail", … } } } }`, so one document can be labeled for M1 and M3 at once. `doc/` has no sample ads, so all lines are synthetic with fictional firms (own registry `analytics/eval/registry.csv`); UKNF samples, if they arrive, are added as `origin: uknf-sample` with no code change. Labeling rules: `analytics/eval/README.md`.
 - Script `analytics/eval/run.py` (`python -m investwatch_analytics.evaluation`): precision / recall / F1 per module and per rule (`strict` headline, `review` counts `uncertain` as flagged), threshold curve with the API's counting → with `--db` stored in `calibration_points`, one idempotent run per module. The one-shot `analytics-eval` compose service runs it on every `docker compose up`; `/api/calibration` adds analyst labels to the stored run.
 - Unit tests for P0 rules (pytest, 2–3 cases per rule) – fast feedback loop while tuning dictionaries.
-- Default thresholds are the best-F1 thresholds of the rules-only gold run (ADR 0316), except M1, taken from the recorded DeepSeek gold run (ADR 0318): M1 0.75, M2 0.1, M3 0.4 (M2 re-measured from 0.25 when `analytics-llm-p0` added R4, R6, R14, R17 and R18; M3 raised from its best-F1 0.25 to the S3.4 gate cap; `analytics/eval/thresholds.json`).
+- Default thresholds are the best-F1 thresholds of the rules-only gold run (ADR 0316), except M1, taken from the recorded DeepSeek gold run (ADR 0318): M1 0.75, M2 0.05, M3 0.4 (M2 re-measured from 0.25 when `analytics-llm-p0` added R4, R6, R14, R17 and R18, and from 0.1 when all 18 rules were built, [ADR 0319](decisions/0319-m2-default-threshold-005.md); M3 raised from its best-F1 0.25 to the S3.4 gate cap; `analytics/eval/thresholds.json`).
 - In the demo: show how moving the M2 threshold from the default 0.1 upwards changes the number of alerts and FP/FN (rerun `python analytics/eval/run.py` for the current numbers).
 
 ## 9. Schedule for Damian (Sat 13:30 → Sun 10:30)

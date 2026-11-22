@@ -59,6 +59,8 @@ KNOWN_PARAMS = {
     "performance_patterns", "forecast_disclaimer_patterns",
     "tax_patterns", "tax_exclude_patterns", "tax_individual_patterns", "tax_change_patterns", "tax_context_patterns",
     "tax_subject_patterns",
+    # analytics-m2-visual-rules (R5, R8)
+    "min_contrast", "min_font_px",
     # analytics-m2-text-rules (R9)
     "jargon_patterns", "max_avg_sentence_words", "max_jargon_share", "min_jargon_hits",
 }
@@ -228,7 +230,7 @@ class Catalogue:
 
     @classmethod
     def load(cls, path: Path | None = None, *, module: str = "M2") -> "Catalogue":
-        from . import m1, m2, m2_text, m3  # noqa: F401  (registers the rule classes)
+        from . import m1, m2, m2_text, m2_visual, m3  # noqa: F401  (registers the rule classes)
 
         path = path or DEFAULT_CATALOGUE
         if module not in _ID_PREFIX:
@@ -326,6 +328,12 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
             isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a number in (0, 1]")
+        if key == "min_contrast" and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not 1 <= value <= 21
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a WCAG contrast ratio in [1, 21]")
+        if key == "min_font_px" and (isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a positive number")
         if key in ("max_avg_sentence_words", "min_jargon_hits") and (
             isinstance(value, bool) or not isinstance(value, int) or value < 1
         ):
