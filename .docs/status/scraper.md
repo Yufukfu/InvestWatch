@@ -19,6 +19,8 @@ Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEO
 
 - Social R&D (ADR 0109, docs-only PR): X tweets are collectable with a dedicated account's cookies (Playwright reading the page's GraphQL); YouTube metadata works anonymously through our fetch layer; YouTube transcripts work through audio plus local Whisper (residential proxy, Node 22, PO token server), not through the caption URL (429 from the home IP). Specs `scraper-social-youtube` (metadata only) and `scraper-social-x` follow.
 
+- Hand-in (issues #77 and #74, scraper part): `.docs/presentation-scraper.md` has five slides with speaker notes (architecture, safety, coverage on the 223 documents of #78, add-a-source example, AI-assisted process), every number sourced from `origin/main`; X and YouTube collectors and re-scan tracking are labelled "in progress, not merged". Docs-only, no OpenSpec change.
+
 ## Demo rehearsal (issue #78)
 
 Source: Damian's recorded run in the issue (clean `docker compose up` from `main` c810a14, one `POST /api/scans` per seeded source, all 202), read against the code; I did not rerun the stack. Since c810a14 scraper code changed on `main` only for the renderer (PR #67, merged 00:24Z, after the run, off by default) and refactors made for it (`blocking.py`, `addresses.py`; not checked as behaviour-neutral), so the run's scraper is the current one without rendering, as far as that check goes.
@@ -61,7 +63,7 @@ Clean project from this branch (2026-11-22, one `docker compose up -d --build --
 
 - `scraper-v3-render` adds to `scraper/compose.yaml` only the `include` of `compose.renderer.yaml`, the `render` network and the worker's renderer settings, keeping `stop_grace_period` 60 s (ADR 0106); the root `compose.yaml` needs no new line.
 - Wiring (`Ingestor`, `sweep`, `Storage.check_bucket`, the job-error sink) is done in `scraper-orchestration` (`app.py`).
-- Two redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`) and `ingest.errors.redact` (full). Keep the full one and drop the other when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).
+- Three redactors exist: `reporting.redact` (userinfo only, used by `fetch.py` and `reporting.py`), `logs.redact` (URL and DSN secrets, used by the JSON log formatter) and `ingest.errors.redact` (full). Keep the full one and drop the others when `scraper-orchestration` wires the pieces (follow-up 3 of `scraper-ingest`).
 - Issue 36 (author provenance): no collector on `main` sets `author`; the ingest drops it from a page. A `scrape_meta` "author verified" flag would need a contract change and is only proposed (`scrape_meta.author_source`, in the issue 36 reply), not in the contract; its PR must keep the flag off a page-supplied `scrape_meta`.
 - `scrape_meta.scraper` is settled without a contract change: `httpx` plus `scrape_meta.client` (ADR 0101).
 - The real UKNF sample format is unknown until the stand: `sample_import` reads HTML, `.txt` and `.md`; a PDF or DOCX reader is one function in `READERS`, added on the day.

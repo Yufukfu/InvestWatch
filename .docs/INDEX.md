@@ -33,6 +33,7 @@
 | Get the architecture diagram and scale-out slides for the hand-in PDF | [presentation-architecture.md](presentation-architecture.md) |
 | Run the analytics part of the hand-in demo (documents per module, expected findings, click path, LLM cache, fallback if Gemini is down) | [demo-analytics.md](demo-analytics.md) |
 | Get the analytics slide content for the hand-in PDF (M1/M2/M3, gold-set numbers, add-a-rule example, LLM swap) | [presentation-analytics.md](presentation-analytics.md) |
+| Get the scraper slide content for the hand-in PDF (architecture, safety, real-data coverage, add-a-source example, AI-assisted process) | [presentation-scraper.md](presentation-scraper.md) |
 | Get the dashboard and architecture slides, the live demo click-by-click or the 3-minute video script | [presentation-dashboard.md](presentation-dashboard.md) |
 | Check the stack filled itself on a first `up`, or see which brief requirement is met by what | [brief-compliance.md](brief-compliance.md), [scraper/README.md](../scraper/README.md) |
 | Hand in the project: title, description (PL/EN), PDF slide order, what is still left for humans | [hand-in.md](hand-in.md) |
