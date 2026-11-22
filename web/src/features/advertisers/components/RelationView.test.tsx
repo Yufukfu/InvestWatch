@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { AdvertiserFinding, AdvertiserRow, Relation } from '../model';
+import { NO_FIRM, type AdvertiserFinding, type AdvertiserRow, type Relation } from '../model';
 import { RelationView } from './RelationView';
 
 const row: AdvertiserRow = {
@@ -75,6 +75,11 @@ describe('RelationView', () => {
     ]);
     fireEvent.click(screen.getByRole('button', { name: 'Tytuł f2' }));
     expect(p.onOpenFinding).toHaveBeenCalledWith('f2');
+  });
+
+  it('names the findings with no matched firm "bez dopasowanej firmy"', () => {
+    setup({ advertiser: 'h:@a', firm: NO_FIRM }, { findings: [finding('f9')] });
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('1 zgłoszenie: @a → promuje bez dopasowanej firmy');
   });
 
   it('names an unknown firm key without calling it unmatched', () => {

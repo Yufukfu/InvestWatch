@@ -4,6 +4,7 @@ import { storeWrapper } from '../../test/store';
 import { AdvertisersPage } from './AdvertisersPage';
 
 const ALFA = 'facc6bd1-c728-5348-90a4-011b0972fea9';
+const EUROTRADE = '2d7456b6-f7b5-52f2-a039-64e250001e24';
 const MAREK_ID = 'ef85ced1-2f04-5f3d-bc93-63a276c206fd';
 const MAREK_TITLE = 'Finfluencer @marek_trader reklamuje Alfa Inwestycje DM z kodem polecającym';
 
@@ -78,6 +79,14 @@ describe('AdvertisersPage (contract mock)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Powiązania' }));
     expect(window.location.search).toBe('');
     expect(screen.getByRole('img', { name: /Graf powiązań/ })).toBeInTheDocument();
+  });
+
+  it('narrows a shared relation link to the firm in rel_firm', async () => {
+    // @marek_trader promotes only Alfa; the EuroTrade relation of the same advertiser has no findings.
+    renderPage(`?rel_adv=${encodeURIComponent('h:@marek_trader')}&rel_firm=${EUROTRADE}`);
+    expect(await screen.findByText('WYBRANA RELACJA')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^0 zgłoszeń: @marek_trader/);
+    expect(screen.queryByText(MAREK_TITLE)).toBeNull();
   });
 
   it('reopens a relation from a shared link and follows the browser back button', async () => {
