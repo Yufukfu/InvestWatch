@@ -9,6 +9,7 @@ Covers `analytics/`, `api/` and `contracts/`; whoever changes them updates this 
 - Mock server for `web/` in `contracts/mock-server/` (REST `http://localhost:8000/api`, Socket.IO `/events`) merged (PR #8, `mock-server` archived).
 - Contract 1.1.0 (`findings-document-filter`, issue #33, team OK): optional `document_id` on `GET /findings` in the contract, `api/` and the mock server, plus a mock post with an M1 and an M3 finding. Kacper re-syncs `web/`'s contract snapshot in his PR.
 - Contract 1.2.0 (`api-finding-export`, issue #70, team OK asked in the PR): read-only `GET /findings/{id}/export`, the evidence pack for UKNF (JSON, or a printable page with `?format=html`, which Kacper's "Eksportuj" button links to). The mock server serves it too (`mock-finding-export`), with `raw` always unavailable.
+- Contract 1.3.0 (`api-bulk-export-coverage`, issue #115, team OK asked in the PR): `POST /findings/bulk-status`, `GET /findings/export` (CSV of the filtered list) and `m2_coverage` in `/stats/summary`, in `api/` and the mock server, so `web/` can add the bulk bar, "Eksportuj raport" and the coverage strip. PDF export is not done.
 
 ### analytics
 - `analytics-llm-bare-array` (stacked on #92): a bare JSON array answer is read as `{"results": …}` instead of being dropped as malformed. 11 of 27 `gemma-4-26b-a4b-it` answers in the #92 evaluation were bare arrays.
