@@ -42,9 +42,9 @@
 
 ## 7. Keyboard shortcuts
 
-- [ ] 7.1 Write the failing tests first: `J`/`K` move the selection, `J` with nothing selected selects the first row, `K` on the first row stays, `3` sends a `PATCH` with `confirmed` and the finding stays selected, `3` on an already confirmed finding sends nothing, `1` with no detail open sends nothing, typing `1` in the search field sends nothing, a modifier key is ignored, `J` on the last row does nothing, a failed `PATCH` shows the normal error, `O` does nothing for a non-http URL, `/` focuses search, `Esc` closes the detail once (the shortcuts do not also handle it), and the legend disclosure lists every shortcut
-- [ ] 7.2 Implement `useFindingShortcuts` and the shortcut legend disclosure
-- [ ] 7.3 mutations: N tried, N caught
+- [x] 7.1 Write the failing tests first: `J`/`K` move the selection, `J` with nothing selected selects the first row, `K` on the first row stays, `3` sends a `PATCH` with `confirmed` and the finding stays selected, `3` on an already confirmed finding sends nothing, `1` with no detail open sends nothing, typing `1` in the search field sends nothing, a modifier key is ignored, `J` on the last row does nothing, a failed `PATCH` shows the normal error, `O` does nothing for a non-http URL, `/` focuses search, `Esc` closes the detail once (the shortcuts do not also handle it), and the legend disclosure lists every shortcut
+- [x] 7.2 Implement `useFindingShortcuts` and the shortcut legend disclosure
+- [x] 7.3 mutations: 25 tried, 25 caught (1 equivalent: dead selectedId guard removed)
 
 ## 8. Responsive evidence
 
