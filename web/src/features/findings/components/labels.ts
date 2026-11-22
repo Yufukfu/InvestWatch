@@ -90,3 +90,8 @@ export function safeHttpUrl(url: string | null | undefined): string | undefined 
     return undefined;
   }
 }
+
+// 12000 -> "12 000" with a no-break space, as Polish groups thousands, so a count never wraps inside.
+export function groupThousands(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}

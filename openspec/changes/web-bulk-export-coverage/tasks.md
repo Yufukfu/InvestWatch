@@ -2,9 +2,9 @@
 
 ## 1. Report export link
 
-- [ ] 1.1 Write failing tests: `exportUrl` builds `<API base>/findings/export` with the list filters (same mapping as `toQueryArg`), `sort` always, never `page`/`page_size`; the findings page shows `Eksportuj raport` with that `href` and the 10 000-row note, and the truncation note above 10 000.
-- [ ] 1.2 Implement `exportUrl` and the link with its note. Tests, lint, typecheck.
-- [ ] 1.3 Mutation check.
+- [x] 1.1 Write failing tests: `exportUrl` builds `<API base>/findings/export` with the list filters (same mapping as `toQueryArg`), `sort` always, never `page`/`page_size`; the findings page shows `Eksportuj raport` with that `href` and the 10 000-row note, and the truncation note above 10 000.
+- [x] 1.2 Implement `exportUrl` and the link with its note. Tests, lint, typecheck.
+- [x] 1.3 Mutation check, each against `findingsUrl.test.ts` and `FindingsPage.test.tsx`: `sort` dropped from the export params; `page` added to them; the `undefined` guard dropped (every key written); `score_min` misnamed; the truncation boundary `>` moved to `>=`; the truncation note never shown; `download` dropped. The `%2C` to `,` rewrite is not mutated: both forms decode to the same value (equivalent mutant). mutations: 7 tried, 7 caught
 
 ## 2. M2 coverage strip
 

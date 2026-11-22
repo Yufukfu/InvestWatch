@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { ExportReportLink } from './components/ExportReportLink';
 import { FindingDetailPanel } from './components/FindingDetailPanel';
 import { FindingsFilters } from './components/FindingsFilters';
 import { FindingsPager } from './components/FindingsPager';
@@ -11,6 +12,7 @@ import { StatusEditor } from './components/StatusEditor';
 import { useDocumentFindings } from './data/useDocumentFindings';
 import { useFindingDetail } from './data/useFindingDetail';
 import { useFindingShortcuts, type ShortcutTarget } from './data/useFindingShortcuts';
+import { EXPORT_ROW_CAP, exportUrl } from './data/findingsUrl';
 import { useFindings } from './data/useFindings';
 import { useStatusChange } from './data/useStatusChange';
 
@@ -76,6 +78,7 @@ export function FindingsPage() {
             Odświeżanie…
           </span>
         )}
+        <ExportReportLink href={exportUrl(f.filters)} cap={EXPORT_ROW_CAP} total={f.total} />
       </div>
       <ShortcutLegend />
       <FindingsFilters filters={f.filters} onChange={f.setFilters} onReset={f.resetFilters} />
