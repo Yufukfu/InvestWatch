@@ -201,6 +201,10 @@ describe('interaction styling', () => {
     expect(declared('input:focus-visible', 'border-color')).toBe('var(--control-border)');
   });
 
+  it('keeps a disabled pager button as opaque as an enabled one', () => {
+    expect(declared('.pager .btn:disabled', 'opacity')).toBe('1');
+  });
+
   it('gives every control a 120-150ms transition from tokens', () => {
     const dur = Number(/^(\d+)ms$/.exec(tokens.get('--dur') ?? '')?.[1]);
     expect(dur).toBeGreaterThanOrEqual(120);

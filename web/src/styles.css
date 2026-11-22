@@ -186,6 +186,7 @@ main > [id] { scroll-margin-top: var(--space-4); }
 .btn:hover:not(:disabled) { background: var(--tint-hover); border-color: var(--accent); }
 .btn:active:not(:disabled) { background: var(--tint-selected); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.pager .btn:disabled { opacity: 1; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
 .btn-primary:active:not(:disabled) { background: var(--text-2); border-color: var(--text-2); }
