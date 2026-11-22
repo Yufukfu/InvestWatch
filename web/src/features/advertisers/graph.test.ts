@@ -50,13 +50,29 @@ describe('buildGraph', () => {
       ['h:@a', '@a', 5, true],
       ['h:@b', '@b', 2, false],
     ]);
-    // Y is promoted only by the first advertiser, X also by the second: Y sits higher (fewer crossings).
+    // Both firms get most of their findings from the first advertiser; the larger firm comes first.
     expect(g.firms.map((x) => [x.key, x.name, x.count])).toEqual([
-      ['r-Y', 'Y', 1],
       ['r-X', 'X', 5],
+      ['r-Y', 'Y', 1],
     ]);
     expect(g.unmatched).toBe(1);
     expect(g.hidden).toBe(0);
+  });
+
+  it("orders firms like hen68's mockup: each at the row of the advertiser that sends it the most findings", () => {
+    // The placeholder data of the Powiązania mockup (issue #72).
+    const mockup = aggregateAdvertisers([
+      ...times(5, '@finanse_z_pasja', 'OKX'), ...times(3, '@finanse_z_pasja', 'Nordic'), ...times(1, '@finanse_z_pasja', 'Capital'),
+      ...times(4, '@kdpwiadomosci', 'OKX'), ...times(3, '@kdpwiadomosci', 'Capital'),
+      ...times(4, '@krypto_mentor_pl', 'Nordic'), ...times(2, '@krypto_mentor_pl', 'Bitvest'),
+      ...times(4, '@zysk_codziennie', 'Bitvest'),
+      ...times(3, '@inwestuj_z_tomkiem', 'OKX'),
+      ...times(2, '@forex_sygnaly24', 'Alpha'),
+      ...times(1, '@mama_na_gieldzie', 'Alpha'),
+    ]);
+    const g = buildGraph(mockup);
+    expect(g.advertisers.map((a) => a.label)).toEqual(['@finanse_z_pasja', '@kdpwiadomosci', '@krypto_mentor_pl', '@zysk_codziennie', '@inwestuj_z_tomkiem', '@forex_sygnaly24', '@mama_na_gieldzie']);
+    expect(g.firms.map((x) => [x.name, x.count])).toEqual([['OKX', 12], ['Capital', 4], ['Nordic', 7], ['Bitvest', 6], ['Alpha', 3]]);
   });
 
   it('places nodes top to bottom inside the height and keeps the edge ends on them', () => {

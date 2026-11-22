@@ -29,26 +29,30 @@ export type Graph = {
   unmatched: number;
 };
 
-// Rows come sorted by count (aggregateAdvertisers). Firms are ordered by the mean position of the advertisers
-// that promote them (fewer crossings), then by count.
+// Rows come sorted by count (aggregateAdvertisers). Each firm sits at the row of the advertiser that sends it the
+// most findings (its strongest edge, the earlier row on a tie), then by count: the layout of hen68's mockup (#72),
+// which keeps the thick edges short and level.
 export function buildGraph(rows: readonly AdvertiserRow[], maxAdvertisers = GRAPH_MAX_ADVERTISERS): Graph {
   const matched = rows.filter((r) => r.firms.some((f) => f.key !== NO_FIRM));
   const shown = matched.slice(0, maxAdvertisers);
-  const firmAcc = new Map<string, { name: string; count: number; weighted: number }>();
+  const firmAcc = new Map<string, { name: string; count: number; top: number; topCount: number }>();
   const pairs: Array<Omit<GraphEdge, 'width' | 'y1' | 'y2'>> = [];
   shown.forEach((r, i) => {
     for (const f of r.firms) {
       if (f.key === NO_FIRM || !f.name) continue;
       pairs.push({ advertiser: r.key, firm: f.key, count: f.count, repeat: r.repeat });
-      const acc = firmAcc.get(f.key) ?? { name: f.name, count: 0, weighted: 0 };
+      const acc = firmAcc.get(f.key) ?? { name: f.name, count: 0, top: i, topCount: 0 };
       acc.count += f.count;
-      acc.weighted += f.count * i;
+      if (f.count > acc.topCount) {
+        acc.top = i;
+        acc.topCount = f.count;
+      }
       firmAcc.set(f.key, acc);
     }
   });
   const firmList = [...firmAcc.entries()]
-    .map(([key, a]) => ({ key, name: a.name, count: a.count, center: a.weighted / a.count }))
-    .sort((a, b) => a.center - b.center || b.count - a.count || a.name.localeCompare(b.name, 'pl'));
+    .map(([key, a]) => ({ key, name: a.name, count: a.count, top: a.top }))
+    .sort((a, b) => a.top - b.top || b.count - a.count || a.name.localeCompare(b.name, 'pl'));
   const height = Math.max(shown.length, firmList.length, 1) * ROW_HEIGHT;
   const advStep = height / Math.max(shown.length, 1);
   const firmStep = height / Math.max(firmList.length, 1);

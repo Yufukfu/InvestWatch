@@ -604,10 +604,15 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 /* Graph: HTML labels in two columns, the SVG between them draws only the edges. */
 .adv-graph { margin: 0; }
 .adv-graph-scroll { overflow-x: auto; }
-.adv-graph-inner { min-width: 630px; padding: 0 0 var(--space-6); }
-.adv-graph-heads, .adv-graph-body { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(170px, 300px) minmax(220px, 1fr); }
+.adv-graph-inner { min-width: 610px; padding: 0 0 var(--space-6); }
+.adv-graph-heads, .adv-graph-body { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(150px, 240px) minmax(220px, 1.15fr); }
 .adv-graph-hint { display: none; margin: 0 0 var(--space-3); color: var(--muted); font-size: 13px; }
 @media (max-width: 699px) { .adv-graph-hint { display: block; } }
+/* Tablet: a narrower edge area and smaller labels leave room for full handles and firm names. */
+@media (max-width: 899px) {
+  .adv-graph-heads, .adv-graph-body { grid-template-columns: minmax(240px, 1fr) 130px minmax(220px, 1.15fr); }
+  .adv-graph-col > li { font-size: 15px; }
+}
 @media (max-width: 599px) { .adv-filters-sep { display: none; } .adv-view { margin-left: 0; } }
 .adv-graph-heads { margin-bottom: var(--space-4); color: var(--muted); font-family: var(--font-graph); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 .adv-graph-heads > :first-child { text-align: right; padding-right: 72px; }
