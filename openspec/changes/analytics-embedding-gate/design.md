@@ -82,7 +82,7 @@ There is no "borderline" band above zero hits. One hit already passes, and the r
 
 ### 5. Degrade and logging
 
-- **No embedder.** `GateEmbedding` is not built. Every no-hit drop has path `dictionary_only_fallback`. Start-up logs one INFO line, `embedding gate off`, with `reason: embedder_disabled`.
+- **No embedder.** `GateEmbedding` is not built. Every no-hit drop of at least `GATE_EMBED_MIN_CHARS` characters has path `dictionary_only_fallback`; a shorter one keeps `dictionary`, as with an embedder. Start-up logs one INFO line, `embedding gate off`, with `reason: embedder_disabled`.
 - **Breaker open, failed vector or no centroids.** The path is `dictionary_only_fallback`.
   - One WARNING `embedding gate degraded`, with the reason (`breaker_open`, `embed_timeout`, `no_centroids`, …), is logged only when the reason differs from the last one.
   - One INFO `embedding gate restored` is logged when the rescue works again.

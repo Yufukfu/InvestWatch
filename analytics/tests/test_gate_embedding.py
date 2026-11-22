@@ -228,6 +228,20 @@ def test_rescue_margin_boundary_is_inclusive():
     assert not ready({DOC: v}, margin=0.001).rescue(DOC, "h1").passed
 
 
+def test_rescue_decides_on_the_logged_three_place_margin():
+    # cos to offer 0.66, to off_topic 0.6302: the raw margin 0.0298 is logged as 0.03, so it passes at 0.03.
+    v = np.array([0.66, 0.0, 0.6302], dtype=np.float64)
+    v = np.append(v, np.sqrt(1 - v @ v)).astype(np.float32)
+    seeds = {"offer": ["oferta a"], OFF_TOPIC: ["mecz"]}
+    emb = FakeEmbedder(docs={DOC: v})
+    emb_vecs = {"oferta a": np.array([1, 0, 0, 0], np.float32), "mecz": np.array([0, 0, 1, 0], np.float32)}
+    emb.embed = lambda t, h: EmbedOutcome(emb_vecs.get(t, v), "bge-m3", "ok")
+    ge = GateEmbedding(emb, seeds, GateSettings(embed_min_margin=0.03), retry_s=60, clock=Clock())
+    assert ge.warm()
+    r = ge.rescue(DOC, "h1")
+    assert r.margin == 0.03 and r.passed
+
+
 def test_rescue_figures_rounded_to_three_places():
     r = ready({DOC: unit(0.81234, 0, 0.58321)}).rescue(DOC, "h1")
     assert r.similarity == round(r.similarity, 3) and r.margin == round(r.margin, 3)

@@ -100,9 +100,11 @@ class GateEmbedding:
             return Rescue(FALLBACK, False, outcome=outcome)
         v = _unit(np.asarray(outcome.vector, dtype=np.float32))
         on = max(float(v @ c) for name, c in self.centroids.items() if name != OFF_TOPIC)
-        margin = on - float(v @ self.centroids[OFF_TOPIC])
+        # Decide on the same 3-place figure that is logged and that eval/gate_calibrate.py sweeps, so a drop never
+        # shows a margin equal to the threshold (seen in the manual run: logged 0.03, compared as 0.0298).
+        margin = round(on - float(v @ self.centroids[OFF_TOPIC]), 3)
         self._restored()
-        return Rescue(EMBEDDING, margin >= self._s.embed_min_margin, round(on, 3), round(margin, 3), outcome)
+        return Rescue(EMBEDDING, margin >= self._s.embed_min_margin, round(on, 3), margin, outcome)
 
     def _embed(self, text: str, content_hash: str | None) -> "EmbedOutcome":
         try:
