@@ -9,4 +9,4 @@
 ## 2. Closing
 
 - [x] 2.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry. Rule added to `.claude/rules/web-dashboard.md`; no ADR (no hard-to-reverse choice, no new dependency).
-- [ ] 2.2 Run `iw-pr-review` and fix real findings.
+- [x] 2.2 Run `iw-pr-review` and fix real findings. One `iw-reviewer` pass (`security: yes`) on the whole branch, which has one logic commit, so it is also the group review: no blocking findings. Could not check: whether screen readers and braille displays keep FSI/PDI in accessible names and live speech (jsdom checks the strings only).
