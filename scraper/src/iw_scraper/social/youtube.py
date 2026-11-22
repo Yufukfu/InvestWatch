@@ -15,11 +15,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from iw_scraper.config import youtube_max_videos
+from iw_scraper.config import yt_transcript_proxy, youtube_max_videos
 from iw_scraper.fetch import FetchDeferred, FetchFailure
 from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure
 from iw_scraper.social.model import Flow, FlowContext
+from iw_scraper.social.transcript import fetch_transcript
 from iw_scraper.types import JobError, Reason
 
 _log = logging.getLogger(__name__)
@@ -167,20 +168,25 @@ def _watch_url(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-def _page(video: Video, *, http_status: int) -> dict:
-    """The page dict `Ingestor.ingest` takes: the title, the description and (later) the transcript, one text."""
-    text = "\n\n".join(part for part in (video.title, video.description) if part)
+def _language(tracks: tuple[Track, ...]) -> str:
+    """The track to read: Polish when there is one (the channels of interest are Polish), else the first listed."""
+    return next((track.language for track in tracks if track.language.split("-")[0] == "pl"), tracks[0].language)
+
+
+def _page(video: Video, *, http_status: int, transcript: str = "", transcript_status: str = "none") -> dict:
+    """The page dict `Ingestor.ingest` takes: the title, the description and the transcript, one text."""
+    text = "\n\n".join(part for part in (video.title, video.description, transcript) if part)
     url = _watch_url(video.video_id)
     return {
         "url": url, "canonical_url": url, "http_status": http_status, "title": video.title, "lang": None,
         "text": text, "published_at": video.published_at, "links": [],
-        "scrape_meta": {"video_id": video.video_id, "transcript": "none"},
+        "scrape_meta": {"video_id": video.video_id, "transcript": transcript_status},
         "html": json.dumps(video.stored, ensure_ascii=False, sort_keys=True),
     }
 
 
-def make_flow(*, max_videos=youtube_max_videos) -> Flow:
-    """The YouTube flow; `max_videos` is the one thing a test replaces."""
+def make_flow(*, max_videos=youtube_max_videos, transcript=fetch_transcript, proxy=yt_transcript_proxy) -> Flow:
+    """The YouTube flow; the arguments are the three things a test replaces."""
 
     async def flow(ctx: FlowContext) -> AttemptResult:
         source = ctx.source
@@ -197,7 +203,25 @@ def make_flow(*, max_videos=youtube_max_videos) -> Flow:
         remaining = [video_id for video_id in wanted if _watch_url(video_id) not in known]
 
         profile = f"https://www.youtube.com/@{handle}"
-        stored = unplayable = unreadable = foreign = 0
+        stored = unplayable = unreadable = foreign = captions = failed = 0
+        transcript_proxy = proxy()
+        if transcript_proxy is None and remaining:
+            _log.info("youtube transcripts are off: YT_TRANSCRIPT_PROXY is not set")
+
+        async def transcribe(video: Video) -> tuple[str, str]:
+            """The transcript text and its status: `caption`, `none` or `failed`; a block ends transcripts for the run."""
+            nonlocal transcript_proxy
+            if transcript_proxy is None or not video.tracks:
+                return "", "none"
+            try:
+                text = ((await transcript(video.video_id, _language(video.tracks), transcript_proxy)) or "").strip()
+            except FetchFailure as failure:
+                if failure.reason is Reason.BLOCKED:
+                    transcript_proxy = None  # a blocked proxy is not tried again in this run
+                _log.info("youtube transcript of %s failed: %s", video.video_id, failure.reason.value)
+                return "", "failed"
+            return text, "caption" if text else "none"
+
         for video_id in remaining:
             began = time.monotonic()
             try:
@@ -220,8 +244,10 @@ def make_flow(*, max_videos=youtube_max_videos) -> Flow:
                 foreign += 1
             else:
                 author = {"name": video.channel_name, "handle": f"@{handle}", "profile_url": profile, "followers": None}
+                text, status = await transcribe(video)
+                captions, failed = captions + (status == "caption"), failed + (status == "failed")
                 outcome = await ctx.ingest(
-                    _page(video, http_status=result.status), source, fetched_at=ctx.clock(),
+                    _page(video, http_status=result.status, transcript=text, transcript_status=status), source, fetched_at=ctx.clock(),
                     duration_ms=int((time.monotonic() - began) * 1000), proxy=result.proxy_id, author=author,
                 )
                 if outcome.outcome == "failed":  # the ingestor has recorded it in `job_errors`
@@ -229,8 +255,8 @@ def make_flow(*, max_videos=youtube_max_videos) -> Flow:
                 stored += outcome.outcome == "inserted"
         _log.info(
             "youtube videos of %s: %d stored, %d already stored, %d unplayable skipped, %d unreadable skipped, "
-            "%d of another channel skipped",
-            handle, stored, len(wanted) - len(remaining), unplayable, unreadable, foreign,
+            "%d of another channel skipped, %d transcripts read, %d transcripts failed",
+            handle, stored, len(wanted) - len(remaining), unplayable, unreadable, foreign, captions, failed,
         )
         if remaining and unreadable == len(remaining):
             raise ParseFailure(Reason.PARSE_ERROR, "no readable watch page")
