@@ -50,6 +50,25 @@ describe('CalibrationPanel', () => {
     expect(screen.getByText(/Liczba oznaczonych próbek: 70/)).toBeInTheDocument();
   });
 
+  it('draws the TP, FN, FP and TN counts of the selected point as a proportion bar with text labels', () => {
+    setup({ index: i70 });
+    const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
+    // Layout only: each segment grows by its returned count, so the browser sets the widths and nothing is recomputed.
+    const segments = Array.from(group.querySelectorAll<HTMLElement>('.proportion-bar > span'));
+    expect(segments.map((s) => s.style.flexGrow)).toEqual(['23', '7', '0', '40']);
+    const labels = within(group).getAllByRole('listitem');
+    expect(labels.map((li) => li.textContent)).toEqual(['TP 23', 'FN 7', 'FP 0', 'TN 40']);
+  });
+
+  it('moves the proportion bar with the slider point', () => {
+    setup({ index: i50 });
+    const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
+    const point = calM2.points[i50];
+    expect(Array.from(group.querySelectorAll<HTMLElement>('.proportion-bar > span')).map((s) => s.style.flexGrow)).toEqual(
+      [point.tp, point.fn, point.fp, point.tn].map(String),
+    );
+  });
+
   it('shows the selected point next to the current one, as returned', () => {
     setup({ index: i70 });
     expect(metric('Fałszywe alarmy (FP)')).toHaveTextContent('0');

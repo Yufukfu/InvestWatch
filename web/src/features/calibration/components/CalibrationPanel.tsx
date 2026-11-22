@@ -41,6 +41,14 @@ const METRICS: Metric[] = [
   { label: 'F1', value: (p) => p.f1, percent: true },
 ];
 
+// The four outcomes of the selected point, in the order the bar draws them.
+const OUTCOMES = [
+  { key: 'tp', label: 'TP' },
+  { key: 'fn', label: 'FN' },
+  { key: 'fp', label: 'FP' },
+  { key: 'tn', label: 'TN' },
+] as const;
+
 const show = (v: number, percent?: boolean) => (percent ? formatPercent(v) : String(v));
 
 const SAVED_TEXT = 'Zapisano. Poziomy ryzyka zostały przeliczone.';
@@ -127,6 +135,23 @@ function Body({
         />
         <span className="threshold-selected">{formatThreshold(selected.threshold)}</span>
         <span className="muted">obecny próg: {formatThreshold(view.currentThreshold)}</span>
+      </div>
+
+      {/* Layout only: a segment grows by its returned count, so the browser sets the widths; nothing is computed. */}
+      <div className="proportion" role="group" aria-label="Rozkład wyników dla wybranego progu">
+        <div className="proportion-bar" aria-hidden="true">
+          {OUTCOMES.map((o) => (
+            <span key={o.key} className={`seg seg-${o.key}`} style={{ flexGrow: selected[o.key] }} />
+          ))}
+        </div>
+        <ul className="proportion-legend">
+          {OUTCOMES.map((o) => (
+            <li key={o.key}>
+              <span className={`seg-swatch seg-${o.key}`} aria-hidden="true" />
+              {o.label} {selected[o.key]}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="metrics">

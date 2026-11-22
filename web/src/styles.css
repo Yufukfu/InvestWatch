@@ -333,10 +333,21 @@ button.link:hover { color: var(--accent-strong); }
 .segmented button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .threshold-row { display: grid; grid-template-columns: auto minmax(160px, 1fr) auto auto; align-items: center; gap: 12px; margin: 12px 0; }
 .threshold-row label { font-weight: 600; }
-.threshold-row input[type='range'] { accent-color: var(--accent); min-height: 0; padding: 0; border: 0; }
+.threshold-row input[type='range'] { accent-color: var(--accent); width: 100%; min-height: var(--tap); padding: 0; border: 0; }
 .threshold-selected { font-family: var(--font-display); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) { .threshold-row { grid-template-columns: 1fr auto; } .threshold-row input[type='range'] { grid-column: 1 / -1; } }
+.proportion { margin: var(--space-4) 0; }
+.proportion-bar { display: flex; gap: 2px; height: 16px; border-radius: var(--radius-pill); overflow: hidden; background: var(--risk-none-bg); }
+.proportion-bar > .seg { flex-basis: 0; min-width: 0; }
+.seg-tp { background: var(--green); }
+.seg-fn { background: var(--amber); }
+.seg-fp { background: var(--accent); }
+.seg-tn { background: var(--slate); }
+.proportion-legend { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-family: var(--font-mono); font-weight: 600; }
+.proportion-legend li { display: flex; align-items: center; gap: 6px; }
+.seg-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+@media (max-width: 599px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .metric { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
 .metric-label { color: var(--muted); font-weight: 600; }
 .metric-value { font-family: var(--font-display); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }

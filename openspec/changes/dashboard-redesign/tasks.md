@@ -30,9 +30,9 @@
 
 ## 5. Calibration panel
 
-- [ ] 5.1 Update tests first: a proportion bar with TP, FN, FP and TN segments whose widths follow the returned counts and whose labels carry the counts as text; metrics show their value beside the current one; slider spans the full width on phone
-- [ ] 5.2 Restyle the calibration panel (module switch at 44px, large threshold figure, proportion bar, metric grid with two columns on phone, chart markers legible, warning and save bar)
-- [ ] 5.3 mutations: N tried, N caught
+- [x] 5.1 Update tests first: a proportion bar with TP, FN, FP and TN segments whose widths follow the returned counts and whose labels carry the counts as text; metrics show their value beside the current one; slider spans the full width on phone
+- [x] 5.2 Restyle the calibration panel (module switch at 44px, large threshold figure, proportion bar, metric grid with two columns on phone, chart markers legible, warning and save bar)
+- [x] 5.3 mutations: 7 tried, 7 caught
 
 ## 6. Triage entry
 
