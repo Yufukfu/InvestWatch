@@ -72,7 +72,17 @@ These are catalogue params of one rule, not module thresholds. ADR 0316 defaults
 
 A model that says `fail` without a rating, or with a rating of 3, is therefore never a violation.
 
-### 5. Evaluation
+### 5. A rules-only R9 `uncertain` is not scored (Damian)
+
+The first gold run with R9 moved the rules-only best M2 threshold from 0.1 to 0.05 (follow-ups F2). Damian decided that a rules-only R9 `uncertain` must not raise the M2 score: it has no evidence of an infringement, so only an LLM verdict for R9 counts. The finding still lists it as `uncertain` ("do weryfikacji") with its signal.
+
+- **Where:** a catalogue-level, per-rule flag, `llm_only_uncertain: true`, read into `RuleSpec`. It is validated as a boolean at load. It is not a special case inside R9.
+- **How:** `modules/m2.score(rules, catalogue)` leaves out entirely (numerator and denominator) a result that is `uncertain`, has `method` `rule`, and comes from a flagged rule. The rule then weighs as if it were not applicable. An LLM `uncertain` (`hybrid`/`llm`), a `fail` and a `pass` still count. Without the catalogue, `score(rules)` behaves as before.
+- **Why leave it out instead of counting it as `pass`:** adding weight to the denominator would lower the score of every document with a jargon-heavy warning. Nothing is known either way, so the result is not scored.
+
+With the flag, rules-only M2 at 0.1 is back to the R10 numbers, and `test_eval_thresholds` stays at 0.1.
+
+### 6. Evaluation
 
 Gold rows already label R9 and R10. Run `eval/run.py --module M2` before and after. If `test_eval_thresholds` fails, report the numbers to the coordinator and do not change the defaults (the deepseek branch owns them).
 

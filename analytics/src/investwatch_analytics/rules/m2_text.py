@@ -6,11 +6,15 @@ risk-warning detector through `_RiskWarnings` and its YAML anchors.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
+from dataclasses import replace
+from functools import cached_property
 
+from ..llm.judge import LlmVerdict
 from ..models import Block, RuleResult
 from ..preprocessing import Sentence, sentence_language
-from .engine import Context, register
+from .engine import Context, compile_patterns, register
 from .m2 import NO_RISK_INFO, VIEWPORTS, _RiskWarnings
 
 #: Blocks that never set the main message's language (legal boilerplate, footers).
@@ -73,3 +77,66 @@ class R10LanguageConsistency(_RiskWarnings):
             "fail", warnings[0].text,
             f"Ostrzeżenie o ryzyku jest w innym języku ({langs[0]}) niż główny przekaz materiału ({main}).",
         )
+
+
+#: The model's rating, stated at the start of its explanation as the R9 question asks ("Ocena: 2/5").
+_RATING = re.compile(r"\bocena\s*:?\s*([1-5])\s*/\s*5\b", re.IGNORECASE)
+_WORD = re.compile(r"\w+")
+
+
+@register
+class R9Comprehensibility(_RiskWarnings):
+    """ZASÓB R9: "ostrzeżenie o ryzyku … językiem zrozumiałym dla przeciętnego odbiorcy grupy docelowej".
+
+    LLM-first: the rules only raise a signal (long sentences, jargon) and never fail; the LLM decides with a 1-5
+    rating, and `accept_llm_verdict` keeps a fail only for a rating of 2 or lower (a pass only for 4 or higher).
+    """
+
+    rule_id = "R9"
+
+    @cached_property
+    def _p(self) -> dict:
+        p = self.spec.params
+        return {
+            "jargon": compile_patterns(p.get("jargon_patterns", [])),
+            "max_avg": int(p.get("max_avg_sentence_words", 30)),
+            "max_share": float(p.get("max_jargon_share", 0.05)),
+            "min_hits": int(p.get("min_jargon_hits", 2)),
+        }
+
+    def _hits(self, text: str) -> int:
+        return sum(len(j.findall(text)) for j in self._p["jargon"])
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        warnings = [s for s in ctx.pre.sentences if self.is_warning(s.text)]
+        if not warnings:
+            return self.result("not_applicable", None, NO_RISK_INFO)
+        p = self._p
+        words = sum(len(_WORD.findall(s.text)) for s in warnings)
+        hits = [self._hits(s.text) for s in warnings]
+        total = sum(hits)
+        avg = words / len(warnings)
+        share = total / words if words else 0.0
+        numbers = (
+            f"średnia długość zdania {avg:.0f} słów, terminy specjalistyczne: {total} "
+            f"(udział {share * 100:.0f}%)".replace(".", ",")
+        )
+        raised = avg > p["max_avg"] or share >= p["max_share"] or total >= p["min_hits"]
+        if not raised:
+            return self.result("pass", warnings[0].text, f"Ostrzeżenie o ryzyku jest napisane prostym językiem ({numbers}).")
+        worst = warnings[hits.index(max(hits))]
+        return self.result(
+            "uncertain", worst.text,
+            f"Ostrzeżenie o ryzyku może być niezrozumiałe dla przeciętnego klienta ({numbers}) – do weryfikacji.",
+        )
+
+    def accept_llm_verdict(self, verdict: LlmVerdict) -> LlmVerdict:
+        m = _RATING.search(verdict.explanation)
+        rating = int(m.group(1)) if m else None
+        if verdict.result == "fail" and rating is not None and rating <= 2:
+            return verdict
+        if verdict.result == "pass" and rating is not None and rating >= 4:
+            return verdict
+        if verdict.result in ("fail", "pass"):
+            return replace(verdict, result="uncertain")
+        return verdict

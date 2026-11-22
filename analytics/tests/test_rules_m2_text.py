@@ -214,3 +214,233 @@ def test_r10_falls_back_to_document_guess(registry, catalogue):
     r = run(text, registry, catalogue)["R10"]
     assert r.result == "pass"
     assert r.evidence == PL_WARNING
+
+
+# ---- R9 comprehensibility (LLM-first) -----------------------------------------------------------
+
+import yaml  # noqa: E402
+
+from investwatch_analytics.llm.judge import JudgeOutcome, LlmVerdict  # noqa: E402
+from investwatch_analytics.rules.engine import DEFAULT_CATALOGUE, CatalogueError  # noqa: E402
+
+JARGON = (
+    "Ekspozycja na ryzyko bazowe instrumentu implikuje asymetryczny profil wypłaty, a zmienność implikowana i "
+    "ryzyko kredytowe kontrahenta mogą skutkować deprecjacją wartości rynkowej poniżej poziomu partycypacji."
+)
+JARGON_AD = f"Reklama. Certyfikaty strukturyzowane na indeks WIG20 z ochroną kapitału na poziomie 90%. {JARGON}"
+CFD_WARNING = (
+    "Kontrakty CFD są złożonymi instrumentami i wiążą się z wysokim ryzykiem szybkiej utraty środków z powodu "
+    "dźwigni finansowej."
+)
+LONG_WARNING = (
+    "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału, "
+    "a klient powinien przed podjęciem decyzji zapoznać się z dokumentem, który opisuje wszystkie koszty, opłaty "
+    "i ryzyka związane z tym produktem oraz sposób ich naliczania w czasie."
+)
+
+
+class FakeJudge:
+    """Answers with the given verdicts and records the checks it was asked."""
+
+    model_name = "fake"
+
+    def __init__(self, *verdicts: LlmVerdict):
+        self.verdicts = {v.rule_id: v for v in verdicts}
+        self.calls: list[dict] = []
+
+    def judge(self, **kw) -> JudgeOutcome:
+        self.calls.append(kw)
+        return JudgeOutcome(verdicts=dict(self.verdicts), model="fake")
+
+    def asked(self) -> set[str]:
+        return {c.rule_id for call in self.calls for c in call["checks"]}
+
+
+def load_with(tmp_path, rule_id: str, params: dict) -> Catalogue:
+    data = yaml.safe_load(DEFAULT_CATALOGUE.read_text(encoding="utf-8"))
+    entry = next(e for e in data["rules"] if e["id"] == rule_id)
+    entry["params"] = {**(entry.get("params") or {}), **params}
+    path = tmp_path / "rules.yaml"
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    return Catalogue.load(path)
+
+
+def test_r9_catalogue_entry(catalogue):
+    spec = catalogue.get("R9")
+    assert spec.implemented
+    assert spec.severity == "low"
+    assert spec.legal_basis == "art. 44 ust. 2 lit. d rozp. del. 2017/565"
+    assert spec.llm is not None and spec.llm["when"] == "uncertain"
+    assert "Ocena: N/5" in spec.llm["question"]
+
+
+def test_r9_jargon_warning_rules_only_uncertain(registry, catalogue):
+    r = run(JARGON_AD, registry, catalogue)["R9"]
+    assert r.result == "uncertain"
+    assert r.evidence == JARGON
+    assert r.method == "rule"
+    assert "specjalistyczn" in r.explanation
+
+
+@pytest.mark.parametrize("warning", [PL_WARNING, CFD_WARNING])
+def test_r9_plain_warning_passes_and_is_not_deferred(registry, catalogue, warning):
+    judge = FakeJudge(LlmVerdict("R9", "fail", warning, "Ocena: 1/5. Niezrozumiałe."))
+    r = run(f"Reklama. Otwórz rachunek i inwestuj w akcje z GPW. {warning}", registry, catalogue, judge)["R9"]
+    assert r.result == "pass"
+    assert r.evidence == warning
+    assert "R9" not in judge.asked()
+
+
+def test_r9_evidence_is_the_warning_with_most_jargon(registry, catalogue):
+    r = run(f"Reklama. {PL_WARNING} {JARGON}", registry, catalogue)["R9"]
+    assert r.result == "uncertain"
+    assert r.evidence == JARGON
+
+
+def test_r9_long_warning_uncertain(registry, catalogue):
+    assert run(f"Reklama. {LONG_WARNING}", registry, catalogue)["R9"].result == "uncertain"
+
+
+def test_r9_one_jargon_word_in_a_short_warning_uncertain(registry, catalogue):
+    # One hit (under min_jargon_hits), but a high share: 1 of 5 words.
+    text = "Reklama. Otwórz rachunek i inwestuj w akcje z GPW. Ryzyko kontrahenta oznacza możliwą stratę."
+    assert run(text, registry, catalogue)["R9"].result == "uncertain"
+
+
+def test_r9_two_jargon_hits_with_a_low_share_uncertain(registry, catalogue):
+    # Two hits over ~50 words (share under 5%, average under 30 words): the hit count alone raises it.
+    a = ("Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części kapitału, także z powodu "
+         "zmian ceny, kursu waluty lub problemów finansowych naszego kontrahenta w czasie trwania umowy.")
+    b = ("Wartość inwestycji może spaść poniżej kwoty wpłaconej przez klienta, bo zależy od zmienności cen na "
+         "rynku, a hedging nie chroni w pełni przed ryzykiem straty części pieniędzy.")
+    assert run(f"Reklama. {a} {b}", registry, catalogue)["R9"].result == "uncertain"
+
+
+def test_r9_no_warning_not_applicable(registry, catalogue):
+    r = run("Otwórz konto maklerskie i inwestuj w akcje z rynku GPW.", registry, catalogue)["R9"]
+    assert r.result == "not_applicable"
+    assert NO_RISK in r.explanation.lower()
+
+
+def test_r9_deferred_only_when_uncertain(registry, catalogue):
+    judge = FakeJudge()
+    run(JARGON_AD, registry, catalogue, judge)
+    assert "R9" in judge.asked()
+
+
+def test_r9_model_low_rating_fails(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R9", "fail", JARGON, "Ocena: 1/5. Żargon specjalistyczny."))
+    r = run(JARGON_AD, registry, catalogue, judge)["R9"]
+    assert r.result == "fail"
+    assert r.evidence == JARGON
+    assert r.method == "hybrid"
+
+
+def test_r9_model_rating_two_is_the_boundary(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R9", "fail", JARGON, "Ocena: 2/5. Trudne."))
+    assert run(JARGON_AD, registry, catalogue, judge)["R9"].result == "fail"
+
+
+@pytest.mark.parametrize("explanation", ["Ocena: 3/5. Średnio.", "Niezrozumiałe dla klienta.", "Ocena: 7/5.", "Ocena: 1/3."])
+def test_r9_model_fail_without_a_low_rating_uncertain(registry, catalogue, explanation):
+    judge = FakeJudge(LlmVerdict("R9", "fail", JARGON, explanation))
+    r = run(JARGON_AD, registry, catalogue, judge)["R9"]
+    assert r.result == "uncertain"
+
+
+def test_r9_model_pass_needs_a_high_rating(registry, catalogue):
+    high = FakeJudge(LlmVerdict("R9", "pass", JARGON, "Ocena: 4/5. Zrozumiałe."))
+    assert run(JARGON_AD, registry, catalogue, high)["R9"].result == "pass"
+    mid = FakeJudge(LlmVerdict("R9", "pass", JARGON, "Ocena: 3/5. Średnio."))
+    assert run(JARGON_AD, registry, catalogue, mid)["R9"].result == "uncertain"
+
+
+def test_r9_model_quote_not_in_document_uncertain(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R9", "fail", "Zdanie, którego nie ma w tekście.", "Ocena: 1/5."))
+    r = run(JARGON_AD, registry, catalogue, judge)["R9"]
+    assert r.result == "uncertain"
+    assert r.evidence is None
+
+
+def test_other_rules_keep_their_llm_verdict(registry, catalogue):
+    # The hook narrows only R9: R17's fail without a rating still stands.
+    text = "Jesteśmy nadzorowani przez KNF."
+    judge = FakeJudge(LlmVerdict("R17", "fail", text, "Sugeruje aprobatę nadzoru."))
+    r = run(text, registry, catalogue, judge)["R17"]
+    assert "R17" in judge.asked()
+    assert r.result == "fail"
+
+
+@pytest.mark.parametrize("params", [
+    {"max_avg_sentence_words": 0}, {"max_avg_sentence_words": "dużo"}, {"max_avg_sentence_words": True},
+    {"max_jargon_share": 0}, {"max_jargon_share": 1.5}, {"min_jargon_hits": 0}, {"min_jargon_hits": 1.5},
+    {"jargon_patterns": ["("]},
+])
+def test_r9_bad_params_rejected(tmp_path, params):
+    with pytest.raises(CatalogueError, match="R9"):
+        load_with(tmp_path, "R9", params)
+
+
+# ---- scoring: a rules-only R9 uncertain carries no evidence (Damian, change analytics-m2-text-rules) -------
+
+from investwatch_analytics.modules.m2 import score  # noqa: E402
+
+
+def results(text: str, registry, catalogue, judge=None) -> list:
+    return list(run(text, registry, catalogue, judge).values())
+
+
+def test_r9_declares_llm_only_uncertain(catalogue):
+    assert catalogue.get("R9").llm_only_uncertain is True
+    assert [s.id for s in catalogue.specs if s.llm_only_uncertain] == ["R9"]
+
+
+def test_rules_only_r9_uncertain_does_not_change_the_score(registry, catalogue):
+    rules = results(JARGON_AD, registry, catalogue)
+    r9 = next(r for r in rules if r.rule_id == "R9")
+    assert r9.result == "uncertain" and r9.method == "rule"
+    without_r9 = [r for r in rules if r.rule_id != "R9"]
+    assert score(rules, catalogue) == score(without_r9, catalogue)
+    assert score(rules) != score(without_r9)  # without the catalogue every uncertain counts, as before
+
+
+def test_llm_r9_fail_raises_the_score(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R9", "fail", JARGON, "Ocena: 1/5. Żargon."))
+    rules = results(JARGON_AD, registry, catalogue, judge)
+    assert next(r for r in rules if r.rule_id == "R9").result == "fail"
+    without_r9 = [r for r in rules if r.rule_id != "R9"]
+    assert score(rules, catalogue) == score(rules) > score(without_r9, catalogue)
+
+
+def test_llm_r9_uncertain_still_counts(registry, catalogue):
+    judge = FakeJudge(LlmVerdict("R9", "fail", JARGON, "Ocena: 3/5. Średnio."))
+    rules = results(JARGON_AD, registry, catalogue, judge)
+    r9 = next(r for r in rules if r.rule_id == "R9")
+    assert r9.result == "uncertain" and r9.method == "hybrid"
+    as_pass = [r.model_copy(update={"result": "pass"}) if r.rule_id == "R9" else r for r in rules]
+    assert score(rules, catalogue) == score(rules) > score(as_pass, catalogue)
+
+
+def test_rules_only_r9_pass_is_scored(registry, catalogue):
+    rules = results(f"Reklama. Otwórz rachunek i inwestuj w akcje z GPW. {PL_WARNING}", registry, catalogue)
+    assert next(r for r in rules if r.rule_id == "R9").result == "pass"
+    assert score(rules, catalogue) == score(rules)
+
+
+def test_other_rules_uncertain_still_counts(registry, catalogue):
+    # R2's rules-only uncertain (a label only mid-text) is unaffected by the flag.
+    filler = " ".join(f"Zdanie numer {n} o ofercie." for n in range(6))
+    rules = results(f"{filler} To jest reklama. {filler}", registry, catalogue)
+    assert next(r for r in rules if r.rule_id == "R2").result == "uncertain"
+    as_pass = [r.model_copy(update={"result": "pass"}) if r.rule_id == "R2" else r for r in rules]
+    assert score(rules, catalogue) == score(rules) > score(as_pass, catalogue)
+
+
+@pytest.mark.parametrize("value", ["yes", 1, None])
+def test_llm_only_uncertain_must_be_a_boolean(tmp_path, value):
+    data = yaml.safe_load(DEFAULT_CATALOGUE.read_text(encoding="utf-8"))
+    next(e for e in data["rules"] if e["id"] == "R9")["llm_only_uncertain"] = value
+    path = tmp_path / "rules.yaml"
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    with pytest.raises(CatalogueError, match="R9"):
+        Catalogue.load(path)

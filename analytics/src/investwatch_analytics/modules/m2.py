@@ -25,13 +25,26 @@ FAIL_VALUE = {"fail": 1.0, "uncertain": 0.5, "pass": 0.0}
 EXCERPT_MAX = 500
 
 
-def score(rules: list[RuleResult]) -> float:
-    """Σ(weight·fail) / Σ(weight·applicable); uncertain = half a fail; 0 when nothing applies."""
-    applicable = [r for r in rules if r.result in FAIL_VALUE]
+def score(rules: list[RuleResult], catalogue: Catalogue | None = None) -> float:
+    """Σ(weight·fail) / Σ(weight·applicable); uncertain = half a fail; 0 when nothing applies.
+
+    With the catalogue, a rules-only `uncertain` of a rule marked `llm_only_uncertain` (R9) is not scored at all: it
+    has no evidence of an infringement, so only an LLM verdict for it counts.
+    """
+    applicable = [r for r in rules if r.result in FAIL_VALUE and not _unscored(r, catalogue)]
     total = sum(WEIGHTS[r.severity] for r in applicable)
     if not total:
         return 0.0
     return round(sum(WEIGHTS[r.severity] * FAIL_VALUE[r.result] for r in applicable) / total, 3)
+
+
+def _unscored(r: RuleResult, catalogue: Catalogue | None) -> bool:
+    if catalogue is None or r.result != "uncertain" or r.method != "rule":
+        return False
+    try:
+        return catalogue.get(r.rule_id).llm_only_uncertain
+    except KeyError:
+        return False
 
 
 def build_finding(
@@ -61,7 +74,7 @@ def build_finding(
         id=new_id(),
         document_id=ctx.doc.id,
         module="M2",
-        score=score(rules),
+        score=score(rules, catalogue),
         status="new",
         title=title,
         summary=summary,

@@ -10,12 +10,18 @@ Scope approved by Damian ("dokładamy brakujące reguły, start"). R10 first, th
 
 ## 2. R9 comprehensibility (LLM-first)
 
-- [ ] 2.1 Failing tests: jargon warning rules-only `uncertain` naming the hits, plain and CFD warnings `pass` and not deferred, stub-judge `fail` with `Ocena: 1/5` and verified quote → `fail` / `hybrid`, `fail` with `Ocena: 3/5` or no rating → `uncertain`, unverified quote → `uncertain`, no warning `not_applicable`, bad params rejected at load
-- [ ] 2.2 `Rule.accept_llm_verdict` hook in `_refine`, R9 class, catalogue entry with params and `llm:` block, new `KNOWN_PARAMS` with validation; tests green
-- [ ] 2.3 Mutation check
+- [x] 2.1 Failing tests: jargon warning rules-only `uncertain` naming the hits, plain and CFD warnings `pass` and not deferred, stub-judge `fail` with `Ocena: 1/5` and verified quote → `fail` / `hybrid`, `fail` with `Ocena: 3/5` or no rating → `uncertain`, unverified quote → `uncertain`, no warning `not_applicable`, bad params rejected at load
+- [x] 2.2 `Rule.accept_llm_verdict` hook in `_refine`, R9 class, catalogue entry with params and `llm:` block, new `KNOWN_PARAMS` with validation; tests green
+- [x] 2.3 Mutation check. `mutations: 16 tried, 16 caught` (each of the three signal conditions, pass when raised, worst-warning evidence, no-warning branch, fail rating boundary both ways, fail without a rating, pass rating boundary, narrowing removed, rating regex digit range, hook not called, default hook narrowing other rules, positive-integer and share-range param checks). The first run left 2 survivors (worst-warning evidence, the rating regex); a two-warning test and an `Ocena: 1/3` case were added. Gold rules-only: R9 strict P/R 1.0/0.0 (never fails without the LLM, by design), review P/R 1.0/1.0; M2 at 0.1 unchanged at F1 0.857, but the best F1 moves to 0.884 at 0.05 (follow-ups F2)
 
-## 3. Close
+## 3. Rules-only R9 uncertain is not scored (Damian)
 
-- [ ] 3.1 Gold evaluation rules-only before / after (and `--llm` if available); per-rule P/R and M2 at 0.1 in the PR body; `test_eval_thresholds` result reported to the coordinator
-- [ ] 3.2 Docs (`.docs/analytics-plan.md` M2 rule list, `.docs/status/` analytics line if present), AI log, `docs-check`
-- [ ] 3.3 Archive the change (last commit)
+- [x] 3.1 Failing tests: the flag is declared on R9 only and validated as a boolean; a rules-only R9 `uncertain` leaves the score unchanged; an LLM `fail` and an LLM `uncertain` are scored; a rules-only R9 `pass` and R2's `uncertain` are scored as before
+- [x] 3.2 `RuleSpec.llm_only_uncertain`, load validation, `modules/m2.score(rules, catalogue)`, R9 `llm_only_uncertain: true`; tests green, `test_eval_thresholds` green at 0.1
+- [x] 3.3 Mutation check. `mutations: 8 tried, 8 caught` (flag ignored, method check, result check, flag on every rule, finding scored without the catalogue, flag not read from YAML, boolean validation, R9 flag off). The first run left 2 survivors (method check, result check): the score assertions compared against a pass, not the no-catalogue score; they now assert equality with `score(rules)`, and a rules-only R9 `pass` case was added
+
+## 4. Close
+
+- [ ] 4.1 Gold evaluation rules-only before / after (and `--llm` if available); per-rule P/R and M2 at 0.1 in the PR body; `test_eval_thresholds` result reported to the coordinator
+- [ ] 4.2 Docs (`.docs/analytics-plan.md` M2 rule list, `.docs/status/` analytics line if present), AI log, `docs-check`
+- [ ] 4.3 Archive the change (last commit)
