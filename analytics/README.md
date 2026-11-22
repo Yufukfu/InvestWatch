@@ -14,12 +14,13 @@ A document gives at most one finding per module ([`modules/router.py`](src/inves
 
 | Who publishes | Registry | Module |
 |---|---|---|
+| the supervisor or an official register (page or author profile host on `knf.gov.pl`, `uknf.gov.pl`, `gov.pl` or a subdomain; `OFFICIAL_SOURCE_DOMAINS` replaces the list) | — | nothing (`official_source`): it warns about firms, it does not advertise them |
 | a registered firm (the page host or the author's profile host is its domain; any platform; a handle alone is not enough) | — | M2 for that firm |
 | a foreign firm without a Polish branch (`foreign_no_branch`), its own material | — | nothing (`out_of_scope_m2_foreign_no_branch`): M2 is for firms registered in Poland, including Polish branches |
 | `firm_own` source | firm named or page on a firm domain | M2 |
-| `firm_own` source | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| `firm_own` source | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`); service vocabulary alone is no offer |
 | a third party | firm named in the text or linked | M1 (a foreign firm without a Polish branch only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
-| a third party | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| a third party | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`) |
 
 M1 score: σ(bias + Σ w·x), how certain this is a third-party ad of the firm. M3 score: the same form, capped at 0.4 unless S3.4 (a recommendation to buy, sell or hold financial instruments) is found; M3 means "may indicate" investment advice, and the summary says when personalisation (art. 76) is unconfirmed ([ADR 0308](../.docs/decisions/0308-m3-s34-gate.md)). Signals, weights and dictionaries: [`rules/m1_signals.yaml`](src/investwatch_analytics/rules/m1_signals.yaml), [`rules/m3_signals.yaml`](src/investwatch_analytics/rules/m3_signals.yaml). Evidence may quote the author handle, a link or the page URL as well as the text. Routing and the M1/M3 rules read at most the first 200 000 characters (`SCAN_MAX` in `pipeline.py`); firm names are compared after NFKC and removal of zero-width characters, with quotes cut from the original text. Specs: [`m1-third-party-signals`](../openspec/specs/m1-third-party-signals/spec.md), [`m3-unauthorized-advice-signals`](../openspec/specs/m3-unauthorized-advice-signals/spec.md).
 
@@ -95,6 +96,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 |---|---|---|
 | `REGISTRY_CSV` | `registry/knf.csv` (the real KNF register snapshot; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | firm registry, files and refresh in [`registry/README.md`](registry/README.md) |
 | `LOG_LEVEL` | `INFO` | log level |
+| `OFFICIAL_SOURCE_DOMAINS` | `knf.gov.pl,uknf.gov.pl,gov.pl` | comma-separated domains (subdomains included) whose pages never become findings (`official_source`); a value replaces the default; a malformed entry stops the worker and the CLI with exit 2 |
 | `DATABASE_URL` | worker: required | Postgres, app role (`postgresql://iw_app:...@postgres:5432/investwatch`) |
 | `REDIS_URL` | worker: required | Redis (`redis://:<password>@redis:6379/0`) |
 | `WORKER_CONSUMER` | hostname | consumer name in the group `analytics` |

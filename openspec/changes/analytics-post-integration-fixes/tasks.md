@@ -22,12 +22,12 @@ Each group is one commit, and its first task is the failing test. No test calls 
 
 ## 4. Evaluation with the LLM (~1 h, mostly waiting)
 
-- [ ] 4.1 `eval/run.py --llm` with hosted Gemma 4 (`gemma-4-31b-it`, or `gemma-4-26b-a4b-it` on repeated 503; record which); the key is never printed
-- [ ] 4.2 Per module: P/R/F1 at the defaults, the best-F1 threshold, the plateau and the number of cases, sent to the coordinator; defaults unchanged
+- [x] 4.1 `eval/run.py --llm` with hosted Gemma 4 (`gemma-4-31b-it`, or `gemma-4-26b-a4b-it` on repeated 503; record which); the key is never printed
+- [x] 4.2 Per module: P/R/F1 at the defaults, the best-F1 threshold, the plateau and the number of cases, sent to the coordinator; defaults unchanged. Run 1 used `gemma-4-31b-it` (1 of 69 documents with the LLM: 503s, then the breaker). Run 2 used `gemma-4-26b-a4b-it` with `LLM_BREAKER_FAILURES=1000`: 27 calls, 5 OK, 10 returned 503, 1 timed out, and 11 were HTTP 200 'not a JSON object' (follow-ups F2-F3). The rows below are from run 2. M1: n=18, P/R/F1 1.000/0.800/0.889, best 0.65, plateau [0.40, 0.65]. M2: n=35, 0.933/0.609/0.737, best 0.10, plateau [0.05, 0.10]. M3: n=18, 1.000/0.300/0.462, best 0.25, plateau [0.25, 0.25]
 
 ## 5. Closing
 
-- [ ] 5.1 Docs (`iw-docs-update`): analytics plan §6, `.env.example`, the domain status file, `docs-check` clean
-- [ ] 5.2 AI log row (`iw-ai-log`)
+- [x] 5.1 Docs (`iw-docs-update`): analytics plan §6, `.env.example`, the domain status file, `docs-check` clean
+- [x] 5.2 AI log row (`iw-ai-log`)
 - [ ] 5.3 Final review (`iw-pr-review`)
 - [ ] 5.4 Archive the change (last commit)
