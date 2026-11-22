@@ -97,6 +97,8 @@ Rule engine: each rule is a class with `applies(doc) → bool` and `evaluate(doc
 | R17 Implying supervisory approval | text + LLM | mention of KNF/ESMA/"supervised" → LLM: does it suggest product approval | **P0** |
 | R18 Supervision as a safety argument | text + LLM | as above + safety words ("bezpieczna", "gwarantowana", "pewna") in the same sentence | **P0** |
 
+Built (2026-11-22): R1-R4, R6, R11, R12a, R12b, R14-R18 (R11, R12a, R12b, R15, R16 in change `analytics-m2-p1-rules`: rules-first, R11, R12a and R15 with an `llm:` block for their uncertain case). One owner rule per art. 44 element, R15 reports every forecast and R11 only violations ([ADR 0315](decisions/0315-m2-art44-element-ownership.md)). Not built: R13 is visual and needs `blocks` (#29), like R5, R7 and R8; R9 has no cheap rules signal and waits for an LLM-first change; R10 was not built in `analytics-llm-p0`.
+
 For social media content (no `blocks`) the visual rules return `not_applicable`; for images in a post – OCR (`tesseract` / `easyocr`) as P2.
 
 `score_M2 = Σ(weight_r · fail_r) / Σ(weight_r · applicable_r)`, weights: high = 3 (R3, R6, R14, R17, R18), medium = 2, low = 1.

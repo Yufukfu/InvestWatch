@@ -112,7 +112,7 @@ Stage 3, the lowest priority (Damian). Do not start before `analytics-llm-p0` ta
 
 ## 9. Closing
 
-- [ ] 9.1 Apply the iw-docs-update skill:
+- [x] 9.1 Apply the iw-docs-update skill (done: plan §5 status paragraph, README status, rule list and M2 evaluation row, ADR 0315 listed, AI log row; no analytics file exists in `.docs/status/`, so none was touched; docs-check ok):
   - `.docs/analytics-plan.md` §5: the status of R11, R12a, R12b, R15 and R16; R13 marked visual (#29); R9 marked LLM-first;
   - `analytics/README.md`: the rule list;
   - list ADR 0315 and check that it is listed in `.docs/decisions/README.md`;
