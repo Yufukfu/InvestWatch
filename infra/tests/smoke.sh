@@ -5,7 +5,7 @@
 # used to read `docker compose config --format json`).
 #
 #   infra/tests/smoke.sh                 all groups except the LLM download
-#   infra/tests/smoke.sh parallel redis  selected groups
+#   infra/tests/smoke.sh parallel redis  selected groups (scale builds the scraper and analytics images)
 #   SMOKE_LLM=1 infra/tests/smoke.sh llm also pulls gemma3:4b and bge-m3 (several GB)
 set -euo pipefail
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
@@ -420,9 +420,40 @@ group_join() {
   check "a failed minio-init blocks the module" init_failure_blocks_module "$f"
 }
 
+# Scale-out (spec openspec/changes/architecture-scale-out, scale-out): the scalable services run as several replicas
+# of the real root stack. Builds the scraper and analytics images for this project, so the first run takes minutes.
+ROOT_FILE="$ROOT/compose.yaml"
+sc() { local p=$1; shift; docker compose -p "$p" --env-file "$TMP/$p.env" -f "$ROOT_FILE" "$@"; }
+scale_no_fixed_names() { # a container_name or a host port makes `--scale` fail or collide
+  sc "$1" config --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s).services;let bad=0;for(const k of ["worker","analytics"]){const v=j[k];if(v.container_name||(v.ports||[]).length){console.log(k+": container_name or ports set");bad=1}}process.exit(bad)})'
+}
+scale_replicas_run() { # two of each running, all healthy
+  local p=$1 w a
+  sc "$p" up -d --wait --wait-timeout 400 --scale worker=2 --scale analytics=2 worker analytics || return 1
+  w=$(sc "$p" ps -q --status running worker | wc -l); a=$(sc "$p" ps -q --status running analytics | wc -l)
+  echo "running worker=$w analytics=$a"; [ "$w" -eq 2 ] && [ "$a" -eq 2 ]
+}
+scale_analytics_consumers() { # every replica is its own consumer of the group (consumer name = container hostname)
+  local p=$1 out c h bad=0
+  out=$(sc "$p" exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XINFO CONSUMERS iw:documents analytics')
+  for c in $(sc "$p" ps -q analytics); do
+    h=$(docker inspect -f '{{.Config.Hostname}}' "$c")
+    case $out in *"$h"*) echo "consumer $h present" ;; *) echo "consumer $h MISSING"; bad=1 ;; esac
+  done
+  return $bad
+}
+
+group_scale() {
+  local p="iw-smoke-s-$RUN_ID"
+  PROJECTS+=("$p"); new_env "$p" 18452 18089 >/dev/null
+  check "worker and analytics have no container_name and no host port" scale_no_fixed_names "$p"
+  check "two worker and two analytics replicas run and are healthy" scale_replicas_run "$p"
+  check "each analytics replica is its own consumer of iw:documents" scale_analytics_consumers "$p"
+}
+
 # ---------------------------------------------------------------- main
 
-GROUPS_ALL=(parallel env redis minio networks llm join)
+GROUPS_ALL=(parallel env redis minio networks llm join scale)
 [ $# -gt 0 ] && SELECTED=("$@") || SELECTED=("${GROUPS_ALL[@]}")
 docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1 || docker pull -q "$PROBE_IMAGE" >/dev/null
 for g in "${SELECTED[@]}"; do log "== $g"; "group_$g"; done

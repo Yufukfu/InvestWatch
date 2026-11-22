@@ -2,13 +2,13 @@
 
 ## 1. Run it first (evidence before any doc)
 
-- [ ] 1.1 Failing probe: write the scale probe in `infra/tests/smoke.sh` for two `analytics` and two `worker` replicas (running, distinct consumers in `XINFO CONSUMERS iw:documents analytics`); run it and confirm it fails or passes for the stated reason
-- [ ] 1.2 On a clean stack run `docker compose up -d --wait --scale worker=3 --scale analytics=2`; record `docker compose ps`, the consumer list, and one scan of several sources; note any error, duplicate findings row or lost entry
-- [ ] 1.3 Kill one `analytics` replica mid-batch and confirm another claims its pending entries; record `XPENDING`
-- [ ] 1.4 Read the analytics code paths shared across replicas (MinHash near-dup groups, `iw:stats:gate`, LLM cache) and check them against a two-replica run; open an issue for Damian for anything that duplicates or loses work
-- [ ] 1.5 Duplicate `scheduler` and `gateway` by mistake and record what happens
-- [ ] 1.6 Two `api` replicas through the gateway: try a browser Socket.IO session with the default transports; record whether the session survives and events arrive (the decision-2 gate)
-- [ ] 1.7 Mutation check; line reads `mutations: N tried, N caught` (add a `container_name` to `worker`, then to `analytics`: the probe must go red)
+- [x] 1.1 Failing probe: write the scale probe in `infra/tests/smoke.sh` for two `analytics` and two `worker` replicas (running, distinct consumers in `XINFO CONSUMERS iw:documents analytics`); run it and confirm it fails or passes for the stated reason
+- [x] 1.2 On a clean stack run `docker compose up -d --wait --scale worker=3 --scale analytics=2`; record `docker compose ps`, the consumer list, and one scan of several sources; note any error, duplicate findings row or lost entry
+- [x] 1.3 Kill one `analytics` replica mid-batch and confirm another claims its pending entries; record `XPENDING`
+- [x] 1.4 Read the analytics code paths shared across replicas (MinHash near-dup groups, `iw:stats:gate`, LLM cache) and check them against a two-replica run; open an issue for Damian for anything that duplicates or loses work
+- [x] 1.5 Duplicate `scheduler` and `gateway` by mistake and record what happens
+- [x] 1.6 Two `api` replicas through the gateway: try a browser Socket.IO session with the default transports; record whether the session survives and events arrive (the decision-2 gate)
+- [x] 1.7 Mutation check; mutations: 3 tried, 3 caught (add a `container_name` to `worker`, then to `analytics`: the probe must go red)
 
 ## 2. Fix only what the run broke
 

@@ -14,7 +14,7 @@ Say which InvestWatch services can run with more than one replica on one host, s
 
 #### Scenario: Analytics replicas are separate consumers
 - **WHEN** two `analytics` replicas run and documents are published on `iw:documents`
-- **THEN** `XINFO CONSUMERS iw:documents analytics` lists two consumers with different names, and no document produces two findings rows for the same `(document_id, module)`
+- **THEN** each replica's hostname is a consumer of the group in `XINFO CONSUMERS iw:documents analytics` (stale names of replaced replicas may also be listed), and no document produces two findings rows for the same `(document_id, module)`
 
 #### Scenario: A replica stops mid-work
 - **WHEN** one `analytics` replica is killed while it holds unacknowledged entries
@@ -40,7 +40,7 @@ The scale-out documentation SHALL list every service of the root stack as scalab
 - **THEN** the second replica fails to start because the host port is taken, and the documentation says so
 
 ### Requirement: The api scales only if its realtime path does
-`api` SHALL be documented as scalable only after a run with two replicas behind the gateway shows that the dashboard still receives `finding.*` events and keeps one Socket.IO session across HTTP long-polling requests and the upgrade. Otherwise it SHALL be documented as single-instance with that reason.
+`api` SHALL be documented as scalable only after a run with two replicas behind the gateway shows that requests are spread over both and the dashboard still receives `finding.*` events and keeps one Socket.IO session across HTTP long-polling requests and the upgrade. Otherwise it SHALL be documented as single-instance with that reason (on 2026-11-22 the gateway sent every request to one replica, see `evidence.md`).
 
 #### Scenario: Two api replicas, one browser session
 - **WHEN** two `api` replicas run and a browser connects to `/socket.io` through the gateway
