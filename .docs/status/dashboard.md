@@ -41,4 +41,3 @@ Covers `web/` and `infra/`; whoever changes them updates this file (owners: [`.g
 ## Blockers and open decisions
 
 - Compose includes the `api` service (`api/compose.yaml`), and the gateway sends `/api` and `/socket.io` to it (`infra/gateway/Caddyfile`). The `npm run dev` server still proxies to the contract mock server started by hand (see `web/README.md`) until the api has real data; switching the dev server over is Kacper's task, before the demo. Team-wide entry in `.docs/STATUS.md`.
-- Root `README.md` exists; its Quick Start is pending the deployment ADR. Per-service READMEs are stubs.

@@ -20,7 +20,7 @@ Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEO
 
 - Social R&D (ADR 0109, docs-only PR): X tweets are collectable with a dedicated account's cookies (Playwright reading the page's GraphQL); YouTube metadata works anonymously through our fetch layer; YouTube transcripts work through audio plus local Whisper (residential proxy, Node 22, PO token server), not through the caption URL (429 from the home IP). Specs `scraper-social-youtube` (metadata only) and `scraper-social-x` follow.
 
-- Hand-in (issues #77 and #74, scraper part): `.docs/presentation-scraper.md` has five slides with speaker notes (architecture, safety, coverage on the 223 documents of #78, add-a-source example, AI-assisted process), every number sourced from `origin/main`; X and YouTube collectors and re-scan tracking are labelled "in progress, not merged". Docs-only, no OpenSpec change.
+- Hand-in (issues #77 and #74, scraper part): `.docs/presentation-scraper.md` has five slides with speaker notes (architecture, safety, coverage on the 223 documents of #78, add-a-source example, AI-assisted process), every number sourced from `origin/main`; X and YouTube collectors and re-scan tracking were labelled "in progress, not merged" then; both are merged now (#128, #108) and the slides say so. Docs-only, no OpenSpec change.
 
 ## Demo rehearsal (issue #78)
 

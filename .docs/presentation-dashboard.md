@@ -13,13 +13,13 @@ Every UI label below is copied from `web/src/` on `main` at `ba32bd27` (2026-11-
      scraper ─▶ PostgreSQL documents + MinIO raw HTML ─▶ Redis Stream iw:documents
      analytics (M1, M2, M3, rules first, LLM second) ─▶ PostgreSQL findings + Redis iw:events
      api (FastAPI REST + Socket.IO) ─▶ HTTPS gateway (Caddy, :8443) ─▶ dashboard (React)
-     LLM: any OpenAI-compatible endpoint (hosted Gemma, or local Gemma via Ollama, --profile llm)
+     LLM: any OpenAI-compatible endpoint (hosted DeepSeek Flash by default, ADR 0318, or local Gemma via Ollama, --profile llm)
 ```
 
 - **Separate services, one `docker compose up`:** the root `compose.yaml` only `include:`s each module's own file (`infra/`, `web/`, `api/`, `analytics/`, `scraper/`), so each module also deploys on its own ([ADR 0202](decisions/0202-deployment-topology.md)).
 - **Contracts between modules, not shared code:** `ScrapedDocument`, `Finding`, REST and events are JSON Schema and OpenAPI in `contracts/`, frozen as v1; the dashboard's API client is generated from `contracts/openapi.yaml` ([integration-plan.md](integration-plan.md) §3-§6).
 - **Scales by adding workers:** scraper workers scale with `--scale worker=N` (limits and run lock in Redis); analytics reads `iw:documents` as a consumer group, so several workers can share it ([integration-plan.md](integration-plan.md) §2).
-- **Open source, on-premise:** PostgreSQL, Redis, MinIO, Caddy, Ollama; the only exception is the hosted LLM, which swaps to local Gemma by env only (mentor-approved, [ADR 0304](decisions/0304-llm-serving.md)).
+- **Open source, on-premise:** PostgreSQL, Redis, MinIO, Caddy, Ollama; the only exception is the hosted LLM (DeepSeek Flash by default, ADR 0318), which swaps to local Gemma by env only (mentor-approved, [ADR 0304](decisions/0304-llm-serving.md)).
 
 **Notes:** The scraper knows nothing about analytics, and the dashboard knows only the REST contract and the event names; a module can be rewritten without touching the others. Only the gateway publishes a host port (`127.0.0.1:8443`); everything else sits on internal Docker networks. Hardening of each container (non-root, read-only root filesystem, `cap_drop: [ALL]`) is in `.docs/security-audit.md` "Service notes". A drawn diagram for this slide is tracked in #74; until then this text block is the slide.
 
@@ -63,12 +63,12 @@ One page, top to bottom (`web/src/App.tsx`): header with live and health badges,
 - `Zapisz próg` stores it (`PUT /settings/thresholds`); the API derives every finding's risk level on read from that threshold (`high` if `score >= t`, `medium` if `score >= t - 0.2`), so the findings, the summary and future alerts change at once (`Zapisano. Poziomy ryzyka zostały przeliczone.`). `Wróć do obecnego` undoes the preview.
 - The curve comes from the gold-set evaluation that runs on every `docker compose up` (`analytics-eval`) plus the analysts' own labels (`Liczba oznaczonych próbek`).
 
-| M2 threshold (gold set, `GET /api/calibration?module=M2` on `main` a0ad3d13, [demo-analytics.md](demo-analytics.md) §5) | Precision | Recall | Alerts (TP+FP) |
+| M2 threshold (gold set, rules-only run of `main` 61238394 with all 18 rules; [demo-analytics.md](demo-analytics.md) §5) | Precision | Recall | Alerts (TP+FP) |
 |---|---|---|---|
-| 0.10 (default) | 0.944 | 0.739 | 18 |
+| 0.05 (default) | 0.955 | 0.913 | 22 |
+| 0.10 | 0.95 | 0.826 | 20 |
 | 0.25 | 1.00 | 0.609 | 14 |
-| 0.40 | 1.00 | 0.478 | 11 |
-| 0.50 | 1.00 | 0.348 | 8 |
+| 0.40 | 1.00 | 0.304 | 7 |
 
 **Notes:** This is jury criterion "wpływ zmian parametrów progowych na wyniki w panelu kalibracji" made concrete: the numbers in the table are the panel's own data source (synthetic gold set, rules only; see the analytics section). The panel needs labelled data; with none it says `Za mało oznaczonych danych, aby skalibrować ten moduł.` Raising a threshold is a precision-for-recall trade the analyst sees before saving, and saving is explicit and global, with a warning that it changes every finding of that module.
 
@@ -86,13 +86,57 @@ One page, top to bottom (`web/src/App.tsx`): header with live and health badges,
 
 ---
 
+## 6. Advertiser to firm: who promotes whom
+
+The `Powiązania` page (`#powiazania`, module M1, change `advertiser-firm-view`, PR #129) answers "which third parties advertise which registered firms, and who keeps doing it".
+
+- **Graph:** an inline-SVG graph of advertisers to KNF-registry firms; edge thickness is the number of findings for the pair, repeat advertisers are red and also carry a text label.
+- **Repeat advertiser:** 2 or more distinct matched firms, or 5 or more findings.
+- **Drill-down:** an edge, a firm or an advertiser opens a relation page with its findings; a row opens the finding detail with the quote and the signals.
+- **Filters and a table view:** period, risk, minimum findings, repeat only; a `Graf | Tabela` toggle and a `Najczęstsi reklamodawcy` table that highlights an advertiser's edges.
+- **Cheap by design:** built in the browser from `GET /findings?module=M1&page_size=200` (at most 3 pages, 600 findings, the cap is stated on screen); no new endpoint, contract change or dependency.
+
+**Notes:** Source: `web/src/features/advertisers/`, `.docs/status/dashboard.md`. Limit to say aloud: on real data we did not check how many advertisers repeat, and on the static contract mock none does (4 advertisers, one finding each), so show it on the demo stack and read the KPI sentence, not a prepared claim. The graph is a view of M1 findings, not a separate analysis.
+
+---
+
+## 7. How we build with AI: spec, test, review, record, human merge
+
+Every change takes the same path; the guards that matter are code, not prompts.
+
+1. **Spec:** an OpenSpec proposal that a human approves.
+2. **Test first:** a failing test, then the code, then a hand-written mutation check on every guard.
+3. **Reviewer agent:** the read-only `iw-reviewer` on each task group's own pinned `BASE..HEAD`; every finding is verified against the code before it is fixed or rejected.
+4. **Docs and log:** `iw-docs-update` with `docs-check`, an AI-log entry, the change archived as the last commit.
+5. **Human merge:** the agent may push its own branch and open the PR (ADR 0207); the human approves and merges every PR.
+
+On `main` at `313c625b`: **89** archived OpenSpec changes, **42** specs, **42** ADRs, **134** AI-log entries, **118** merged PRs, **1276** commits, 7 project skills (`iw-*`) and one reviewer agent.
+
+**Denied by the tested git hook** (`.claude/hooks/git-guard.js`): force push, any push to `main`, `--all`/`--mirror`, `reset --hard`, whole-tree checkout, amending a pushed commit; on commit a staged `.env`, `console.log` in JS/TS, service code with no active OpenSpec change, and contract edits after the freeze; and, from ADR 0207, any remote but `origin`, rewiring a remote, deleting or updating a branch other than the current one, and merging or approving through `gh api`.
+
+**Notes:** Sources: `.claude/SDLC.md`, `.claude/CODE_REVIEW.md`, ADR 0207, `.docs/ai-workflow.md` (the log, including rules that misled us). Counts: `ls openspec/changes/archive | wc -l`, `ls openspec/specs | wc -l`, `ls .docs/decisions | grep -c '^0[1-3]'`, `ls .docs/ai-log | grep -c '^20'`, `gh pr list --state merged --limit 500 --json number -q length`, `git rev-list --count HEAD`. Honest limits: the hook reads command text only, so it catches mistakes, not a determined agent, and every `IW_*` escape used is reported in the PR body; CI is advisory, not a required check. Scraper-specific evidence (what review caught that green tests had not) is on scraper slide 5.
+
+---
+
+## 8. What is unique
+
+- **Rules first, LLM second:** deterministic rules decide what they can; the model only settles the doubtful cases and must quote the document, and the quote is verified against the text.
+- **A legal basis on every finding:** M2 rules carry the article of Delegated Regulation 2017/565 (M3: art. 76), shown next to the evidence.
+- **Calibration that acts:** saving a threshold in the dashboard recomputes every finding's risk level at once, with precision, recall and TP/FP/FN/TN shown beside it.
+- **A swappable model:** the hosted LLM (DeepSeek Flash by default, ADR 0318) becomes a local open model (Gemma via Ollama) by environment variables only; without any model the system runs on rules.
+- **Advertiser to firm graph:** repeat third-party promoters of registered firms in one view (slide 6).
+
+**Notes:** Each bullet maps to code or an ADR: `llm-analysis` spec and ADR 0304/0318 (quote check, env-only swap), `m2_rules.yaml` (`legal_basis`), `web-calibration` spec (`PUT /settings/thresholds`). Do not call the numbers real-world accuracy: the gold set is synthetic.
+
+---
+
 # Demo flow (live demo and 3-minute video)
 
 Not slides. The live order follows the jury's criteria in challenge §6: scraping works, classification and the threshold, UI and real-time alerts.
 
 ## Before the demo (once, about 30 min ahead)
 
-1. **On the pre-warmed demo stack (`iw-demo`), do not run `down -v` or rebuild:** the LLM verdicts live in that stack's Redis cache and the hosted Gemma mostly returns 503s, so a fresh stack would show rules-only findings ([demo-analytics.md](demo-analytics.md) §0 and §4). `docker compose restart` is safe. Only on a new machine: `./scripts/init-env.sh` if there is no `.env`, then `docker compose up --build -d`.
+1. **On the pre-warmed demo stack (`iw-demo`), do not run `down -v` or rebuild:** the LLM verdicts live in that stack's Redis cache and the demo stack's cache holds verdicts from the old hosted default, Gemma on the Gemini API, which mostly returned 503s (the default is DeepSeek Flash since ADR 0318, but the cache was filled before), so a fresh stack without an LLM key would show rules-only findings ([demo-analytics.md](demo-analytics.md) §0 and §4). `docker compose restart` is safe. Only on a new machine: `./scripts/init-env.sh` if there is no `.env`, then `docker compose up --build -d`.
 2. LLM: the demo findings come from the cache (demo-analytics.md §4 lists their ids). If the cache is gone, either run local Gemma (`docker compose --profile llm up -d`, runbook in the analytics section, slide 7) or accept rules-only findings and say so.
 3. Live-alert source: XTB forex (`https://www.xtb.com/pl/forex`, id in demo-analytics.md §4) has never been scanned on the demo stack, so scanning it live yields a new M2 finding. It is not cached: rules-only it is built in seconds, but with a slow Gemini it can take up to the 50 s document budget (ADR 0317). Its cron, and those of comparic and XTB IKE, are cleared on that stack, so no scheduled rescan stores an uncached version before 10:30.
 4. Open https://localhost:8443 in a browser that trusts the local certificate (`infra/README.md`), check `System działa` and `Na żywo` in the header.
@@ -110,9 +154,9 @@ Not slides. The live order follows the jury's criteria in challenge §6: scrapin
 | 5 | In `Decyzja analityka` set `W analizie`, type a note, click `Zapisz` | `Zapisano.`; the status changes in the list behind | "Status workflow; the change is broadcast to other open dashboards (`finding.updated`)." |
 | 6 | Close the detail; in the filters pick `Moduł` = `M1 · Finfluencerzy`, `Poziom ryzyka` = `Wysoki` | only high-risk M1 findings (in #78: the Take Profit guide, the Comparic ranking, the icobench list) | "Filters stay in the URL, so this view is a link." |
 | 7 | Click `Wyczyść filtry`, then `Moduł` = `M3 · Usługi bez zezwolenia` | M3 findings, e.g. the Moneteo review (high, 0.50 in #78) | "Shadow advisory: firms outside the KNF register offering advice." |
-| 8 | Scroll to `Kalibracja progów`, pick `M2`, move the slider from 0.10 to 0.25 | TP/FP/FN/TN, precision 0.944 → 1.00, recall 0.739 → 0.609, alerts 18 → 14 (gold set), the chart marker moves | "Threshold up: fewer false alarms, more misses. Preview only, nothing changed yet." |
-| 9 | Optional: click `Zapisz próg` | `Zapisano. Poziomy ryzyka zostały przeliczone.`; M2 findings scoring 0.10-0.25 drop from high, so the `Wysokie ryzyko` card may go down | The XTB IKE finding (0.368) stays high at 0.25. Do not save 0.40: XTB IKE would drop. How far the card moves depends on the stack's other M2 scores; read it at the rehearsal. |
-| 10 | `Wróć do obecnego` is only for the preview; if you saved, move back to 0.10 and `Zapisz próg` again | the card goes back | "The threshold is the analyst's choice, measured, not hard-coded." |
+| 8 | Scroll to `Kalibracja progów`, pick `M2`, move the slider from the default 0.05 to 0.25 | TP/FP/FN/TN, precision 0.955 → 1.00, recall 0.913 → 0.609, alerts 22 → 14 on a build of current `main` (a stack built before ADR 0319 starts at 0.10; read the panel, not this cell), the chart marker moves | "Threshold up: fewer false alarms, more misses. Preview only, nothing changed yet." |
+| 9 | Optional: click `Zapisz próg` | `Zapisano. Poziomy ryzyka zostały przeliczone.`; M2 findings scoring between the old and the new threshold drop from high, so the `Wysokie ryzyko` card may go down | The XTB IKE finding (0.368) stays high at 0.25. Do not save 0.40: XTB IKE would drop. How far the card moves depends on the stack's other M2 scores; read it at the rehearsal. |
+| 10 | `Wróć do obecnego` is only for the preview; if you saved, move back to 0.05 and `Zapisz próg` again | the card goes back | "The threshold is the analyst's choice, measured, not hard-coded." |
 
 ## 3-minute video script
 
