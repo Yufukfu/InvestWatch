@@ -97,9 +97,10 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
-      # The on-premise variant from ADR 0209: download the databases, then match locally, no per-package query.
+      # The on-premise variant from ADR 0209: download the databases, then match locally. --offline also turns off
+      # every other network feature (registry resolution), not only the vulnerability lookups.
       - name: Download the databases and scan offline
-        run: docker run --rm -v "$PWD:/src:ro" "$IMAGE_OSV" scan source --offline-vulnerabilities --download-offline-databases -r /src
+        run: docker run --rm -v "$PWD:/src:ro" "$IMAGE_OSV" scan source --offline --download-offline-databases -r /src
 
   pip-audit:
     name: Python dependencies (pip-audit, ${{ matrix.python }})

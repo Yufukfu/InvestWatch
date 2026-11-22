@@ -38,8 +38,9 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
   - ADR 0209 is not edited (accepted). The new facts go in the runbook and the status file.
   - `.docs/status/dashboard.md`
   - add the `iw-ai-log` row
-- [ ] 4.2 Run `iw-pr-review` and fix real findings, with the reviewer told not to run Docker or scans locally
-- [ ] 4.3 Put the "Security scans" section in the PR body with the Actions run links and times
+- [x] 4.2 Run `iw-pr-review` and fix real findings, with the reviewer told not to run Docker or scans locally
+  - Deterministic checks green (`test-diff-check`: no weakened tests; Gitleaks on the branch range: 8 commits, no leaks). Whole-branch review: 1 blocking finding. The spec said npm advisories below high do not fail "the scan", but OSV-Scanner reads the same lockfile and fails on any advisory, as ADR 0209 intends. Fixed by narrowing the SHALL to the npm audit step. Could-not-check: `--offline-vulnerabilities` leaves registry resolution on, so the offline job now uses the full `--offline` (with `--download-offline-databases`), proven by the re-run on this PR. `mutations: n/a, spec wording and a CLI flag, no guard changed`
+- [x] 4.3 Put the "Security scans" section in the PR body with the Actions run links and times
 
 ## Workflow follow-up
 

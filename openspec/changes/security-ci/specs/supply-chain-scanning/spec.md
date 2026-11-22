@@ -37,7 +37,7 @@ The secret scan SHALL read the full git history of the checked-out ref and fail 
 - **THEN** the workflow fetches the full history before scanning, so the scan never reports a clean result over a single commit
 
 ### Requirement: Dependency scans over every manifest
-The dependency scans SHALL cover every `package-lock.json` and every `requirements*.txt` in the repository. A finding SHALL fail the scan, except npm advisories below high, which are reported but do not fail it. Per ADR 0209 decision 2, only package names and versions leave the runner.
+The dependency scans SHALL cover every `package-lock.json` and every `requirements*.txt` in the repository. Every finding SHALL fail the OSV-Scanner and `pip-audit` scans. The npm audit step SHALL fail on npm advisories of high or critical severity and SHALL report lower ones without failing. Per ADR 0209 decision 2, only package names and versions leave the runner.
 
 #### Scenario: Vulnerable pin
 - **WHEN** a manifest pins a version with a known OSV advisory
