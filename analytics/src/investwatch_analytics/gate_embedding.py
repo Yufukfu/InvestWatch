@@ -93,8 +93,7 @@ class GateEmbedding:
 
     def rescue(self, text: str, content_hash: str | None) -> Rescue:
         if not self.ready:
-            self._degraded(_NOT_BUILT)
-            return Rescue(FALLBACK, False)
+            return Rescue(FALLBACK, False)  # warm() already logged why the centroids are missing
         outcome = self._embed(text, content_hash)
         if outcome.vector is None:
             self._degraded(outcome.status)

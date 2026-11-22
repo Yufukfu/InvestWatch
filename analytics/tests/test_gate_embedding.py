@@ -240,6 +240,18 @@ def test_rescue_without_centroids_is_fallback_and_does_not_embed():
     assert r.path == "dictionary_only_fallback" and not r.passed and r.outcome is None and emb.calls == []
 
 
+def test_rescue_without_centroids_adds_no_log_line_to_the_warm_failure(caplog):
+    clock = Clock()
+    emb = FakeEmbedder(fail={"oferta a": "embed_unavailable"})
+    ge = build(emb, clock=clock)
+    with caplog.at_level(logging.INFO):
+        ge.warm()
+        ge.rescue(DOC, "h1")
+        ge.rescue(DOC, "h2")
+    assert [(r.getMessage(), r.reason) for r in caplog.records if r.getMessage().startswith("embedding gate")] == [
+        ("embedding gate degraded", "embed_unavailable")]
+
+
 def test_rescue_failed_vector_is_fallback_with_outcome():
     ge = ready({})
     ge._embedder.fail = {DOC: "breaker_open"}
