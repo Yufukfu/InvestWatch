@@ -90,13 +90,49 @@ export function newCommitPaths({ git = realGit, dir, headSha, baseSha }) {
   return vsBranch.filter((f) => vsBase.has(f));
 }
 
-/** What the push would carry beyond the PR head: the text diff and messages to scan, and binary files to refuse */
-export function pushedContent({ git = realGit, dir, headSha }) {
-  const numstat = git(['-C', dir, 'diff', '--numstat', '-z', '--no-renames', headSha, 'HEAD']);
-  const binary = numstat.split('\0').filter((l) => /^-\t-\t/.test(l)).map((l) => l.slice(4));
-  const text = git(['-C', dir, 'diff', '--no-renames', '--no-ext-diff', '--no-textconv', headSha, 'HEAD'], { maxBuffer: 16 * 1024 * 1024 });
-  const messages = git(['-C', dir, 'log', '--format=%B', `${headSha}..HEAD`]);
+/**
+ * What the agent's commits add, to scan before the push: text lines and binary files that are new against the
+ * PR head AND against the base recorded at clone time. After a conflict merge, `headSha..HEAD` also carries
+ * everything the base changed since the fork (a test token, a PDF); those are already on the base, not the
+ * agent's, and must not wedge the PR (Adam, PR #48). Messages are the first-parent commits only, for the same reason.
+ */
+export function pushedContent({ git = realGit, dir, headSha, baseSha }) {
+  const binaries = (from) => git(['-C', dir, 'diff', '--numstat', '-z', '--no-renames', from, 'HEAD']).split('\0').filter((l) => /^-\t-\t/.test(l)).map((l) => l.slice(4));
+  const added = (from) => addedLines(git(['-C', dir, 'diff', '--no-renames', '--no-ext-diff', '--no-textconv', '-U0', from, 'HEAD'], { maxBuffer: 64 * 1024 * 1024 }));
+  let binary = binaries(headSha);
+  let lines = added(headSha);
+  if (baseSha) {
+    const onBase = new Set(binaries(baseSha));
+    binary = binary.filter((f) => onBase.has(f));
+    lines = intersect(lines, added(baseSha));
+  }
+  const messages = git(['-C', dir, 'log', '--first-parent', '--format=%B', `${headSha}..HEAD`]);
+  const text = [...lines].map(([f, ls]) => `+++ ${f}\n${ls.join('\n')}`).join('\n');
   return { binary, text: `${text}\n${messages}` };
+}
+
+/** `git diff -U0` output -> Map(file -> added lines, in order) */
+function addedLines(diff) {
+  const out = new Map();
+  let file = null;
+  for (const l of diff.split('\n')) {
+    if (l.startsWith('diff --git ')) file = null;
+    else if (l.startsWith('+++ ')) { file = l === '+++ /dev/null' ? null : l.slice(4).replace(/^b\//, ''); if (file && !out.has(file)) out.set(file, []); }
+    else if (file && l.startsWith('+')) out.get(file).push(l.slice(1));
+  }
+  return out;
+}
+
+/** Per file, the lines added in both diffs (as a multiset: a second copy of a base line is new) */
+function intersect(a, b) {
+  const out = new Map();
+  for (const [f, ls] of a) {
+    const left = new Map();
+    for (const l of b.get(f) || []) left.set(l, (left.get(l) || 0) + 1);
+    const keep = ls.filter((l) => { const n = left.get(l) || 0; if (n) left.set(l, n - 1); return n > 0; });
+    if (keep.length) out.set(f, keep);
+  }
+  return out;
 }
 
 /** The runner pushes, not the session: never force, only to the PR's own branch name */
@@ -151,7 +187,8 @@ export function findEnvFiles({ fs = realFs, mainRoot }) {
   return out;
 }
 
-const MARKER_LINE = /^(<{7}|>{7}|={7})( |$)/m;
+// git labels its start, base and end markers (`<<<<<<< HEAD`); a bare ======= alone is often a heading underline
+const MARKER_LINE = /^(<{7}|\|{7}|>{7}) /m;
 
 /** Merge origin/<base> into the PR branch; returns the files git could not resolve, or why it refused */
 export function startMerge({ git, dir, baseRef }) {
@@ -169,12 +206,16 @@ export function startMerge({ git, dir, baseRef }) {
 }
 
 /** After the session: every conflict resolved and staged, no markers left; then the runner commits the merge */
-export function finishMerge({ fs = realFs, git, dir, files, headRef, baseRef }) {
+export function finishMerge({ fs = realFs, git, dir, files, headRef, baseRef, baseSha }) {
   const unmerged = git(['-C', dir, ...NAMES, '--diff-filter=U']).split('\0').filter(Boolean);
   if (unmerged.length) return `${unmerged.length} file(s) still have unresolved conflicts: ${unmerged.slice(0, 3).join(', ')}`;
   const marked = (files || []).filter((f) => { try { return MARKER_LINE.test(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return false; } });
   if (marked.length) return `conflict markers are left in ${marked.slice(0, 3).join(', ')}`;
   if (fs.existsSync(path.join(dir, '.git', 'MERGE_HEAD'))) git(['-C', dir, 'commit', '--quiet', '--no-edit', '-m', `Merge origin/${baseRef} into ${headRef}`]);
+  // a session that ran `git merge --abort` (or reset) leaves no merge: never report the conflict as resolved
+  if (baseSha) {
+    try { git(['-C', dir, 'merge-base', '--is-ancestor', baseSha, 'HEAD']); } catch { return `HEAD does not contain origin/${baseRef} (${baseSha.slice(0, 12)}): the merge was undone`; }
+  }
   return null;
 }
 

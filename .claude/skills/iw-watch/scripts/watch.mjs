@@ -269,7 +269,7 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (gitSnapshot({ dir: clone.dir }) !== before) return human('the session changed .git/config, .git/hooks or .git/info/attributes; the runner runs no git in this clone');
   const git = safe;
   if (it.kind === 'conflict') {
-    const left = finishMerge({ git, dir: clone.dir, files: it.conflictFiles, headRef: it.headRef, baseRef: it.baseRef });
+    const left = finishMerge({ git, dir: clone.dir, files: it.conflictFiles, headRef: it.headRef, baseRef: it.baseRef, baseSha: clone.baseSha });
     if (left) return human(left);
   }
   const dirty = own ? git(['-C', clone.dir, 'status', '--porcelain']) : '';
@@ -284,7 +284,7 @@ function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   if (leaks(`${body}\n${issueText}`, deps.env)) return human('the reply or the issue contains something that looks like a credential; nothing is posted, check the drafts');
   // the commits are scanned too: a test can write a secret into a fixture or a commit message
   if (own) {
-    const pushed = pushedContent({ git, dir: clone.dir, headSha: clone.head });
+    const pushed = pushedContent({ git, dir: clone.dir, headSha: clone.head, baseSha: clone.baseSha });
     if (pushed.binary.length) return human(`the agent's commits add binary files (${pushed.binary.slice(0, 3).join(', ')}); the runner pushes text only`);
     if (pushed.text.length > 2 * 1024 * 1024) return human('the agent\'s commits are larger than 2 MB; the runner does not push them');
     if (leaks(pushed.text, deps.env)) return human('the agent\'s commits contain something that looks like a credential; nothing is pushed');

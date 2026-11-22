@@ -75,6 +75,12 @@ Adam's fourth review ([6008673170](https://github.com/Yufukfu/InvestWatch/pull/4
 - the probe shows that the sandbox already refuses writes to `.claude/hooks/` and `.git/config`; `.github/` was writable and is now in `denyWrite`;
 - before publishing, the runner checks that the PR is still open and at the cloned head.
 
+Adam's fifth review ([6008900021](https://github.com/Yufukfu/InvestWatch/pull/48#pullrequestreview-6008900021), on e191ab3) found that the pushed-content scan refused every conflict merge whose fork predates a token-shaped test string, a binary or a large file on main, because `headSha..HEAD` also carries what main changed since the fork. Now:
+- the scan covers only lines and binary files that are new against both the PR head and the base sha recorded at clone time, and only first-parent commit messages; what is already on main is not the agent's;
+- a conflict counts as resolved only when the recorded base sha is an ancestor of `HEAD`, so a session that runs `git merge --abort` gets no "resolved" reply;
+- a bare `=======` line is not a conflict marker (git labels its `<<<<<<<`, `|||||||` and `>>>>>>>` lines);
+- tests now pin the 2 MB cap, the `conflictSha` dedupe, a rename out of `.github/` and `.gitattributes`.
+
 **The boundary that is left:**
 - The runner pushes and comments with the user's own git and `gh` credentials, outside the sandbox, so a published reply is posted as that person.
 - A sandboxed session can still read files that are not in `denyRead` (for example a `.env` of another repository or `~/.pgpass`) and smuggle them out encoded (base64 beats the scan) in its reply or commits. Run `--publish` only on a machine without such secrets; inverting `denyRead` to deny the whole home directory is the follow-up.

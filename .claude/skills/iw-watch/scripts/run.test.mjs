@@ -722,3 +722,99 @@ test('run: when a teammate pushed meanwhile, the runner\'s push is rejected, nev
   assert.equal(s.notices()[0].kind, 'needs-human');
   assert.deepEqual(s.posts(), []);
 });
+
+test('run: a conflict merge still pushes when main itself added a token-shaped string and a binary since the fork (Adam, PR #48)', async () => {
+  const s = conflicted({ 'web/a.ts': 'export const a = 9;\n', 'web/fake.test.mjs': 'const t = "ghp_abcdefghijklmnopqrstuvwxyz123456";\n', 'doc/report.pdf': Buffer.from([0x25, 0x50, 0x44, 0x46, 0, 1, 2, 0, 255]) });
+  // and a commit message on main that quotes a token shape (the merged-in history is not the agent's)
+  git(s.mainRoot, 'checkout', '-q', 'main');
+  git(s.mainRoot, 'commit', '-q', '--allow-empty', '-m', 'test: fixture ghp_abcdefghijklmnopqrstuvwxyz123456');
+  git(s.mainRoot, 'push', '-q', 'origin', 'HEAD:main');
+  git(s.mainRoot, 'checkout', '-q', 'web/fe');
+  s.deps.spawnClaude = resolver('export const a = 1;\nexport const b = 9;\n');
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(s.notices()[0].kind, 'done', s.notices()[0].detail);
+  assert.equal(git(s.origin, 'show', 'web/fe:web/a.ts'), 'export const a = 1;\nexport const b = 9;');
+  assert.equal(s.posts().length, 1);
+});
+
+test('run: in a conflict merge, a token or binary the agent itself adds is still refused', async () => {
+  for (const [file, content, re] of [['web/a.ts', 'export const a = 1;\nconst t = "ghp_abcdefghijklmnopqrstuvwxyz123456";\n', /looks like a credential/], ['web/blob.bin', Buffer.from([0, 1, 2, 0, 255]), /binary files \(web\/blob\.bin\)/]]) {
+    const s = conflicted({ 'web/a.ts': 'export const a = 9;\n', 'web/main.test.mjs': 'const t = "ghp_abcdefghijklmnopqrstuvwxyz123456";\n' });
+    const resolve = resolver(file === 'web/a.ts' ? content : 'export const a = 1;\n');
+    s.deps.spawnClaude = (f, args, opts) => {
+      if (file !== 'web/a.ts') { fs.writeFileSync(path.join(opts.cwd, file), content); git(opts.cwd, 'add', file); }
+      return resolve(f, args, opts);
+    };
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha, file);
+    assert.match(s.notices()[0].detail, re);
+  }
+});
+
+test('run: agent commits larger than 2 MB are never pushed', async () => {
+  const s = setup();
+  s.deps.spawnClaude = (f, args, opts) => {
+    fs.writeFileSync(path.join(opts.cwd, 'web/big.txt'), `${'abcdefghij\n'.repeat(200 * 1024)}`);
+    git(opts.cwd, 'add', 'web/big.txt');
+    git(opts.cwd, 'commit', '-q', '-m', 'big');
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'r');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha);
+  assert.match(s.notices()[0].detail, /larger than 2 MB/);
+});
+
+test('run: a session that aborts the merge gets no "resolved" reply, and the conflict is not marked handled', async () => {
+  const s = conflicted({ 'web/a.ts': 'export const a = 9;\n' });
+  s.deps.spawnClaude = (f, args, opts) => {
+    git(opts.cwd, 'merge', '--abort');
+    fs.mkdirSync(path.join(opts.cwd, '.iw-watch'), { recursive: true });
+    fs.writeFileSync(path.join(opts.cwd, '.iw-watch/reply.md'), 'resolved');
+    return { status: 0, stdout: stream(), stderr: '' };
+  };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(git(s.origin, 'rev-parse', 'web/fe'), s.feSha);
+  assert.deepEqual(s.posts(), []);
+  assert.match(s.notices()[0].detail, /does not contain origin\/main/);
+  const st = JSON.parse(fs.readFileSync(path.join(s.stateDir, 'state.json'), 'utf8'));
+  assert.equal(st.prs[11].conflictSha, undefined);
+});
+
+test('run: a resolved conflict is handled once per head sha (conflictSha dedupe)', async () => {
+  const s = conflicted({ 'web/a.ts': 'export const a = 9;\n' });
+  let sessions = 0;
+  const resolve = resolver('export const a = 1;\nexport const b = 9;\n');
+  s.deps.spawnClaude = (...a) => { sessions += 1; return resolve(...a); };
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(s.notices()[0].kind, 'done');
+  const st = JSON.parse(fs.readFileSync(path.join(s.stateDir, 'state.json'), 'utf8'));
+  assert.equal(st.prs[11].conflictSha, s.feSha);
+  s.out.length = 0;
+  await main(['run', '--mine', '--publish'], s.deps); // GitHub still reports the old head as CONFLICTING
+  assert.equal(sessions, 1, 'no second session for the same head');
+  assert.deepEqual(s.notices(), []);
+});
+
+test('run: a bare ======= line (a heading underline) is not a conflict marker', async () => {
+  const s = conflicted({ 'web/a.ts': 'export const a = 9;\n' });
+  s.deps.spawnClaude = resolver('/*\nTitle\n=======\n*/\nexport const a = 1;\n');
+  await main(['run', '--mine', '--publish'], s.deps);
+  assert.equal(s.notices()[0].kind, 'done', s.notices()[0].detail);
+});
+
+test('run: a fix branch that renames a file out of .github/ or adds a .gitattributes gets no session', async () => {
+  for (const change of [(r) => { fs.mkdirSync(path.join(r, 'docs'), { recursive: true }); git(r, 'mv', '.github/CODEOWNERS', 'docs/owners.txt'); }, (r) => fs.writeFileSync(path.join(r, 'web/.gitattributes'), '*.ts filter=x\n')]) {
+    const s = setup();
+    git(s.mainRoot, 'checkout', '-q', 'web/fe');
+    change(s.mainRoot);
+    git(s.mainRoot, 'add', '-A');
+    git(s.mainRoot, 'commit', '-q', '-m', 'hostile');
+    git(s.mainRoot, 'push', '-q', 'origin', 'web/fe');
+    s.deps.gh = fakeGh({ 'pr list mine': [{ ...s.pr11, headRefOid: git(s.mainRoot, 'rev-parse', 'HEAD') }], 'pr list open': [{ number: 11 }] }).gh;
+    await main(['run', '--mine', '--publish'], s.deps);
+    assert.equal(s.calls.length, 0);
+    assert.match(s.notices()[0].detail, /changes .*(\.github\/CODEOWNERS|web\/\.gitattributes)/);
+  }
+});

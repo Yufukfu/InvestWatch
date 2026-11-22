@@ -305,3 +305,13 @@ The watcher SHALL raise a `conflict` item for my PR when GitHub reports it `CONF
 
 - **WHEN** a conflict marker or an unmerged path remains after the session
 - **THEN** nothing is committed or pushed and the human is told which file
+
+#### Scenario: Main's own content does not block the merge
+
+- **WHEN** main added a token-shaped test string or a binary file since the PR forked, and the agent resolves the conflict without adding either
+- **THEN** the pushed-content scan ignores what is already on the base, and the runner pushes and posts
+
+#### Scenario: Merge undone by the session
+
+- **WHEN** the session runs `git merge --abort`, so `HEAD` no longer contains the base sha recorded at clone time
+- **THEN** nothing is pushed or posted, the conflict is not marked handled, and the human is told
