@@ -33,6 +33,6 @@
 
 ## 6. Closing
 
-- [ ] 6.1 Apply iw-docs-update: an ADR with the derivation rule and its two limits (next free number across all branches, 0109 is taken), `scraper/README.md` (how to read `rescan_outcome`, what `gone` means, soft 404s not detected), `.docs/status/scraper.md`, and add the iw-ai-log row; `docs-check` prints `docs-check: ok`
+- [x] 6.1 Apply iw-docs-update: an ADR with the derivation rule and its two limits (next free number across all branches, 0109 is taken), `scraper/README.md` (how to read `rescan_outcome`, what `gone` means, soft 404s not detected), `.docs/status/scraper.md`, and add the iw-ai-log row; `docs-check` prints `docs-check: ok`
 - [ ] 6.2 Post the derivation queries and the decision 5 migration proposal as a comment on issue 71 (owners Damian and Kacper); link it from the PR body
 - [ ] 6.3 Run iw-pr-review and fix real findings

@@ -49,6 +49,16 @@ Opt-in live smoke tests make real requests and are deselected by default (`-m sc
 
 It cannot give a success rate: the schema keeps only the last run of each source, so statuses are of the last run and nothing older, and the header says so.
 
+## Re-scan outcomes
+
+A web source is one page, and every version of it is one `documents` row. What a re-scan found is in two places (reasoning and the two known limits: [ADR 0110](../.docs/decisions/0110-rescan-changed-and-removed-derivation.md)):
+
+- **Edited page:** a new `documents` row; the ingest result carries `previous_document_id`, and the log has `rescan_outcome` with outcome `changed`. Earlier rows are never touched.
+- **Removed page:** an HTTP 404 or 410 on a source that already stored a document, confirmed by one more request in the same run (not a retry), is stored once as a `job_errors` row with reason `gone` and the source URL (userinfo dropped, redacted, cut to 300 characters). A source that never stored a document keeps `http_error`. A `gone` run ends `ok` with `documents = 0`, is not retried and does not count toward the domain failure pause; while the page stays missing, a re-scan makes one request and adds no row.
+- **Log only:** every web re-scan logs one JSON line `{"event": "rescan_outcome", "outcome": ..., "source_id": ..., "document_id": ...}` with outcome `unchanged`, `changed`, `reverted` (an earlier text came back), `reappeared` (the page answers again after a `gone`) or `gone`. Lookup failures are logged as `rescan_lookup_failed` and never fail a run. Social sources are not classified.
+
+The api derives the labels from the tables: `changed` = the document is not the newest of its source (`created_at DESC, id DESC`); `removed` = the newest `gone` error is newer than the newest document. The queries are pinned in `tests/test_e2e.py`. Two cases come out wrong without a new column: a revert to an earlier text still reads "changed", and a page that returns unchanged after a removal still reads "removed" (use the log lines, or see ADR 0110). Soft 404s (a 200 "not found" page) and redirects to a home page are not detected.
+
 ## Author provenance
 
 Analytics routes a post to M2 (published by the firm itself) from `author.handle`, `author.profile_url` and the host of `url` (`advertiser.publisher_firm`; `url` is the guarded fetch URL, so a collector must never take it from markup), so where they come from decides whether an impersonator can fake a firm post (issue 36). Read from the code on `main`:
