@@ -44,6 +44,37 @@ RUN pip install -r scraper/requirements-dev.txt
 WORKDIR /app/scraper
 CMD ["pytest", "-q"]
 
+# The renderer is its own image (ADR 0107): the browser runs hostile page code, so it never shares an image
+# with the scraper's credentials. Build: docker build -f scraper/Dockerfile --target renderer-test .
+FROM python:3.12-slim-bookworm AS renderer-base
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PLAYWRIGHT_BROWSERS_PATH=/opt/pw
+WORKDIR /app
+COPY scraper/requirements-renderer.txt scraper/requirements-renderer.txt
+# the headless shell is all a screenshot needs; the browser build is fixed by the playwright pin
+RUN pip install -r scraper/requirements-renderer.txt \
+ && playwright install --with-deps --only-shell chromium \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY scraper/src/iw_renderer scraper/src/iw_renderer
+# the modules shared with the scraper: address checks and block markers, free of the fetch client (no noble-tls here)
+COPY scraper/src/iw_scraper/__init__.py scraper/src/iw_scraper/addresses.py scraper/src/iw_scraper/blocking.py scraper/src/iw_scraper/
+ENV PYTHONPATH=/app/scraper/src
+
+FROM renderer-base AS renderer-test
+COPY scraper/requirements-renderer-dev.txt scraper/requirements-renderer-dev.txt
+RUN pip install -r scraper/requirements-renderer-dev.txt
+COPY scraper/pyproject.toml scraper/pyproject.toml
+COPY scraper/tests_renderer scraper/tests_renderer
+WORKDIR /app/scraper
+CMD ["pytest", "-q", "tests_renderer"]
+
+FROM renderer-base AS renderer
+# the browser runs hostile page code: a user with no shell, no home, nothing to write to but the tmpfs mounts
+RUN useradd --system --uid 10002 --no-create-home --shell /usr/sbin/nologin iwr
+USER iwr
+WORKDIR /app/scraper
+EXPOSE 8080
+CMD ["python", "-m", "iw_renderer"]
+
 FROM base AS runtime
 # code and the tls-client library stay root-owned and read-only for the runtime user
 RUN useradd --system --uid 10001 iw

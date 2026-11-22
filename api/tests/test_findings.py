@@ -120,6 +120,46 @@ def test_text_search_is_literal_and_covers_firm_and_advertiser(client, migrated_
     assert titles("_") == {"y"}  # literal underscore in "@inwestor_jan"; as a wildcard it would match all four
 
 
+def _two_on_one_document(url):
+    """One document with an M1 and an M3 finding, plus a decoy document with an M3 finding."""
+    doc, other = document_row(), document_row()
+    m1 = finding_row(doc["id"], module="M1", score=0.88)
+    m3 = finding_row(doc["id"], module="M3", score=0.84)
+    _insert(url, [doc, other], [m1, m3, finding_row(other["id"], module="M3", score=0.9)])
+    return doc["id"], m1, m3
+
+
+def test_document_filter_returns_all_its_findings(client, migrated_db):
+    doc, m1, m3 = _two_on_one_document(migrated_db.app_url)
+    r = client.get("/api/findings", params={"document_id": str(doc)})
+    assert r.status_code == 200
+    assert_response_matches("/findings", "get", r)
+    body = r.json()
+    assert body["total"] == 2 and {i["id"] for i in body["items"]} == {str(m1["id"]), str(m3["id"])}
+
+
+def test_document_filter_combines_with_module(client, migrated_db):
+    doc, _, m3 = _two_on_one_document(migrated_db.app_url)
+    body = client.get("/api/findings", params={"document_id": str(doc), "module": "M3"}).json()
+    assert body["total"] == 1 and [i["id"] for i in body["items"]] == [str(m3["id"])]
+
+
+def test_document_filter_combines_with_sort_and_pagination(client, migrated_db):
+    doc, m1, _ = _two_on_one_document(migrated_db.app_url)
+    body = client.get("/api/findings", params={"document_id": str(doc), "sort": "score",
+                                               "page": 2, "page_size": 1}).json()
+    assert body["total"] == 2 and body["page"] == 2 and body["page_size"] == 1
+    assert [i["id"] for i in body["items"]] == [str(m1["id"])]  # 0.84 then 0.88
+
+
+def test_document_filter_unknown_and_malformed(client, migrated_db):
+    _two_on_one_document(migrated_db.app_url)
+    empty = client.get("/api/findings", params={"document_id": str(uuid.uuid4())})
+    assert empty.status_code == 200 and empty.json()["items"] == [] and empty.json()["total"] == 0
+    bad = client.get("/api/findings", params={"document_id": "not-a-uuid"})
+    assert bad.status_code == 422 and bad.json()["details"][0]["loc"] == ["query", "document_id"]
+
+
 def test_page_past_the_end(client, migrated_db):
     _many(migrated_db.app_url, 60)
     body = client.get("/api/findings", params={"page": 3, "page_size": 50}).json()

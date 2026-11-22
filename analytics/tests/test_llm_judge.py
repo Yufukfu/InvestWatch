@@ -10,6 +10,7 @@ import logging
 
 import pytest
 
+from conftest import stored_hash
 from llm_stub import Reply, closed_port_url
 from investwatch_analytics.config import LlmSettings
 from investwatch_analytics.llm.judge import SemanticCheck
@@ -33,7 +34,7 @@ def judge_for(url: str, **env):
 
 def ask(judge, text=ALFA, checks=(R17,), module="M2"):
     pre = preprocess(text)
-    return judge.judge(module=module, module_context="", text=text, content_hash=pre.content_hash,
+    return judge.judge(module=module, module_context="", text=text, content_hash=stored_hash(text),
                        sentences=pre.sentences, checks=list(checks))
 
 

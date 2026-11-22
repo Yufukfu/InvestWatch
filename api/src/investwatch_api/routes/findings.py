@@ -62,6 +62,7 @@ async def list_findings(
     status: str | None = None,
     platform: Annotated[str | None, Query(max_length=32, pattern=TEXT_PARAM)] = None,
     source_id: UUID | None = None,
+    document_id: UUID | None = None,
     risk_level: RiskLevel | None = None,
     score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
     date_from: datetime | None = None,
@@ -84,6 +85,8 @@ async def list_findings(
         conditions.append(findings.c.platform == platform)
     if source_id:
         conditions.append(exists().where(documents.c.id == findings.c.document_id, documents.c.source_id == source_id))
+    if document_id:
+        conditions.append(findings.c.document_id == document_id)
     if risk_level:
         conditions.append(risk == risk_level)
     if score_min is not None:
