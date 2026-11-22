@@ -151,7 +151,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     settings = settings or Settings()
     store = store or Store(load_mock_data(settings.contracts_dir))
 
-    api = FastAPI(title="InvestWatch mock API", version="1.0.0")
+    api = FastAPI(title="InvestWatch mock API", version="1.1.0")
     api.state.store = store
     api.state.settings = settings
     api.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
@@ -182,6 +182,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         status: str | None = None,
         platform: str | None = None,
         source_id: UUID | None = None,
+        document_id: UUID | None = None,
         risk_level: RiskLevel | None = None,
         score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
         date_from: datetime | None = None,
@@ -212,6 +213,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             if platform and f["platform"] != platform:
                 continue
             if docs_of_source is not None and f["document_id"] not in docs_of_source:
+                continue
+            if document_id and f["document_id"] != str(document_id):
                 continue
             if risk_level and store.risk_level_of(f) != risk_level:
                 continue

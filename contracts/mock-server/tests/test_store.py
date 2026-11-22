@@ -11,8 +11,8 @@ from iw_mock_server.store import MockDataError, Store, load_mock_data, risk_leve
 def test_loads_all_mock_files_and_they_match_the_schemas(contracts_dir):
     data = load_mock_data(contracts_dir)
 
-    assert len(data.findings) == 9
-    assert len(data.documents) == 9
+    assert len(data.findings) == 11
+    assert len(data.documents) == 10
     assert len(data.sources) == 4
     for finding in data.findings:
         assert_valid("finding", finding)
@@ -24,6 +24,18 @@ def test_loads_all_mock_files_and_they_match_the_schemas(contracts_dir):
         assert_valid("events", event)
     assert set(data.calibration) == {"M1", "M2", "M3"}
     assert data.thresholds == {"M1": 0.6, "M2": 0.5, "M3": 0.7}
+
+
+def test_mocks_have_one_document_with_an_m1_and_an_m3_finding(contracts_dir):
+    data = load_mock_data(contracts_dir)
+    by_document: dict[str, list[str]] = {}
+    for finding in data.findings:
+        by_document.setdefault(finding["document_id"], []).append(finding["module"])
+
+    shared = {doc: modules for doc, modules in by_document.items() if len(modules) > 1}
+    assert list(shared.values()) == [["M3", "M1"]]  # newest first: M3 runs after M1
+    assert len({(f["document_id"], f["module"]) for f in data.findings}) == len(data.findings)
+    assert len({f["id"] for f in data.findings}) == len(data.findings)
 
 
 def test_missing_mock_file_names_the_file(contracts_copy):

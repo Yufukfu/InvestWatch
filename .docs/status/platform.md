@@ -7,6 +7,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 ### contracts
 - v1 in `contracts/`, required core frozen; ADRs 0301-0305 accepted (PR #3).
 - Mock server for `web/` in `contracts/mock-server/` (REST `http://localhost:8000/api`, Socket.IO `/events`) merged (PR #8, `mock-server` archived).
+- Contract 1.1.0 (`findings-document-filter`, issue #33, team OK): optional `document_id` on `GET /findings` in the contract, `api/` and the mock server, plus a mock post with an M1 and an M3 finding. Kacper re-syncs `web/`'s contract snapshot in his PR.
 
 ### analytics
 - `analytics-skeleton` merged (PR #10): pure pipeline, registry, M2 rules R1-R3, CLI. No worker, storage or events yet.
@@ -46,6 +47,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 
 ## Active OpenSpec changes
 
+- `findings-document-filter` (contract 1.1.0, `document_id` on `GET /findings`) archived in its own PR, linked to issue #33
 - `api-v1` and `api-v1-review-fixes` archived in PR #21 (merges after PR #18)
 - `api-db-schema` and `api-db-schema-review-fixes` archived in PR #15
 - `infra-compose` and `infra-compose-review-fixes` archived in PR #18
