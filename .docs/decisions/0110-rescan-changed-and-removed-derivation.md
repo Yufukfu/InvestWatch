@@ -6,7 +6,7 @@
 
 ## Context
 
-The brief's Module 1 asks for periodic updates that show what happened to an ad since it was flagged. Before this change a re-scan that found edited text inserted a second `documents` row linked to nothing, and a page that disappeared was the generic `http_error` of any server hiccup. The schema is Damian's (ADR 0303) and the contracts are frozen, so neither a column nor an event field was available. Issue 71 asks for the scraper half. Spec: [`openspec/changes/scraper-rescan-tracking/`](../../openspec/changes/scraper-rescan-tracking/design.md).
+The brief's Module 1 asks for periodic updates that show what happened to an ad since it was flagged. Before this change a re-scan that found edited text inserted a second `documents` row linked to nothing, and a page that disappeared was the generic `http_error` of any server hiccup. The schema is Damian's (ADR 0303) and the contracts are frozen, so neither a column nor an event field was available. Issue 71 asks for the scraper half. Spec: [`openspec/changes/archive/2026-11-22-scraper-rescan-tracking/`](../../openspec/changes/archive/2026-11-22-scraper-rescan-tracking/design.md).
 
 Facts read from the code on `main` (2026-11-22): `Ingestor.ingest` dedups on `(source_id, content_hash)`, so edited text is a new row and unchanged text leaves no trace; `job_errors` already has nullable `url` and `occurred_at` that the scraper never filled, and `reason` is free text; `fetch()` hides redirect hops, so a 404 behind a redirect is indistinguishable from one on the source URL.
 

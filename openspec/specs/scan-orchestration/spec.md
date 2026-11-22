@@ -18,7 +18,7 @@ Every collection SHALL run as a queued job. The queue SHALL cap the number of jo
 - **THEN** those jobs run after it restarts, or on another worker, without being enqueued again
 
 ### Requirement: Retry transient failures in the queue only
-The queue SHALL retry transient failures (`timeout`, HTTP 5xx) up to a cap with exponential backoff and jitter. A `Retry-After` hint may raise a delay and never shorten it. A job that exceeds its job timeout counts as a `timeout` failure and is retried like any other. No other component retries.
+The queue SHALL retry transient failures (`timeout`, HTTP 5xx) up to a cap with exponential backoff and jitter. A `Retry-After` hint may raise a delay and never shorten it. A job that exceeds its job timeout counts as a `timeout` failure and is retried like any other. No other component retries; the confirmation request of a removed page (`web-collection`) is not a retry.
 
 #### Scenario: Transient failure is retried
 - **WHEN** a job fails with `timeout` or HTTP 503 and the retry cap is not reached
@@ -33,7 +33,7 @@ The queue SHALL retry transient failures (`timeout`, HTTP 5xx) up to a cap with 
 - **THEN** one job error with the failing reason (`timeout` or `http_error`) is recorded
 
 #### Scenario: Non-transient failure is not retried
-- **WHEN** a job fails with `blocked`, `blocked_target` or HTTP 404
+- **WHEN** a job fails with `blocked`, `blocked_target` or HTTP 404 (`http_error`, or `gone` for a source with a stored document)
 - **THEN** it is not retried and one job error is recorded
 
 #### Scenario: Retry-After defers the whole domain
@@ -106,7 +106,7 @@ For every job that runs, scheduled or requested, the scraper SHALL publish `scan
 - **THEN** it publishes nothing, and the running job's own events cover the source
 
 ### Requirement: Derive run status and record it on the source
-`data.status` SHALL be `ok` with no job error, `failed` with no document and at least one job error, otherwise `partial`. When a job starts running the scraper SHALL set `sources.last_run_status` to `running`; at its final outcome it SHALL write `last_run_at` (UTC) and `last_run_status`. The number of new documents of the job is the `documents` field of `scan.finished`; there is no `documents_count` column (the API counts `documents` rows on read).
+`data.status` SHALL be `ok` with no job error (a `gone` observation is not one), `failed` with no document and at least one job error, otherwise `partial`. When a job starts running the scraper SHALL set `sources.last_run_status` to `running`; at its final outcome it SHALL write `last_run_at` (UTC) and `last_run_status`. The number of new documents of the job is the `documents` field of `scan.finished`; there is no `documents_count` column (the API counts `documents` rows on read).
 
 #### Scenario: Run ends with job errors
 - **WHEN** a job ends with one document and one job error
@@ -119,6 +119,10 @@ For every job that runs, scheduled or requested, the scraper SHALL publish `scan
 #### Scenario: Last run counts
 - **WHEN** a second job for the same source finds only duplicates
 - **THEN** `scan.finished` has `documents = 0` and `status = ok`
+
+#### Scenario: Removed page ends ok and is not requeued
+- **WHEN** a job ends with a `gone` job error and no document
+- **THEN** `scan.finished` has `status = ok`, `documents = 0`, `sources.last_run_status = ok`, and the job is not requeued
 
 ### Requirement: Schedule collection and the republish sweep
 Exactly one scheduler tick SHALL enqueue each due job, however many workers run, by using a unique job id per source and cron slot. The scheduler SHALL re-read `sources` every minute so changed or deactivated sources apply without a restart. The republish sweep SHALL run on a configurable interval.
