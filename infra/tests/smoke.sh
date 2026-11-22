@@ -359,6 +359,15 @@ llm_networks() { # serving ollama on data only (its API is unauthenticated); the
   echo "$nets" | tr '\n' ' '; echo
   [ "$nets" = "$(printf 'ollama=data\nollama-pull=egress')" ]
 }
+llm_pull_env() { # issue #149: OLLAMA_MODELS is Ollama's models *directory*; the pull list must use another name.
+  # A stale OLLAMA_MODELS list from an old .env is in the environment here and must not reach either container.
+  local env
+  env=$(OLLAMA_MODELS="gemma3:4b bge-m3" dc "$1" --profile llm config --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s).services;for(const k of ["ollama","ollama-pull"]){const e=j[k].environment||{};console.log(k+" OLLAMA_MODELS="+("OLLAMA_MODELS" in e)+" OLLAMA_PULL_MODELS="+(e.OLLAMA_PULL_MODELS||""))}})')
+  echo "$env" | tr '
+' ';'; echo
+  [ "$env" = "$(printf 'ollama OLLAMA_MODELS=false OLLAMA_PULL_MODELS=
+ollama-pull OLLAMA_MODELS=false OLLAMA_PULL_MODELS=gemma3:4b bge-m3')" ]
+}
 llm_pull_completes() { # `up --wait` returns while the one-shot still runs: wait for it to exit
   local c st
   dcx "$1" "$PROBE_FILE" --profile llm wait ollama-pull >/dev/null || { echo "ollama-pull exited non-zero"; return 1; }
@@ -376,7 +385,7 @@ llm_no_host_port() {
 }
 pull_fail_isolated() { # a failed pull (an unknown model stands in for an unreachable registry) leaves the rest healthy
   local p=$1 code
-  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_MODELS=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
+  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_PULL_MODELS=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
   code=$?; echo "ollama-pull exit: $code"; [ "$code" -ne 0 ] || return 1
   dcx "$p" "$PROBE_FILE" ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" {print; bad=1} END {exit bad}'
 }
@@ -388,6 +397,7 @@ group_llm() {
   check "nothing LLM-related after a plain up" no_llm_without_profile "$p"
   check "ollama and ollama-pull exist only under --profile llm" llm_defined_in_profile "$p"
   check "serving ollama only on data, the pull only on egress" llm_networks "$p"
+  check "ollama-pull gets OLLAMA_PULL_MODELS, no ollama container gets OLLAMA_MODELS" llm_pull_env "$p"
   if [ "${SMOKE_LLM:-0}" != 1 ]; then log "SKIP  model download (set SMOKE_LLM=1; pulls gemma3:4b and bge-m3, several GB)"; return 0; fi
   check "--profile llm pulls and serves the model" dcx "$p" "$PROBE_FILE" --profile llm up -d --wait --wait-timeout 1500 ollama ollama-pull
   check "ollama-pull runs to completion and exits 0" llm_pull_completes "$p"

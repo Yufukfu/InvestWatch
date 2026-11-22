@@ -75,7 +75,7 @@ Every infrastructure password and key SHALL come from the untracked root `.env`,
 - **AND** without `openssl`, `scripts/init-env.sh` SHALL fail with a message that names `openssl`
 
 ### Requirement: Optional local LLM behind a profile
-The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls every model in `OLLAMA_MODELS` (default `gemma3:4b bge-m3`), both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `data` at `http://ollama:11434/v1`, and keep the weights in a named volume.
+The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pulls every model in `OLLAMA_PULL_MODELS` (default `gemma3:4b bge-m3`), both only in the compose profile `llm`. Without the profile, neither SHALL start and no model weights SHALL be downloaded. With the profile, `ollama` SHALL serve the OpenAI-compatible API under `/v1` to containers on `data` at `http://ollama:11434/v1`, and keep the weights in a named volume.
 
 #### Scenario: Plain up downloads no weights
 - **WHEN** `docker compose up -d` runs without `--profile llm`
@@ -93,6 +93,11 @@ The stack SHALL define an `ollama` service and a one-shot `ollama-pull` that pul
 - **WHEN** the `llm` profile runs
 - **THEN** of `ollama` and `ollama-pull`, only the `ollama-pull` one-shot SHALL reach the internet
 - **AND** `ollama` SHALL publish no host port and SHALL NOT join a network with internet access
+
+#### Scenario: Pull list does not set the models directory
+- **WHEN** `docker compose --profile llm config` resolves the stack, with `OLLAMA_MODELS="gemma3:4b bge-m3"` left over in the environment
+- **THEN** `ollama-pull` has `OLLAMA_PULL_MODELS`, and neither `ollama` nor `ollama-pull` has `OLLAMA_MODELS` (Ollama's own models-directory setting)
+- **AND** on an empty model volume `ollama-pull` SHALL exit 0
 
 ### Requirement: Network isolation
 Only the gateway SHALL publish host ports in the default stack. `redis`, `minio`, `postgres` and `ollama` SHALL be on `data`, which stays `internal`. Outbound internet SHALL be available only to services on a non-internal network. Those are `egress`, which a module joins for internet access, and `edge`, which carries the gateway's published ports and so cannot be internal; a module joins `edge` only to be routed.
