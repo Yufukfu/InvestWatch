@@ -24,7 +24,9 @@ function edgeClass(e: GraphEdge, selected: string | undefined): string {
 
 // Advertiser handles and firm names are untrusted: HTML labels next to the SVG, each in its own dir="auto"
 // element; the SVG only draws the edges. The same data is in the "Tabela" view (keyboard and screen readers).
-export function AdvertiserGraph({ graph, selected, onOpenRelation }: Props) {
+export function AdvertiserGraph({ graph, selected: picked, onOpenRelation }: Props) {
+  // An advertiser with no matched firm has no edges: nothing to highlight, so nothing fades.
+  const selected = graph.advertisers.some((a) => a.key === picked) ? picked : undefined;
   const labels = new Map(graph.advertisers.map((a) => [a.key, a.label]));
   const firms = new Map(graph.firms.map((f) => [f.key, f.name]));
   // The selected advertiser's edges are drawn last, so they are on top.

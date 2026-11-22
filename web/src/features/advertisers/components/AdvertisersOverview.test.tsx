@@ -40,8 +40,14 @@ describe('AdvertisersOverview', () => {
   it('states the KPI sentence with the repeat count in its own element', () => {
     const { container } = render(<AdvertisersOverview {...props()} />);
     expect(screen.getByRole('heading', { name: 'POWIĄZANIA · M1 · FINFLUENCERZY I FIRMY Z REJESTRU' })).toBeInTheDocument();
-    expect(container.querySelector('.adv-figures')).toHaveTextContent('3 reklamodawców promuje 2 licencjonowane firmy, w tym 1 powtarzający się');
+    expect(container.querySelector('.adv-figures')).toHaveTextContent('3 reklamodawcy promują 2 licencjonowane firmy, w tym 1 powtarzający się');
     expect(container.querySelector('[data-kpi="repeat"]')).toHaveClass('hero-value-risk');
+  });
+
+  it('uses the many form from 5 advertisers', () => {
+    const five = aggregateAdvertisers(['@1', '@2', '@3', '@4', '@5'].map((h) => f(h, 'Q')));
+    const { container } = render(<AdvertisersOverview {...props({ rows: five, graph: buildGraph(five), kpis: kpis(five) })} />);
+    expect(container.querySelector('.adv-figures')).toHaveTextContent('5 reklamodawców promuje 1 licencjonowaną firmę');
   });
 
   it('uses Polish plurals in the KPI sentence', () => {

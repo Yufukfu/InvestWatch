@@ -18,7 +18,7 @@ describe('AdvertisersPage (contract mock)', () => {
   it('states the KPI sentence and draws the M1 advertisers, none from M3', async () => {
     renderPage();
     await screen.findByRole('img', { name: /Graf powiązań/ });
-    expect(figures()).toHaveTextContent('4 reklamodawców promuje 2 licencjonowane firmy, w tym 0 powtarzających się');
+    expect(figures()).toHaveTextContent('4 reklamodawcy promują 2 licencjonowane firmy, w tym 0 powtarzających się');
     const left = screen.getByRole('list', { name: 'Reklamodawcy' });
     expect(within(left).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['@finanse_z_kasia1', '@inwestor_jan1', '@marek_trader1']);
     expect(screen.queryByText('Sygnały VIP')).toBeNull();

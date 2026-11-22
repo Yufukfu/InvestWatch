@@ -51,6 +51,11 @@ describe('AdvertiserGraph', () => {
     expect(order).toEqual(['h:@b|r-X', 'h:@a|r-X', 'h:@a|r-Y']);
   });
 
+  it('fades nothing when the selected advertiser has no edge', () => {
+    const { container } = render(<AdvertiserGraph graph={graph} selected="h:@c" onOpenRelation={vi.fn()} />);
+    expect(container.querySelector('.adv-edge-dim')).toBeNull();
+  });
+
   it('opens the relation of a clicked edge', () => {
     const onOpen = vi.fn();
     const { container } = render(<AdvertiserGraph graph={graph} selected={undefined} onOpenRelation={onOpen} />);

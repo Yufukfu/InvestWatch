@@ -10,7 +10,7 @@ export function AdvertisersHero({ kpis }: { kpis: AdvertiserKpis }) {
       </h2>
       <p className="hero-figures adv-figures">
         <span className="hero-value" data-kpi="advertisers">{kpis.advertisers}</span>{' '}
-        <span className="hero-label">{kpis.advertisers === 1 ? 'reklamodawca promuje' : 'reklamodawców promuje'}</span>{' '}
+        <span className="hero-label">{plural(kpis.advertisers, 'reklamodawca promuje', 'reklamodawcy promują', 'reklamodawców promuje')}</span>{' '}
         <span className="hero-value" data-kpi="firms">{kpis.firms}</span>{' '}
         <span className="hero-label">
           {plural(kpis.firms, 'licencjonowaną firmę', 'licencjonowane firmy', 'licencjonowanych firm')}, w tym

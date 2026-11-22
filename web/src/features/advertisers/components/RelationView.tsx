@@ -46,6 +46,7 @@ export function RelationView({ relation, row, findings, onBack, onOpenFinding, r
       </div>
     );
   const firm = relation.firm === undefined ? undefined : row.firms.find((f) => f.key === relation.firm);
+  // Undefined for a firm key not among the advertiser's firms (an old link, or filtered out).
   const firmName = relation.firm === NO_FIRM ? NO_FIRM_LABEL : firm?.name;
   const others = row.firms.filter((f) => f.key !== NO_FIRM && f.name && f.key !== relation.firm);
   const n = findings.length;
@@ -67,7 +68,7 @@ export function RelationView({ relation, row, findings, onBack, onOpenFinding, r
             </span>{' '}
             <span className="visually-hidden">promuje</span>{' '}
             <span className="adv-relation-name" dir="auto">
-              {firmName ?? NO_FIRM_LABEL}
+              {firmName ?? 'nieznana firma'}
             </span>
           </>
         )}

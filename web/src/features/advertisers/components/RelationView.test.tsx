@@ -77,6 +77,11 @@ describe('RelationView', () => {
     expect(p.onOpenFinding).toHaveBeenCalledWith('f2');
   });
 
+  it('names an unknown firm key without calling it unmatched', () => {
+    setup({ advertiser: 'h:@a', firm: 'r-gone' }, { findings: [] });
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('0 zgłoszeń: @a → promuje nieznana firma');
+  });
+
   it('goes back to the graph', () => {
     const p = setup({ advertiser: 'h:@a', firm: 'rx' });
     fireEvent.click(screen.getByRole('button', { name: 'Powiązania' }));
