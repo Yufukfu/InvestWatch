@@ -9,9 +9,9 @@
 
 ## 2. M2 rule grid
 
-- [ ] 2.1 Write failing tests: title with N, squares in order with the rule id, legend counts for all four results, accessible names with result and legal basis, tooltip text with `dir="auto"`, `brak podstawy prawnej`, none for M1/M3 or no rules, markup stays text.
-- [ ] 2.2 Implement `RuleGrid`, place it in the detail for M2, styles and contrast pairs.
-- [ ] 2.3 Mutation check.
+- [x] 2.1 Write failing tests: title with N, squares in order with the rule id, legend counts for all four results, accessible names with result and legal basis, tooltip text with `dir="auto"`, `brak podstawy prawnej`, none for M1/M3 or no rules, markup stays text.
+- [x] 2.2 Implement `RuleGrid`, place it in the detail for M2, styles and contrast pairs.
+- [x] 2.3 Mutation check, against `RuleGrid.test.tsx`, `FindingDetailPanel.test.tsx` and `styles.test.ts`: the M2 guard dropped; the grid removed from the detail; the empty-rules guard dropped; N hard-coded to 17; a missing legend count not shown as 0; counts never added up; `Niepewne` mislabelled; the legal basis not isolated in the name; the rule id not isolated; `dir="auto"` dropped from the tooltip's legal basis; the tooltip's `brak podstawy prawnej` dropped; the result colour class dropped; the keyboard-focus selector dropped from the tooltip rule. mutations: 13 tried, 13 caught
 
 ## 3. Closing
 

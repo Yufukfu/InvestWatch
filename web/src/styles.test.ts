@@ -56,6 +56,8 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--accent-text', '--accent'],
   ['--accent-text', '--accent-strong'],
   ['--accent-text', '--amber'],
+  ['--accent-text', '--green'],
+  ['--text-2', '--tint-neutral'],
   ['--accent-text', '--risk-high'],
   ['--green', '--surface'],
   ['--m3', '--surface'],
@@ -279,5 +281,13 @@ describe('header export on a phone', () => {
     const phone = /@media \(max-width: 599px\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
     expect(phone).toMatch(/\.app-header \.header-export \{[^}]*display: none/);
     expect(phone).toMatch(/\.app-header \.header-export\.header-export-open \{[^}]*display: flex/);
+  });
+});
+
+describe('M2 rule grid', () => {
+  // jsdom applies no CSS, so the selectors that show the legal basis are pinned here: hover and keyboard focus.
+  it('shows the tooltip on hover and on keyboard focus', () => {
+    expect(css).toMatch(/\.rule-cell-wrap:hover \.rule-tip, \.rule-cell:focus-visible \+ \.rule-tip \{ display: grid; \}/);
+    expect(css).toMatch(/\.rule-tip \{ display: none;/);
   });
 });
