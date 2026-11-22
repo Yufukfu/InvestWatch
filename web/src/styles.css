@@ -167,6 +167,12 @@ main > [id] { scroll-margin-top: var(--space-4); }
 .kpis li { display: flex; flex-direction: column; gap: var(--space-1); }
 .kpi-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; line-height: 1.1; }
 .kpi-label { color: var(--muted); font-size: 13px; }
+/* M2 register coverage: eyebrow, one sentence with the numbers, and a bar of the same share (decorative). */
+.coverage { display: grid; gap: var(--space-2); padding-top: var(--space-6); border-top: 1px solid var(--border); }
+.coverage-eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.coverage-text { margin: 0; font-size: 15px; }
+.coverage-bar { height: 10px; border-radius: 999px; background: var(--tint-neutral); overflow: hidden; }
+.coverage-bar > span { display: block; height: 100%; background: var(--accent); }
 @media (min-width: 600px) { .kpis { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-4) var(--space-8); } .hero-value { font-size: 80px; } .hero-label { font-size: 26px; } }
 .hero-sep { display: inline; }
 @media (max-width: 599px) {

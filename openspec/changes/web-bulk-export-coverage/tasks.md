@@ -8,9 +8,9 @@
 
 ## 2. M2 coverage strip
 
-- [ ] 2.1 Write failing tests: `useSummary` maps `m2_coverage` (or leaves it undefined); `M2Coverage` shows counts and percentage with a bar, `brak danych` when missing, the no-M2 text when `total` is 0.
-- [ ] 2.2 Implement the view model, the hook mapping, the component on the overview and its styles.
-- [ ] 2.3 Mutation check.
+- [x] 2.1 Write failing tests: `useSummary` maps `m2_coverage` (or leaves it undefined); `M2Coverage` shows counts and percentage with a bar, `brak danych` when missing, the no-M2 text when `total` is 0.
+- [x] 2.2 Implement the view model, the hook mapping, the component on the overview and its styles.
+- [x] 2.3 Mutation check, against `src/features/summary`: `brak danych` emptied; the `total === 0` branch disabled; the clamp to 100% dropped; the clamp to 0% dropped; the singular boundary moved to 2; the bar fill drawn with no value; the bar exposed to assistive technology; `registry_matched` mapped from `total`; a missing field mapped to zeros instead of undefined; the strip removed from the overview. mutations: 10 tried, 10 caught
 
 ## 3. Bulk status change
 
