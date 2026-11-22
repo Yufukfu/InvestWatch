@@ -136,8 +136,12 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     # /v1 cannot set num_ctx per request: a small default context silently truncates a stage-2 chunk.
+    # Two models (gemma3:4b for stage 2, bge-m3 for embeddings, ADR 0313) stay loaded side by side through
+    # a demo instead of evicting each other on every document.
     environment:
       OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-8192}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
     networks: [data]
     read_only: true
     tmpfs: [/tmp]
@@ -152,8 +156,9 @@ services:
       resources:
         limits: { cpus: "4.0", memory: 6G }
 
-  # One-shot on egress only: runs its own loopback-only server on the shared model volume, pulls
-  # OLLAMA_MODEL, exits. Nothing else can reach it, and the serving `ollama` above never gets internet.
+  # One-shot on egress only: runs its own loopback-only server on the shared model volume, pulls every
+  # model in OLLAMA_MODELS (space-separated), exits. Nothing else can reach it, and the serving `ollama`
+  # above never gets internet.
   ollama-pull:
     image: *ollama-image
     profiles: [llm]
@@ -164,10 +169,10 @@ services:
       - |
         ollama serve >/tmp/serve.log 2>&1 &
         i=0; until ollama list >/dev/null 2>&1; do i=$$((i + 1)); [ $$i -lt 60 ] || { cat /tmp/serve.log; exit 1; }; sleep 1; done
-        ollama pull "$$OLLAMA_MODEL"
+        for m in $$OLLAMA_MODELS; do ollama pull "$$m" || exit 1; done
     environment:
       OLLAMA_HOST: 127.0.0.1:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
+      OLLAMA_MODELS: ${OLLAMA_MODELS:-gemma3:4b bge-m3}
     volumes:
       - ollama_models:/root/.ollama
     networks: [egress]

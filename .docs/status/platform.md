@@ -44,6 +44,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - Redis 8, object storage (MinIO, bucket `iw-raw`), the optional Ollama profile `llm`, project-scoped networks (`data`, `edge`, `egress`) and the smoke test `infra/tests/smoke.sh`: applied and archived, in PR #18.
 - Kacper's two reviews of PR #18 fixed in `infra-compose-review-fixes` (archived).
 - `OLLAMA_CONTEXT_LENGTH=8192` (default, override in `.env`) on the `ollama` service for the stage-2 LLM change: issue #32, branch `chore/ollama-context-length` (`infra-compose-review-fixes` follow-up 3).
+- `ollama-pull` pulls `OLLAMA_MODELS` (default `gemma3:4b bge-m3`, `bge-m3` for `analytics-embeddings`, ADR 0313); `ollama` keeps both loaded (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`): issue #65, change `infra-ollama-bge-m3`, branch `infra/ollama-pull-bge-m3`.
 
 ## Active OpenSpec changes
 
