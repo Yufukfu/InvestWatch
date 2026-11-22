@@ -15,4 +15,4 @@
 ## 3. Closing
 
 - [x] 3.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry.
-- [ ] 3.2 Run `iw-pr-review` and fix real findings.
+- [x] 3.2 Run `iw-pr-review` and fix real findings. Group 1: no findings. Group 2: one real finding (advertiser with only a profile URL or website had an empty name cell), fixed in its own commit, fix re-reviewed clean. Whole branch: no blocking findings. Could not check: layout at 375/768/1280 px in a real browser and the production build (shared machine, no builds or dev servers); Gitleaks not installed.
