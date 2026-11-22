@@ -1,4 +1,5 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { MODULE_LABEL } from '../../findings/components/labels';
 import type { TrendBucket, TrendPoint } from '../model';
 
 export type TrendChartProps = {
@@ -16,9 +17,12 @@ export type TrendChartProps = {
 // Series differ by colour and by dash pattern, and the legend names them: never colour alone.
 const SERIES = [
   { key: 'M1', color: 'var(--accent)', dash: undefined },
-  { key: 'M2', color: 'var(--amber)', dash: '6 3' },
-  { key: 'M3', color: 'var(--m3)', dash: '2 3' },
+  { key: 'M2', color: 'var(--link)', dash: '6 5' },
+  { key: 'M3', color: 'var(--m3)', dash: '2 4' },
 ] as const;
+
+// Axis ticks: small mono figures in the muted colour, as in the mockup.
+const TICK = { fontFamily: 'var(--font-mono)', fontSize: 12, fill: 'var(--muted)' };
 
 const BUCKETS: { value: TrendBucket; label: string }[] = [
   { value: 'hour', label: 'Godzina' },
@@ -56,8 +60,8 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
       margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
     >
       <CartesianGrid stroke="var(--border)" vertical={false} />
-      <XAxis dataKey="t" tickFormatter={(t: string) => formatTick(t, bucket)} minTickGap={24} />
-      <YAxis allowDecimals={false} width={32} />
+      <XAxis dataKey="t" tickFormatter={(t: string) => formatTick(t, bucket)} minTickGap={24} tick={TICK} tickLine={false} axisLine={{ stroke: 'var(--accent)' }} tickMargin={8} />
+      <YAxis allowDecimals={false} width={32} tick={TICK} tickLine={false} axisLine={false} />
       <Tooltip isAnimationActive={false} defaultIndex={tooltipIndex} labelFormatter={(t) => formatFull(String(t), bucket)} />
       {SERIES.map((s) => (
         <Line
@@ -65,7 +69,9 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
           dataKey={s.key}
           stroke={s.color}
           strokeDasharray={s.dash}
-          strokeWidth={2}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
           dot={false}
           isAnimationActive={false}
         />
@@ -104,16 +110,18 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
             </ResponsiveContainer>
           )}
         </div>
-        <ul className="trend-legend" aria-label="Legenda">
-          {totals.map((s) => (
-            <li key={s.key}>
-              <svg width="28" height="10" aria-hidden="true">
-                <line x1="0" y1="5" x2="28" y2="5" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash} />
-              </svg>
-              {`${s.key}: ${s.total}`}
-            </li>
-          ))}
-        </ul>
+        <div className="trend-footer">
+          <ul className="trend-legend" aria-label="Legenda">
+            {totals.map((s) => (
+              <li key={s.key}>
+                <svg width="24" height="10" aria-hidden="true">
+                  <line x1="0" y1="5" x2="24" y2="5" stroke={s.color} strokeWidth="3" strokeDasharray={s.dash} strokeLinecap="round" />
+                </svg>
+                <span>{`${s.key} · ${MODULE_LABEL[s.key]}`}</span>
+                <span className="mono">{s.total}</span>
+              </li>
+            ))}
+          </ul>
         {bucket === 'day' && <p className="trend-note">Dni liczone w czasie UTC.</p>}
         <details className="trend-table">
           <summary>Pokaż dane w tabeli</summary>
@@ -141,6 +149,7 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
             </tbody>
           </table>
         </details>
+        </div>
       </>
     );
   }
@@ -148,7 +157,10 @@ export function TrendChart({ points, bucket, onBucketChange, isLoading, isError,
   return (
     <section className="trend" aria-label="Trend zgłoszeń">
       <div className="trend-header">
-        <h2>Trend zgłoszeń</h2>
+        <div>
+          <h2>Trend zgłoszeń</h2>
+          <p className="section-sub">Liczba wykrytych incydentów w czasie, według modułu</p>
+        </div>
         <div className="trend-buckets" role="group" aria-label="Przedział czasu">
           {BUCKETS.map((b) => (
             <button key={b.value} type="button" aria-pressed={bucket === b.value} onClick={() => onBucketChange(b.value)}>

@@ -37,14 +37,19 @@ describe('TrendChart (props only, no store)', () => {
   it('draws one series per module with a legend naming them and their totals', () => {
     setup();
     const items = within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem');
-    expect(items.map((li) => li.textContent)).toEqual(['M1: 4', 'M2: 3', 'M3: 1']);
+    expect(items.map((li) => li.textContent)).toEqual(['M1 · Finfluencerzy4', 'M2 · Zgodność reklam3', 'M3 · Usługi bez zezwolenia1']);
+  });
+
+  it('says in a subtitle what the chart counts', () => {
+    setup();
+    expect(screen.getByText('Liczba wykrytych incydentów w czasie, według modułu')).toBeInTheDocument();
     expect(linePaths()).toHaveLength(3);
   });
 
   it('colours the series from tokens and keeps the risk red away from every module', () => {
     setup();
     const strokes = linePaths().map((el) => el.getAttribute('stroke'));
-    expect(strokes).toEqual(['var(--accent)', 'var(--amber)', 'var(--m3)']);
+    expect(strokes).toEqual(['var(--accent)', 'var(--link)', 'var(--m3)']);
     for (const stroke of strokes) {
       expect(stroke).not.toMatch(/risk-high|sev-high|#/);
     }
@@ -54,7 +59,7 @@ describe('TrendChart (props only, no store)', () => {
     setup();
     const swatches = Array.from(document.querySelectorAll('.trend-legend line'));
     for (const els of [linePaths(), swatches]) {
-      expect(els.map((el) => el.getAttribute('stroke-dasharray'))).toEqual([null, '6 3', '2 3']);
+      expect(els.map((el) => el.getAttribute('stroke-dasharray'))).toEqual([null, '6 5', '2 4']);
     }
   });
 

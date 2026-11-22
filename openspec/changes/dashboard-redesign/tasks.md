@@ -52,7 +52,7 @@ The first screenshot review (8.3) found the built look diverges from the mockups
 
 - [x] 8a.1 Tokens, header and hero: white header with the `NARZĘDZIE NADZORCZE` tagline and an underlined active tab, ink for selected controls, red only for high risk and the triage action, flat white sections with dividers, 24-28px section headings with a subtitle, the `PRZEGLĄD · date` eyebrow, 96px hero figures on one row and a four-up KPI strip (Nowe, M1, M2, M3) (mutations: 13 tried, 13 caught)
 - [x] 8a.2 Filters and findings table: plain label row and ink pills, uppercase table headers, plain title text, score bar coloured by risk, `dd.mm.rrrr · hh:mm` dates, `Strona n z m` pager (mutations: 8 tried, 8 caught)
-- [ ] 8a.3 Trend chart: ink solid, blue dashed and teal dotted lines, mono ticks, two-line legend with counts, `Godzina | Dzień` segmented control
+- [x] 8a.3 Trend chart: ink solid, blue dashed and teal dotted lines, mono ticks, two-line legend with counts, `Godzina | Dzień` segmented control (mutations: 8 tried, 8 caught)
 - [ ] 8a.4 Phone and tablet: hamburger menu, `Filtry n` button with removable filter chips, bordered finding cards, tablet four-column list with the meta line under the title
 - [ ] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` tags, navy toast, labelled proportion bar and selection markers
 - [ ] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real
