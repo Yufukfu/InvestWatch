@@ -86,6 +86,9 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--text', '--callout-bg'],
   ['--banner-fg', '--banner-bg'],
   ['--link', '--banner-bg'],
+  ['--link-strong', '--surface'],
+  ['--link-strong', '--banner-bg'],
+  ['--link-strong', '--tint-hover'],
 ];
 
 // Non-text parts (control borders, focus ring, slider) need 3:1.
@@ -133,6 +136,73 @@ describe('design tokens', () => {
   it('uses no text smaller than 12px', () => {
     const sizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1]));
     expect(sizes.filter((s) => s < 12)).toEqual([]);
+  });
+});
+
+// Every `selectors { body }` pair, media blocks flattened (the stylesheet never nests rules).
+const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({
+  selectors: sel.replace(/\/\*[^]*?\*\//g, '').split(',').map((s) => s.trim()),
+  body,
+}));
+
+function px(value: string): number {
+  const resolved = value.trim().replace(/var\((--[\w-]+)\)/g, (_, n: string) => tokens.get(n) ?? 'NaN');
+  const m = /^(-?\d+(?:\.\d+)?)px$/.exec(resolved);
+  if (!m) throw new Error(`not a px value: ${value}`);
+  return Number(m[1]);
+}
+
+// Value of `prop` in the last rule that lists exactly `selector`.
+function declared(selector: string, prop: string): string | undefined {
+  const values = rules
+    .filter((r) => r.selectors.includes(selector))
+    .map((r) => new RegExp(`(?:^|[;\\s])${prop}\\s*:\\s*([^;]+)`).exec(r.body)?.[1]?.trim())
+    .filter(Boolean);
+  return values.at(-1);
+}
+
+describe('interaction styling', () => {
+  it('underlines nothing at rest: only :hover or :focus-visible rules may set an underline', () => {
+    const resting = rules.filter((r) => /text-decoration(-line)?\s*:[^;]*underline/.test(r.body))
+      .flatMap((r) => r.selectors).filter((s) => !/:(hover|focus-visible)/.test(s));
+    expect(resting).toEqual([]);
+  });
+
+  it('removes the browser underline from every link in one base rule', () => {
+    expect(declared('a', 'text-decoration')).toBe('none');
+  });
+
+  it('keeps text links distinguishable by weight, not only colour', () => {
+    expect(Number(declared('a', 'font-weight'))).toBeGreaterThanOrEqual(500);
+  });
+
+  it('leaves at least 16px above the data-table disclosure', () => {
+    const top = declared('.trend-table', 'margin-top') ?? declared('.trend-table', 'margin')?.split(/\s+/)[0];
+    expect(px(top ?? '0px')).toBeGreaterThanOrEqual(16);
+  });
+
+  it('gives every control a 120-150ms transition from tokens', () => {
+    const dur = Number(/^(\d+)ms$/.exec(tokens.get('--dur') ?? '')?.[1]);
+    expect(dur).toBeGreaterThanOrEqual(120);
+    expect(dur).toBeLessThanOrEqual(150);
+    for (const sel of ['.btn', '.chip', '.filter-chip', 'input', 'select', 'textarea', 'button.link', '.trend-table summary', '.segmented button', '.trend-buckets button', '.app-nav a', '.sort', '.rule-group summary', '.shortcuts summary']) {
+      expect(declared(sel, 'transition'), sel).toContain('var(--dur)');
+    }
+  });
+
+  it('draws control corners from radius tokens, never a literal', () => {
+    for (const sel of ['.btn', '.chip', '.filter-chip', 'input', '.trend-table summary', '.segmented button', '.nav-toggle']) {
+      expect(declared(sel, 'border-radius'), sel).toMatch(/^var\(--radius/);
+    }
+  });
+
+  it('shows hover and active feedback on buttons', () => {
+    expect(rules.some((r) => r.selectors.some((s) => s.startsWith('.btn:active')))).toBe(true);
+    expect(rules.some((r) => r.selectors.some((s) => s.startsWith('.chip:hover') || s.startsWith('.chip:has(input:not(:checked)):hover')))).toBe(true);
+  });
+
+  it('raises surfaces with a token shadow, not ad-hoc ones', () => {
+    for (const sel of ['.detail', '.toast']) expect(declared(sel, 'box-shadow'), sel).toMatch(/var\(--shadow/);
   });
 });
 
