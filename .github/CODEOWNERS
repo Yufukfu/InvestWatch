@@ -1,0 +1,10 @@
+# Owners per module, the split in .docs/STATUS.md. GitHub requests their review automatically, and the
+# iw-watch runner reads this file (from the default branch) to route reviews and defect reports.
+# Shared areas (infra/, .docs/, openspec/, .claude/, root files) have no single owner on purpose.
+# Last matching pattern wins.
+
+/scraper/   @hen68
+/web/       @kacpermalczyk
+/analytics/ @Yufukfu
+/api/       @Yufukfu
+/contracts/ @Yufukfu

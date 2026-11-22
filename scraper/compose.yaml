@@ -7,6 +7,11 @@
 
 # One image, built once by `worker` only: three services that each build and export the same tag race on Docker's
 # containerd image store ("image ... already exists"). seed and scheduler reuse the image compose builds first.
+# The page renderer (ADR 0107) is its own file, checked by scraper/tests/renderer_stack.sh; the worker joins its
+# internal `render` network below.
+include:
+  - compose.renderer.yaml
+
 x-scraper-image: &scraper-image
   image: investwatch/scraper:${IW_VERSION:-dev}
 
@@ -75,14 +80,21 @@ services:
       ALLOWED_PORTS: ${ALLOWED_PORTS:-80,443}
       COMPOSE_INTERNAL_HOSTS: ${COMPOSE_INTERNAL_HOSTS:-}
       FETCH_EXTRA_HOSTS: ${FETCH_EXTRA_HOSTS:-}
+      # Page rendering, off by default. With it on, an attempt must outlast a render (RENDER_TIMEOUT_SECONDS + 60 s).
+      SCRAPER_RENDER_ENABLED: ${SCRAPER_RENDER_ENABLED:-false}
+      SCRAPER_RENDER_MAX_PER_HOUR: ${SCRAPER_RENDER_MAX_PER_HOUR:-20}
+      SCRAPER_ATTEMPT_TIMEOUT: ${SCRAPER_ATTEMPT_TIMEOUT:-180}
+      RENDERER_URL: http://renderer:8080
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-90}
     depends_on:
       api-migrate: { condition: service_completed_successfully }
       seed: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-    # data reaches Postgres, Redis and MinIO; egress is the route to the scraped sites.
-    networks: [data, egress]
+    # data reaches Postgres, Redis and MinIO; egress is the route to the scraped sites; render is the private link to
+    # the renderer.
+    networks: [data, egress, render]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${SCRAPER_HEALTH_PORT:-8080}/health', timeout=3)"]
       interval: 10s

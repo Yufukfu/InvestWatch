@@ -1,25 +1,31 @@
 from __future__ import annotations
 
-import hashlib
+import dataclasses
 
 import pytest
 
-from investwatch_analytics.preprocessing import content_hash, guess_language, normalize, preprocess, split_sentences
+from investwatch_analytics import preprocessing
+from investwatch_analytics.preprocessing import Preprocessed, guess_language, normalize, preprocess, split_sentences
 
 
-def test_equivalent_texts_hash_the_same():
+def test_equivalent_texts_normalize_the_same():
     composed = "Zarabiaj  na ETF\n\n ź"  # NBSP, runs of spaces/newlines, decomposed accent
     precomposed = "Zarabiaj na ETF ź"
     assert normalize(composed) == normalize(precomposed) == "Zarabiaj na ETF ź"
-    assert content_hash(composed) == content_hash(precomposed)
 
 
-def test_hash_is_sha256_of_normalized_text():
-    assert content_hash(" a  b ") == hashlib.sha256(b"a b").hexdigest()
+def test_matching_folds_compatibility_characters():
+    """NFKC is for matching only (ADR 0105): ligatures and full-width digits fold, the original text stays."""
+    text = "Zysk ﬁrmy ２０%"
+    p = preprocess(text)
+    assert normalize(text) == p.normalized == "Zysk firmy 20%"
+    assert p.original == text
 
 
-def test_different_texts_hash_differently():
-    assert content_hash("zysk 8%") != content_hash("zysk 9%")
+def test_preprocessing_computes_no_content_hash():
+    """Issue #31: the stored NFC `content_hash` written by the scraper is the only one; analytics never hashes."""
+    assert not hasattr(preprocessing, "content_hash")
+    assert "content_hash" not in {f.name for f in dataclasses.fields(Preprocessed)}
 
 
 def test_sentence_split_keeps_legal_forms():
@@ -101,7 +107,6 @@ def test_preprocess_bundle():
     assert p.normalized == "Reklama. Inwestuj z nami."
     assert p.lang == "pl"
     assert len(p.sentences) == 2
-    assert p.content_hash == content_hash("Reklama. Inwestuj z nami.")
 
 
 def test_preprocess_empty_text():

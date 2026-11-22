@@ -11,7 +11,7 @@ import pytest
 
 from investwatch_analytics import preprocessing
 from investwatch_analytics.preprocessing import (
-    content_hash, guess_language, normalize, preprocess, split_sentences,
+    guess_language, normalize, preprocess, split_sentences,
 )
 
 #: Compatibility characters NFKC rewrites (ligature, fullwidth, NBSP, superscript, ellipsis), Polish letters in
@@ -21,12 +21,12 @@ ALPHABET = list("abcdefghij XYZ ąęłśż.!?…") + ["ﬁ", "ﬂ", "Ａ", "ｚ"
 
 
 def field_by_field(text: str) -> tuple:
-    return (normalize(text), content_hash(text), guess_language(text), split_sentences(text))
+    return (normalize(text), guess_language(text), split_sentences(text))
 
 
 def fields(text: str) -> tuple:
     p = preprocess(text)
-    return (p.normalized, p.content_hash, p.lang, p.sentences)
+    return (p.normalized, p.lang, p.sentences)
 
 
 def random_text(rng: random.Random) -> str:

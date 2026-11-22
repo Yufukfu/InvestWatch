@@ -183,7 +183,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/findings` | list; filters: `module, status, platform, source_id, risk_level, score_min, date_from, date_to, q` |
+| GET | `/findings` | list; filters: `module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q`. `document_id` (contract 1.1.0) returns every finding of one document, at most one per module, so the detail panel can list M1 and M3 of one post across pages |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
@@ -215,7 +215,7 @@ Redis Pub/Sub `iw:events` → API → Socket.IO (namespace `/events`, path `/soc
 - **LLM note:** the task PDF asks for an on-premise, open-source stack with no external paid APIs; the mentors allowed a hosted provider for the hackathon if the code swaps easily to open-source models ([ADR 0304](decisions/0304-llm-serving.md)). Analytics calls an **OpenAI-compatible HTTP API** configured by `LLM_*` env only: a hosted provider during development, or local Gemma (`gemma3:4b`) through the optional `ollama` compose profile, which Ollama serves under `/v1`. The hand-in README names the mentor exception and the local fallback, because the jury checks compliance with the specified technologies.
 - Database migrations in one place (Alembic in `api`) – Adam and Damian never create tables by hand.
 - Every service: `/health`, JSON logs to stdout, zero `console.log` in the production frontend build.
-- Dependencies: `npm audit` / `pip-audit` before every merge to `main`; results in `.docs/security-audit.md`.
+- Dependencies: `npm audit` / `pip-audit` per service before every merge to `main`, plus a repository-wide offline OSV-Scanner run once its CI job lands; no finding open unless documented as a residual risk; Gitleaks for hard-coded secrets; results in the PR body (`.docs/security-audit.md` only for service notes and the hand-in run); target: required CI checks on every PR ([ADR 0209](decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](supply-chain.md)).
 - Branches: `scraper/*`, `dashboard/*`, `analytics/*`; merge to `main` only with a working `docker compose up`.
 - **Technical documentation, code, comments and commit messages are in English.** User-facing dashboard texts and finding summaries are in Polish.
 

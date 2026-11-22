@@ -1,12 +1,15 @@
 """Text preprocessing (`.docs/analytics-plan.md` §2 step 1, rules-only part).
 
-Normalized text feeds the hash and the language guess only. Sentences keep spans into the
+Normalized (NFKC) text is for matching, the language guess and excerpts only. Sentences keep spans into the
 ORIGINAL text, so rule evidence is always a verbatim substring of `ScrapedDocument.text`.
+
+No content hash is computed here: `ScrapedDocument.content_hash` is the stored value the scraper wrote (NFC,
+`.docs/integration-plan.md` §3, ADR 0105), used as is. Hashing this NFKC text would give a different value for
+compatibility characters (issue #31).
 """
 
 from __future__ import annotations
 
-import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -49,14 +52,6 @@ _EN_WORDS = {
 
 def normalize(text: str) -> str:
     return _WS.sub(" ", unicodedata.normalize("NFKC", text)).strip()
-
-
-def content_hash(text: str) -> str:
-    return _hash_of_normalized(normalize(text))
-
-
-def _hash_of_normalized(norm: str) -> str:
-    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
 def guess_language(text: str) -> str | None:
@@ -113,7 +108,6 @@ def _append(out: list[Sentence], text: str, start: int, end: int) -> None:
 class Preprocessed:
     original: str
     normalized: str
-    content_hash: str
     lang: str | None
     sentences: list[Sentence] = field(default_factory=list)
 
@@ -123,12 +117,11 @@ class Preprocessed:
 
 
 def preprocess(text: str) -> Preprocessed:
-    # NFKC once: hash and language derive from the same normalized text (three passes took ~26 s on 2 MB of 'ﬁ').
+    # NFKC once: the language guess reuses this normalized text (repeated passes took ~26 s on 2 MB of 'ﬁ').
     norm = normalize(text)
     return Preprocessed(
         original=text,
         normalized=norm,
-        content_hash=_hash_of_normalized(norm),
         lang=_language_of_normalized(norm),
         sentences=split_sentences(text),
     )

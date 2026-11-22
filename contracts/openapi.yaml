@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: InvestWatch API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     REST API between the `api` service (owner: C) and the dashboard (owner: B).
     Real-time events are delivered over Socket.IO (namespace `/events`), see `schemas/events.schema.json`.
@@ -29,6 +29,7 @@ paths:
         - { name: status, in: query, description: Comma-separated list, schema: { type: string, example: "new,in_review" } }
         - { name: platform, in: query, schema: { type: string } }
         - { name: source_id, in: query, schema: { type: string, format: uuid } }
+        - { name: document_id, in: query, description: Only the findings of this document (at most one per module). Combines with the other filters and pagination. Added in 1.1.0, schema: { type: string, format: uuid } }
         - { name: risk_level, in: query, schema: { type: string, enum: [high, medium, low] } }
         - { name: score_min, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }

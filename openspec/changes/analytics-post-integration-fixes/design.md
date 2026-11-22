@@ -32,7 +32,7 @@ All three are below the M3 default of 0.4, so P/R/F1 at the default do not chang
 
 ## 3. NFKC once
 
-`preprocess` computes `norm = normalize(text)` once and passes it to the private helpers `_hash_of_normalized(norm)` and `_language_of_normalized(norm)`. The public `content_hash(text)` and `guess_language(text)` stay, because other callers and tests use them. They become `normalize` followed by the private helper, so their results do not change. `split_sentences(text)` already runs on the original text.
+`preprocess` computes `norm = normalize(text)` once and passes it to the private helper `_language_of_normalized(norm)`. The public `guess_language(text)` stays, because other callers and tests use it. It becomes `normalize` followed by the helper, so its result does not change. (`main` removed `content_hash` from preprocessing in the meantime, so the hash part of the first version of this change was dropped at the merge.) `split_sentences(text)` already runs on the original text.
 
 Tests:
 

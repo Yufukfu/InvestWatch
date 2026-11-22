@@ -98,11 +98,11 @@ Analytics SHALL route by publisher identity and registry result, not by `source_
 ## ADDED Requirements
 
 ### Requirement: Preprocessing normalizes once
-Preprocessing SHALL apply Unicode NFKC and whitespace collapsing to a document's text once and derive `normalized`, `content_hash` and the language guess from that one result, so the normalization cost is paid once per document and not once per derived field. The result SHALL be identical to deriving each field separately: the same normalized text, hash, language, and sentences with the same offsets into the original text.
+Preprocessing SHALL apply Unicode NFKC and whitespace collapsing to a document's text once and derive `normalized` and the language guess from that one result, so the normalization cost is paid once per document and not once per derived field. The result SHALL be identical to deriving each field separately: the same normalized text, language, and sentences with the same offsets into the original text.
 
 #### Scenario: Same result as before
 - **WHEN** a mock document text, or a seeded random text with compatibility characters (`ﬁ`, fullwidth letters, NBSP), CRLF and mixed whitespace, is preprocessed
-- **THEN** `normalized`, `content_hash`, `lang` and every sentence's text, `start` and `end` equal those computed field by field
+- **THEN** `normalized`, `lang` and every sentence's text, `start` and `end` equal those computed field by field
 
 #### Scenario: One NFKC pass
 - **WHEN** a text is preprocessed

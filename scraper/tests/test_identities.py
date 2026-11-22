@@ -8,7 +8,7 @@ import pytest
 from noble_tls import Client
 
 from iw_scraper.fetch import Identity, fetch
-from iw_scraper.identities import CHROME_VERSION, TABLE, check_pairing, draw_identity, load_table
+from iw_scraper.identities import CHROME_VERSION, TABLE, check_pairing, draw_identity, load_table, mobile_variant
 
 PAGE = b"<html><body><p>ok</p></body></html>"
 
@@ -190,3 +190,31 @@ async def test_cookies_set_during_a_run_are_kept_within_that_run(stub):
     await fetch(stub.url("/set"), CHROME, None)
 
     assert dict((n.lower(), v) for n, v in stub.requests[1].headers)["cookie"] == "sid=abc"
+
+
+def test_mobile_variant_is_android_chrome_of_the_same_version():
+    for identity in TABLE:
+        mobile = mobile_variant(identity)
+        user_agent = header(mobile, "user-agent")
+        assert "Linux; Android" in user_agent and user_agent.endswith("Mobile Safari/537.36")
+        assert f"Chrome/{CHROME_VERSION}." in user_agent
+        assert header(mobile, "sec-ch-ua-mobile") == "?1"
+        assert header(mobile, "sec-ch-ua-platform") == '"Android"'
+        assert header(mobile, "accept-language") == header(identity, "accept-language")
+        assert mobile.tls_profile == identity.tls_profile
+
+
+def test_every_mobile_variant_of_the_table_passes_the_pairing_check():
+    for identity in TABLE:
+        check_pairing(mobile_variant(identity))
+
+
+def test_a_mobile_variant_of_another_version_does_not_pair_with_the_tls_profile():
+    with pytest.raises(ValueError, match="user agent version"):
+        check_pairing(mobile_variant(CHROME, version=CHROME_VERSION + 1))
+
+
+def test_the_mobile_variant_of_a_non_chrome_identity_is_refused():
+    firefox = with_header(CHROME, "user-agent", "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0")
+    with pytest.raises(ValueError, match="Chrome"):
+        mobile_variant(firefox)

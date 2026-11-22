@@ -1,0 +1,41 @@
+# Page renderer (owner Adam): headless Chromium behind a small HTTP service, called by the scraper worker over the
+# private `render` network. The browser runs hostile page code, so this service holds no secret and no route to
+# Postgres, Redis or MinIO: an explicit environment (no env_file, the root .env holds every secret), networks `egress`
+# and `render` only, no host port. Why a separate service and what is accepted: ADR 0107.
+# Checked by scraper/tests/renderer_stack.sh.
+services:
+  renderer:
+    build:
+      context: ..
+      dockerfile: scraper/Dockerfile
+      target: renderer
+    image: investwatch/renderer:${IW_VERSION:-dev}
+    restart: unless-stopped
+    init: true  # Chromium spawns many children; PID 1 must reap them
+    environment:
+      HOME: /tmp  # the browser profile and the Playwright driver write here, the only writable path besides /dev/shm
+      RENDERER_PORT: "8080"
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-90}
+      RENDER_MAX_PAGE_HEIGHT: ${RENDER_MAX_PAGE_HEIGHT:-12000}
+      RENDER_MAX_PNG_BYTES: ${RENDER_MAX_PNG_BYTES:-8000000}
+      RENDER_CONCURRENCY: ${RENDER_CONCURRENCY:-1}
+    # egress reaches the scraped sites; render is internal and shared with the scraper worker (the `worker` will join it in
+    # the scraper overlay added with the render hook). Not on data or edge.
+    networks: [egress, render]
+    read_only: true
+    tmpfs: ["/tmp:size=256m"]
+    shm_size: 256m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.5", memory: 1g, pids: 256 }
+networks:
+  egress: {}
+  render: { internal: true }
