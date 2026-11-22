@@ -1,6 +1,6 @@
 # InvestWatch – Analytics Module Work Plan
 
-Owner: **Damian**. Input/output contracts: [integration-plan.md](integration-plan.md) (sections 3, 4).
+Owners: [`.github/CODEOWNERS`](../.github/CODEOWNERS). Input/output contracts: [integration-plan.md](integration-plan.md) (sections 3, 4).
 Requirement sources: `Opis Wyzwania HackNation UKNF 19.11.pdf`, `ZASÓB DLA UCZESTNIKÓW … kryteria oceny informacji o ryzyku.docx` (18 rules), annexes to topics 1–3.
 
 ## 1. Design principles

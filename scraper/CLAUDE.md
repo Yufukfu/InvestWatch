@@ -1,4 +1,6 @@
-# scraper (Adam's module)
+# scraper
+
+Owners: [`.github/CODEOWNERS`](../.github/CODEOWNERS).
 
 Collects web and social-media content and writes `ScrapedDocument` rows (contract v1, `.docs/integration-plan.md` §3) plus HTML and screenshots to MinIO. Downstream, `analytics` consumes the Redis Stream `iw:documents`; the scraper knows nothing about analytics.
 
@@ -32,7 +34,7 @@ Only `firm_own` sources that target `M2` are rendered, and only with `SCRAPER_RE
 
 ## Ingest (`src/iw_scraper/ingest/`)
 
-`Ingestor.ingest` is the one entry point: validate, dedup pre-check, upload HTML, insert, then `XADD`; `sweep` republishes rows whose announcement was lost. Spec `scraper-ingest` (capability `document-ingest`), reasoning in [ADR 0104](../.docs/decisions/0104-ingest-order-and-republish-sweep.md). Rules that bite: `content_hash` is defined once (NFC, whitespace collapsed, case kept; [ADR 0105](../.docs/decisions/0105-content-hash-normalisation.md), `.docs/integration-plan.md` §3) and `tests/test_ingest_document.py` pins it with literal hashes, so never switch it to NFKC; the schema belongs to Damian's module (Alembic in `api/`, never create or alter a table here); `iw-raw` is created by `minio-init`, the service only checks it (`Storage.check_bucket`); the conflict target of the insert is named and must match Damian's partial unique index; `job_errors.detail` is redacted but must still never be given credentials. Nothing calls these yet: the wiring (sink adapter, `page` dict with `html`, `check_bucket` at startup, the scheduled sweep) is still to be assigned between `scraper-v1` and `scraper-orchestration`. Tests need PostgreSQL, Redis and MinIO (`IW_TEST_*`, see [`README.md`](README.md)); a mutation check goes on every guard (`iw-commit-cycle`).
+`Ingestor.ingest` is the one entry point: validate, dedup pre-check, upload HTML, insert, then `XADD`; `sweep` republishes rows whose announcement was lost. Spec `scraper-ingest` (capability `document-ingest`), reasoning in [ADR 0104](../.docs/decisions/0104-ingest-order-and-republish-sweep.md). Rules that bite: `content_hash` is defined once (NFC, whitespace collapsed, case kept; [ADR 0105](../.docs/decisions/0105-content-hash-normalisation.md), `.docs/integration-plan.md` §3) and `tests/test_ingest_document.py` pins it with literal hashes, so never switch it to NFKC; the schema belongs to `api/` (Alembic; never create or alter a table here); `iw-raw` is created by `minio-init`, the service only checks it (`Storage.check_bucket`); the conflict target of the insert is named and must match the partial unique index of the `api/` migration `0001`; `job_errors.detail` is redacted but must still never be given credentials. Nothing calls these yet: the wiring (sink adapter, `page` dict with `html`, `check_bucket` at startup, the scheduled sweep) is still to be assigned between `scraper-v1` and `scraper-orchestration`. Tests need PostgreSQL, Redis and MinIO (`IW_TEST_*`, see [`README.md`](README.md)); a mutation check goes on every guard (`iw-commit-cycle`).
 
 ## Done means
 

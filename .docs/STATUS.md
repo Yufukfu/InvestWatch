@@ -15,16 +15,16 @@ Team-wide state only: milestones and decisions that need the whole team. Module 
 
 ## Domain status
 
-| File | Owner | Covers |
-|---|---|---|
-| [status/scraper.md](status/scraper.md) | Adam | `scraper/` |
-| [status/dashboard.md](status/dashboard.md) | Kacper | `web/`, `infra/` |
-| [status/platform.md](status/platform.md) | Damian | `analytics/`, `api/`, `contracts/` |
+| File | Covers |
+|---|---|
+| [status/scraper.md](status/scraper.md) | `scraper/` |
+| [status/dashboard.md](status/dashboard.md) | `web/`, `infra/` |
+| [status/platform.md](status/platform.md) | `analytics/`, `api/`, `contracts/` |
 
-A blocker goes in the file of the domain it blocks. Naming another owner in your file is fine; changing their file needs their OK.
+Whoever changes a directory updates the file that covers it. Who owns a directory is in [`.github/CODEOWNERS`](../.github/CODEOWNERS) only ([ADR 0211](decisions/0211-codeowners-single-source.md)). A blocker goes in the file of the domain it blocks.
 
 ## Team-wide blockers and open decisions
 
-- Repository layout is Kacper's (`scraper/`, `analytics/`, `web/`, `contracts/`, `api/`, `infra/`, `.docs/`, `doc/` for UKNF materials); confirm with him before adding directories.
-- Demo path: until the api (`api-v1`, PR #21) or a mock service is in the root compose, `docker compose up` shows the dashboard's error states only; the dashboard is developed against `contracts/mock-server` run as a separate container ([ADR 0206](decisions/0206-dashboard-data-from-backend.md), decision in PR #25). Accepted for now; before the demo and the Sunday 10:30 hand-in `docker compose up` must run the whole system. Owner Kacper, with Damian for the backend.
+- Repository layout (`scraper/`, `analytics/`, `web/`, `contracts/`, `api/`, `infra/`, `.docs/`, `doc/` for UKNF materials): a new top-level directory needs the whole team's OK ([ADR 0211](decisions/0211-codeowners-single-source.md)).
+- Demo path: until the api (`api-v1`, PR #21) or a mock service is in the root compose, `docker compose up` shows the dashboard's error states only; the dashboard is developed against `contracts/mock-server` run as a separate container ([ADR 0206](decisions/0206-dashboard-data-from-backend.md), decision in PR #25). Accepted for now; before the demo and the Sunday 10:30 hand-in `docker compose up` must run the whole system. Kacper, with Damian for the backend.
 - Dependency and secret scans: results go in each PR body ("Security scans" section), not in a shared file; `.docs/security-audit.md` keeps service notes and the hand-in run ([ADR 0209](decisions/0209-supply-chain-scanning.md), [integration-plan.md](integration-plan.md) §7). Target: the scans as required CI checks on every PR.

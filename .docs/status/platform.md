@@ -1,6 +1,6 @@
-# Status: platform (Damian)
+# Status: platform
 
-Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their state. Last updated: 2026-11-22 (Sun).
+Covers `analytics/`, `api/` and `contracts/`; whoever changes them updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-22 (Sun).
 
 ## State
 

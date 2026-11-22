@@ -1,6 +1,9 @@
-# Owners per module, the split in .docs/STATUS.md. GitHub requests their review automatically, and the
-# iw-watch runner reads this file (from the default branch) to route reviews and defect reports.
-# Shared areas (infra/, .docs/, openspec/, .claude/, root files) have no single owner on purpose.
+# The only place that says who owns which path (ADR 0211): docs link here instead of naming owners, and
+# docs-check fails on a module without a line here or a per-person ownership statement in a live doc.
+# GitHub requests the owners' review automatically, and the iw-watch runner reads this file (from the
+# default branch) to route reviews and defect reports.
+# Shared areas (infra/, .docs/, openspec/, .claude/, .github/, root files) have no owner on purpose: any
+# teammate may change them, and a new top-level directory needs the whole team's OK.
 # Last matching pattern wins.
 
 /scraper/   @hen68

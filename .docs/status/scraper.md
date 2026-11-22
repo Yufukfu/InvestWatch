@@ -1,6 +1,6 @@
-# Status: scraper (Adam)
+# Status: scraper
 
-Edit only this file for `scraper/` state. Last updated: 2026-11-21 (Sat).
+Covers `scraper/`; whoever changes it updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-21 (Sat).
 
 ## State
 

@@ -8,12 +8,12 @@
 
 ## 2. Remove ownership statements from live docs
 
-- [ ] 2.1 `.github/CODEOWNERS` header: it is the source of truth, shared areas have no owner, and it no longer points at `.docs/STATUS.md`.
-- [ ] 2.2 Root `CLAUDE.md` and `README.md`: drop the owner columns and the "confirm with Kacper" layout rule (a new top-level directory needs the whole team), link `CODEOWNERS`.
-- [ ] 2.3 Service docs: titles and `Owner:` lines in the `CLAUDE.md` and `README.md` of `scraper/`, `analytics/`, `api/`, `contracts/`, `web/` and `infra/`; `web/CLAUDE.md`'s "Kacper also defines the repository structure"; `infra/README.md`; the module `compose.yaml` headers; `infra/postgres/init/01-app-role.sh`; `.claude/rules/web-dashboard.md`.
-- [ ] 2.4 Process docs: `.claude/SDLC.md`, `openspec/config.yaml`, `.docs/integration-plan.md` §1, `.docs/analytics-plan.md`, `.docs/INDEX.md` (a "Who owns X?" route to `CODEOWNERS`), `contracts/README.md`, and the `web-foundation` spec purpose.
-- [ ] 2.5 Status: `.docs/STATUS.md` maps files to directories only and loses the layout rule; `.docs/status/*.md` titles without names. Verify: `docs-check` exits 0 and `openspec validate --specs --strict` passes.
-- [ ] 2.6 Mutation check: `mutations: n/a, docs-only group; the guard is docs-check from group 1`.
+- [x] 2.1 `.github/CODEOWNERS` header: it is the source of truth, shared areas have no owner, and it no longer points at `.docs/STATUS.md`.
+- [x] 2.2 Root `CLAUDE.md` and `README.md`: drop the owner columns and the "confirm with Kacper" layout rule (a new top-level directory needs the whole team), link `CODEOWNERS`.
+- [x] 2.3 Service docs: titles and `Owner:` lines in the `CLAUDE.md` and `README.md` of `scraper/`, `analytics/`, `api/`, `contracts/`, `web/` and `infra/`; `web/CLAUDE.md`'s "Kacper also defines the repository structure"; `infra/README.md`; the module `compose.yaml` headers; `infra/postgres/init/01-app-role.sh`; `.claude/rules/web-dashboard.md`. Also `scraper/compose.renderer.yaml`, which review round 1 found.
+- [x] 2.4 Process docs: `.claude/SDLC.md`, `openspec/config.yaml`, `.docs/integration-plan.md` §1, `.docs/analytics-plan.md`, `.docs/INDEX.md` (a "Who owns X?" route to `CODEOWNERS`), `contracts/README.md`, and the `web-foundation` spec purpose. Also the `iw-docs-update` skill (the status rows and "never another owner's file"), and `.docs/presentation-analytics.md` ("Owner: Damian" becomes "Written by Damian").
+- [x] 2.5 Status: `.docs/STATUS.md` maps files to directories only and loses the layout rule; `.docs/status/*.md` titles without names. Verify: `docs-check` exits 0 and `openspec validate --specs --strict` passes.
+- [x] 2.6 Mutation check: `mutations: n/a, docs-only group; the guard is docs-check from group 1`.
 
 ## 3. Closing
 

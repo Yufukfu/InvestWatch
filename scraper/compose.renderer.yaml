@@ -1,4 +1,4 @@
-# Page renderer (owner Adam): headless Chromium behind a small HTTP service, called by the scraper worker over the
+# Page renderer: headless Chromium behind a small HTTP service, called by the scraper worker over the
 # private `render` network. The browser runs hostile page code, so this service holds no secret and no route to
 # Postgres, Redis or MinIO: an explicit environment (no env_file, the root .env holds every secret), networks `egress`
 # and `render` only, no host port. Why a separate service and what is accepted: ADR 0107.

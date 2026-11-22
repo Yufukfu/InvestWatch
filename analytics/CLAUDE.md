@@ -1,4 +1,6 @@
-# analytics (Damian's module)
+# analytics
+
+Owners: [`.github/CODEOWNERS`](../.github/CODEOWNERS).
 
 Consumes the Redis Stream `iw:documents` (consumer group `analytics`), runs modules M1-M3, inserts `findings` and publishes to `iw:events`. The logic lives in the docs, not here:
 

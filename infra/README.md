@@ -1,6 +1,6 @@
 # infra
 
-Shared infrastructure, owned by Kacper (repository layout). Each module has its own `compose.yaml`; the root `compose.yaml` only includes them, so a module is deployed, scaled or replaced without touching the others. Reasoning: [ADR 0202](../.docs/decisions/0202-deployment-topology.md) (topology), [ADR 0306](../.docs/decisions/0306-object-storage-image.md) (object storage and Redis images), [ADR 0304](../.docs/decisions/0304-llm-serving.md) (LLM fallback).
+Shared infrastructure, with no single owner ([`.github/CODEOWNERS`](../.github/CODEOWNERS)): any teammate may change it. Each module has its own `compose.yaml`; the root `compose.yaml` only includes them, so a module is deployed, scaled or replaced without touching the others. Reasoning: [ADR 0202](../.docs/decisions/0202-deployment-topology.md) (topology), [ADR 0306](../.docs/decisions/0306-object-storage-image.md) (object storage and Redis images), [ADR 0304](../.docs/decisions/0304-llm-serving.md) (LLM fallback).
 
 | Service | Purpose | Reachable from |
 |---|---|---|
@@ -60,7 +60,7 @@ networks:
 - `iw_admin` (from `POSTGRES_ADMIN_*`): migrations and ops only.
 - `iw_app` (from `POSTGRES_APP_*`): what services use. CRUD on tables in `public`, no DDL, no superuser.
 - Connection for services on `data`: `postgresql://iw_app:<password>@postgres:5432/investwatch`.
-- Schema comes from migrations (Alembic in `api`, owner Damian), never by hand. Run migrations as `iw_admin`: `iw_app` gets CRUD automatically only on tables created by `iw_admin`. The init script runs only on an empty volume; to reset: `docker compose down -v`.
+- Schema comes from migrations (Alembic in `api`), never by hand. Run migrations as `iw_admin`: `iw_app` gets CRUD automatically only on tables created by `iw_admin`. The init script runs only on an empty volume; to reset: `docker compose down -v`.
 
 ## Object storage access
 
