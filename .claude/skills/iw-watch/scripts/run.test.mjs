@@ -10,11 +10,18 @@ import { main } from './watch.mjs';
 import { fakeGh, fx, ME } from './testkit.mjs';
 import { MARKER } from './lib/rounds.mjs';
 
+// The runner commits merges itself (lib/worktree.mjs) with whatever git identity the machine has. macOS guesses one
+// from the host name, a Linux CI runner has none ("Author identity unknown"), so these tests passed on laptops and
+// failed in CI. Give this process (and every git it spawns) a fixed identity, ignore the developer's own git config
+// (a ~/.gitconfig identity hid the bug too) and turn guessing off, so a missing identity fails here, on any machine.
+Object.assign(process.env, {
+  GIT_AUTHOR_NAME: 'iw-test', GIT_AUTHOR_EMAIL: 'iw-test@example.invalid',
+  GIT_COMMITTER_NAME: 'iw-test', GIT_COMMITTER_EMAIL: 'iw-test@example.invalid',
+  GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.useConfigOnly', GIT_CONFIG_VALUE_0: 'true',
+});
 const ID = ['-c', 'user.name=iw-test', '-c', 'user.email=iw-test@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const git = (cwd, ...args) => execFileSync('git', [...ID, ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-// The runner commits a merge with the user's own git identity. A CI runner has none, and on Linux git cannot guess
-// one ("Author identity unknown"), so the runner's own git calls get a fixed one here (node --test: one process per file).
-Object.assign(process.env, { GIT_AUTHOR_NAME: 'iw-test', GIT_AUTHOR_EMAIL: 'iw-test@example.invalid', GIT_COMMITTER_NAME: 'iw-test', GIT_COMMITTER_EMAIL: 'iw-test@example.invalid' });
 
 function repo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'iw-run-'));
@@ -455,6 +462,18 @@ test('run: --limit caps the sessions per run', async () => {
   const s = setup();
   await main(['run', '--mine', '--review-requested', '--limit', '1'], s.deps);
   assert.equal(s.calls.length, 1);
+});
+
+test('run: an approved notice takes no --limit slot from a session', async () => {
+  const approval = { ...fx('reviews-11.json').find((r) => r.state === 'APPROVED'), body: '' };
+  const s = setup();
+  const pr11 = { ...s.pr11, reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  // #11 is approved (sorts first, no session), #28 waits for my review (a session)
+  s.deps.gh = fakeGh({ 'pr list mine': [pr11], 'pr list review': [s.pr28], 'pr list open': [{ number: 11 }, { number: 28 }], 'pulls/11/reviews': [approval], 'pulls/11/comments': [], 'issues/11/comments': [] }).gh;
+  assert.equal(await main(['run', '--mine', '--review-requested', '--limit', '1'], s.deps), 0, s.err.join(''));
+  assert.equal(s.calls.length, 1, 'the review session still runs');
+  assert.deepEqual(s.notices().map((n) => n.kind).sort(), ['approved', 'draft-ready']);
+  assert.doesNotMatch(s.err.join(''), /wait for the next run/);
 });
 
 test('run: without the claude CLI it exits non-zero with install guidance and writes no state', async () => {

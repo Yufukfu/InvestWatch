@@ -25,12 +25,12 @@ pip-audit -r <service>/requirements.txt -r <service>/requirements-dev.txt   # ea
 # Repository-wide, offline against a local OSV database (on-premise mode): manifests only, not a recursive walk
 docker run --rm -v "$PWD":/src:ro -v osv-db:/root/.cache/osv-scanner \
   ghcr.io/google/osv-scanner:v2.2.4 \
-  scan source --offline-vulnerabilities --download-offline-databases \
+  scan source --offline --download-offline-databases \
   -L /src/web/package-lock.json \
   $(for f in */requirements*.txt contracts/mock-server/requirements*.txt; do printf -- '-L requirements.txt:/src/%s ' "$f"; done)
 ```
 
-**Not run to completion on this repository yet.** On a MacBook Air M1 (8 GB) under Docker Desktop, a recursive `-r /src` run found all 10 manifests in under 1 s, loaded the npm database (`npm/all.zip`) and then stalled until it was killed, leaving the cache empty. The likely cause is the size of the npm database, not the file walk (unverified). Run it in CI or on a machine with more memory, not on a developer laptop, and check that `osv-db` is non-empty after the first run. Once `osv-db` holds the database, an air-gapped host runs the same command with `--offline` in place of the two offline flags. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0209, decision 5).
+**Run it in CI, not on a developer laptop.** The CI offline job (section 5) completed on PR #100: it loaded the npm and PyPI databases and scanned 12 manifests in about 28 s. On a MacBook Air M1 (8 GB) under Docker Desktop, the same scan loaded `npm/all.zip` and then stalled until it was killed, leaving the cache empty (likely memory, unverified). On a machine with enough memory, check that `osv-db` is non-empty after the first run. Once it holds the database, an air-gapped host runs the same command without `--download-offline-databases`. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0209, decision 5).
 
 ## 3. Fixing a finding
 
@@ -47,26 +47,45 @@ docker run --rm -v "$PWD":/src:ro -v osv-db:/root/.cache/osv-scanner \
 - **Hard-coded secrets** (a key pasted into code, YAML or a test) are caught by Gitleaks:
 
 ```bash
-# A git worktree's .git is a file that points at the main checkout, so mount that too, at the same path
+# Works in a plain clone and in a git worktree, whose .git is a file pointing at the main checkout.
+# Mount the worktree and the shared git dir at fixed paths and tell git where they are. Mounting them
+# at their host paths (-v "$PWD:$PWD") showed an empty directory under Docker Desktop on macOS.
 GIT_COMMON=$(git rev-parse --path-format=absolute --git-common-dir)
+GIT_SUB=$(git rev-parse --path-format=absolute --git-dir); GIT_SUB=${GIT_SUB#"$GIT_COMMON"}
 GITLEAKS=zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
-# Staged changes, before a commit (git-tracked content only: never reads the untracked .env or node_modules)
-docker run --rm -v "$PWD:$PWD:ro" -v "$GIT_COMMON:$GIT_COMMON:ro" -w "$PWD" "$GITLEAKS" \
-  git "$PWD" --staged --no-banner --redact
-# Full history of main
-docker run --rm -v "$PWD:$PWD:ro" -v "$GIT_COMMON:$GIT_COMMON:ro" -w "$PWD" "$GITLEAKS" \
-  git "$PWD" --log-opts=origin/main --no-banner --redact
+gitleaks() { docker run --rm -v "$PWD:/repo:ro" -v "$GIT_COMMON:/gitcommon:ro" -w /repo \
+  -e GIT_DIR="/gitcommon$GIT_SUB" -e GIT_COMMON_DIR=/gitcommon -e GIT_WORK_TREE=/repo \
+  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+  "$GITLEAKS" git /repo --no-banner --redact "$@"; }
+gitleaks --staged                  # staged changes, before a commit (tracked content only, never the untracked .env)
+gitleaks --log-opts=origin/main    # full history of main
 ```
 
-  Check the `N commits scanned` line: `0 commits` means git history was not readable (the worktree case above), and "no leaks found" is then false. `--redact` keeps the matched value out of the output. Never paste a finding's secret into a PR, an issue or a chat. Known false positives go in `.gitleaks.toml` (added with the CI follow-up), with the file and the reason. The first two are the mock ids in `contracts/mocks/generate_mocks.py`.
+  Check the `N commits scanned` line: `0 commits` means git history was not readable (the worktree case above), and "no leaks found" is then false. `--redact` keeps the matched value out of the output. Never paste a finding's secret into a PR, an issue or a chat. Known false positives go in `.gitleaks.toml`, with the file and the reason. Put an entry on the rule that fires (`[[rules]] id = "<rule>"` plus `[[rules.allowlists]]`), never in a top-level `[[allowlists]]` with `paths`: in v8.28.0 that skips the whole file whatever `condition` says. Then check the entry with a scratch copy of the file plus a credential-shaped line, which must still be reported. Two entries today: the two mock ids in `contracts/mocks/generate_mocks.py`, and UUID firm keys (`key: '<uuid>',`) in web test files. Every PR scans all branches (`fetch-depth: 0`), so a false positive on any pushed branch fails every PR until its entry is on `main`.
 - **A real secret was committed.** Rotate it first (new password in `.env`, then restart the stack), then remove it from the code. Deleting it alone is not enough: git history keeps the old value, and we never rewrite pushed history (root `CLAUDE.md`).
 
-## 5. Status
+## 5. In CI
+
+`.github/workflows/security.yml` runs on every pull request to `main` and by hand from the Actions tab. It is not a required check: a red job is fixed or logged as a residual risk in the PR body (section 3), it does not block the merge itself.
+
+| Job | What it runs |
+|---|---|
+| Secrets (Gitleaks, full history) | every commit with `.gitleaks.toml`, values redacted. It fails when the log shows 0 commits scanned, because Gitleaks over an unreadable history says "no leaks found" and exits 0. |
+| Dependencies (OSV-Scanner) | `scan source -r` over the checkout in online mode: only package names and versions go to osv.dev |
+| Dependencies (OSV-Scanner, offline database) | by hand (start the workflow with `offline` ticked) and on every PR that changes `security.yml`, so a pin bump is proven before the merge. It downloads the databases first, the on-premise mode of ADR 0209 |
+| Python dependencies (pip-audit) | every `requirements*.txt`, on Python 3.12 or 3.13 like the images. It fails if a requirements file is in a directory the matrix does not list |
+| Node dependencies (npm audit) | every tracked `package-lock.json`, failing at high |
+
+Every action is pinned by commit SHA, both images by digest and `pip-audit` by `==`. The test `.github/tests/workflow-pins.test.mjs` fails on anything unpinned in that file. To bump a tool, read the new SHA (`gh api repos/<owner>/<action>/git/ref/tags/<tag>`) or digest (`docker buildx imagetools inspect <image>:<tag>`) and change it in a PR.
+
+## 6. Status
 
 | Control | State |
 |---|---|
 | `pip-audit`, `npm audit` in CI | in `.github/workflows/ci.yml`, on every PR to `main` ([ADR 0213](decisions/0213-ci-on-every-pr.md)); advisory, not a required check |
 | `.env` isolation (gitignore, hook, CI) | in place |
-| OSV-Scanner (offline) | manual (section 2); CI job is the ADR 0209 follow-up |
-| Gitleaks + `.gitleaks.toml` | manual (section 4); CI job is the ADR 0209 follow-up |
-| Actions pinned by SHA, `pip install pip-audit` pinned in CI, Postgres and Caddy images and the moving-tag Dockerfile bases (`api`, `scraper`, `web`) pinned by digest | follow-up |
+| OSV-Scanner | on every PR in `security.yml` (online); offline database by hand and on PRs that change `security.yml` (section 5) |
+| Gitleaks + `.gitleaks.toml` | on every PR in `security.yml`, full history |
+| `pip-audit`, `npm audit` on every PR | in `security.yml` (`pip-audit==2.10.1`) |
+| Actions pinned by SHA, scanner images by digest | `security.yml`, enforced by `.github/tests/workflow-pins.test.mjs` |
+| `ci.yml` actions by SHA, Postgres and Caddy images and the moving-tag Dockerfile bases (`api`, `scraper`, `web`) pinned by digest | follow-up |

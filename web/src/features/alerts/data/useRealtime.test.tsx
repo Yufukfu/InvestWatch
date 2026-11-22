@@ -5,6 +5,7 @@ import { useGetCalibrationQuery, useGetFindingsByIdQuery, useGetFindingsQuery, u
 import detail from '../../../test/fixtures/finding-detail.json';
 import findings from '../../../test/fixtures/findings.json';
 import summary from '../../../test/fixtures/summary.json';
+import { iso } from '../../../test/iso';
 import { server } from '../../../test/setup';
 import { storeWrapper } from '../../../test/store';
 import { useRealtime } from './useRealtime';
@@ -229,12 +230,12 @@ describe('useRealtime', () => {
       fake.fire('finding.high_risk', { ...brief, id: uid(1), title: 'Stary' });
       fake.fire('finding.high_risk', { ...brief, id: uid(2), title: 'Nowy' });
     });
-    expect(result.current.announcement).toBe('Wysokie ryzyko: Nowy');
+    expect(result.current.announcement).toBe(`Wysokie ryzyko: ${iso('Nowy')}`);
     act(() => result.current.dismiss(uid(2)));
-    expect(result.current.announcement).toBe('Wysokie ryzyko: Nowy');
+    expect(result.current.announcement).toBe(`Wysokie ryzyko: ${iso('Nowy')}`);
     expect(result.current.alerts.map((a) => a.id)).toEqual([uid(1)]);
     act(() => result.current.open(uid(1)));
-    expect(result.current.announcement).toBe('Wysokie ryzyko: Nowy');
+    expect(result.current.announcement).toBe(`Wysokie ryzyko: ${iso('Nowy')}`);
   });
 
   it('does not alert on finding.created', () => {
@@ -242,6 +243,13 @@ describe('useRealtime', () => {
     act(() => fake.fire('finding.created', brief));
     expect(result.current.alerts).toEqual([]);
     expect(result.current.announcement).toBe('');
+  });
+
+  it('isolates a right-to-left override in the announced title, and keeps the alert title verbatim', () => {
+    const { result } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
+    act(() => fake.fire('finding.high_risk', { ...brief, id: uid(1), title: 'Zysk \u2069\u202Egpj.exe' }));
+    expect(result.current.announcement).toBe('Wysokie ryzyko: \u2068Zysk \u202Egpj.exe\u2069');
+    expect(result.current.alerts[0].title).toBe('Zysk \u2069\u202Egpj.exe');
   });
 
   it('raises no toast for a blank title and cuts a long title to 200 characters', () => {
