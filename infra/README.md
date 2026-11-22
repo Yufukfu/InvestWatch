@@ -72,7 +72,7 @@ networks:
 
 ```bash
 docker compose --profile llm up -d          # adds ollama and pulls gemma3:4b and bge-m3 (several GB, Docker Hub)
-docker compose --profile llm up ollama-pull # pre-pull before a demo
+docker compose --profile llm up --exit-code-from ollama-pull ollama-pull # pre-pull before a demo; plain `up` exits 0 even if the pull fails
 ```
 
 A plain `docker compose up` starts neither and downloads nothing.
