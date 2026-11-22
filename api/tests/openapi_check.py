@@ -1,4 +1,5 @@
-"""Copied from the archived mock server (branch contracts/mock-server, tests/openapi_check.py); only CONTRACTS_DIR changed.
+"""Copied from the archived mock server (branch contracts/mock-server, tests/openapi_check.py); CONTRACTS_DIR changed and
+file refs may carry a fragment (`./schemas/finding.schema.json#/$defs/rule_result`, the export route).
 
 Validate HTTP responses against the response schemas in contracts/openapi.yaml.
 
@@ -35,8 +36,9 @@ def _rewrite_refs(node, schemas: dict[str, dict]):
     if isinstance(node, dict):
         out = {k: _rewrite_refs(v, schemas) for k, v in node.items()}
         ref = node.get("$ref")
-        if isinstance(ref, str) and ref in schemas:
-            out["$ref"] = schemas[ref]["$id"]
+        base, _, fragment = ref.partition("#") if isinstance(ref, str) else ("", "", "")
+        if base in schemas:
+            out["$ref"] = schemas[base]["$id"] + (f"#{fragment}" if fragment else "")
         return out
     if isinstance(node, list):
         return [_rewrite_refs(v, schemas) for v in node]
