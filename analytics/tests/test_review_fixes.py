@@ -50,7 +50,9 @@ def test_no_warning_with_a_real_registry_file(tmp_path, capsys):
 def test_clean_title_names_the_checked_rules():
     registry = Registry.from_csv(SEED_REGISTRY)
     text = ("Reklama. Bank Przykładowy S.A. – Biuro Maklerskie. Otwórz IKE i inwestuj długoterminowo. "
-            "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału.")
+            "Inwestowanie w instrumenty finansowe wiąże się z ryzykiem utraty części lub całości zainwestowanego kapitału. "
+            # IKE is a tax reference: without the disclaimer of the m2-bank-ok mock, R16 fails (analytics-m2-p1-rules).
+            "Traktowanie podatkowe zależy od indywidualnej sytuacji klienta i może ulec zmianie.")
     [f] = analyze(ScrapedDocument.model_validate(make_doc(text=text)), registry=registry, catalogue=Catalogue.load(), now=NOW)
     assert f.score == 0
     checked = [r.rule_id for r in f.rules if r.result != "not_applicable"]
