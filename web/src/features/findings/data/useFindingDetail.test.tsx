@@ -44,6 +44,27 @@ describe('useFindingDetail', () => {
     expect(d.exportUrl).toBe(`http://localhost/api/findings/${detail.id}/export?format=html`);
   });
 
+  it('has no re-scan state for the contract mock, which carries no scrape_meta.rescan', async () => {
+    const { result } = renderHook(() => useFindingDetail(detail.id), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.detail).toBeDefined());
+    expect(result.current.detail!.rescan).toBeUndefined();
+  });
+
+  it('maps document.scrape_meta.rescan from the api to the view model', async () => {
+    const latest = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+    const withRescan = {
+      ...detail,
+      document: {
+        ...detail.document,
+        scrape_meta: { ...detail.document.scrape_meta, rescan: { state: 'changed', latest_document_id: latest, checked_at: '2026-11-22T06:00:00Z' } },
+      },
+    };
+    server.use(http.get('http://localhost/api/findings/:id', () => HttpResponse.json(withRescan)));
+    const { result } = renderHook(() => useFindingDetail(detail.id), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current.detail).toBeDefined());
+    expect(result.current.detail!.rescan).toEqual({ state: 'changed', latestDocumentId: latest, checkedAt: '2026-11-22T06:00:00Z' });
+  });
+
   it('reports notFound on a 404', async () => {
     const { result } = renderHook(() => useFindingDetail('00000000-0000-4000-8000-000000000000'), { wrapper: storeWrapper() });
     await waitFor(() => expect(result.current.notFound).toBe(true));

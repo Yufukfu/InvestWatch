@@ -2,6 +2,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useGetFindingsByIdQuery, type GetFindingsByIdApiResponse } from '../../../api/generated';
 import { config } from '../../../config';
 import type { FindingDetail } from '../model';
+import { parseRescan } from './rescan';
 
 function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
   return {
@@ -46,6 +47,7 @@ function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
     llm: f.model?.llm,
     // A navigation, not an RTK Query fetch: the api renders the printable page (contracts 1.2.0).
     exportUrl: `${config.apiBaseUrl}/findings/${encodeURIComponent(f.id)}/export?format=html`,
+    rescan: parseRescan(f.document?.scrape_meta),
   };
 }
 

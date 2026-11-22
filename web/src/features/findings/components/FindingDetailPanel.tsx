@@ -12,6 +12,7 @@ import {
   SEVERITY_LABEL,
   STATUS_LABEL,
 } from './labels';
+import { RescanNotice } from './RescanNotice';
 import { RiskBadge } from './RiskBadge';
 
 type Props = {
@@ -143,6 +144,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
           <span className="muted">{d.url}</span>
         )}
       </p>
+      <RescanNotice rescan={d.rescan} />
 
       {d.summary && (
         <section className="detail-section" aria-labelledby="d-summary">

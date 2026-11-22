@@ -111,6 +111,11 @@ button.link:hover { color: #1e40af; }
 .risk-medium { background: var(--risk-medium-bg); color: var(--risk-medium-fg); }
 .risk-low { background: var(--risk-low-bg); color: var(--risk-low-fg); }
 .risk-none { background: #e5e7eb; color: #374151; }
+.rescan { margin: 8px 0 0; }
+.rescan code { overflow-wrap: anywhere; }
+.rescan-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.rescan-changed .rescan-badge { background: var(--risk-medium-bg); color: var(--risk-medium-fg); }
+.rescan-removed .rescan-badge { background: var(--risk-high-bg); color: var(--risk-high-fg); }
 .status { white-space: nowrap; font-weight: 500; }
 .status::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #6b7280; vertical-align: middle; }
 .status-new::before { background: #1d4ed8; }

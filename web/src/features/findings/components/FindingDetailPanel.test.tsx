@@ -103,6 +103,15 @@ describe('FindingDetailPanel', () => {
     expect(screen.getByText(/gemma3:4b/)).toBeInTheDocument();
   });
 
+  it('shows the re-scan badge for a changed page and none without a re-scan state', () => {
+    const { unmount } = render(<FindingDetailPanel {...base} detail={detail({ rescan: { state: 'removed' } })} />);
+    expect(screen.getByText('Usunięta')).toBeInTheDocument();
+    unmount();
+    render(<FindingDetailPanel {...base} detail={detail()} />);
+    expect(screen.queryByText('Usunięta')).toBeNull();
+    expect(screen.queryByText('Zmieniona')).toBeNull();
+  });
+
   it('flags an unauthorised firm and an advertiser on the warning list', () => {
     render(
       <FindingDetailPanel
