@@ -5,9 +5,9 @@
 # Checked by scraper/tests/renderer_stack.sh.
 services:
   renderer:
+    # Build context is scraper/ only: the renderer stages take nothing from contracts/ (or anywhere else).
     build:
-      context: ..
-      dockerfile: scraper/Dockerfile
+      context: ../scraper
       target: renderer
     # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
     pull_policy: build

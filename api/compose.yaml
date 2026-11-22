@@ -13,10 +13,14 @@
 # one service only leaves the other to pull a tag no registry has. BuildKit solves the shared steps once, so a full
 # `up --build` still builds one image's worth of layers. Tag per compose project, rebuilt on every `up` (issue #63; see
 # web/compose.yaml).
+# Build context is this folder; contracts/ is the one outside input, passed as the named context `contracts`.
+# Paths are `../api` and `../contracts`, not `.`: with several -f files Compose resolves them from the first file's
+# directory (infra/ in the command above), and `..` is valid from infra/, api/ and scraper/ alike (issue #97).
 x-api-build: &api-build
   build:
-    context: ..
-    dockerfile: api/Dockerfile
+    context: ../api
+    additional_contexts:
+      contracts: ../contracts
   pull_policy: build
 
 services:

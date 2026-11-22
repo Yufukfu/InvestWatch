@@ -45,8 +45,7 @@ services:
   renderer-e2e:
     profiles: [e2e]
     build:
-      context: ..
-      dockerfile: scraper/Dockerfile
+      context: ../scraper
       target: renderer-test
     command: ["python", "tests_renderer/e2e_server.py"]
     shm_size: 256m
@@ -55,9 +54,10 @@ services:
       - ./tests/fixtures/demo:/app/scraper/tests/fixtures/demo:ro
   test:
     build:
-      context: ..
-      dockerfile: scraper/Dockerfile
+      context: ../scraper
       target: test
+      additional_contexts:
+        contracts: ../contracts
     environment:
       REDIS_URL: redis://redis:6379/0
       IW_TEST_REDIS_URL: redis://redis:6379/1

@@ -39,7 +39,7 @@ Python 3.12 and the native TLS library are only in the image. From the repositor
 COMPOSE_PROJECT_NAME=iw-scraper-orch docker compose -f scraper/compose.test.yaml run --rm --build test
 ```
 
-The renderer's tests need its own image (Chromium, no database): `docker build -f scraper/Dockerfile --target renderer-test -t iw-renderer:test .` then `docker run --rm --shm-size 256m iw-renderer:test pytest -q tests_renderer`. `scraper/tests/renderer_stack.sh` checks the compose service (network, no host port, health).
+The renderer's tests need its own image (Chromium, no database): `docker build --target renderer-test -t iw-renderer:test scraper` then `docker run --rm --shm-size 256m iw-renderer:test pytest -q tests_renderer`. `scraper/tests/renderer_stack.sh` checks the compose service (network, no host port, health).
 
 Without those services (a bare `docker run` of the image) the service-backed tests are skipped, and with `CI` set they fail.
 

@@ -1,0 +1,10 @@
+# Build context is scraper/ (see Dockerfile; contracts/ comes in as the named context `contracts`).
+# Keep secrets, local environments and caches out of the image.
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv
+**/*.pem
+**/*.key
+**/__pycache__
+**/.pytest_cache

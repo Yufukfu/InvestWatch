@@ -30,6 +30,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0212](0212-ai-log-one-file-per-entry.md) | AI log: one file per entry in `.docs/ai-log/`, table rendered on demand (replaces the `merge=union` table) | accepted (takes effect when the PR merges) |
 | [0213](0213-ci-on-every-pr.md) | `ci.yml` runs on every PR to `main` as an advisory check (not required: needs a paid plan or a public repo) | accepted (takes effect when the PR merges) |
 | [0214](0214-dashboard-fonts-fontsource.md) | Dashboard fonts: self-hosted static `@fontsource` packages (Space Grotesk, Inter, Geist Mono), Latin and Latin Extended only | accepted (takes effect when the PR merges) |
+| [0215](0215-module-build-contexts.md) | Each module builds from its own folder; `contracts/` is a named build context for `api` and `scraper` | accepted (takes effect when the PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |

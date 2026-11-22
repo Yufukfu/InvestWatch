@@ -29,7 +29,7 @@ A module adds `<module>/compose.yaml` with its own Dockerfile, and one line in t
 ```yaml
 services:
   analytics:
-    build: .
+    build: ../analytics               # the module's own folder; `../`, not `.`, so a -f chain starting at infra/ resolves it
     networks: [data, egress]          # + edge if the gateway routes to it
     environment:
       DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-investwatch}
@@ -53,6 +53,7 @@ networks:
 - Runtime setup belongs to the consumer: analytics creates its consumer group (`XGROUP CREATE iw:documents analytics $ MKSTREAM`), and `api` writes the default thresholds ([ADR 0305](../.docs/decisions/0305-threshold-storage.md)). The scraper's job queue uses the same Redis, db 0, keys prefixed `iw:scraper:`.
 - Redis runs `noeviction` with `maxmemory 128mb`: when it is full, every write fails instead of silently dropping data. The scraper therefore caps the stream when it publishes: `XADD iw:documents MAXLEN ~ 10000 * document_id <uuid> schema v1` (approximate trimming is cheap; 10 000 is an example, sized so unconsumed entries stay far below the cap). Analytics acknowledges entries (`XACK`) as it processes them.
 - Local LLM: `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama` (any non-empty value).
+- Build from the module's own folder. An image that needs `contracts/` takes it as a named context, as `api` and `scraper` do: `additional_contexts: { contracts: ../contracts }` in compose and `COPY --from=contracts schemas ...` in the Dockerfile ([ADR 0215](../.docs/decisions/0215-module-build-contexts.md)).
 - Running one module alone joins the same networks only with the stack's project name: `docker compose -p investwatch --env-file .env -f web/compose.yaml up`.
 
 ## Scale-out

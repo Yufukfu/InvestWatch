@@ -14,7 +14,8 @@ def test_api_and_migrate_each_build_the_api_dockerfile():
     # starts api-migrate without api (scraper/tests/stack.sh) would pull a tag no registry has.
     for name in ("api", "api-migrate"):
         svc = SERVICES[name]
-        assert svc["build"] == {"context": "..", "dockerfile": "api/Dockerfile"}, name
+        # Context is api/ itself; contracts/ is the only outside input, as a named context.
+        assert svc["build"] == {"context": "../api", "additional_contexts": {"contracts": "../contracts"}}, name
         assert svc["pull_policy"] == "build", name
 
 

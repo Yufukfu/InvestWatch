@@ -84,10 +84,13 @@ services:
   # port). Scale with `--scale worker=N`: the queue, run lock and domain limits are shared through Redis.
   worker:
     <<: [*scraper-image, *hardening]
+    # Build context is this folder; contracts/ (the JSON Schemas) is the one outside input, as the named context
+    # `contracts`. `../` paths for the reason the include above gives.
     build:
-      context: ..
-      dockerfile: scraper/Dockerfile
+      context: ../scraper
       target: runtime
+      additional_contexts:
+        contracts: ../contracts
     # Tag per compose project (x-scraper-image), rebuilt on every `up` (issue #63; see web/compose.yaml).
     pull_policy: build
     command: ["python", "-m", "iw_scraper", "worker"]

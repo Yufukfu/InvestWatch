@@ -1,5 +1,6 @@
-# Build context is the repository root: docker build -f scraper/Dockerfile .
-# (the image needs contracts/ for schema validation)
+# Build context is scraper/. The JSON Schemas the scraper validates against come in as the named context `contracts`,
+# the only input from outside this folder (the renderer stages need none). From the repository root:
+#   docker build --build-context contracts=contracts --target runtime scraper
 FROM python:3.12-slim-bookworm AS base
 
 ARG TLS_CLIENT_VERSION=1.18.1
@@ -15,7 +16,7 @@ RUN apt-get update \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY scraper/requirements.txt scraper/requirements.txt
+COPY requirements.txt scraper/requirements.txt
 RUN pip install -r scraper/requirements.txt
 
 # noble-tls would fetch the *latest* tls-client through api.github.com at run time (unpinned, rate limited).
@@ -35,8 +36,8 @@ RUN set -eu; \
     printf '%s %s' "$EXPECTED" "${TLS_CLIENT_VERSION}" > "$DEPS/.version"; \
     python -c "import noble_tls; from noble_tls import Session, Client; Session(client=Client.CHROME_146_PSK); print('tls-client loaded')"
 
-COPY contracts/ contracts/
-COPY scraper/ scraper/
+COPY --from=contracts schemas contracts/schemas
+COPY . scraper/
 ENV PYTHONPATH=/app/scraper/src CONTRACTS_DIR=/app/contracts
 
 FROM base AS test
@@ -45,25 +46,25 @@ WORKDIR /app/scraper
 CMD ["pytest", "-q"]
 
 # The renderer is its own image (ADR 0107): the browser runs hostile page code, so it never shares an image
-# with the scraper's credentials. Build: docker build -f scraper/Dockerfile --target renderer-test .
+# with the scraper's credentials. Build: docker build --target renderer-test scraper
 FROM python:3.12-slim-bookworm AS renderer-base
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PLAYWRIGHT_BROWSERS_PATH=/opt/pw
 WORKDIR /app
-COPY scraper/requirements-renderer.txt scraper/requirements-renderer.txt
+COPY requirements-renderer.txt scraper/requirements-renderer.txt
 # the headless shell is all a screenshot needs; the browser build is fixed by the playwright pin
 RUN pip install -r scraper/requirements-renderer.txt \
  && playwright install --with-deps --only-shell chromium \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
-COPY scraper/src/iw_renderer scraper/src/iw_renderer
+COPY src/iw_renderer scraper/src/iw_renderer
 # the modules shared with the scraper: address checks and block markers, free of the fetch client (no noble-tls here)
-COPY scraper/src/iw_scraper/__init__.py scraper/src/iw_scraper/addresses.py scraper/src/iw_scraper/blocking.py scraper/src/iw_scraper/
+COPY src/iw_scraper/__init__.py src/iw_scraper/addresses.py src/iw_scraper/blocking.py scraper/src/iw_scraper/
 ENV PYTHONPATH=/app/scraper/src
 
 FROM renderer-base AS renderer-test
-COPY scraper/requirements-renderer-dev.txt scraper/requirements-renderer-dev.txt
+COPY requirements-renderer-dev.txt scraper/requirements-renderer-dev.txt
 RUN pip install -r scraper/requirements-renderer-dev.txt
-COPY scraper/pyproject.toml scraper/pyproject.toml
-COPY scraper/tests_renderer scraper/tests_renderer
+COPY pyproject.toml scraper/pyproject.toml
+COPY tests_renderer scraper/tests_renderer
 WORKDIR /app/scraper
 CMD ["pytest", "-q", "tests_renderer"]
 
