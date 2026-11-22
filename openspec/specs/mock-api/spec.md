@@ -2,9 +2,7 @@
 
 ## Purpose
 A contract-conformant stand-in for the InvestWatch REST API and Socket.IO events, backed by `contracts/mocks/`, so the dashboard can be developed and demoed without the other services. Lives in `contracts/mock-server/`.
-
 ## Requirements
-
 ### Requirement: Serve the contract REST routes from mock data
 The mock server SHALL expose every path of `contracts/openapi.yaml` under the `/api` prefix on a configurable port (default `8000`), and every JSON response SHALL validate against the schema referenced by that path in `contracts/openapi.yaml` and `contracts/schemas/`. Data SHALL come from the files in `contracts/mocks/` (mock-to-endpoint table in `contracts/README.md`); the contracts themselves are defined in `.docs/integration-plan.md` §4-§5 and are not restated here.
 
@@ -151,3 +149,19 @@ The generated mocks SHALL contain at least one document that has findings from t
 #### Scenario: M1 and M3 on one post
 - **WHEN** `python contracts/mocks/generate_mocks.py` runs
 - **THEN** `findings.json` has exactly one `document_id` shared by two findings, one with `module` M1 and one with M3, and `python contracts/validate.py` exits 0
+
+### Requirement: Serve the finding evidence pack
+The mock server SHALL serve `GET /api/findings/{id}/export` as in `contracts/openapi.yaml` 1.2.0: for `format=json` (the default) a pack whose `finding`, `document` and `screenshot_urls` equal the mock `GET /api/findings/{id}` body, whose `failed_rules` are the finding's rules with `result` `fail`, and whose `raw.available` is false with `unavailable_reason` `not_found` when the mock document has an `html_object_key` and `no_key` otherwise; for `format=html` the same content as a printable page with every value HTML-escaped and a `Content-Security-Policy` that allows no scripts. An unknown id SHALL return 404 in both formats and a malformed id or `format` SHALL return 422.
+
+#### Scenario: JSON pack of a mock finding
+- **WHEN** the dashboard calls `GET /api/findings/{id}/export` for any mock finding
+- **THEN** the response is 200, validates against `contracts/openapi.yaml` and matches that finding's detail
+
+#### Scenario: Printable page
+- **WHEN** the dashboard opens `GET /api/findings/{id}/export?format=html`
+- **THEN** the response is 200 `text/html` with a CSP starting `default-src 'none'`
+
+#### Scenario: Unknown finding
+- **WHEN** a client calls the export with a well-formed UUID that is not a mock finding
+- **THEN** the response is 404 with an error body
+
