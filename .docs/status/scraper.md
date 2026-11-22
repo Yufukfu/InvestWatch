@@ -49,6 +49,12 @@ Gaps that matter for the demo:
 
 Clean project from this branch (2026-11-22, one `docker compose up -d --build --wait` on empty volumes, rules-only analytics because no LLM key was set, renderer off, real network): `up --wait` returned after 37 s with images already built (a cold image build was not timed); `bootstrap` exited 0; about three minutes later `status` reported 17 of 17 scheduled sources `scanned`, the 2 X and YouTube rows `manual`, 223 documents, findings M1 53, M2 5, M3 12 and 19 calibration points per module, and exited 0 (ready). A first read, about one minute after `up`, showed 15 scanned, 2 pending, 153 documents. Not checked: a cold build time, a run with the LLM on, a scheduled scan landing by cron, a rerun on the same volumes beyond the `stack.sh` check (no new requests).
 
+## Rehearsal on `main` 313c625b (2026-11-22, own project name, own volumes)
+
+- Cron: the KNF row's `schedule_cron` set to `*/5 * * * *` through `PATCH /api/sources/{id}` (the seed one-shot does not change an existing row). The scheduler enqueued `sched-<source>-20261122T0510Z`, the worker ran it and `iw:events` carried `scan.started` 05:12:34Z and `scan.finished` 05:12:43Z (`documents` 0, `status` ok: the page was unchanged). The job ran two minutes after its slot because the worker was busy with renders; the scheduler's five-minute look-back still caught it.
+- Render: with `SCRAPER_RENDER_ENABLED=true`, R4 and R6 returned `pass` on rendered XTB and mBank findings (`GET /api/findings?module=M2`, `rules[].result`), and `not_applicable` on a document stored after a failed render. Five simultaneous scans overloaded the one-at-a-time renderer: renders of 8-85 s, `render_failed` job errors ("renderer did not answer", "render exceeded"), repeated arq retries with `run lock lost` warnings, and no document stored for minutes. Default stays off; the `.env` line is `SCRAPER_RENDER_ENABLED=true` (in `.env.example`, commented in `scraper/README.md`).
+- Not checked: a solo render timing on an idle renderer, rendering in the first-run bootstrap with the flag on from the start.
+
 ## Active OpenSpec changes
 
 - `scraper-rescan-tracking` (issue 71: edited and removed web pages)

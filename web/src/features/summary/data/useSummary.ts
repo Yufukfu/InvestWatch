@@ -11,5 +11,8 @@ export function useSummary(): SummaryCounts | undefined {
     byModule: Object.entries(data.by_module ?? {})
       .map(([module, count]) => ({ module, count: count ?? 0 }))
       .sort((a, b) => a.module.localeCompare(b.module)),
+    m2Coverage: data.m2_coverage
+      ? { total: data.m2_coverage.total, registryMatched: data.m2_coverage.registry_matched }
+      : undefined,
   };
 }

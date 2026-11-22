@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { isolate } from '../../../format/bidi';
 import { formatScore } from '../../../format/score';
 import type { FindingRow, FindingSort } from '../model';
 import { findingsCount, detectedParts, MODULE_LABEL, platformLabel, STATUS_LABEL } from './labels';
@@ -15,7 +17,36 @@ type Props = {
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
+  /** Bulk selection of the loaded page; without it the table has no checkboxes. */
+  selection?: RowSelection;
 };
+
+export type RowSelection = {
+  ids: ReadonlySet<string>;
+  toggle: (id: string) => void;
+  toggleAll: () => void;
+};
+
+// Checked when every row is selected, mixed when only some are (indeterminate is a DOM property only).
+function SelectAllBox({ rows, selection }: { rows: FindingRow[]; selection: RowSelection }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const selected = rows.filter((r) => selection.ids.has(r.id)).length;
+  const all = rows.length > 0 && selected === rows.length;
+  const some = selected > 0 && !all;
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = some;
+  }, [some]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="row-check"
+      aria-label="Zaznacz wszystkie na tej stronie"
+      checked={all}
+      onChange={selection.toggleAll}
+    />
+  );
+}
 
 // dd.mm.yyyy · hh:mm; the year is its own element so the phone card can show dd.mm · hh:mm.
 function DetectedAt({ iso }: { iso: string }) {
@@ -49,7 +80,7 @@ function SortHeader({ label, field, sort, onSort }: { label: string; field: Sort
 }
 
 // Scraped content is untrusted: every value is rendered as React text, never as HTML.
-export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect, onReset, onFirstPage, isLoading, isFetching, isError }: Props) {
+export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect, onReset, onFirstPage, isLoading, isFetching, isError, selection }: Props) {
   if (isError) return <p className="state" role="alert">Nie udało się pobrać zgłoszeń.</p>;
   if (isLoading || !rows)
     return (
@@ -91,6 +122,11 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
         <table className="findings" role="table">
           <thead>
             <tr role="row">
+              {selection && (
+                <th scope="col" role="columnheader" className="col-select">
+                  <SelectAllBox rows={rows} selection={selection} />
+                </th>
+              )}
               <th scope="col" role="columnheader" className="col-risk">Ryzyko</th>
               <th scope="col" role="columnheader" className="col-title">Tytuł</th>
               <th scope="col" role="columnheader" className="col-module">Moduł</th>
@@ -108,6 +144,18 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                 aria-current={f.id === selectedId ? 'true' : undefined}
                 className={[f.id === selectedId && 'selected', f.riskLevel && `row-${f.riskLevel}`].filter(Boolean).join(' ') || undefined}
               >
+                {selection && (
+                  <td role="cell" className="col-select">
+                    {/* The title is untrusted: isolated, so its direction cannot reorder "Zaznacz:" (format/bidi). */}
+                    <input
+                      type="checkbox"
+                      className="row-check"
+                      aria-label={`Zaznacz: ${isolate(f.title)}`}
+                      checked={selection.ids.has(f.id)}
+                      onChange={() => selection.toggle(f.id)}
+                    />
+                  </td>
+                )}
                 <td role="cell" className="col-risk">
                   <RiskBadge level={f.riskLevel} />
                 </td>

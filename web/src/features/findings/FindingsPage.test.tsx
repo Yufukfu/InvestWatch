@@ -508,4 +508,196 @@ describe('FindingsPage keyboard shortcuts', () => {
     await settle();
     expect(patches).toEqual([]);
   });
+
+  it('has no export link of its own: the header carries it', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    expect(screen.queryByRole('link', { name: /Eksportuj raport/ })).toBeNull();
+  });
 });
+
+describe('FindingsPage bulk status change', () => {
+  const [a, b, c] = findings.items;
+  const rowBox = (title: string) => {
+    const box = screen.getAllByRole('checkbox', { name: /^Zaznacz: / }).find((x) => x.getAttribute('aria-label')?.includes(title));
+    if (!box) throw new Error(`no checkbox for ${title}`);
+    return box;
+  };
+  const allBox = () => screen.getByRole('checkbox', { name: 'Zaznacz wszystkie na tej stronie' });
+
+  function recordBulk(reply?: (ids: string[], status: string) => Response) {
+    const calls: { ids: string[]; status: string }[] = [];
+    server.use(
+      http.post('http://localhost/api/findings/bulk-status', async ({ request }) => {
+        const body = (await request.json()) as { ids: string[]; status: string };
+        calls.push(body);
+        if (reply) return reply(body.ids, body.status);
+        return HttpResponse.json({
+          updated: body.ids.length,
+          not_found: 0,
+          results: body.ids.map((id) => ({ id, result: 'updated', finding: { ...findings.items.find((i) => i.id === id), status: body.status } })),
+        });
+      }),
+    );
+    return calls;
+  }
+
+  it('selects rows, confirms them in one request, shows per-item results and clears the selection', async () => {
+    const calls = recordBulk((ids) =>
+      HttpResponse.json({
+        updated: 1,
+        not_found: 1,
+        results: [
+          { id: ids[0], result: 'updated', finding: { ...a, status: 'confirmed' } },
+          { id: ids[1], result: 'not_found', finding: null },
+        ],
+      }),
+    );
+    let listCalls = 0;
+    server.use(
+      http.get('http://localhost/api/findings', () => {
+        listCalls += 1;
+        return HttpResponse.json(findings);
+      }),
+    );
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    expect(screen.queryByRole('region', { name: 'Masowe działania' })).toBeNull();
+    fireEvent.click(rowBox(b.title));
+    fireEvent.click(rowBox(a.title));
+    const bar = screen.getByRole('region', { name: 'Masowe działania' });
+    expect(bar).toHaveTextContent('Zaznaczono 2 zgłoszenia');
+    expect(bar).toHaveTextContent('Esc — wyczyść zaznaczenie');
+    expect(within(bar).getAllByRole('button').map((x) => x.textContent)).toEqual([
+      'Potwierdź',
+      'W analizie',
+      'Fałszywy alarm',
+      'Zamknij',
+      'Nowe',
+      'Wyczyść zaznaczenie',
+    ]);
+    fireEvent.click(within(bar).getByRole('button', { name: 'Potwierdź' }));
+    // Row order, not click order.
+    await waitFor(() => expect(calls).toEqual([{ ids: [a.id, b.id], status: 'confirmed' }]));
+    const result = await screen.findByRole('status', { name: 'Wynik zmiany statusu' });
+    expect(result).toHaveTextContent('Nowy status: Potwierdzone. Zaktualizowano: 1. Nie znaleziono: 1.');
+    const items = within(result).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent(`${a.title} — zaktualizowano`);
+    expect(items[1]).toHaveTextContent(`${b.title} — nie znaleziono`);
+    expect(within(items[0]).getByText(a.title)).toHaveAttribute('dir', 'auto');
+    expect(screen.queryByRole('region', { name: 'Masowe działania' })).toBeNull();
+    expect(rowBox(a.title)).not.toBeChecked();
+    await waitFor(() => expect(listCalls).toBe(2));
+    fireEvent.click(within(result).getByRole('button', { name: 'Ukryj wynik' }));
+    expect(screen.queryByRole('status', { name: 'Wynik zmiany statusu' })).toBeNull();
+  });
+
+  it('the header checkbox selects the whole page, shows mixed for some, and clears', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    expect(allBox()).not.toBeChecked();
+    fireEvent.click(rowBox(c.title));
+    expect(allBox()).toHaveProperty('indeterminate', true);
+    expect(screen.getByRole('region', { name: 'Masowe działania' })).toHaveTextContent('Zaznaczono 1 zgłoszenie');
+    fireEvent.click(allBox());
+    expect(allBox()).toBeChecked();
+    expect(allBox()).toHaveProperty('indeterminate', false);
+    expect(screen.getByRole('region', { name: 'Masowe działania' })).toHaveTextContent(`Zaznaczono ${findings.items.length} zgłoszeń`);
+    fireEvent.click(allBox());
+    expect(screen.queryByRole('region', { name: 'Masowe działania' })).toBeNull();
+    expect(screen.getAllByRole('checkbox').filter((x) => (x as HTMLInputElement).checked)).toHaveLength(0);
+    fireEvent.click(rowBox(a.title));
+    fireEvent.click(screen.getByRole('button', { name: 'Wyczyść zaznaczenie' }));
+    expect(rowBox(a.title)).not.toBeChecked();
+  });
+
+  it('sends one request while saving, however many buttons are pressed', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const calls = recordBulk();
+    server.use(
+      http.post('http://localhost/api/findings/bulk-status', async ({ request }) => {
+        const body = (await request.json()) as { ids: string[]; status: string };
+        calls.push(body);
+        await gate;
+        return HttpResponse.json({ updated: 1, not_found: 0, results: [{ id: body.ids[0], result: 'updated', finding: a }] });
+      }),
+    );
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    fireEvent.click(rowBox(a.title));
+    fireEvent.click(screen.getByRole('button', { name: 'Potwierdź' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zamknij' })).toHaveAttribute('aria-disabled', 'true'));
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Potwierdź' }));
+    release();
+    await screen.findByRole('status', { name: 'Wynik zmiany statusu' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('a failed request shows a Polish error and keeps the selection', async () => {
+    recordBulk(() => HttpResponse.json({ error: 'ids must be unique' }, { status: 422 }));
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    fireEvent.click(rowBox(a.title));
+    fireEvent.click(screen.getByRole('button', { name: 'Zamknij' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się zmienić statusu: serwer odrzucił tę wartość.');
+    expect(screen.getByText('(ids must be unique)')).toHaveAttribute('dir', 'auto');
+    expect(rowBox(a.title)).toBeChecked();
+    expect(screen.getByRole('region', { name: 'Masowe działania' })).toBeInTheDocument();
+  });
+
+  it('a filter change clears the selection', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    fireEvent.click(rowBox(a.title));
+    fireEvent.change(screen.getByLabelText('Moduł'), { target: { value: 'M2' } });
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Masowe działania' })).toBeNull());
+    fireEvent.change(screen.getByLabelText('Moduł'), { target: { value: '' } });
+    await screen.findByText(a.title);
+    expect(rowBox(a.title)).not.toBeChecked();
+  });
+
+  it('Esc clears the selection with no detail open; J still works from a focused checkbox', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    const box = rowBox(a.title);
+    fireEvent.click(box);
+    box.focus();
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Masowe działania' })).toBeNull();
+    fireEvent.click(box);
+    fireEvent.keyDown(box, { key: 'j' });
+    expect(window.location.search).toBe(`?finding=${a.id}`);
+    expect(rowBox(a.title)).toBeChecked();
+  });
+
+  it('Esc with a detail open closes only the detail, not the selection', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(a.title);
+    fireEvent.click(rowBox(b.title));
+    fireEvent.click(screen.getByRole('button', { name: findings.items.find((i) => i.id === detail.id)!.title }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(rowBox(b.title)).toBeChecked();
+  });
+
+  it('keeps markup in a title as text in the checkbox name and in the results', async () => {
+    const evil = '<img src=x onerror=alert(1)>';
+    server.use(
+      http.get('http://localhost/api/findings', () => HttpResponse.json({ ...findings, items: [{ ...a, title: evil }], total: 1 })),
+    );
+    recordBulk((ids) => HttpResponse.json({ updated: 0, not_found: 1, results: [{ id: ids[0], result: 'not_found', finding: null }] }));
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    const box = await screen.findByRole('checkbox', { name: /^Zaznacz: / });
+    expect(box.getAttribute('aria-label')).toContain(evil);
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole('button', { name: 'W analizie' }));
+    const result = await screen.findByRole('status', { name: 'Wynik zmiany statusu' });
+    expect(result).toHaveTextContent(`${evil} — nie znaleziono`);
+    expect(document.querySelector('img')).toBeNull();
+  });
+});
+

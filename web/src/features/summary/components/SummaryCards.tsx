@@ -1,5 +1,6 @@
 import { MODULE_LABEL } from '../../findings/components/labels';
 import type { SummaryCounts } from '../model';
+import { M2Coverage } from './M2Coverage';
 
 type Props = {
   summary: SummaryCounts | undefined;
@@ -45,6 +46,7 @@ export function SummaryCards({ summary, asOf, onStartTriage }: Props) {
           </li>
         ))}
       </ul>
+      <M2Coverage coverage={summary.m2Coverage} />
     </section>
   );
 }

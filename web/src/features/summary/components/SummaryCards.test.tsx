@@ -60,3 +60,17 @@ describe('SummaryCards (hero)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('SummaryCards (M2 coverage)', () => {
+  it('shows the coverage strip under the KPIs', () => {
+    render(
+      <SummaryCards summary={{ ...SUMMARY, m2Coverage: { total: 22, registryMatched: 11 } }} asOf="22.11.2026" onStartTriage={vi.fn()} />,
+    );
+    expect(screen.getByRole('region', { name: /Pokrycie rejestrem KNF/ })).toHaveTextContent('11 z 22 zgłoszeń M2 dopasowano do rejestru KNF (50%)');
+  });
+
+  it('shows brak danych for a server without the field', () => {
+    render(<SummaryCards summary={SUMMARY} asOf="22.11.2026" onStartTriage={vi.fn()} />);
+    expect(screen.getByRole('region', { name: /Pokrycie rejestrem KNF/ })).toHaveTextContent('brak danych');
+  });
+});

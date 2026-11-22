@@ -9,6 +9,8 @@ import { investWatchApi } from './generated';
 export const api = investWatchApi.enhanceEndpoints({
   endpoints: {
     patchFindingsById: { invalidatesTags: ['findings', 'stats', 'calibration'] },
+    // The bulk change moves the same counts as the single PATCH (issue #115).
+    postFindingsBulkStatus: { invalidatesTags: ['findings', 'stats', 'calibration'] },
     putSettingsThresholds: { invalidatesTags: ['settings', 'findings', 'stats', 'calibration'] },
   },
 });
