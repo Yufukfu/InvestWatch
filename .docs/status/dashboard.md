@@ -1,6 +1,6 @@
 # Status: dashboard (Kacper)
 
-Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat).
+Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -12,11 +12,12 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 - Real-time alerts (`web/src/features/alerts/`, change `realtime-alerts`, [ADR 0208](../decisions/0208-dashboard-realtime-socketio-client.md)): one Socket.IO connection to `/events`, refetch on connect, `finding.created`/`high_risk` invalidate findings and stats, `finding.updated` patches the cached status, high-risk toasts with `Pokaż`, and a live badge in the header. Checked in headless Chrome against the mock server (dev and production build, console clean in the build).
 - Calibration panel (`web/src/features/calibration/`, change `calibration-panel`): module switch, a slider over the points of `GET /calibration` with TP/FP/FN/TN, precision, recall and F1 next to their values at the current threshold, a precision/recall chart (Recharts, lazy chunk shared with the trend) with a data table, and an explicit global `Zapisz próg` (`PUT /settings/thresholds`, which also invalidates findings, stats and calibration). Demo checked on the mock: M2 0.50 to 0.90 drops "Wysokie ryzyko" from 6 to 4 and recomputes the rows.
 - Web rules in `.claude/rules/web-dashboard.md`.
-- Supply chain ([ADR 0209](../decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): decision and runbook in a docs-only PR. OSV-Scanner (offline) and Gitleaks are run by hand until the CI follow-up adds their jobs, `.gitleaks.toml` and SHA-pinned actions.
+- Supply chain ([ADR 0209](../decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): `.github/workflows/security.yml` (change `security-ci`) runs Gitleaks over the full history, OSV-Scanner (online on PRs, offline database by hand), `pip-audit` and `npm audit` on every PR to `main`, not as a required check. Actions are pinned by SHA and images by digest, enforced by `.github/tests/workflow-pins.test.mjs`. `.gitleaks.toml` allowlists the two mock ids. Still open: SHA pins in `ci.yml` and digests for Postgres, Caddy and the Dockerfile bases.
 - Frontend layering ([ADR 0204](../decisions/0204-frontend-architecture.md)) applied to health, summary, findings and trend, with a lint check on components.
 
 ## Active OpenSpec changes
 
+- `security-ci` (branch `chore/security-ci`): ADR 0209 scans in CI on every PR.
 - none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
 
 ## Blockers and open decisions

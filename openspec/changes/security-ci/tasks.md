@@ -28,7 +28,7 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
 
 ## 4. Closing
 
-- [ ] 4.1 Apply `iw-docs-update`:
+- [x] 4.1 Apply `iw-docs-update` (done before group 3, because the root `CLAUDE.md` forbids opening the PR with docs to follow; the run results from group 3 are added to the PR body, not the docs):
   - `.docs/supply-chain.md`: a CI section and an updated status table
   - ADR 0209 is not edited (accepted). The new facts go in the runbook and the status file.
   - `.docs/status/dashboard.md`
