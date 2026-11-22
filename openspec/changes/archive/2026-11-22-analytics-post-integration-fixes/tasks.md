@@ -29,5 +29,5 @@ Each group is one commit, and its first task is the failing test. No test calls 
 
 - [x] 5.1 Docs (`iw-docs-update`): analytics plan §6, `.env.example`, the domain status file, `docs-check` clean
 - [x] 5.2 AI log row (`iw-ai-log`)
-- [ ] 5.3 Final review (`iw-pr-review`)
-- [ ] 5.4 Archive the change (last commit)
+- [x] 5.3 Final review (`iw-pr-review`): checks green, whole-branch review no blocking findings
+- [x] 5.4 Archive the change (last commit)
