@@ -15,6 +15,7 @@ EXPECTED_REASONS = {
     "storage_error",
     "publish_failed",
     "invalid_request",
+    "render_failed",
 }
 
 
