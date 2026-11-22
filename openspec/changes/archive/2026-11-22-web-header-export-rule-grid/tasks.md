@@ -16,4 +16,4 @@
 ## 3. Closing
 
 - [x] 3.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry.
-- [ ] 3.2 Run `iw-pr-review` and fix real findings.
+- [x] 3.2 Run `iw-pr-review` and fix real findings. Group reviews: one blocking finding (phone export cascade, fixed in task 1.4); rule-grid group and whole-change review: no blocking findings. Could not check: a rendered browser at 375/768/1280 px.
