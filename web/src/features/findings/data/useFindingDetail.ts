@@ -1,6 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useGetFindingsByIdQuery, type GetFindingsByIdApiResponse } from '../../../api/generated';
 import type { FindingDetail } from '../model';
+import { parseRescan } from './rescan';
 
 function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
   return {
@@ -43,6 +44,7 @@ function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
     screenshotUrl: f.screenshot_urls?.desktop,
     pipelineVersion: f.model?.pipeline_version,
     llm: f.model?.llm,
+    rescan: parseRescan(f.document?.scrape_meta),
   };
 }
 

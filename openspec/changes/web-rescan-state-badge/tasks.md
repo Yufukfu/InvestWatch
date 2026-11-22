@@ -1,8 +1,8 @@
 ## 1. Parse the re-scan state in the data hook
 
-- [ ] 1.1 Failing tests in `web/src/features/findings/data/rescan.test.ts` and `useFindingDetail.test.tsx`: known states, `current`, missing key (mock), non-object, unknown state, invalid id and time
-- [ ] 1.2 `web/src/features/findings/data/rescan.ts` `parseRescan(scrapeMeta)` and the `rescan` field on `FindingDetail` (`model.ts`), mapped in `useFindingDetail`
-- [ ] 1.3 Mutation check
+- [x] 1.1 Failing tests in `web/src/features/findings/data/rescan.test.ts` and `useFindingDetail.test.tsx`: known states, `current`, missing key (mock), non-object, unknown state, invalid id and time
+- [x] 1.2 `web/src/features/findings/data/rescan.ts` `parseRescan(scrapeMeta)` and the `rescan` field on `FindingDetail` (`model.ts`), mapped in `useFindingDetail`
+- [x] 1.3 Mutation check: mutations: 10 tried, 10 caught (state conjuncts, current accepted, UUID anchors, id/time type and parse guards, both object guards, mapping dropped; the `typeof id` survivor got the `[uuid]` case)
 
 ## 2. Badge and line in the detail panel
 

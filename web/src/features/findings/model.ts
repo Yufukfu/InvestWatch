@@ -73,6 +73,10 @@ export type AdvertiserView = {
   onWarningList?: boolean | null;
 };
 
+// Re-scan state of the finding's page (issue #71); `current` is not represented, it shows nothing.
+export type RescanState = 'changed' | 'removed';
+export type RescanView = { state: RescanState; latestDocumentId?: string; checkedAt?: string };
+
 export type FindingDetail = {
   id: string;
   module: FindingModule;
@@ -93,4 +97,5 @@ export type FindingDetail = {
   screenshotUrl?: string;
   pipelineVersion?: string;
   llm?: string | null;
+  rescan?: RescanView;
 };
