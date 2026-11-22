@@ -64,6 +64,16 @@ describe('StatusEditor', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Zapisano.');
   });
 
+  it('keeps a right-to-left override in the server detail inside its own dir="auto" element', () => {
+    const detail = 'invalid \u202Esutats';
+    render(<StatusEditor {...base} error={{ message: 'serwer odrzucił tę wartość.', detail }} onSave={vi.fn()} />);
+    const el = screen.getByText(detail);
+    expect(el).toHaveAttribute('dir', 'auto');
+    expect(el).toHaveAttribute('lang', 'en');
+    expect(el.textContent).toBe(detail);
+    expect(el.textContent).not.toContain('Odpowiedź serwera:');
+  });
+
   it('submits with the keyboard (form submit)', () => {
     const onSave = vi.fn();
     render(<StatusEditor {...base} onSave={onSave} />);

@@ -40,7 +40,7 @@
   "domains": {
     "knf": 293,
     "curated": 31,
-    "curated_unverified": 31
+    "curated_unverified": 0
   },
   "unknown_countries": 0
 }
