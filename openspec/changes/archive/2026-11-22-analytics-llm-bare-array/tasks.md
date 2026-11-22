@@ -23,3 +23,7 @@ No test calls a real LLM (`stub_llm` only). Task 2.1 makes live calls; it is a m
 - [x] 3.2 AI log row (`iw-ai-log`)
 - [x] 3.3 Final review (`iw-pr-review`): one `iw-reviewer` pass with `security: yes` over the whole change (it is a single group); no blocking findings
 - [x] 3.4 Archive the change (last commit)
+
+## Follow-ups
+
+- S3.5 misses performance fees ("Prowizja od wyniku 20%"). In the #92 run the gold positive `m3-portfolio-management` lost its only offer signal once the LLM judged its S3.4 candidate `pass`, so it ended as `no_signals`. Add performance-fee phrasing to the S3.5 dictionary in a later change (coordinator: record it, don't do it now).
