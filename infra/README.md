@@ -67,6 +67,8 @@ for c in $(docker compose ps -q analytics); do echo "$(docker inspect -f '{{.Con
 docker compose up -d --wait --scale worker=1 --scale analytics=1     # back to one each
 ```
 
+With `--local-llm`, `up --wait` exits 1 once `ollama-pull` finishes (a one-shot that no service depends on). Drop `--wait`, or name the services: `docker compose up -d --wait --scale worker=3 --scale analytics=2 worker analytics`.
+
 The consumer list also keeps the names of replicas that were stopped or replaced; compare it with `docker compose ps`. A killed replica's unacknowledged entries are claimed by another one after `CLAIM_MIN_IDLE_MS` (60 s).
 
 | Service | Scale? | Why (evidence: `openspec/changes/archive/2026-11-22-architecture-scale-out/evidence.md`, 2026-11-22) |

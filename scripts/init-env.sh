@@ -12,7 +12,7 @@ for arg in "$@"; do
   case $arg in
     --local-llm) local_llm=1 ;;
     -*) echo "usage: $0 [--local-llm] [file]" >&2; exit 2 ;;
-    *) target=$arg ;;
+    *) [ -z "$target" ] || { echo "usage: $0 [--local-llm] [file]" >&2; exit 2; }; target=$arg ;;
   esac
 done
 case $target in
