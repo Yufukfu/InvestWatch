@@ -352,3 +352,22 @@ test('--mine: completed checks that passed or were skipped do not hold the appro
   const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
   assert.equal(run(gh, empty()).items.filter((i) => i.kind === 'approved').length, 1);
 });
+
+test('--mine: no approved item on a draft PR or one whose base is not the default branch', () => {
+  const ok = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const routes = (pr) => ({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  const approved = (pr, extra) => run(fakeGh(routes(pr)).gh, empty(), { mine: true }, extra).items.filter((i) => i.kind === 'approved').length;
+  assert.equal(approved(ok), 1, 'the control case is told');
+  assert.equal(approved({ ...ok, isDraft: true }), 0, 'a draft');
+  assert.equal(approved({ ...ok, baseRefName: 'web/stack-base' }), 0, 'a stacked PR into another branch');
+  assert.equal(approved(ok, { defaultBranch: 'develop' }), 0, 'main is not the default branch here');
+  assert.equal(approved({ ...ok, baseRefName: 'develop' }, { defaultBranch: 'develop' }), 1, 'the default branch comes from the caller');
+});
+
+test('scan --mine: the default branch for the approved check is the repository\'s, not a hard-coded main', async () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const routes = { 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [], 'repo view': { nameWithOwner: REPO, defaultBranchRef: { name: 'develop' } } };
+  const c = cli(routes);
+  assert.equal(await main(['scan', '--mine', '--json'], c.deps), 0, c.err.join(''));
+  assert.deepEqual(JSON.parse(c.out.join('')).items.filter((i) => i.kind === 'approved'), [], 'a PR into main is not mergeable work when develop is the default');
+});
