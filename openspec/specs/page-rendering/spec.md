@@ -7,7 +7,13 @@ Give the visual M2 rules (R4-R8, R13) the layout they need, by rendering selecte
 ## Requirements
 
 ### Requirement: Render only the pages that need it
-The scraper SHALL run the render step only for a source that is collectable, whose `source_kind` is `firm_own` and whose `target_modules` include `M2`, and only while `SCRAPER_RENDER_ENABLED` is true (default false) and the shared budget `SCRAPER_RENDER_MAX_PER_HOUR` (default 20 renders per UTC hour across all workers) is not spent. When the budget is spent the render SHALL be skipped without a job error and `scrape_meta.render.skipped` SHALL be `budget`. The render step SHALL run after the page was fetched and parsed and after the duplicate check, so a page whose `content_hash` is already stored costs neither a browser nor budget, and SHALL NOT replace the document's `text`, `content_hash` or `scrape_meta.scraper`.
+The scraper SHALL run the render step only for a collectable `firm_own` source whose `target_modules` include `M2`, only while `SCRAPER_RENDER_ENABLED` is true (default false), and only while the shared budget `SCRAPER_RENDER_MAX_PER_HOUR` (default 20 renders per UTC hour across all workers) is not spent.
+
+#### Scenario: Budget, order and what the render leaves alone
+- **WHEN** the render step is considered for a document
+- **THEN** when the budget is spent the render SHALL be skipped without a job error and `scrape_meta.render.skipped` SHALL be `budget`
+- **AND** the render step SHALL run after the page was fetched and parsed and after the duplicate check, so a page whose `content_hash` is already stored costs neither a browser nor budget
+- **AND** the render step SHALL NOT replace the document's `text`, `content_hash` or `scrape_meta.scraper`
 
 #### Scenario: Firm's own M2 page
 - **WHEN** an active web source with `source_kind` `firm_own` and `target_modules` `["M2"]` is collected and `SCRAPER_RENDER_ENABLED` is true
@@ -38,7 +44,14 @@ The scraper SHALL run the render step only for a source that is collectable, who
 - **THEN** the stored `text` and `content_hash` are the static parse's, so rerunning an unchanged page still deduplicates
 
 ### Requirement: Render goes through the same guards as fetch
-The scraper SHALL call the renderer once per viewport, in the order `desktop`, `mobile`, `tablet`. Before each call it SHALL apply the shared state `fetch` uses: the per-domain rate limit and the `Retry-After` / failure pause (the URL, port and address guard and `robots.txt` were applied by the run before the page was fetched, and the renderer re-checks the address of every browser request), and the run's identity (User-Agent, client hints, `Accept-Language`) and proxy; the `mobile` viewport SHALL use a mobile variant of that identity of the same browser family and version that passes the same pairing check, and `desktop` and `tablet` SHALL use the run's identity. Each viewport is one navigation and SHALL pass the rate limit and the domain gate as its own request. A block signal in any viewport SHALL end the render, the viewports not yet loaded SHALL NOT be attempted, a `Retry-After` it carries SHALL be recorded in the domain gate, and nothing SHALL be retried in the same run.
+The scraper SHALL call the renderer once per viewport, in the order `desktop`, `mobile`, `tablet`, and before each call SHALL apply the shared state `fetch` uses: the per-domain rate limit, the `Retry-After` and failure pause, and the run's identity and proxy.
+
+#### Scenario: What each call carries and when the render ends
+- **WHEN** the renderer is called for a viewport
+- **THEN** the URL, port and address guard and `robots.txt` were applied by the run before the page was fetched, and the renderer SHALL re-check the address of every browser request
+- **AND** the `mobile` viewport SHALL use a mobile variant of the run's identity of the same browser family and version that passes the same pairing check, and `desktop` and `tablet` SHALL use the run's identity
+- **AND** each viewport is one navigation and SHALL pass the rate limit and the domain gate as its own request
+- **AND** a block signal in any viewport SHALL end the render, the viewports not yet loaded SHALL NOT be attempted, a `Retry-After` it carries SHALL be recorded in the domain gate, and nothing SHALL be retried in the same run
 
 #### Scenario: Refused by robots
 - **WHEN** `robots.txt` disallows the page for the scraper's agent
@@ -81,7 +94,15 @@ The scraper SHALL call the renderer once per viewport, in the order `desktop`, `
 - **THEN** the `mobile` blocks reflect the mobile layout, not the desktop markup scaled down
 
 ### Requirement: The browser is confined
-Every request the browser makes SHALL be intercepted and checked. A request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, or its resource type is `media` or `eventsource`, or it is a websocket; a navigation to a host other than the source host's site SHALL be refused without replacing the page. Chromium follows redirects without asking the interceptor (measured, ADR 0107), so every redirect hop of every request the browser makes (the first navigation, subresources, fetches and frames) SHALL be checked after the load against the same address and port rules (a navigation hop also against the source site), and a render with a hop that left the site, reached a non-public address or a closed port SHALL fail and keep nothing of the page it landed on. Downloads, new pages, service workers, shared workers, permission prompts and dialogs SHALL be refused. The browser process SHALL hold no database, Redis or object-storage credentials.
+Every request the browser makes SHALL be intercepted and checked, and a request SHALL be aborted when its scheme is not http(s), its port is not in `ALLOWED_PORTS`, its host resolves to a non-public address, its resource type is `media` or `eventsource`, or it is a websocket.
+
+#### Scenario: Navigations, redirects and refused features
+- **WHEN** the browser navigates, follows a redirect or the page uses a browser feature
+- **THEN** a navigation to a host other than the source host's site SHALL be refused without replacing the page
+- **AND** because Chromium follows redirects without asking the interceptor (measured, ADR 0107), every redirect hop of every request the browser makes (the first navigation, subresources, fetches and frames) SHALL be checked after the load against the same address and port rules, a navigation hop also against the source site
+- **AND** a render with a hop that left the site, reached a non-public address or a closed port SHALL fail and keep nothing of the page it landed on
+- **AND** downloads, new pages, service workers, shared workers, permission prompts and dialogs SHALL be refused
+- **AND** the browser process SHALL hold no database, Redis or object-storage credentials
 
 #### Scenario: Private address from the page
 - **WHEN** the page's script or stylesheet references `http://169.254.169.254/` or a name that resolves to a private range
@@ -131,7 +152,12 @@ The scraper SHALL capture a full-page PNG for each of `desktop` (1440x900), `tab
 - **THEN** no screenshot and no block is stored and one job error with reason `blocked` or `blocked_target` is recorded
 
 ### Requirement: Describe the text blocks of each viewport
-For each viewport the scraper SHALL emit `blocks` in the contract's `block` shape: one entry per rendered block of text (the nearest block-level element with its own text), in document order, with `viewport`, `text`, `tag`, `font_size_px`, `font_weight` (an integer, rounded), `color`, `background_color` (both `#rrggbb`), `bbox` `[x, y, width, height]` in CSS pixels relative to the page, `visible`, `in_viewport_on_load`, `requires_interaction`, `region` and `overflow_clipped`. Text of `script`, `style`, `noscript` and `template` elements SHALL NOT appear. The text SHALL be taken verbatim and never interpreted.
+For each viewport the scraper SHALL emit `blocks` in the contract's `block` shape: one entry per rendered block of text (the nearest block-level element with its own text), in document order, taken verbatim and never interpreted.
+
+#### Scenario: Fields of a block
+- **WHEN** a viewport is measured
+- **THEN** each block SHALL carry `viewport`, `text`, `tag`, `font_size_px`, `font_weight` (an integer, rounded), `color`, `background_color` (both `#rrggbb`), `bbox` `[x, y, width, height]` in CSS pixels relative to the page, `visible`, `in_viewport_on_load`, `requires_interaction`, `region` and `overflow_clipped`
+- **AND** text of `script`, `style`, `noscript` and `template` elements SHALL NOT appear
 
 #### Scenario: Small risk text
 - **WHEN** a page shows body text at 16 px and a risk warning at 10 px
@@ -154,7 +180,23 @@ For each viewport the scraper SHALL emit `blocks` in the contract's `block` shap
 - **THEN** no block is emitted for it
 
 ### Requirement: Say where a block is and whether it can be seen
-`visible` SHALL be `false` for a block hidden by `display`, `visibility`, `opacity` 0 or a zero-size box, and such text SHALL still be emitted so that hiding is detectable. `in_viewport_on_load` SHALL be `true` only when the block's box is inside the first viewport height without scrolling. `requires_interaction` SHALL be `true` for a block inside a closed `details`, or hidden and controlled by a visible element (`summary`, or an element whose `aria-controls` names it with `aria-expanded` `false`), and `false` otherwise. `region` SHALL be `footer` inside `footer` or `[role=contentinfo]`, `header` inside `header` or `[role=banner]`, `aside` inside `aside`, `overlay` inside a fixed or modal positioned layer, `legal` inside an element whose id, class, accessible name or section heading contains one of the placement words in one list (case-insensitive substring, diacritics folded): `legal`, `prawn`, `klauzul`, `objasnien`, `warunk`, `regulacj`, `regulamin`, `zastrzezen`, `przypis`, `knf`, `disclaimer`, `disclosure`, `footnote`, `endnote`, `fine-print`, `fineprint`, `small-print`, `important-information`, `important-notice`, `terms`, `tnc`, `notice`, `compliance`, `regulatory`, `imprint`, `impressum`, or inside `small`, `role=note`, `role=doc-footnote` or `role=doc-endnotes`, and `main` otherwise. `region` SHALL always be set, never `null` (analytics' R6 cannot pass a block with unknown region). The list SHALL hold placement words only, never content words such as `risk`, `ryzyk`, `ostrzezen` or `warning`: a prominent risk box below the fold is not legal text and must not fail R6 as one.
+`visible`, `in_viewport_on_load`, `requires_interaction` and `region` SHALL say where a block is and whether it can be seen, and `region` SHALL always be set, never `null` (analytics' R6 cannot pass a block with unknown region).
+
+#### Scenario: Visibility and interaction flags
+- **WHEN** a block is measured
+- **THEN** `visible` SHALL be `false` for a block hidden by `display`, `visibility`, `opacity` 0 or a zero-size box, and such text SHALL still be emitted so that hiding is detectable
+- **AND** `in_viewport_on_load` SHALL be `true` only when the block's box is inside the first viewport height without scrolling
+- **AND** `requires_interaction` SHALL be `true` for a block inside a closed `details`, or hidden and controlled by a visible element (`summary`, or an element whose `aria-controls` names it with `aria-expanded` `false`), and `false` otherwise
+
+#### Scenario: Region values
+- **WHEN** a block's `region` is decided
+- **THEN** `region` SHALL be `footer` inside `footer` or `[role=contentinfo]`, `header` inside `header` or `[role=banner]`, `aside` inside `aside`, and `overlay` inside a fixed or modal positioned layer
+- **AND** `region` SHALL be `legal` inside an element whose id, class, accessible name or section heading contains one of the placement words in one list (case-insensitive substring, diacritics folded): `legal`, `prawn`, `klauzul`, `objasnien`, `warunk`, `regulacj`, `regulamin`, `zastrzezen`, `przypis`, `knf`, `disclaimer`, `disclosure`, `footnote`, `endnote`, `fine-print`, `fineprint`, `small-print`, `important-information`, `important-notice`, `terms`, `tnc`, `notice`, `compliance`, `regulatory`, `imprint`, `impressum`
+- **AND** `region` SHALL also be `legal` inside `small`, `role=note`, `role=doc-footnote` or `role=doc-endnotes`, and `main` otherwise
+
+#### Scenario: The legal list holds placement words only
+- **WHEN** the list of placement words is maintained
+- **THEN** it SHALL hold placement words only, never content words such as `risk`, `ryzyk`, `ostrzezen` or `warning`: a prominent risk box below the fold is not legal text and must not fail R6 as one
 
 #### Scenario: Collapsed accordion
 - **WHEN** a risk text sits in a closed `details` element
@@ -200,7 +242,12 @@ The renderer SHALL stop a render that exceeds `RENDER_TIMEOUT_SECONDS` (default 
 - **THEN** the second waits for the first and neither fails
 
 ### Requirement: Rendering never costs the text document
-When rendering fails for any reason (browser crash, timeout, block, refused target, renderer unreachable, malformed renderer response, upload failure) the scraper SHALL still ingest the document from the static parse without `blocks` and `screenshots`, and SHALL record one job error per failed render: `blocked` for a block signal, `blocked_target` for a refused target, `storage_error` for a failed upload, and `render_failed` for every other failure, with a detail that names the cause and contains no URL query, credentials or proxy. A render failure SHALL NOT trigger a queue retry or a domain failure cooldown.
+When rendering fails for any reason the scraper SHALL still ingest the document from the static parse and SHALL record one job error per failed render, with a detail that names the cause and contains no URL query, credentials or proxy. A render failure SHALL NOT trigger a queue retry or a domain failure cooldown.
+
+#### Scenario: Reasons and what is dropped
+- **WHEN** the render fails by browser crash, timeout, block, refused target, renderer unreachable, malformed renderer response or upload failure
+- **THEN** the document SHALL be ingested without `blocks` and `screenshots`, except that viewports already taken stay when a later renderer call fails (scenario "Failure after the first viewport")
+- **AND** the job error reason SHALL be `blocked` for a block signal, `blocked_target` for a refused target, `storage_error` for a failed upload, and `render_failed` for every other failure
 
 #### Scenario: Browser crashes
 - **WHEN** the browser process dies during the render
@@ -234,7 +281,14 @@ The scraper SHALL upload the screenshots before inserting the document row, like
 - **THEN** `documents.payload.blocks` is a non-empty array whose entries validate against the contract's `block` definition
 
 ### Requirement: Run the browser in an isolated container
-The renderer SHALL be a separate image and service with a pinned Playwright version and a browser build pinned by that version and by the base image tag (and by the checksum where the vendor publishes one), run as a non-root user with a read-only root filesystem, `no-new-privileges`, dropped capabilities and CPU and memory limits, attached only to the `egress` network and an internal network `render` shared with the scraper, and published to no host port. It SHALL be started with an explicit `environment` and no `env_file`. It SHALL keep no state between renders and SHALL use a fresh browser context, with no cookies carried over, for every viewport of every render.
+The renderer SHALL be a separate image and service with a pinned Playwright version and a browser build pinned by that version and the base image tag, run as a non-root user with a read-only root filesystem, `no-new-privileges`, dropped capabilities and CPU and memory limits, published to no host port.
+
+#### Scenario: Pinning, networks, environment and state
+- **WHEN** the renderer service is built and started
+- **THEN** the browser build SHALL also be pinned by the checksum where the vendor publishes one
+- **AND** the service SHALL be attached only to the `egress` network and an internal network `render` shared with the scraper
+- **AND** it SHALL be started with an explicit `environment` and no `env_file`
+- **AND** it SHALL keep no state between renders and SHALL use a fresh browser context, with no cookies carried over, for every viewport of every render
 
 #### Scenario: Not reachable from outside
 - **WHEN** the stack is up
