@@ -17,14 +17,14 @@ InvestWatch to działający prototyp systemu, który zbiera z internetu i medió
 **Co robi**
 - **Silnik scrapujący:** kolejka zadań (arq na Redis), harmonogram cron, ręczne skanowanie z API, klient TLS podszywający się pod przeglądarkę, rotacja tożsamości przeglądarki (User-Agent razem z nagłówkami i profilem TLS) i proxy, poszanowanie `robots.txt` i limitów na domenę, ochrona przed SSRF, opcjonalny renderer Playwright dla zrzutów ekranu i układu strony. Strony WWW i publiczne kanały Telegram; dane w PostgreSQL, surowy HTML w MinIO.
 - **Moduł 1 (finfluencerzy i podmioty trzecie):** wykrywa reklamy firm z rejestru KNF (749 firm z czterech list KNF) publikowane przez osoby trzecie: siedem ważonych sygnałów (wzmianka o firmie, link afiliacyjny lub kod, oznaczenie współpracy, wezwanie do działania, ton promocyjny, autor spoza firmy, kierowanie do Polaków). Wynik: firma, reklamodawca, treść, URL.
-- **Moduł 2 (informacja o ryzyku):** materiały samych firm sprawdzane regułami z załącznika UKNF (art. 44 rozporządzenia delegowanego 2017/565); 8 z 18 reguł zaimplementowanych, każda z cytatem z materiału i podstawą prawną; reguły wizualne czytają rozmiar czcionki i położenie bloków, gdy scraper renderuje stronę (renderer domyślnie wyłączony).
+- **Moduł 2 (informacja o ryzyku):** materiały samych firm sprawdzane regułami z załącznika UKNF (art. 44 rozporządzenia delegowanego 2017/565); 12 z 18 reguł zaimplementowanych, każda z cytatem z materiału i podstawą prawną; reguły wizualne czytają rozmiar czcionki i położenie bloków, gdy scraper renderuje stronę (renderer domyślnie wyłączony).
 - **Moduł 3 (shadow advisory):** podmioty spoza rejestru KNF oferujące w praktyce doradztwo inwestycyjne (art. 76): słownictwo doradcze, personalizacja, rekomendacja konkretnych instrumentów, płatne sygnały; twarda bramka, by sama edukacja nie była oskarżeniem.
 - **Reguły najpierw, LLM potem:** wszystko, co da się sprawdzić deterministycznie, liczą reguły; model językowy (Gemma) rozstrzyga tylko przypadki wątpliwe i musi zacytować dokument. Model jest wymienny przez zmienne środowiskowe: hostowana Gemma lub lokalna Gemma w Ollamie (`--profile llm`); bez modelu system działa na samych regułach.
 - **Panel (React):** filtry po module, poziomie ryzyka, platformie, wyniku, dacie i statusie; wykres trendu (Recharts); szczegóły zgłoszenia z cytatami i podstawą prawną; zmiana statusu z notatką; alerty wysokiego ryzyka przez Socket.IO; panel kalibracji progów z precyzją, czułością, TP/FP/FN/TN i zapisem progu, który od razu przelicza poziomy ryzyka.
 
 **Wyniki**
 - Na prawdziwych danych (próba generalna, #78): 17 źródeł (13 stron WWW, 4 kanały Telegram), 223 dokumenty, 0 błędów analityki, 72 zgłoszenia (M1 54, M2 5, M3 13), 10 alertów wysokiego ryzyka.
-- Na zbiorze wzorcowym (69 dokumentów syntetycznych napisanych z kryteriów UKNF, reguły bez LLM, domyślne progi): M1 precyzja 1,00 / czułość 0,80; M2 0,93 / 0,61; M3 1,00 / 0,40. Progi M1 i M2 są zmierzone na tym zbiorze; próg M3 (0,4) wynika z bramki S3.4. Zbiór jest syntetyczny, bo nie otrzymaliśmy próbek od UKNF; prawdziwe próbki dodaje się bez zmiany kodu.
+- Na zbiorze wzorcowym (69 dokumentów syntetycznych napisanych z kryteriów UKNF, reguły bez LLM, domyślne progi): M1 precyzja 1,00 / czułość 0,80; M2 0,944 / 0,739; M3 1,00 / 0,40. Progi M1 i M2 są zmierzone na tym zbiorze; próg M3 (0,4) wynika z bramki S3.4. Zbiór jest syntetyczny, bo nie otrzymaliśmy próbek od UKNF; prawdziwe próbki dodaje się bez zmiany kodu.
 
 **Architektura**
 Lekkie, osobne serwisy (scraper, analytics, api, web, infra), każdy z własnym `compose.yaml`, połączone kontraktami JSON Schema i OpenAPI (zamrożone jako v1) oraz strumieniami Redis. Skalowanie przez kolejne workery scrapera i analityki. Nowe źródło to kilka linii TOML, nowa platforma to jeden moduł parsera, nowa reguła M2 to wpis YAML i jedna klasa. Stos open source i on-premise (PostgreSQL, Redis, MinIO, Caddy, Ollama); jedyny wyjątek, hostowany LLM, zatwierdził mentor i zamienia się na lokalny model samą konfiguracją.
@@ -36,7 +36,7 @@ Każda zmiana przechodzi tę samą ścieżkę z Claude Code: specyfikacja OpenSp
 Skanowanie zależności (`npm audit`, `pip-audit`) i historii repozytorium (Gitleaks), sekrety wyłącznie w nieśledzonym `.env`, kontenery bez roota z systemem plików tylko do odczytu, tekst ze scrapowanych stron wyświetlany zawsze jako zwykły tekst.
 
 **Ograniczenia (uczciwie)**
-Facebook, Instagram i TikTok nie są pokryte (logowanie lub strona w JavaScript); z mediów społecznościowych działa Telegram. W M2 działa 8 z 18 reguł. Liczby jakości pochodzą ze zbioru syntetycznego i z samych reguł. W próbie generalnej hostowany LLM był niedostępny, więc 71 z 72 zgłoszeń policzyły same reguły.
+Facebook, Instagram i TikTok nie są pokryte (logowanie lub strona w JavaScript); z mediów społecznościowych działa Telegram. W M2 działa 12 z 18 reguł (brakuje R5, R7-R10, R13). Liczby jakości pochodzą ze zbioru syntetycznego i z samych reguł. W próbie generalnej hostowany LLM był niedostępny, więc 71 z 72 zgłoszeń policzyły same reguły.
 
 ## Description (EN)
 
@@ -44,13 +44,13 @@ InvestWatch is a working prototype that collects investment promotion from the w
 
 - **Scraper:** job queue (arq on Redis), cron scheduler and manual scans from the API, a browser-impersonating TLS client, rotating browser identities (User-Agent with matching headers and TLS profile) and proxies, `robots.txt` and per-domain limits, SSRF guards, an optional Playwright renderer for screenshots and layout. Web pages and public Telegram channels; PostgreSQL for data, MinIO for raw HTML.
 - **M1, finfluencers and third parties:** ads for firms in the KNF register (749 firms from four KNF lists) published by someone else; seven weighted signals; output: firm, advertiser, content, URL.
-- **M2, risk information:** the firms' own marketing checked against the UKNF rules (art. 44 of Delegated Regulation 2017/565); 8 of 18 rules implemented, each with a verbatim quote and its legal basis.
+- **M2, risk information:** the firms' own marketing checked against the UKNF rules (art. 44 of Delegated Regulation 2017/565); 12 of 18 rules implemented, each with a verbatim quote and its legal basis.
 - **M3, shadow advisory:** entities outside the register that in fact offer investment advice (art. 76), with a hard gate so that education alone is never flagged as advice.
 - **Rules first, LLM second:** the model (Gemma) only decides the cases the rules defer and must quote the document; hosted or local (Ollama) by env only; rules-only if it is down.
 - **Dashboard (React):** filters, trend chart, finding detail with quotes and legal basis, status workflow, Socket.IO high-risk alerts, and a calibration panel where moving and saving a threshold recomputes risk levels at once.
-- **Results:** real-data rehearsal (#78): 17 sources, 223 documents, 72 findings, 10 high-risk alerts, 0 analytics errors. Synthetic gold set (69 documents, rules only): precision / recall M1 1.00 / 0.80, M2 0.93 / 0.61, M3 1.00 / 0.40.
+- **Results:** real-data rehearsal (#78): 17 sources, 223 documents, 72 findings, 10 high-risk alerts, 0 analytics errors. Synthetic gold set (69 documents, rules only): precision / recall M1 1.00 / 0.80, M2 0.944 / 0.739, M3 1.00 / 0.40.
 - **Process:** spec-driven development with Claude Code (OpenSpec, test first, reviewer agent, git guards, AI log); on `main`: 66 archived changes, 38 ADRs, 91 AI-log entries, 79 merged PRs; the human merges every PR.
-- **Limits:** no Facebook, Instagram or TikTok (login walls); 8 of 18 M2 rules; quality numbers are synthetic and rules-only.
+- **Limits:** no Facebook, Instagram or TikTok (login walls); 12 of 18 M2 rules (R5, R7-R10 and R13 not built); quality numbers are synthetic and rules-only.
 
 ## PDF: slide order
 
