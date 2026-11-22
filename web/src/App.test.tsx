@@ -133,7 +133,7 @@ describe('App (against contract mocks)', () => {
       );
       renderApp();
       fireEvent.click(await screen.findByRole('button', { name: 'Rozpocznij triage' }));
-      expect(await screen.findByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeInTheDocument();
+      expect(await screen.findByText('Brak zgłoszeń dla wybranych filtrów')).toBeInTheDocument();
       expect(seen.at(-1)!.get('risk_level')).toBe('high');
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(window.location.search).toBe('?status=new&risk_level=high');

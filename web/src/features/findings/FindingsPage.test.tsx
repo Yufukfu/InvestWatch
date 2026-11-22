@@ -44,7 +44,7 @@ describe('FindingsPage', () => {
       ),
     );
     render(<FindingsPage />, { wrapper: storeWrapper() });
-    expect(await screen.findByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeInTheDocument();
+    expect(await screen.findByText('Brak zgłoszeń dla wybranych filtrów')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: /Wyczyść filtry/ })[0]);
     expect(await screen.findByText(findings.items[0].title)).toBeInTheDocument();
     expect(window.location.search).toBe('');

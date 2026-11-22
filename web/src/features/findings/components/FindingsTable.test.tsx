@@ -125,9 +125,24 @@ describe('FindingsTable', () => {
     render(<FindingsTable {...props} rows={[]} total={0} onReset={onReset} />);
     expect(screen.queryByRole('table')).toBeNull();
     const empty = screen.getByRole('status');
-    expect(empty).toHaveTextContent('Żadne zgłoszenie nie pasuje do filtrów.');
+    expect(empty).toHaveTextContent('Brak zgłoszeń dla wybranych filtrów');
     fireEvent.click(within(empty).getByRole('button', { name: 'Wyczyść filtry' }));
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains the empty state with a hint on what to change', () => {
+    render(<FindingsTable {...props} rows={[]} total={0} />);
+    expect(within(screen.getByRole('status')).getByText('Zmień zakres dat lub poziom ryzyka.')).toBeInTheDocument();
+  });
+
+  it('draws three decorative skeleton rows under the loading text, and marks the region busy', () => {
+    render(<FindingsTable {...props} rows={undefined} isLoading />);
+    const loading = screen.getByRole('status');
+    expect(loading).toHaveAttribute('aria-busy', 'true');
+    expect(loading).toHaveTextContent('Ładowanie…');
+    const skeleton = loading.querySelector('.skeleton');
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+    expect(skeleton?.children).toHaveLength(3);
   });
 
   it('shows loading and error states', () => {
@@ -152,7 +167,7 @@ describe('FindingsTable', () => {
   it('a page past the end is not "no matches": it offers the first page', () => {
     const onFirstPage = vi.fn();
     render(<FindingsTable {...props} rows={[]} total={9} onFirstPage={onFirstPage} />);
-    expect(screen.queryByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeNull();
+    expect(screen.queryByText('Brak zgłoszeń dla wybranych filtrów')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Na tej stronie nie ma już zgłoszeń.');
     fireEvent.click(screen.getByRole('button', { name: 'Wróć do pierwszej strony' }));
     expect(onFirstPage).toHaveBeenCalledTimes(1);

@@ -51,13 +51,24 @@ function SortHeader({ label, field, sort, onSort }: { label: string; field: Sort
 // Scraped content is untrusted: every value is rendered as React text, never as HTML.
 export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect, onReset, onFirstPage, isLoading, isFetching, isError }: Props) {
   if (isError) return <p className="state" role="alert">Nie udało się pobrać zgłoszeń.</p>;
-  if (isLoading || !rows) return <p className="state" role="status">Ładowanie…</p>;
+  if (isLoading || !rows)
+    return (
+      // The text is for assistive technology; the bars are decorative.
+      <div className="state" role="status" aria-busy="true">
+        <span className="visually-hidden">Ładowanie…</span>
+        <div className="skeleton" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+    );
   // Rows can be empty with total > 0 on a page past the end (old link, or the last row changed status).
   if (rows.length === 0 && (total ?? 0) > 0)
     return (
       <div className="state state-empty" role="status">
-        <p>Na tej stronie nie ma już zgłoszeń.</p>
-        <button type="button" className="btn" onClick={onFirstPage}>
+        <p className="state-title">Na tej stronie nie ma już zgłoszeń.</p>
+        <button type="button" className="btn btn-ghost" onClick={onFirstPage}>
           Wróć do pierwszej strony
         </button>
       </div>
@@ -65,8 +76,9 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
   if (rows.length === 0)
     return (
       <div className="state state-empty" role="status">
-        <p>Żadne zgłoszenie nie pasuje do filtrów.</p>
-        <button type="button" className="btn" onClick={onReset}>
+        <p className="state-title">Brak zgłoszeń dla wybranych filtrów</p>
+        <p className="state-hint">Zmień zakres dat lub poziom ryzyka.</p>
+        <button type="button" className="btn btn-ghost" onClick={onReset}>
           Wyczyść filtry
         </button>
       </div>

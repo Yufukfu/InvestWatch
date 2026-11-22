@@ -8,6 +8,8 @@
   --border: #e4e7ec;
   --control-border: #8a919e;
   --border-strong: #cbd2dc;
+  --skeleton: #eef0f4;
+  --skeleton-shine: #f8f9fb;
   --tint-hover: #f6f7f9;
   --tint-selected: #eceff4;
   --tint-neutral: #e8edf5;
@@ -317,8 +319,19 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 
 /* States and pager */
 .state { color: var(--muted); margin: 16px 0; }
-.state-empty { text-align: center; padding: 24px; border: 1px dashed var(--border); border-radius: var(--radius); }
-.state-empty p { margin: 0 0 12px; }
+/* Components sheet: dashed empty card with a display title, a hint and a link-style action. */
+.state-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 28px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
+.state-empty p { margin: 0; }
+.state-title { font-family: var(--font-display); font-size: 18px; line-height: 22px; font-weight: 700; color: var(--text); }
+.state-hint { font-size: 14px; line-height: 18px; }
+.state-empty .btn-ghost { font-size: 13px; font-weight: 700; text-decoration: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Skeleton rows while the list loads: three bars of 100%, 82% and 64%; the shimmer stops under reduced motion (global rule). */
+.skeleton { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
+.skeleton span { display: block; height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--skeleton) 25%, var(--skeleton-shine) 50%, var(--skeleton) 75%) 0 0 / 200% 100%; animation: skeleton-shimmer 1.4s linear infinite; }
+.skeleton span:nth-child(2) { width: 82%; }
+.skeleton span:nth-child(3) { width: 64%; }
+@keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .pager-pos { position: relative; font-size: 13px; color: var(--muted); }
 .pager-short { display: none; }
