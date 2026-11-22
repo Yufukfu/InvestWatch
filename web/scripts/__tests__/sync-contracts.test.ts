@@ -78,7 +78,10 @@ describe('contracts:check', () => {
   it('fails when the OpenAPI spec changed', () => {
     const box = sandbox();
     const spec = path.join(box.contracts, 'openapi.yaml');
-    fs.writeFileSync(spec, fs.readFileSync(spec, 'utf8').replace('version: 1.0.0', 'version: 1.0.1'));
+    const original = fs.readFileSync(spec, 'utf8');
+    const changed = original.replace(/^(\s+version:\s*).+$/m, (_, prefix) => `${prefix}0.0.0-changed`);
+    expect(changed).not.toBe(original);
+    fs.writeFileSync(spec, changed);
     const result = check(box);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('src/api/openapi.json');
