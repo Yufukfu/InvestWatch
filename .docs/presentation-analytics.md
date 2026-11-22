@@ -29,7 +29,7 @@ Seven weighted signals, `score = σ(bias + Σ weight · signal)`:
 - **S1.1** registered firm mentioned (name, alias or domain, fuzzy match)
 - **S1.2** affiliate link or promo code (`?ref=`, `utm_`, "z moim linkiem") — weight 2.5
 - **S1.3** partnership label (#reklama, #współpraca, `rel=sponsored`) — weight 2.0
-- **S1.4** call to action ("otwórz konto", "link w bio") — rules, LLM on doubt
+- **S1.4** call to action ("otwórz konto", "link w bio") — rules, every hit confirmed by the LLM
 - **S1.5** promotional vs. educational tone — LLM, 3 classes with a quote
 - **S1.6** author is not the firm (handle and domain checked against the register)
 - **S1.7** aimed at Polish audiences
@@ -46,7 +46,7 @@ Each rule is a class plus a YAML catalogue entry (name, severity, legal basis, d
 
 - 8 of 18 rules implemented, all P0: **R1** firm identification, **R2** ad label, **R3** risk next to return claims, **R4** risk font size, **R6** risk hidden in footer/footnotes, **R14** past-performance disclaimer, **R17** implying KNF approval, **R18** supervision as a safety argument.
 - `score = Σ weight·fail / Σ weight·applicable`, high-severity rules weigh 3.
-- The other 10 are already in the catalogue and the gold set (`not_implemented`), so their numbers appear the moment a rule lands.
+- The other 10 (11 catalogue entries: R12 is split into R12a and R12b) are already in the catalogue and the gold set (`not_implemented`), so their numbers appear the moment a rule lands.
 
 **Gold set (synthetic, 35 docs, 14 hard cases), threshold 0.1:** precision **0.93**, recall **0.61**, F1 **0.74** (TP 14, FP 1, FN 9, TN 11).
 
@@ -143,9 +143,9 @@ Plus one line registering the new parameter names (`engine.py`, so a typo in the
 
 **What you get for free:** the rule shows up in findings with its quote and legal basis, is weighted into the M2 score by its severity, is scored by the next gold-set run (its labels were already there), and appears in the dashboard. Tuning a dictionary is a one-line YAML change with no code.
 
-**Real diff size** (`git show --stat 45bd8fee`): +52 lines Python, +47/−3 YAML, +2 engine, +117 tests.
+**Real diff size** (`git show --stat 45bd8fee`): +52 lines Python, +44/−3 YAML, +2 engine, +129 test lines (117 of them a new test file).
 
-**Optional LLM hook:** add an `llm:` block (`question`, `when: uncertain`) to the catalogue entry and the engine sends only the deferred case to the model (R3, R17, R18 do this).
+**Optional LLM hook:** add an `llm:` block (`question`, `when: uncertain`) to the catalogue entry and the engine sends the model only the cases the rule defers: `when: uncertain` sends only doubtful verdicts (R3, R18), `when: always` every case where the rule applies (R17).
 
 ---
 
