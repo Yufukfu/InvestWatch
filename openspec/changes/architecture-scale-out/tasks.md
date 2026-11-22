@@ -24,9 +24,9 @@
 
 ## 4. Diagram and slides
 
-- [ ] 4.1 `.docs/presentation-architecture.md`: slide 1 architecture diagram (services, networks, streams and channels, writes and reads, LLM variants), slide 2 scale-out table and demo commands, Notes and sources on each, "not claimed" list
-- [ ] 4.2 Check the diagram against `docker compose config --services` and the networks in the compose files, and the stream and channel arrows against producers and consumers in the code; fix the diagram, not the check
-- [ ] 4.3 One link from the root `README.md` to the runbook; no diagram there
+- [x] 4.1 `.docs/presentation-architecture.md`: slide 1 architecture diagram (services, networks, streams and channels, writes and reads, LLM variants), slide 2 scale-out table and demo commands, Notes and sources on each, "not claimed" list
+- [x] 4.2 Check the diagram against `docker compose config --services` and the networks in the compose files, and the stream and channel arrows against producers and consumers in the code; fix the diagram, not the check
+- [x] 4.3 One link from the root `README.md` to the runbook; no diagram there
 
 ## 5. Closing
 

@@ -40,7 +40,7 @@ The scale-out documentation SHALL list every service of the root stack as scalab
 - **THEN** the second replica fails to start because the host port is taken, and the documentation says so
 
 ### Requirement: The api scales only if its realtime path does
-`api` SHALL be documented as scalable only after a run with two replicas behind the gateway shows that requests are spread over both and the dashboard still receives `finding.*` events and keeps one Socket.IO session across HTTP long-polling requests and the upgrade. Otherwise it SHALL be documented as single-instance with that reason (on 2026-11-22 the gateway sent every request to one replica, see `evidence.md`).
+`api` SHALL be documented as scalable only after a run with two replicas behind the gateway shows that requests are spread over both and the dashboard still receives `finding.*` events and keeps one Socket.IO session across HTTP long-polling requests and the upgrade. Otherwise it SHALL be documented as single-instance with that reason (on 2026-11-22 the gateway sent every request to one replica, see the change's evidence file).
 
 #### Scenario: Two api replicas, one browser session
 - **WHEN** two `api` replicas run and a browser connects to `/socket.io` through the gateway
