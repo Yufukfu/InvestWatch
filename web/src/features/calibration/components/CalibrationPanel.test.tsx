@@ -55,10 +55,11 @@ describe('CalibrationPanel', () => {
     const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
     // Layout only: each segment grows by its returned count, so the browser sets the widths and nothing is recomputed.
     const segments = Array.from(group.querySelectorAll<HTMLElement>('.proportion-bar > li'));
-    expect(segments.map((s) => s.style.flexGrow)).toEqual(['23', '7', '0', '40']);
+    expect(segments.map((s) => s.style.flexGrow)).toEqual(['23', '7', '40']);
     // The label sits inside its segment, so greyscale and screen readers get the same information as colour.
-    expect(segments.map((li) => li.textContent)).toEqual(['TP 23', 'FN 7', 'FP 0', 'TN 40']);
-    expect(segments.map((li) => li.className)).toEqual(['seg seg-tp', 'seg seg-fn', 'seg seg-fp', 'seg seg-tn']);
+    expect(segments.map((li) => li.textContent)).toEqual(['TP 23', 'FN 7', 'TN 40']);
+    // An outcome with a count of 0 draws no segment (the metric tiles still show every count).
+    expect(segments.map((li) => li.className)).toEqual(['seg seg-tp', 'seg seg-fn', 'seg seg-tn']);
   });
 
   it('opens with the eyebrow and the question as the heading', () => {
@@ -92,12 +93,19 @@ describe('CalibrationPanel', () => {
     expect(screen.getByText('Czułość — mało przeoczonych naruszeń')).toBeInTheDocument();
   });
 
+  it('draws a segment for a count of 1, and none for a count of 0', () => {
+    const points = calM2.points.map((pt, i) => (i === i70 ? { ...pt, tp: 1, fn: 0, fp: 1, tn: 0 } : pt));
+    setup({ view: { ...view, points }, index: i70 });
+    const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
+    expect(Array.from(group.querySelectorAll('.proportion-bar > li')).map((li) => li.textContent)).toEqual(['TP 1', 'FP 1']);
+  });
+
   it('moves the proportion bar with the slider point', () => {
     setup({ index: i50 });
     const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
     const point = calM2.points[i50];
     expect(Array.from(group.querySelectorAll<HTMLElement>('.proportion-bar > li')).map((s) => s.style.flexGrow)).toEqual(
-      [point.tp, point.fn, point.fp, point.tn].map(String),
+      [point.tp, point.fn, point.fp, point.tn].filter((n) => n > 0).map(String),
     );
   });
 

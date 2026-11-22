@@ -5,7 +5,7 @@
 - [x] 1.1 Write the failing tests first: a contrast test that parses the token colours and fails below 4.5:1 for every text-on-fill pair used (placeholder, secondary text, text on risk pills, white on the amber and red fills), a check that non-text controls (borders, focus ring, slider) are at least 3:1, a test that `index.html` has no `style` attribute, and a test that `main.tsx` imports only `latin` and `latin-ext` font files
 - [x] 1.2 Add `@fontsource/space-grotesk`, `@fontsource/inter` and `@fontsource/geist-mono` (the variable packages cannot be limited to two subsets), run `npm audit`, import the used weights and subsets in `main.tsx`
 - [x] 1.3 Replace the `:root` values in `styles.css` with the tokens from the Paper page (colour roles, spacing 4/8 steps, radii, type scale, 2px focus ring, reduced-motion rule) and set Inter as the body font
-- [ ] 1.4 Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`; open the build and confirm all three families load from the same origin with a clean console
+- [x] 1.4 Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`; open the build and confirm all three families load from the same origin with a clean console (typecheck, lint, 470 tests and build pass; console clean under the production CSP header, see 8.4)
 - [x] 1.5 mutations: 12 tried, 12 caught
 
 ## 2. Header, hero summary and navigation
@@ -55,18 +55,18 @@ The first screenshot review (8.3) found the built look diverges from the mockups
 - [x] 8a.3 Trend chart: ink solid, blue dashed and teal dotted lines, mono ticks, two-line legend with counts, `Godzina | Dzień` segmented control (mutations: 8 tried, 8 caught)
 - [x] 8a.4 Phone and tablet: hamburger menu, `Filtry n` button with removable filter chips, bordered finding cards, tablet four-column list with the meta line under the title (mutations: 18 tried, 18 caught)
 - [x] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` / `Zgodne` tags, status radio pills, navy toast, labelled proportion bar and selection markers (mutations: 37 tried, 37 caught)
-- [ ] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real
+- [x] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real (recaptured; three parallel Sonnet comparisons against the mockup exports; verified findings fixed: plain table titles and header case, 58px rows, triage button placement, zero-count bar segments, phone/tablet legend, page-size select and healthy badge hidden, 320px overflow)
 - [x] 8a.7 Components sheet states: shortcut chips, connection banner, empty state and skeleton rows (mutations: 28 tried, 28 caught)
 
 ## 8. Responsive evidence
 
-- [ ] 8.1 Build the production bundle and serve it with the contract mock server; capture every section, plus the open detail, a toast and the calibration panel, at 320, 375, 768, 1024, 1280 and 1440px with Chrome DevTools against the contract mock server (`web/README.md`) and save them under `.docs/screens/dashboard-redesign/`; export the Paper desktop, tablet and mobile artboards to `.docs/screens/dashboard-redesign/design/`
-- [ ] 8.2 Confirm programmatically at each width that `document.documentElement.scrollWidth` does not exceed the viewport width and that no interactive element is smaller than 44px by 44px at 375 and 768px
-- [ ] 8.3 Have a subagent review the saved screenshots against the exported Paper artboards, including a greyscale pass for risk, rule result and status labels and a check that `ąćęłńóśźż` render in the chosen fonts, and list defects; verify each against the code, fix the real ones and recapture
-- [ ] 8.4 Check the browser console is clean in the production build at every width (no CSP violation, no error)
+- [x] 8.1 Build the production bundle and serve it with the contract mock server; capture every section, plus the open detail, a toast and the calibration panel, at 320, 375, 768, 1024, 1280 and 1440px with Chrome DevTools against the contract mock server (`web/README.md`) and save them under `.docs/screens/dashboard-redesign/`; export the Paper desktop, tablet and mobile artboards to `.docs/screens/dashboard-redesign/design/` (production build served by vite preview in front of the contract mock server; the alert toast comes from a local Socket.IO stand-in because the mock server has no real-time; 30 PNGs and the Paper exports are in `.docs/screens/dashboard-redesign/`)
+- [x] 8.2 Confirm programmatically at each width that `document.documentElement.scrollWidth` does not exceed the viewport width and that no interactive element is smaller than 44px by 44px at 375 and 768px (measured with a script at 320, 375, 768, 1024, 1280 and 1440: no horizontal overflow and no interactive element under 44px; it found an 8px overflow at 320 and a 41px disclosure, both fixed)
+- [x] 8.3 Have a subagent review the saved screenshots against the exported Paper artboards, including a greyscale pass for risk, rule result and status labels and a check that `ąćęłńóśźż` render in the chosen fonts, and list defects; verify each against the code, fix the real ones and recapture (subagent review with greyscale and Polish-glyph checks; details above in 8a)
+- [x] 8.4 Check the browser console is clean in the production build at every width (no CSP violation, no error) (no console message at any of the six widths with the exact `security-headers.conf` CSP added by a header proxy)
 
 ## 9. Closing tasks
 
-- [ ] 9.1 Apply the `iw-docs-update` skill (update `web/CLAUDE.md` if its rules changed, `.docs/status/dashboard.md` for the redesign, any ADR needed for the font dependencies), run `docs-check`, and add the `iw-ai-log` row
+- [x] 9.1 Apply the `iw-docs-update` skill (update `web/CLAUDE.md` if its rules changed, `.docs/status/dashboard.md` for the redesign, any ADR needed for the font dependencies), run `docs-check`, and add the `iw-ai-log` row (ADR 0213, `.docs/status/dashboard.md`, `design.md` figure corrected, AI log row; `docs-check: ok`)
 - [ ] 9.2 Run the `iw-pr-review` skill and fix real findings
 - [x] 9.3 Raise the bulk actions, export and M2 coverage strip as an issue assigned to Damian, noting that contracts are frozen (issue #115)

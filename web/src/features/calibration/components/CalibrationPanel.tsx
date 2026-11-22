@@ -140,10 +140,10 @@ function Body({
         <span className="muted">obecny próg: {formatThreshold(view.currentThreshold)}</span>
       </div>
 
-      {/* Layout only: a segment grows by its returned count, so the browser sets the widths; nothing is computed. */}
+      {/* Layout only: a segment grows by its returned count, so the browser sets the widths; nothing is computed. A count of 0 draws no segment. */}
       <div className="proportion" role="group" aria-label="Rozkład wyników dla wybranego progu">
         <ul className="proportion-bar">
-          {OUTCOMES.map((o) => (
+          {OUTCOMES.filter((o) => selected[o.key] > 0).map((o) => (
             <li key={o.key} className={`seg seg-${o.key}`} style={{ flexGrow: selected[o.key] }}>
               {o.label} {selected[o.key]}
             </li>
