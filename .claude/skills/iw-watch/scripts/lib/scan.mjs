@@ -41,11 +41,13 @@ function filesOf(gh, repo, pr) {
   return (gh(['api', '--paginate', `repos/${repo}/pulls/${Number(pr.number)}/files?per_page=100`]) || []).map((f) => f.filename);
 }
 
-export const PR_FIELDS = 'number,title,url,isDraft,isCrossRepository,mergeable,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files';
+export const PR_FIELDS = 'number,title,url,isDraft,isCrossRepository,mergeable,headRefName,headRefOid,baseRefName,author,updatedAt,statusCheckRollup,files,reviewDecision';
 export const LIST_LIMIT = 100;
 export const OPEN_LIMIT = 500;
 // A superseded run is CANCELLED; that is not a failure to fix.
 const FAILED = new Set(['FAILURE', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'ERROR']);
+// A check that has not finished yet: a CheckRun not COMPLETED, or a commit status still PENDING/EXPECTED.
+const running = (c) => (c.__typename === 'StatusContext' || (!c.status && c.state) ? ['PENDING', 'EXPECTED'].includes(c.state) : c.status !== 'COMPLETED');
 // Text from people with write access may reach a session that runs tests; anyone else's is dropped.
 export const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
@@ -131,11 +133,21 @@ function minePr(gh, repo, me, pr, st, maxRounds, state) {
   if (pr.mergeable === 'CONFLICTING' && st.conflictSha !== b.headSha) work.push({ kind: 'conflict', cursor: b.headSha, events: [], checks: [] });
   const pending = {};
   let items = [];
+  // GitHub's own verdict (branch protection, dismissed reviews): approved, every check finished with none failed, and
+  // no conflict means the human can merge. A running check holds it back until a later scan.
+  // No agent acts on it, so it is not capped; once per head sha.
+  const checksDone = !(pr.statusCheckRollup || []).some(running);
+  if (pr.reviewDecision === 'APPROVED' && !checks.length && checksDone && pr.mergeable !== 'CONFLICTING' && st.approvedSha !== b.headSha) {
+    const latest = new Map();
+    for (const r of act.reviews) if (r.state !== 'PENDING' && r.state !== 'COMMENTED' && lc(r.user?.login) !== lc(me) && !isBot(r.user)) latest.set(lc(r.user?.login), r);
+    const approvers = [...latest.values()].filter((r) => r.state === 'APPROVED').map((r) => r.user.login);
+    items.push({ ...b, id: itemId({ kind: 'approved', pr: b.pr, cursor: b.headSha }), kind: 'approved', approvers, events: [], checks: [] });
+  }
   if (work.length) {
     const r = rounds(act, me, st);
-    if (capReached(r, maxRounds)) items = [capItem(b, r, maxRounds, st)].filter(Boolean);
+    if (capReached(r, maxRounds)) items.push(...[capItem(b, r, maxRounds, st)].filter(Boolean));
     else {
-      items = work.map((w) => ({ ...b, id: itemId({ kind: w.kind, pr: b.pr, cursor: w.cursor }), kind: w.kind, rounds: r, maxRounds, events: w.events, checks: w.checks || [], ignoredOutsiders: outsiders }));
+      items.push(...work.map((w) => ({ ...b, id: itemId({ kind: w.kind, pr: b.pr, cursor: w.cursor }), kind: w.kind, rounds: r, maxRounds, events: w.events, checks: w.checks || [], ignoredOutsiders: outsiders })));
       for (const it of items) if (it.kind === 'address-review') pending[it.id] = it.events.map((e) => e.key);
     }
   }

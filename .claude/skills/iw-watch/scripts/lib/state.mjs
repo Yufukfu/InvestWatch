@@ -1,5 +1,5 @@
 // Seen-state and the run lock. Lives outside the repository (XDG state dir), holds no tokens.
-// state.json: { version: 1, prs: { "<n>": { handled, pending, reviewedSha, ciFailedSha, capNotifiedSha, sessions } } }
+// state.json: { version: 1, prs: { "<n>": { handled, pending, reviewedSha, ciFailedSha, capNotifiedSha, conflictSha, approvedSha, sessions } } }
 // Review activity is tracked by event id, not time: GitHub dates a pending review's comments when they were
 // drafted, not when the review was submitted, so a time cursor can skip them. `scan` records the event keys of
 // each address-review item under `pending`; `ack` moves them to `handled`.
@@ -10,7 +10,7 @@ import { randomUUID, createHash } from 'node:crypto';
 export const STALE_LOCK_MS = 30 * 60 * 1000;
 export const HANDLED_MAX = 2000;
 const EMPTY = () => ({ version: 1, prs: {} });
-const KINDS = { 'address-review': 'handled', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha', conflict: 'conflictSha' };
+const KINDS = { 'address-review': 'handled', 'ci-failed': 'ciFailedSha', review: 'reviewedSha', 'cap-reached': 'capNotifiedSha', conflict: 'conflictSha', approved: 'approvedSha' };
 
 /** Short stable digest of a set of event keys, used as the cursor of an address-review item */
 export const digest = (keys) => createHash('sha256').update([...keys].sort().join('\n')).digest('hex').slice(0, 16);

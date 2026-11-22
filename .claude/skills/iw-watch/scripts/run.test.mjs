@@ -818,3 +818,20 @@ test('run: a fix branch that renames a file out of .github/ or adds a .gitattrib
     assert.match(s.notices()[0].detail, /changes .*(\.github\/CODEOWNERS|web\/\.gitattributes)/);
   }
 });
+
+test('run --mine: an approved PR starts no session; the notice is approved, with the approvers, and is acknowledged', async () => {
+  const approval = { ...fx('reviews-11.json').find((r) => r.state === 'APPROVED'), body: '' };
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const s = setup({ over: { 'pr list mine': [pr], 'pulls/11/reviews': [approval], 'pulls/11/comments': [], 'issues/11/comments': [] }, env: { IWATCH_NOTIFY_CMD: '/usr/local/bin/my-notify' } });
+  s.deps.gh = fakeGh({ 'pr list mine': [{ ...pr, headRefOid: s.feSha }], 'pr list review': [], 'pr list open': [{ number: 11 }], 'pulls/11/reviews': [approval], 'pulls/11/comments': [], 'issues/11/comments': [] }).gh;
+  assert.equal(await main(['run', '--mine'], s.deps), 0, s.err.join(''));
+  assert.equal(s.calls.length, 0, 'no claude session');
+  const [n] = s.notices();
+  assert.equal(n.kind, 'approved');
+  assert.match(n.detail, /@hen68/);
+  assert.equal(s.notified[0].args[0], 'approved');
+  const state = JSON.parse(fs.readFileSync(path.join(s.stateDir, 'state.json'), 'utf8'));
+  assert.equal(state.prs[11].approvedSha, s.feSha);
+  assert.equal(await main(['run', '--mine'], s.deps), 0);
+  assert.equal(s.notices().length, 1, 'not told twice');
+});
