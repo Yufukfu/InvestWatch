@@ -442,12 +442,14 @@ scale_replicas_run() { # two of each running, all healthy
   echo "running worker=$w analytics=$a"; [ "$w" -eq 2 ] && [ "$a" -eq 2 ]
 }
 scale_analytics_consumers() { # every replica is its own consumer of the group (consumer name = container hostname)
-  local p=$1 out c h bad=0
+  local p=$1 out c h bad=0 hosts=""
   out=$(sc "$p" exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XINFO CONSUMERS iw:documents analytics')
   for c in $(sc "$p" ps -q analytics); do
-    h=$(docker inspect -f '{{.Config.Hostname}}' "$c")
+    h=$(docker inspect -f '{{.Config.Hostname}}' "$c"); hosts="$hosts$h
+"
     case $out in *"$h"*) echo "consumer $h present" ;; *) echo "consumer $h MISSING"; bad=1 ;; esac
   done
+  [ "$(printf %s "$hosts" | sort -u | wc -l)" -eq "$(printf %s "$hosts" | wc -l)" ] || { echo "replicas share a hostname, so one consumer"; bad=1; }
   return $bad
 }
 

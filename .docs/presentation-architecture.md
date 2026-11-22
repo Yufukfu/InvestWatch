@@ -58,7 +58,7 @@ docker compose up -d --wait --scale worker=3 --scale analytics=2
 | `scheduler` | no (one by design) | started twice by mistake it is harmless: one job id per source and slot (code) |
 | `api`, `web` | no | `api` ran with 2: the gateway sent all requests to one replica; balancing needs dynamic upstreams and Socket.IO stickiness |
 | `gateway` | no | holds the host ports: a second replica fails to start |
-| `postgres`, `redis`, `minio`, `ollama`, `renderer` | no | single node, no clustering configured (`renderer` and `ollama` are optional) |
+| `postgres`, `redis`, `minio`, `ollama`, `renderer` | no | single node, no clustering configured; never `--scale` the data stores, a second replica shares the volume (`renderer` and `ollama` are optional) |
 
 **Measured:** 892 queued documents drained in **21-24 s with one analytics replica and 9-10 s with two** (about 2.3×; rules-only, 12-CPU machine, documents already seen, so it says nothing about the LLM path). More scraper workers do not make one site faster: a domain is still fetched at most every 5 s, wherever it runs.
 

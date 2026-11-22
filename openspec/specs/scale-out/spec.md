@@ -26,7 +26,7 @@ Say which InvestWatch services can run with more than one replica on one host, s
 - **THEN** request starts to that domain stay at least the configured interval apart and no more than the configured number of jobs for it run at once
 
 ### Requirement: Single-instance services are named and checked
-The scale-out documentation SHALL list every service of the root stack as scalable or single-instance with the reason in one line, including `scheduler`, `seed`, `api-migrate`, `analytics-eval`, `postgres`, `redis`, `minio`, `ollama`, `gateway` and `web`. A service listed as single-instance SHALL either have no way to be duplicated by `--scale` (a published host port or a fixed name) or be shown to behave correctly when duplicated by mistake.
+The scale-out documentation SHALL list every service of the root stack as scalable or single-instance with the reason in one line, including `scheduler`, `seed`, `api-migrate`, `analytics-eval`, `postgres`, `redis`, `minio`, `ollama`, `gateway` and `web`. A single-instance service SHALL either have no way to be duplicated by `--scale` (a published host port or a fixed name), or be shown to behave correctly when duplicated, or be documented as must-not-scale with the reason.
 
 #### Scenario: Every service is classified
 - **WHEN** the service names of `docker compose config --services` (with the `llm` profile) are compared with the table

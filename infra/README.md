@@ -78,7 +78,7 @@ The consumer list also keeps the names of replicas that were stopped or replaced
 | `web` | no | Not run with replicas; it goes through the same gateway upstream rule as `api`, so extra replicas would idle. |
 | `gateway` | no | Publishes the host ports: a second replica fails with "port is already allocated". |
 | `renderer` | no | Optional, off by default, not run with replicas. |
-| `postgres`, `redis`, `minio` | no | Single-node data stores, no clustering configured. |
+| `postgres`, `redis`, `minio` | no | Single-node data stores, no clustering configured. Never `--scale` them: a second replica mounts the same volume and can corrupt it. |
 | `ollama` | no | Profile `llm`, one model server (4 CPUs, 6 GB). |
 | `api-migrate`, `minio-init`, `seed`, `analytics-eval`, `ollama-pull` | n/a | One-shots that exit; not services to scale. |
 
