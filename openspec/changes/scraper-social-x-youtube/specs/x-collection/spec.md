@@ -61,21 +61,25 @@ Every document SHALL carry `author` with `handle` the source URL's handle with a
 - **THEN** `followers` or `name` is null and the documents are still emitted
 
 ### Requirement: Bounded run
-A run SHALL read at most `SOCIAL_MAX_POSTS` posts (default 40, shared with Telegram) in at most two adapter page calls, and SHALL NOT make a second call when the first brought no new post.
+A run SHALL read at most `SOCIAL_MAX_POSTS` posts (default 40, shared with Telegram, never more than 40) with one adapter timeline call, which the library answers with at most two timeline requests of twenty posts, and SHALL stop at an empty page. The run SHALL make one further account lookup, for the follower count, only after that call returned posts, and a failed lookup without a restriction marker SHALL leave `followers` null instead of failing the run.
 
 #### Scenario: Default cap
 - **WHEN** an account has 500 posts and `SOCIAL_MAX_POSTS` is unset
-- **THEN** at most 40 documents are emitted and the adapter is called at most twice
+- **THEN** at most 40 documents are emitted and the adapter's timeline call is made once
 
-#### Scenario: Nothing new
-- **WHEN** every post of the first call already exists
-- **THEN** no second call is made
+#### Scenario: Cap below one page
+- **WHEN** `SOCIAL_MAX_POSTS` is 15
+- **THEN** the timeline call asks for 15 posts and at most 15 documents are emitted
+
+#### Scenario: No posts, no follower lookup
+- **WHEN** the timeline call returns no post
+- **THEN** no follower lookup is made
 
 ### Requirement: Stop at the first restriction
-The adapter SHALL report an authentication failure, a challenge, a suspension marker, an empty not-found answer after an earlier success, or a rate limit as a restriction, and the run SHALL end at once with the job error reason `blocked`, keep documents already stored and make no further call. Nothing deactivates the source automatically: the queue's block handling applies and the owner removes the schedule if the account is lost.
+The adapter SHALL report an authentication failure, a challenge, a suspension marker or a rate limit as a restriction (the library gives no separate signal for an empty not-found answer, so an empty timeline is logged and is not an error), and the run SHALL end at once with the job error reason `blocked`, keep documents already stored and make no further call. Nothing deactivates the source automatically: the queue's block handling applies and the owner removes the schedule if the account is lost.
 
 #### Scenario: Account restricted
-- **WHEN** the adapter reports a restriction on the first or second call
+- **WHEN** the adapter reports a restriction on the timeline call or on the follower lookup
 - **THEN** the run ends with reason `blocked`, no further call is made and stored documents stay
 
 #### Scenario: Unknown library error

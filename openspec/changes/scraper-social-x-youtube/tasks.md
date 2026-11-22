@@ -17,11 +17,11 @@
 
 ## 3. X collector
 
-- [ ] 3.1 Test first (`scraper/tests/test_social_x.py`, fixture from 1.3, adapter's page function injected): URL validation, one document per original post with permalink and UTC `published_at`, `lang` outside two letters becomes null, reposts and textless posts skipped, malformed post skipped and all-malformed is one `parse_error`, scrubbed JSON `html`, `scrape_meta.scraper = api` and `post_id`, author from the URL, cookies missing, same post twice is one document
-- [ ] 3.2 Test first: at most two adapter calls and the `SOCIAL_MAX_POSTS` cap, no second call when the first brought nothing new, each restriction marker (auth failure, challenge, suspension, 429, empty not-found after success) ends the run as `blocked` with stored documents kept, an unknown library exception (message holding the cookie and the proxy host) becomes a job error without the secret anywhere and without a crash
-- [ ] 3.3 `social/x.py` adapter (call counting, exception mapping, `from None`) over the chosen library
-- [ ] 3.4 `social/x.py` flow (post to document mapping, author, ingest loop) and its registration
-- [ ] 3.5 Mutation check — mutations: N tried, N caught
+- [x] 3.1 Test first (`scraper/tests/test_social_x.py`, fixture from 1.3, adapter's page function injected): URL validation, one document per original post with permalink and UTC `published_at`, `lang` outside two letters becomes null, reposts and textless posts skipped, malformed post skipped and all-malformed is one `parse_error`, scrubbed JSON `html`, `scrape_meta.scraper = api` and `post_id`, author from the URL, cookies missing, same post twice is one document
+- [x] 3.2 Test first: one timeline call limited to `min(SOCIAL_MAX_POSTS, 40)` and no follower lookup when it returned nothing, a failed follower lookup leaves `followers` null, each restriction marker (auth failure, challenge, suspension, 429, empty not-found after success) ends the run as `blocked` with stored documents kept, an unknown library exception (message holding the cookie and the proxy host) becomes a job error without the secret anywhere and without a crash
+- [x] 3.3 `social/x.py` adapter (call counting, exception mapping, `from None`) over the chosen library
+- [x] 3.4 `social/x.py` flow (post to document mapping, author, ingest loop) and its registration
+- [x] 3.5 Mutation check — mutations: 19 tried, 19 caught
 
 ## 4. YouTube collector (cut if gate 1.2 fails)
 
