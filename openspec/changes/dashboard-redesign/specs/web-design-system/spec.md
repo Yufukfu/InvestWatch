@@ -61,7 +61,7 @@ The dashboard SHALL lay itself out from the viewport width at three steps: up to
 - **THEN** the table shows the risk, title, module and score columns, with platform, status and detection time under the title
 
 ### Requirement: Phone layout
-On phone the filters SHALL collapse behind one "Filtry" control that shows how many are active, each finding SHALL be a card showing risk, module, score, title, platform, status and detection time, and the detail SHALL fill the screen. The summary, trend and calibration SHALL reflow to one column and keep their figures and labels complete.
+Below 1024px (phone and tablet, as in the mockups) the filters SHALL collapse behind one "Filtry" control that shows how many are active, each finding SHALL be a card showing risk, module, score, title, platform, status and detection time, and the detail SHALL fill the screen. The summary, trend and calibration SHALL reflow to one column and keep their figures and labels complete.
 
 #### Scenario: Phone filters
 - **WHEN** the viewport is 375px wide and two filters are active
