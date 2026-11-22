@@ -8,7 +8,7 @@
 # One image, built once by `worker` only: three services that each build and export the same tag race on Docker's
 # containerd image store ("image ... already exists"). seed and scheduler reuse the image compose builds first.
 x-scraper-image: &scraper-image
-  image: investwatch/scraper:${IW_VERSION:-dev}
+  image: investwatch/scraper:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
 
 # Hardening shared by every role. /tmp is the one writable path: every fetch spools its body to a temp file, at most
 # FETCH_MAX_BYTES (5 MiB) times SCRAPER_MAX_JOBS (10) at once, well under the 128m tmpfs; tmpfs counts toward the
@@ -58,6 +58,8 @@ services:
       context: ..
       dockerfile: scraper/Dockerfile
       target: runtime
+    # Tag per compose project (x-scraper-image), rebuilt on every `up` (issue #63; see web/compose.yaml).
+    pull_policy: build
     command: ["python", "-m", "iw_scraper", "worker"]
     restart: unless-stopped
     # 30 s deadline + 10 s requeue (worker.CLOSE_TIMEOUT) + margin: a stop never ends in SIGKILL.

@@ -7,7 +7,9 @@ services:
     # ../analytics, not `.`: with several -f files Compose resolves paths from the first file's directory (infra/ in
     # the command above); from analytics/ (root include) it is the same directory. api-migrate uses `..` likewise.
     build: ../analytics
-    image: investwatch/analytics:${IW_VERSION:-dev}
+    # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
+    pull_policy: build
+    image: investwatch/analytics:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     restart: unless-stopped
     environment:
       # App role: CRUD only, no DDL (infra/postgres/init/01-app-role.sh).
@@ -63,7 +65,7 @@ services:
   # No `build:` here: `analytics` builds the shared image (like api-migrate/api). Two services building one tag run
   # two parallel exports, and with the containerd image store one fails "image ... already exists", aborting `up --build`.
   analytics-eval:
-    image: investwatch/analytics:${IW_VERSION:-dev}
+    image: investwatch/analytics:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["python", "-m", "investwatch_analytics.evaluation", "--db"]
     restart: "no"
     environment:
