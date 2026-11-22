@@ -124,7 +124,23 @@ export function defaultDeps() {
     spawnNotify: spawnSync,
     exec: execFileSync,
     claudeAvailable: () => !spawnSync('claude', ['--version'], { stdio: 'ignore' }).error,
+    gitIdentityProblem: () => gitIdentityProblem(process.env),
   };
+}
+
+/**
+ * Why git could not commit in the runner's clones, or null (#127). The runner commits conflict merges itself and the
+ * agent commits its fixes, in fresh clones that never get the main checkout's local `user.*`, so ask git outside any
+ * repository, as a new clone would: global and system config plus the GIT_* environment. A Linux runner or a cron or
+ * launchd job without a global identity fails here instead of after an agent session.
+ */
+export function gitIdentityProblem(env) {
+  for (const v of ['GIT_AUTHOR_IDENT', 'GIT_COMMITTER_IDENT']) {
+    const r = spawnSync('git', ['var', v], { cwd: os.tmpdir(), env, encoding: 'utf8' });
+    if (r.error) return `git is not runnable: ${r.error.message}`;
+    if (r.status !== 0) return (String(r.stderr).trim().split('\n').find((l) => /identity unknown|fatal/i.test(l)) || `git var ${v} failed`).trim();
+  }
+  return null;
 }
 
 function context(deps) {
@@ -364,6 +380,11 @@ function runCmd(deps, ctx, o) {
     deps.stderr('iw-watch: the claude CLI is not on PATH. Install Claude Code (https://code.claude.com/docs) or use the in-session mode: /loop 2m /iw-watch --mine\n');
     return 2;
   }
+  const noIdentity = deps.gitIdentityProblem();
+  if (noIdentity) {
+    deps.stderr(`iw-watch: no git identity to commit with (${noIdentity}). The runner and the agent commit in fresh clones, which only see your global git config: run git config --global user.name "Your Name" and git config --global user.email "you@example.com", or set GIT_AUTHOR_NAME/EMAIL and GIT_COMMITTER_NAME/EMAIL in the cron or launchd job\n`);
+    return 2;
+  }
   const mainRoot = deps.mainRoot || findMainRoot({ git: deps.git });
   const notify = makeNotifier({ env: deps.env, stdout: deps.stdout, stderr: deps.stderr, now: deps.now, spawn: deps.spawnNotify });
   const res = withState(deps, ctx.repo, (state, sdir, lock) => {
@@ -412,7 +433,7 @@ export async function main(argv, deps = defaultDeps()) {
   }
   deps = { ...defaultDeps(), ...deps };
   try {
-    if (o.cmd === 'run' && !deps.claudeAvailable()) return runCmd(deps, null, o);
+    if (o.cmd === 'run' && (!deps.claudeAvailable() || deps.gitIdentityProblem())) return runCmd(deps, null, o);
     if (o.cmd === 'notify') return notifyCmd(deps, context(deps), o);
     const ctx = withDomains(deps, context(deps), o);
     if (o.cmd === 'ack') {

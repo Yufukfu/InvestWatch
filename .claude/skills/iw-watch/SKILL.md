@@ -98,4 +98,4 @@ Paste one as a comment on the PR, or write any `/iw ...` comment yourself. Your 
 
 ## Requirements
 
-Node >= 22.20, `gh` logged in, and for `run` the `claude` CLI on `PATH` (the flags are pinned against Claude Code 2.1.330 in `scripts/fixtures/claude-help.txt`). `--domain` needs `.github/CODEOWNERS` on the default branch. Tests: `node --test ".claude/skills/iw-watch/scripts/*.test.mjs"`.
+Node >= 22.20, `gh` logged in, and for `run` the `claude` CLI on `PATH` and a global git identity (`git config --global user.name` / `user.email`, or the `GIT_AUTHOR_*` and `GIT_COMMITTER_*` variables in the cron or launchd job): the runner and the agent commit in fresh clones, which never see a checkout's local `user.*`, so `run` checks this first and exits 2 without one (#127) (the flags are pinned against Claude Code 2.1.330 in `scripts/fixtures/claude-help.txt`). `--domain` needs `.github/CODEOWNERS` on the default branch. Tests: `node --test ".claude/skills/iw-watch/scripts/*.test.mjs"`.

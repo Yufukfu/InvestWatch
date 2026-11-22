@@ -29,6 +29,8 @@
 | Work on the analytics pipeline, rules R1-R18, LLM layer or calibration | [analytics-plan.md](analytics-plan.md) §2, §5, §7, §8 |
 | Know which module a document goes to, or change the M1/M3 signals (S1.x, S3.x) | [../analytics/README.md](../analytics/README.md) "Modules and routing", then [../openspec/specs/m1-third-party-signals/spec.md](../openspec/specs/m1-third-party-signals/spec.md), [../openspec/specs/m3-unauthorized-advice-signals/spec.md](../openspec/specs/m3-unauthorized-advice-signals/spec.md) and [decisions/0308-m3-s34-gate.md](decisions/0308-m3-s34-gate.md) |
 | Add or relabel a gold-set document, run the evaluation | [../analytics/eval/README.md](../analytics/eval/README.md), then [../analytics/README.md](../analytics/README.md) "Gold-set evaluation" |
+| Scale `worker` or `analytics`, or see which services must stay at one replica | [../infra/README.md](../infra/README.md#scale-out) |
+| Get the architecture diagram and scale-out slides for the hand-in PDF | [presentation-architecture.md](presentation-architecture.md) |
 | Run the analytics part of the hand-in demo (documents per module, expected findings, click path, LLM cache, fallback if Gemini is down) | [demo-analytics.md](demo-analytics.md) |
 | Get the analytics slide content for the hand-in PDF (M1/M2/M3, gold-set numbers, add-a-rule example, LLM swap) | [presentation-analytics.md](presentation-analytics.md) |
 | Get the dashboard and architecture slides, the live demo click-by-click or the 3-minute video script | [presentation-dashboard.md](presentation-dashboard.md) |

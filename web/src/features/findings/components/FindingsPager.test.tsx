@@ -13,6 +13,13 @@ describe('FindingsPager', () => {
     expect(onPage).toHaveBeenLastCalledWith(1);
   });
 
+  it('also carries the short "page / pages" position for the phone, hidden from assistive technology', () => {
+    render(<FindingsPager page={1} pageSize={10} total={80} onPage={vi.fn()} onPageSize={vi.fn()} />);
+    const short = screen.getByText('1 / 8');
+    expect(short).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Strona 1 z 8')).not.toHaveAttribute('aria-hidden');
+  });
+
   it('disables previous on the first and next on the last page', () => {
     const { rerender } = render(<FindingsPager page={1} pageSize={10} total={20} onPage={vi.fn()} onPageSize={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Poprzednia strona' })).toBeDisabled();

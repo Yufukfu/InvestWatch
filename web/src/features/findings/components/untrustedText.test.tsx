@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { FindingDetail, FindingRow, RuleView } from '../model';
+import type { FindingDetail, FindingFilters, FindingRow, RuleView } from '../model';
 import { FindingDetailPanel } from './FindingDetailPanel';
 import { FindingsTable } from './FindingsTable';
+import { FindingsFilters } from './FindingsFilters';
 
 // Model output and scraped quotes are untrusted (issue #54): markup, Markdown links,
 // bare URLs and bidi controls must stay inert text, and a right-to-left override must
@@ -117,6 +118,16 @@ describe('untrusted finding text', () => {
     const panel = screen.getByRole('dialog');
     expect(within(panel).getByText(handle).tagName).not.toBe('A');
     expect(within(panel).getByText(handle)).toHaveAttribute('dir', 'auto');
+  });
+
+  it('isolates a shared-link search in its filter chip, visibly and in the accessible name', () => {
+    const q = `${RLO}gpj.exe`;
+    const filters: FindingFilters = { status: [], sort: '-detected_at', page: 1, pageSize: 25, q };
+    render(<FindingsFilters filters={filters} onChange={vi.fn()} onReset={vi.fn()} />);
+    const chip = screen.getByRole('button', { name: /^Usuń filtr: / });
+    expect(within(chip).getByText(`„${q}”`)).toHaveAttribute('dir', 'auto');
+    const name = chip.getAttribute('aria-label') ?? '';
+    expect(name).toContain(`\u2068„${q}”\u2069`);
   });
 
   it('isolates the title in the findings table', () => {

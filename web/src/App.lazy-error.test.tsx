@@ -24,6 +24,6 @@ describe('App when the trend chunk fails to load', () => {
     );
     expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać danych trendu.');
     const region = await screen.findByRole('region', { name: 'Podsumowanie' });
-    expect(region).toHaveTextContent(`${summary.total}Wszystkie zgłoszenia`);
+    expect(region).toHaveTextContent(`${summary.total} zgłoszeń`);
   });
 });

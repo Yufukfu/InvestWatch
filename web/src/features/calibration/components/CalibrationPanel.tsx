@@ -28,18 +28,26 @@ const MODULE_NAME: Record<CalibrationModule, string> = {
   M3: 'Usługi bez zezwolenia',
 };
 
-type Metric = { label: string; value: (p: CalibrationPoint) => number | undefined; percent?: boolean };
+type Metric = { label: string; value: (p: CalibrationPoint) => number | undefined; percent?: boolean; tone?: 'fp' | 'fn' };
 
 // Values are shown exactly as GET /calibration returns them; nothing is recalculated here.
 const METRICS: Metric[] = [
-  { label: 'Wykryte naruszenia (TP)', value: (p) => p.tp },
-  { label: 'Fałszywe alarmy (FP)', value: (p) => p.fp },
-  { label: 'Przeoczone (FN)', value: (p) => p.fn },
-  { label: 'Poprawnie pominięte (TN)', value: (p) => p.tn },
+  { label: 'Wykryte (TP)', value: (p) => p.tp },
+  { label: 'Fałszywe alarmy (FP)', value: (p) => p.fp, tone: 'fp' },
+  { label: 'Przeoczone (FN)', value: (p) => p.fn, tone: 'fn' },
+  { label: 'Pominięte (TN)', value: (p) => p.tn },
   { label: 'Precyzja', value: (p) => p.precision, percent: true },
   { label: 'Czułość', value: (p) => p.recall, percent: true },
   { label: 'F1', value: (p) => p.f1, percent: true },
 ];
+
+// The four outcomes of the selected point, in the order the bar draws them.
+const OUTCOMES = [
+  { key: 'tp', label: 'TP' },
+  { key: 'fn', label: 'FN' },
+  { key: 'fp', label: 'FP' },
+  { key: 'tn', label: 'TN' },
+] as const;
 
 const show = (v: number, percent?: boolean) => (percent ? formatPercent(v) : String(v));
 
@@ -59,7 +67,10 @@ export function CalibrationPanel(props: CalibrationPanelProps) {
   return (
     <section className="panel calibration" aria-labelledby={`${id}-title`}>
       <div className="panel-header">
-        <h2 id={`${id}-title`}>Kalibracja progów</h2>
+        <div className="calibration-title">
+          <p className="hero-eyebrow">PANEL KALIBRACJI</p>
+          <h2 id={`${id}-title`}>Ile alarmów, a ile przeoczeń?</h2>
+        </div>
         <div className="segmented" role="group" aria-label="Moduł">
           {CALIBRATION_MODULES.map((m) => (
             // aria-disabled, not disabled: a disabled button drops keyboard focus to <body>. A module switch
@@ -129,6 +140,17 @@ function Body({
         <span className="muted">obecny próg: {formatThreshold(view.currentThreshold)}</span>
       </div>
 
+      {/* Layout only: a segment grows by its returned count, so the browser sets the widths; nothing is computed. A count of 0 draws no segment. */}
+      <div className="proportion" role="group" aria-label="Rozkład wyników dla wybranego progu">
+        <ul className="proportion-bar">
+          {OUTCOMES.filter((o) => selected[o.key] > 0).map((o) => (
+            <li key={o.key} className={`seg seg-${o.key}`} style={{ flexGrow: selected[o.key] }}>
+              {o.label} {selected[o.key]}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="metrics">
         {METRICS.map((m) => {
           const v = m.value(selected);
@@ -136,7 +158,7 @@ function Body({
           const before = m.value(current);
           return (
             <div key={m.label} className="metric" role="group" aria-label={m.label}>
-              <div className="metric-label">{m.label}</div>
+              <div className={`metric-label${m.tone ? ` metric-${m.tone}` : ''}`}>{m.label}</div>
               <div className="metric-value">{show(v, m.percent)}</div>
               {before !== undefined && (
                 <div className="metric-before">
@@ -176,33 +198,37 @@ function Body({
       </details>
 
       <div className="calibration-save">
-        <p className="warning" id={warningId}>
-          Zapisanie progu zmienia poziom ryzyka wszystkich zgłoszeń modułu {module} i próg alertów wysokiego ryzyka.
-        </p>
+        <div className="calibration-callout">
+          <p id={warningId}>
+            Zapisanie progu zmienia poziom ryzyka wszystkich zgłoszeń modułu {module} i próg alertów wysokiego ryzyka.
+          </p>
+          <div className="calibration-buttons">
+            {/* Always rendered: removing the focused button would drop focus to <body>. */}
+            <button
+              type="button"
+              className="btn"
+              aria-disabled={!changed}
+              onClick={() => {
+                if (changed) onIndex(currentIndex);
+              }}
+            >
+              Wróć do obecnego
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              // aria-disabled, not disabled: a disabled button drops keyboard focus to <body>.
+              aria-disabled={!changed || !canSave || isSaving}
+              aria-describedby={warningId}
+              onClick={() => {
+                if (changed && canSave && !isSaving) onSave(selected.threshold);
+              }}
+            >
+              {isSaving ? 'Zapisywanie…' : 'Zapisz próg'}
+            </button>
+          </div>
+        </div>
         <div className="status-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            // aria-disabled, not disabled: a disabled button drops keyboard focus to <body>.
-            aria-disabled={!changed || !canSave || isSaving}
-            aria-describedby={warningId}
-            onClick={() => {
-              if (changed && canSave && !isSaving) onSave(selected.threshold);
-            }}
-          >
-            {isSaving ? 'Zapisywanie…' : 'Zapisz próg'}
-          </button>
-          {/* Always rendered: removing the focused button would drop focus to <body>. */}
-          <button
-            type="button"
-            className="btn"
-            aria-disabled={!changed}
-            onClick={() => {
-              if (changed) onIndex(currentIndex);
-            }}
-          >
-            Wróć do obecnego
-          </button>
           {error && <p role="alert">{error}</p>}
           {/* Always rendered: a live region must exist before its text changes to be announced. */}
           <p role="status" className="saved">

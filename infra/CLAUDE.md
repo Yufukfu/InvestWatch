@@ -10,6 +10,7 @@ Shared infrastructure: Postgres, Redis, object storage (MinIO), the optional Oll
 - Only the gateway publishes host ports (the loopback `compose.dev-ports.yaml` override is opt-in). Network keys are `data` (internal: Postgres, Redis, object store, Ollama), `edge` (routed by the gateway) and `egress` (internet). Never give a network a fixed `name:`; Compose scopes them per project so parallel worktrees don't collide.
 - Modules wait on `postgres`/`redis` with `service_healthy` and on `minio-init` with `service_completed_successfully` (joining contract in `README.md`).
 - Services use the MinIO app user (`MINIO_ACCESS_KEY`), never the root user. Redis keeps `appendonly yes` and `noeviction` (ADR 0305 thresholds must persist; stream entries must never be evicted).
+- `worker` and `analytics` must stay scalable: no `container_name`, no host port, no fixed consumer name. `infra/tests/smoke.sh scale` checks it; which services scale is in `README.md` "Scale-out".
 - `ollama`/`ollama-pull` stay behind `profiles: [llm]`: a plain `up` must download no weights.
 - The MinIO image has no curl, wget or grep: health checks and `minio/init.sh` use bash and shell patterns.
 - Services connect as `iw_app` (CRUD, no DDL). Migrations run as `iw_admin`: `iw_app` gets grants only on tables `iw_admin` creates.

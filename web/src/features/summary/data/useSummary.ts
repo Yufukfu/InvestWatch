@@ -8,5 +8,8 @@ export function useSummary(): SummaryCounts | undefined {
     total: data.total,
     highRisk: data.by_risk_level.high ?? 0,
     newCount: data.by_status.new ?? 0,
+    byModule: Object.entries(data.by_module ?? {})
+      .map(([module, count]) => ({ module, count: count ?? 0 }))
+      .sort((a, b) => a.module.localeCompare(b.module)),
   };
 }
