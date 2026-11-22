@@ -36,6 +36,7 @@
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
 | Update docs after a change | [../.claude/skills/iw-docs-update/SKILL.md](../.claude/skills/iw-docs-update/SKILL.md) |
 | Log AI usage for the jury | [ai-workflow.md](ai-workflow.md) |
+| Let my agent watch GitHub for reviews, review requests and hand-offs from teammates' agents | [../.claude/skills/iw-watch/SKILL.md](../.claude/skills/iw-watch/SKILL.md) |
 
 ## Rules
 
