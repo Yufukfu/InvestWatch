@@ -752,6 +752,35 @@ class R12aPeriodAndScope(_PastPerformance):
             years |= {int(y) for y in _YEAR_TABLE.findall(text) if int(y) <= fetch_year}
         return len(years) >= 5
 
+    def _since_inception(self, sentence: str, fetch_year: int) -> SubCheck:
+        """Art. 44 ust. 4 lit. b: results since inception only for a product younger than 5 years.
+
+        The launch year in the sentence decides at the fetch date (never asked of the model, which has no reference
+        date; group 7 review): under 5 calendar years pass, over 5 fail, exactly 5 (4 or 5 years old) uncertain, and
+        no year at all uncertain (its reference-period sub-check fails anyway).
+        """
+        lit_b = "(art. 44 ust. 4 lit. b)"
+        starts = [int(a or b) for a, b in _YEAR.findall(sentence) if int(a or b) <= fetch_year]
+        if not starts:
+            return SubCheck(
+                self.FIVE_YEARS, "uncertain",
+                f"wyniki od początku działalności bez daty – dopuszczalne tylko dla produktu istniejącego krócej niż 5 lat {lit_b}",
+                sentence,
+            )
+        start = min(starts)
+        age = fetch_year - start
+        if age < 5:
+            return SubCheck(self.FIVE_YEARS, "pass", "")
+        if age > 5:
+            return SubCheck(
+                self.FIVE_YEARS, "fail",
+                f"produkt istnieje od {start} r., ponad 5 lat – wymagane wyniki za ostatnie 5 lat {lit_b}", sentence,
+            )
+        return SubCheck(
+            self.FIVE_YEARS, "uncertain",
+            f"produkt uruchomiony w {start} r. – nie wiadomo, czy istnieje krócej niż 5 lat {lit_b}", sentence,
+        )
+
     @staticmethod
     def _dated(text: str) -> bool:
         return bool(_YEAR.search(text) or _YEAR_TABLE.search(text) or _YEAR_RANGE.search(text) or _DATE.search(text)
@@ -767,11 +796,7 @@ class R12aPeriodAndScope(_PastPerformance):
         elif self._five_years(claims, fetch_year):
             five = SubCheck(self.FIVE_YEARS, "pass", "")
         elif inception is not None:
-            five = SubCheck(
-                self.FIVE_YEARS, "uncertain",
-                "wyniki od początku działalności – dopuszczalne tylko dla produktu istniejącego krócej niż 5 lat "
-                "(art. 44 ust. 4 lit. b)", inception,
-            )
+            five = self._since_inception(inception, fetch_year)
         else:
             five = SubCheck(self.FIVE_YEARS, "fail", "brak wyników za ostatnie 5 lat w pełnych okresach 12-miesięcznych")
         if any(self._dated(t) for t in claims):

@@ -384,12 +384,28 @@ def test_r12a_since_inception_without_date_fails_reference_period(registry, cata
     assert r.explanation.index(FIVE_Y) < r.explanation.index(REF)
 
 
-def test_r12a_since_inception_with_start_year_is_uncertain(registry, catalogue):
-    inception = "Od uruchomienia w 2023 r. fundusz zarobił 18%."
-    r = run(f"{inception} {SOURCE}", registry, catalogue)["R12a"]
+def test_r12a_since_inception_five_years_before_the_fetch_year_is_uncertain(registry, catalogue):
+    # Launched 5 calendar years before the fetch year: 4 or 5 years old, the rules cannot tell (art. 44 ust. 4 lit. b).
+    inception = "Od uruchomienia w 2021 r. fundusz zarobił 18%."
+    r = run(f"{inception} {SOURCE}", registry, catalogue, **FETCHED_2026)["R12a"]
     assert r.result == "uncertain"
     assert r.evidence == inception
     assert FIVE_Y in r.explanation and REF not in r.explanation and SRC not in r.explanation
+
+
+def test_r12a_since_inception_of_a_young_product_passes(registry, catalogue):
+    # Group 7 review: the age is decided from the fetch year in code, never asked of the model.
+    r = run(f"Od uruchomienia w 2023 r. fundusz zarobił 18%. {SOURCE}", registry, catalogue, **FETCHED_2026)["R12a"]
+    assert r.result == "pass"
+
+
+def test_r12a_since_inception_of_an_older_product_fails(registry, catalogue):
+    inception = "Od uruchomienia w 2019 r. fundusz zarobił 40%."
+    # Another past result first, so the evidence must come from the sub-check, not the first claim.
+    r = run(f"W 2025 roku fundusz zyskał 5%. {inception} {SOURCE}", registry, catalogue, **FETCHED_2026)["R12a"]
+    assert r.result == "fail"
+    assert r.evidence == inception
+    assert f"{FIVE_Y}: niespełniony" in r.explanation
 
 
 @pytest.mark.parametrize(
@@ -715,7 +731,7 @@ def test_r11_unsourced_explicit_comparison_is_never_deferred(registry, catalogue
 
 def test_r12a_since_inception_is_deferred(registry, catalogue):
     judge = FakeJudge()
-    r = judged(f"Od uruchomienia w 2023 r. fundusz zarobił 18%. {SOURCE}", registry, catalogue, judge)["R12a"]
+    r = judged(f"Od uruchomienia w 2021 r. fundusz zarobił 18%. {SOURCE}", registry, catalogue, judge, **FETCHED_2026)["R12a"]
     assert "R12a" in judge.asked()
     assert r.result == "uncertain" and r.method == "rule"  # no verdict: the rules-only result stands
 
@@ -733,6 +749,22 @@ def test_every_evidence_is_a_quote_on_every_mock(with_judge, mock_documents, reg
         ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=registry.match(doc.text, doc.url), registry=registry)
         for r in run_rules(catalogue, ctx, judge=FakeJudge() if with_judge else None, module="M2"):
             assert r.evidence is None or r.evidence in doc.text, (raw["id"], r.rule_id, r.evidence)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Oprocentowanie wyższe niż w innych bankach, zgodnie z danymi opublikowanymi przez NBP na dzień 01.10.2026.",
+     "Prowizje niższe niż w innych biurach maklerskich. Dane opublikowane przez KNF, stan na 30.09.2026."],
+    ids=["danymi-opublikowanymi-przez", "dane-opublikowane-przez"],
+)
+def test_r11_data_published_by_an_institution_is_a_source(text, registry, catalogue):
+    # Group 7 review: data published by someone is a source; only the publisher line of the material is not.
+    assert run(text, registry, catalogue)["R11"].result == "pass"
+
+
+def test_r11_best_terms_of_execution_is_still_a_superlative(registry, catalogue):
+    # Group 7 review: only best execution policy wording is boilerplate.
+    assert run("Najlepsze warunki realizacji zleceń na rynku!", registry, catalogue)["R11"].result == "uncertain"
 
 
 def test_r11_publisher_line_is_not_a_source(registry, catalogue):

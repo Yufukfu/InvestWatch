@@ -72,6 +72,8 @@ shared:
     # The method of a comparison names its source too (gold m2-r11-comparison-with-source).
     # Not `opublikowany przez …`: that names the publisher, not the source (group 6 review).
     - '\bopublikowan\w*\s+(?:\S+\s+){0,4}(?:na\s+stronach|w\s+raport|w\s+sprawozdani)\w*'
+    # Data published by someone is a source ("dane opublikowane przez KNF"; group 7 review).
+    - '\bdan\w*\s+(?:\w+\s+)?opublikowan\w*\s+przez\b'
     - '\bporównani\w*\s+(?:\w+\s+){0,2}(?:tabel|cennik|taryf|ofert)\w*'
 
 rules:
@@ -247,7 +249,8 @@ rules:
         - '\bniż\s+(?:\d[\d.,]*|kilk\w*|pół\w*)'
         # Also stripped before the superlatives: document numbers and best execution are boilerplate (group 6 review).
         - '\b(?:załącznik\w*|zał\.|poz\.|ust\.|art\.|pkt\.?)\s*(?:nr|numer)\s*\d+'
-        - '\bnajlepsz\w*\s+(?:\w+\s+)?realizacj\w*'
+        # Only best-execution wording; "najlepsze warunki realizacji" stays a superlative (group 7 review).
+        - '\bnajlepsz\w*\s+(?:możliw\w*\s+)?realizacj\w*'
         - '\bbest\s+execution\b'
       superlative_patterns:
         - '\bnajlepsz\w*'
@@ -310,14 +313,16 @@ rules:
         - '\bod\s+(?:początku\s+(?:działalności|istnienia)|uruchomienia|powstania|startu|debiutu)\b'
         - '\bsince\s+(?:inception|launch)\b'
       source_patterns: *source_markers
-    # Deferred only when the 5-year sub-check alone is uncertain (since inception, dated): art. 44 ust. 4 lit. b.
+    # Deferred only when the 5-year sub-check alone is uncertain: since inception, launched exactly 5 calendar
+    # years before the fetch year (art. 44 ust. 4 lit. b). The age is computed in code from the fetch date; the model
+    # has no reference date, so it is asked only what the text itself states, and never answers fail.
     llm:
       when: uncertain
       question: >-
-        Wyniki historyczne podano od początku działalności produktu, a nie za ostatnie 5 lat. Czy z materiału
-        wynika, że produkt istnieje krócej niż 5 lat (np. podana data uruchomienia jest późniejsza niż 5 lat
-        temu)? Odpowiedz pass, jeśli tak, fail, jeśli nie lub jeśli tego nie wiadomo. Zacytuj dosłownie zdanie
-        z wynikami lub z datą uruchomienia.
+        Wyniki historyczne podano od początku działalności produktu. Czy sam tekst wprost stwierdza, że produkt
+        istnieje krócej niż 5 lat (np. "działa od 4 lat" albo dokładna data uruchomienia z miesiącem)? Nie
+        obliczaj wieku z bieżącej daty. Odpowiedz pass, jeśli tekst to stwierdza, w przeciwnym razie uncertain.
+        Zacytuj dosłownie zdanie, które o tym mówi.
   # ZASÓB R12b (art. 44 ust. 4): "ostrzeżenie o wpływie zmian kursów walutowych oraz czy wskazano wpływ prowizji,
   # opłat i obciążeń na wyniki". The fee statement always applies to past performance; the currency warning only
   # to results in, or a product denominated in, a currency other than PLN (art. 44 ust. 4 lit. e, Damian), and every

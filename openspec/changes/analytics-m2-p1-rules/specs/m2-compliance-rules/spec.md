@@ -165,9 +165,9 @@ R12a (ZASÓB: "okres ostatnich 5 lat … pełne okresy 12-miesięczne … okres 
 
 ### Requirement: R12a 5-year and 12-month sub-check
 The `5 lat / 12 mies.` sub-check SHALL:
-- fail when a past-performance sentence uses a period shorter than 12 months (`od początku roku`, `N miesięcy` with N not a multiple of 12, a quarter);
-- pass with 5 or more years of coverage (`ostatnich 5 lat`, a 5-year range, 5 distinct past years);
-- be `uncertain` when coverage rests only on a since-inception marker, which art. 44 ust. 4 lit. b allows only for a product under 5 years old;
+- fail when a past-performance sentence uses a period shorter than 12 months;
+- pass with 5 or more years of coverage (a range, `ostatnich N lat`, distinct years);
+- on a since-inception marker alone (art. 44 ust. 4 lit. b), pass if the launch year is under 5 years before the fetch year, fail if over, and be `uncertain` at exactly 5 or with no year;
 - fail otherwise.
 
 #### Scenario: Period shorter than 12 months
@@ -179,8 +179,12 @@ The `5 lat / 12 mies.` sub-check SHALL:
 - **THEN** the 12-month basis is met and R12a is `pass`
 
 #### Scenario: Since inception with a start year
-- **WHEN** the only past performance is `Od uruchomienia w 2023 r. fundusz zarobił 18%.`, with a source
+- **WHEN** the only past performance is `Od uruchomienia w 2021 r. fundusz zarobił 18%.`, with a source, fetched in 2026
 - **THEN** R12a is `uncertain` with that sentence as evidence, and the explanation names only the 5-year sub-check
+
+#### Scenario: Since inception of a young or an old product
+- **WHEN** the launch year is 2023, or 2019, and the material was fetched in 2026
+- **THEN** the 5-year sub-check is `pass` for 2023 and `fail` for 2019, quoting the since-inception sentence
 
 ### Requirement: R12a reference period and source sub-checks
 `okres referencyjny` SHALL pass when a year, a year range, a date or `ostatnich N lat/miesięcy` is in a past-performance sentence, and fail otherwise. A since-inception marker without a date SHALL fail it outright. `źródło` SHALL pass when a source marker (shared with R11) appears anywhere. The `llm:` block (`when: uncertain`) SHALL ask whether the product is under 5 years old.
