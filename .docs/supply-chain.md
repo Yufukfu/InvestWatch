@@ -30,6 +30,8 @@ docker run --rm -v "$PWD":/src:ro -v osv-db:/root/.cache/osv-scanner \
   $(for f in */requirements*.txt contracts/mock-server/requirements*.txt; do printf -- '-L requirements.txt:/src/%s ' "$f"; done)
 ```
 
+**Offline covers direct Python pins only.** Without network access OSV-Scanner cannot expand a `requirements*.txt` into its transitive dependencies. In the hand-in run it counted 16 packages in `api/requirements-dev.txt` offline against 90 online. `package-lock.json` already lists every package, so npm is complete offline (362 both ways). Transitive Python dependencies are covered by the online OSV-Scanner job and by `pip-audit`, which resolves them, but both need network access. A fully air-gapped scan of Python would need a lockfile with every transitive pin (for example `pip-compile` output), which we do not have yet.
+
 **Run it in CI, not on a developer laptop.** The CI offline job (section 5) completed on PR #100: it loaded the npm and PyPI databases and scanned 12 manifests in about 28 s. On a MacBook Air M1 (8 GB) under Docker Desktop, the same scan loaded `npm/all.zip` and then stalled until it was killed, leaving the cache empty (likely memory, unverified). On a machine with enough memory, check that `osv-db` is non-empty after the first run. Once it holds the database, an air-gapped host runs the same command without `--download-offline-databases`. The image is pinned by tag here for a manual run. CI pins it by digest (ADR 0209, decision 5).
 
 ## 3. Fixing a finding
