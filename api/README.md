@@ -111,6 +111,8 @@ depends_on:
   api-migrate: { condition: service_completed_successfully }
 ```
 
+Images: `api` and `api-migrate` build the same `api/Dockerfile`, each under its own tag (`investwatch/api:<project>` and `investwatch/api-migrate:<project>`), so naming either one rebuilds it: `docker compose up -d --build --no-deps api` rebuilds and restarts the API alone, without a migration run (issue #157). Before that change only `api-migrate` built, and a targeted `up --build api` kept the old image. They cannot share one tag: two services building one tag race on the image store and abort `up --build` ("image ... already exists").
+
 Locally, from `api/`:
 
 ```bash
