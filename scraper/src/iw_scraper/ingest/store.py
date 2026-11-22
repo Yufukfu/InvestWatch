@@ -15,6 +15,22 @@ class IngestResult:
     outcome: Literal["inserted", "duplicate", "failed"]
     document_id: str | None = None
     error: JobError | None = None  # set when outcome is "failed"
+    previous_document_id: str | None = None  # a web page that already had a version: the one this replaces
+
+
+@dataclass(frozen=True)
+class RemovalState:
+    """The newest document of a source and whether a removal job error is newer than it."""
+
+    document_id: str | None
+    content_hash: str | None
+    created_at: datetime | None
+    gone_at: datetime | None
+
+    @property
+    def gone_is_newer(self) -> bool:
+        # strictly newer: at the same instant the document wins (a removal is only recorded after a document)
+        return self.created_at is not None and self.gone_at is not None and self.gone_at > self.created_at
 
 
 # Named conflict target, as in api/README.md: a bare ON CONFLICT DO NOTHING would also hide a reused `id`.
@@ -71,3 +87,38 @@ async def insert_document(pool: asyncpg.Pool, doc: dict) -> IngestResult:
     if inserted is None:
         return IngestResult("duplicate")
     return IngestResult("inserted", str(inserted))
+
+
+async def removal_state(pool: asyncpg.Pool, source_id: str) -> RemovalState:
+    """Newest document of the source ("newest" is `created_at DESC, id DESC`) and the newest removal row: an `http_error` `HTTP 404`/`HTTP 410` with a url (what `record_gone` writes, what the api reads)."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT d.id, d.content_hash, d.created_at,
+                   (SELECT max(occurred_at) FROM job_errors WHERE source_id = $1 AND reason = 'http_error'
+                      AND detail ~ '^HTTP (404|410)$' AND url IS NOT NULL) AS gone_at
+            FROM (SELECT 1) AS one
+            LEFT JOIN LATERAL (
+              SELECT id, content_hash, created_at FROM documents WHERE source_id = $1
+              ORDER BY created_at DESC, id DESC LIMIT 1
+            ) AS d ON true
+            """,
+            uuid.UUID(source_id),
+        )
+    document_id = row["id"]
+    return RemovalState(None if document_id is None else str(document_id), row["content_hash"], row["created_at"], row["gone_at"])
+
+
+async def previous_document(pool: asyncpg.Pool, source_id: str, document_id: str) -> str | None:
+    """The newest other row of the source created before `document_id` (ties by id); informational only."""
+    async with pool.acquire() as conn:
+        found = await conn.fetchval(
+            """
+            SELECT d.id FROM documents d JOIN documents n ON n.id = $2
+            WHERE d.source_id = $1 AND d.id <> n.id AND (d.created_at, d.id) < (n.created_at, n.id)
+            ORDER BY d.created_at DESC, d.id DESC LIMIT 1
+            """,
+            uuid.UUID(source_id),
+            uuid.UUID(document_id),
+        )
+    return None if found is None else str(found)

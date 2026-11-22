@@ -4,10 +4,14 @@ import asyncio
 import json
 import uuid
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+import pytest
 
 from iw_scraper.ingest.document import build_document
-from iw_scraper.ingest.store import insert_document, is_duplicate
+from iw_scraper.ingest.errors import record_error
+from iw_scraper.ingest.store import insert_document, is_duplicate, previous_document, removal_state
+from iw_scraper.types import JobError, Reason
 
 FETCHED_AT = datetime(2026, 11, 21, 15, 0, 0, tzinfo=timezone.utc)
 
@@ -131,3 +135,125 @@ async def test_post_edited_between_runs_is_a_second_row_for_the_same_permalink(p
     async with pool.acquire() as conn:
         urls = await conn.fetchval("SELECT count(DISTINCT url) FROM documents")
     assert await count(pool) == 2 and urls == 1
+
+
+T0 = datetime(2026, 11, 20, 10, 0, 0, tzinfo=timezone.utc)
+
+
+def minutes(n: int) -> datetime:
+    return T0 + timedelta(minutes=n)
+
+
+async def stored(pool, source, text, at: datetime, doc_id: str | None = None) -> str:
+    """Insert a version of the page and pin its server-side `created_at`."""
+    doc = build(source, text)
+    if doc_id is not None:
+        doc["id"] = doc_id
+    result = await insert_document(pool, doc)
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE documents SET created_at = $2 WHERE id = $1", uuid.UUID(result.document_id), at)
+    return result.document_id
+
+
+async def gone_at(pool, source, at: datetime) -> None:
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", source.id, url=source.url))
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE job_errors SET occurred_at = $1 WHERE reason = 'http_error'", at)
+
+
+async def test_removal_state_of_a_source_with_no_document(pool, seeded_source):
+    state = await removal_state(pool, seeded_source.id)
+    assert state.document_id is None
+    assert state.content_hash is None
+    assert state.gone_is_newer is False
+
+
+async def test_removal_state_names_the_newest_of_two_documents(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(0))
+    newest = await stored(pool, seeded_source, "B", minutes(5))
+    state = await removal_state(pool, seeded_source.id)
+    assert state.document_id == newest
+    assert state.content_hash == build(seeded_source, "B")["content_hash"]
+
+
+async def test_gone_older_than_the_newest_document_is_not_newer(pool, seeded_source):
+    await gone_at(pool, seeded_source, minutes(1))
+    await stored(pool, seeded_source, "A", minutes(5))
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
+
+
+async def test_gone_newer_than_the_newest_document_is_newer(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(0))
+    await gone_at(pool, seeded_source, minutes(5))
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is True
+
+
+async def test_gone_at_the_same_instant_as_the_newest_document_is_not_newer(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(3))
+    await gone_at(pool, seeded_source, minutes(3))
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
+
+
+async def test_gone_of_another_source_does_not_count(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(0))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", str(uuid.uuid4())))
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
+
+
+@pytest.mark.parametrize("detail", ["HTTP 503", "HTTP 4040", "transport error: HTTP 404"])
+async def test_only_a_404_or_410_http_error_counts_as_removal(pool, seeded_source, detail):
+    await stored(pool, seeded_source, "A", minutes(0))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, detail, seeded_source.id, url=seeded_source.url))
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
+
+
+async def test_a_404_without_a_url_is_a_failed_run_not_a_removal(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(0))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", seeded_source.id))  # the url is only set by `record_gone`
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
+
+
+async def test_equal_created_at_makes_the_greater_id_the_newest(pool, seeded_source):
+    low, high = "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"
+    await stored(pool, seeded_source, "A", minutes(0), doc_id=high)
+    await stored(pool, seeded_source, "B", minutes(0), doc_id=low)
+    assert (await removal_state(pool, seeded_source.id)).document_id == high
+
+
+async def test_previous_document_is_the_newest_other_row_before_the_new_one(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(0))
+    second = await stored(pool, seeded_source, "B", minutes(5))
+    new = await stored(pool, seeded_source, "C", minutes(10))
+    assert await previous_document(pool, seeded_source.id, new) == second
+
+
+async def test_previous_document_ignores_rows_created_after_the_new_one(pool, seeded_source):
+    first = await stored(pool, seeded_source, "A", minutes(0))
+    new = await stored(pool, seeded_source, "B", minutes(5))
+    await stored(pool, seeded_source, "C", minutes(10))  # a concurrent worker was faster
+    assert await previous_document(pool, seeded_source.id, new) == first
+
+
+async def test_previous_document_of_the_first_row_is_none(pool, seeded_source):
+    first = await stored(pool, seeded_source, "A", minutes(0))
+    assert await previous_document(pool, seeded_source.id, first) is None
+
+
+async def test_previous_document_breaks_a_tie_by_id(pool, seeded_source):
+    low, high = "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"
+    await stored(pool, seeded_source, "A", minutes(0), doc_id=high)
+    await stored(pool, seeded_source, "B", minutes(0), doc_id=low)
+    assert await previous_document(pool, seeded_source.id, high) == low
+    assert await previous_document(pool, seeded_source.id, low) is None
+
+
+async def test_previous_document_is_scoped_to_the_source(pool, seeded_source):
+    other = replace(seeded_source, id=str(uuid.uuid4()))
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO sources (id, name, platform, url, source_kind, target_modules) VALUES ($1, 'B', 'web', 'https://b.example.com/', 'unknown', $2)",
+            uuid.UUID(other.id), ["M3"],
+        )
+    await stored(pool, other, "A", minutes(0))
+    new = await stored(pool, seeded_source, "B", minutes(5))
+    assert await previous_document(pool, seeded_source.id, new) is None

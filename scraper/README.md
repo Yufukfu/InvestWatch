@@ -51,6 +51,17 @@ Opt-in live smoke tests make real requests and are deselected by default (`-m sc
 
 It cannot give a success rate: the schema keeps only the last run of each source, so statuses are of the last run and nothing older, and the header says so.
 
+## Re-scan outcomes
+
+A web source is one page, and every version of it is one `documents` row. What a re-scan found is in two places (reasoning and the two known limits: [ADR 0110](../.docs/decisions/0110-rescan-changed-and-removed-derivation.md)):
+
+- **Edited page:** a new `documents` row; the ingest result carries `previous_document_id`, and the log has `rescan_outcome` with outcome `changed`. Earlier rows are never touched.
+- **Removed page:** an HTTP 404 or 410 on a source that already stored a document, confirmed by one more request in the same run (not a retry), is stored once as a `job_errors` row with reason `http_error`, detail `HTTP 404` or `HTTP 410` and the source URL (userinfo dropped, redacted, cut to 300 characters), the shape the api reads. A source that never stored a document gets the same row without a URL. A removal run ends `ok` with `documents = 0`, is not retried and does not count toward the domain failure pause; while the page stays missing, a re-scan makes one request and adds no row.
+- **Log only:** every web re-scan logs one JSON line `{"event": "rescan_outcome", "outcome": ..., "source_id": ..., "document_id": ...}` with outcome `unchanged`, `changed`, `reverted` (an earlier text came back), `reappeared` (the page answers again after a removal) or `gone` (a log outcome only, not a reason). Lookup failures are logged as `rescan_lookup_failed` and never fail a run. Social sources are not classified.
+
+The api derives the labels from the tables: `changed` = the document is not the newest of its source (`created_at DESC, id DESC`); `removed` = the newest `http_error` row with detail `HTTP 404`/`HTTP 410` and the page URL is newer than the newest document. The end-to-end test copies the api's predicate from `api/src/investwatch_api/rescan.py`. A source that redirects does not show as removed until the api matches by `source_id` (follow-up for Damian). Two cases come out wrong without a new column: a revert to an earlier text still reads "changed", and a page that returns unchanged after a removal still reads "removed" (use the log lines, or see ADR 0110). Soft 404s (a 200 "not found" page) and redirects to a home page are not detected.
+
+
 ## X and YouTube
 
 Both are dedicated flows (`social/x.py`, `social/youtube.py`, `social/transcript.py`), not page parsers; evidence and the decision are in [ADR 0109](../.docs/decisions/0109-social-collectors-research.md). A source URL is `https://x.com/<handle>` or `https://www.youtube.com/@<handle>`; any other form is refused as `invalid_request` before a request.

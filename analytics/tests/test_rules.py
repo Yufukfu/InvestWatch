@@ -40,7 +40,7 @@ def test_catalogue_is_complete(catalogue):
     ids = [s.id for s in catalogue.specs]
     assert len(ids) == 19 and len(set(ids)) == 19
     assert all(re.match(RULE_ID_PATTERN, i) for i in ids)
-    assert [s.id for s in catalogue.implemented] == ["R1", "R2", "R3", "R4", "R6", "R11", "R12a", "R12b", "R14", "R15", "R16", "R17", "R18"]
+    assert [s.id for s in catalogue.implemented] == ["R1", "R2", "R3", "R4", "R6", "R9", "R10", "R11", "R12a", "R12b", "R14", "R15", "R16", "R17", "R18"]
 
 
 def _write(tmp_path, body: str) -> Path:
@@ -81,8 +81,8 @@ def test_malformed_params_fail_at_load(tmp_path, entry):
 
 
 def test_implemented_rule_without_code_rejected(tmp_path):
-    p = _write(tmp_path, "rules:\n  - {id: R9, name: x, severity: low, legal_basis: null, implemented: true}\n")
-    with pytest.raises(CatalogueError, match="R9"):
+    p = _write(tmp_path, "rules:\n  - {id: R12, name: x, severity: low, legal_basis: null, implemented: true}\n")
+    with pytest.raises(CatalogueError, match="R12 is marked implemented but has no rule class"):
         Catalogue.load(p)
 
 

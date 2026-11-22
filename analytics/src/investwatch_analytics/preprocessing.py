@@ -69,6 +69,25 @@ def _language_of_normalized(norm: str) -> str | None:
     return "pl" if pl >= en else "en"
 
 
+#: A per-sentence guess needs this many marker points for the winning language (change analytics-m2-text-rules).
+MIN_LANGUAGE_SIGNAL = 2
+
+
+def sentence_language(text: str) -> str | None:
+    """`pl` or `en` for one sentence, or None when the signal is too weak or tied (R10).
+
+    Additive: separate from the document guess, which never returns None for non-empty text. Polish points are
+    marker words plus words with a Polish diacritic; English points are marker words.
+    """
+    words = re.findall(r"[a-ząćęłńóśźż]+", normalize(text).lower())
+    pl = sum(w in _PL_WORDS or any(c in _PL_CHARS for c in w) for w in words)
+    en = sum(w in _EN_WORDS for w in words)
+    best, other, lang = (pl, en, "pl") if pl > en else (en, pl, "en")
+    if best < MIN_LANGUAGE_SIGNAL or best == other:
+        return None
+    return lang
+
+
 @dataclass(frozen=True)
 class Sentence:
     text: str

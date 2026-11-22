@@ -227,10 +227,64 @@ rules:
   # R7 and R9 (not built here): not_applicable with "brak informacji o ryzyku" without risk information (ZASÓB).
   - {id: R7, name: Dostępność za 1 kliknięciem, severity: medium, legal_basis: art. 44 ust. 2 lit. b i e rozp. del. 2017/565, implemented: false}
   - {id: R8, name: Responsywność, severity: low, legal_basis: art. 44 ust. 2 lit. g rozp. del. 2017/565, implemented: false}
-  # R9: LLM-first (no rules signal, analytics-m2-p1-rules follow-up F2); not_applicable with "brak informacji o
-  # ryzyku" without risk information.
-  - {id: R9, name: Zrozumiałość, severity: low, legal_basis: art. 44 ust. 2 lit. d rozp. del. 2017/565, implemented: false}
-  - {id: R10, name: Spójność językowa, severity: low, legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565, implemented: false}
+  # ZASÓB R9: "ostrzeżenie o ryzyku … językiem zrozumiałym dla przeciętnego odbiorcy grupy docelowej" (rules/m2_text.py).
+  # LLM-first: the rules only raise a signal on the warning sentences (average length, jargon hits and share) and
+  # never fail; the LLM rates 1-5 and R9 fails only at <= 2 with a verified quote. not_applicable with "brak
+  # informacji o ryzyku" without a warning. The params are this rule's signal, not module thresholds (ADR 0316).
+  - id: R9
+    name: Zrozumiałość
+    severity: low
+    legal_basis: art. 44 ust. 2 lit. d rozp. del. 2017/565
+    implemented: true
+    # Damian: a rules-only uncertain has no evidence of an infringement, so it is not scored; the finding still
+    # lists it ("do weryfikacji") with its signal. Only an LLM verdict counts.
+    llm_only_uncertain: true
+    params:
+      max_avg_sentence_words: 30
+      max_jargon_share: 0.05
+      min_jargon_hits: 2
+      # Specialist terms a retail client is not expected to know. Not `dźwignia`, `spread` or `CFD`: they are in
+      # the standard ESMA warnings, which must pass.
+      jargon_patterns:
+        - '\bimplik\w*'
+        - '\basymetryczn\w*'
+        - '\bkontrahent\w*'
+        - '\bdeprecjacj\w*'
+        - '\bpartycypacj\w*'
+        - '\b(?:ryzyk|instrument)\w*\s+bazow\w*'
+        - '\bprofil\w*\s+wypłat\w*'
+        - '\bwolatyln\w*'
+        - '\bderywat\w*'
+        - '\bduracj\w*'
+        - '\bkonweksj\w*'
+        - '\bkontang\w*'
+        - '\bmargin\s+call\b'
+        - '\bhedg\w*'
+        - '\barbitra[żz]\w*'
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+    llm:
+      when: uncertain
+      question: >-
+        Oceń w skali 1-5, na ile ostrzeżenie o ryzyku jest zrozumiałe dla przeciętnego klienta detalicznego
+        (1 = niezrozumiałe, żargon specjalistyczny; 5 = proste i jasne). Zacznij uzasadnienie od "Ocena: N/5".
+        Odpowiedz fail przy ocenie 1-2, uncertain przy 3, pass przy 4-5. Zacytuj dosłownie najmniej zrozumiałe
+        zdanie ostrzeżenia.
+  # ZASÓB R10: "informacje o ryzyku nie są podane w innym języku niż główny przekaz materiału" (rules/m2_text.py).
+  # Main language: visible non-footer, non-legal, non-warning blocks (desktop first), else the non-warning
+  # sentences, else the document guess. Rules-only; not_applicable with "brak informacji o ryzyku" without a warning.
+  - id: R10
+    name: Spójność językowa
+    severity: low
+    legal_basis: art. 44 ust. 2 lit. f rozp. del. 2017/565
+    implemented: true
+    params:
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
   # ZASÓB R11 (art. 44 ust. 3): "Wykrywa porównania produktów i usług, weryfikuje źródło informacji, przyjęte
   # założenia i flaguje naruszenia w raporcie" – violations only: a compliant comparison is a plain pass that quotes
   # the comparison (Damian, ADR 0315). The core is other products, services and providers; index and benchmark

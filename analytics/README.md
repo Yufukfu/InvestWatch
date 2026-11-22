@@ -128,8 +128,10 @@ Latest numbers (2026-11-22, `main` 0434553b, 69 gold documents): one rules-only 
 |---|---|---|---|---|---|
 | M1 (18: 10 / 8) | **0.75** | 1.0 / 0.7 / 0.824 (7 / 0 / 3 / 8) | 1.0 / 1.0 / 1.0 (10 / 0 / 0 / 8) | 0.40-0.65, F1 0.889 | 0.75-0.80, F1 1.0 |
 | M1 at the old 0.65 | | 1.0 / 0.8 / 0.889 (8 / 0 / 2 / 8) | 0.909 / 1.0 / 0.952 (10 / 1 / 0 / 7) | | |
-| M2 (35: 23 / 12) | 0.1 | 0.944 / 0.739 / 0.829 (17 / 1 / 6 / 11) | 1.0 / 0.739 / 0.85 (17 / 0 / 6 / 12) | 0.05-0.10 | 0.10 only |
+| M2 (35: 23 / 12) | 0.1 | 0.947 / 0.783 / 0.857 (18 / 1 / 5 / 11) | 0.95 / 0.826 / 0.884 (19 / 1 / 4 / 11) | 0.05-0.10 | 0.10 |
 | M3 (18: 10 / 8) | 0.4 (gate cap) | 1.0 / 0.4 / 0.571 (4 / 0 / 6 / 8) | 1.0 / 0.4 / 0.571 (4 / 0 / 6 / 8) | 0.25 only, F1 0.706 | 0.05-0.40, F1 0.588 |
+
+The M2 row is from change `analytics-m2-text-rules` (R9, R10; the DeepSeek run on that branch). Its rules, strict precision / recall: R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R9 1.0 / 0.0 rules-only and 1.0 / 1.0 with DeepSeek (LLM-first: rules-only R9 never fails and its `uncertain` is not scored), R10 1.0 / 1.0, R11, R12a, R12b, R14, R15, R16 and R18 1.0 / 1.0, R17 1.0 / 0.33. R5, R7, R8 and R13 are not built.
 
 M2 slider: at 0.25, 1.0 / 0.609 / 0.757; at 0.40, 1.0 / 0.478 / 0.647, the same on both runs. The DeepSeek run made 28 calls, all valid (3.1 s average, 6.4 s p95).
 

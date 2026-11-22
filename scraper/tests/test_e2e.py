@@ -99,3 +99,91 @@ async def test_two_workers_and_two_simultaneous_requests_store_the_page_once(poo
 async def _settled(events, source_id) -> bool:
     # one job coalesces into the running one (no event) or both finish: at least one finish, none pending
     return len(await finished(events, source_id)) >= 1
+
+
+# "Changed" is the scraper's proposal (design decision 1 of `scraper-rescan-tracking`, issue 71); the api's own
+# query differs. "Removed" copies the predicate of `api/src/investwatch_api/rescan.py` (`rescan_state`, on main):
+# `job_errors` of the source, `url` in {canonical_url or url, url}, `reason = 'http_error'`, `detail` matching
+# GONE_DETAIL, `occurred_at` after the newest fetch of the page. If the scraper writes another reason or detail,
+# this fails; the SQL below must be kept equal to that file.
+CHANGED_SQL = """
+SELECT EXISTS (
+  SELECT 1 FROM documents newer
+  WHERE newer.source_id = d.source_id AND (newer.created_at, newer.id) > (d.created_at, d.id)
+) FROM documents d WHERE d.id = $1
+"""
+REMOVED_SQL = """
+WITH page AS (
+  SELECT coalesce(canonical_url, url) AS key, url, max(fetched_at) OVER () AS last_seen
+  FROM documents WHERE source_id = $1 ORDER BY fetched_at DESC, created_at DESC LIMIT 1
+)
+SELECT EXISTS (
+  SELECT 1 FROM job_errors e, page
+  WHERE e.source_id = $1
+    AND e.url IN (page.key, page.url)
+    AND e.reason = 'http_error'
+    AND e.detail ~ '^HTTP (404|410)$'  -- GONE_DETAIL of rescan.py
+    AND e.occurred_at > page.last_seen)
+"""
+
+
+async def derived(pool, source_id: str, first_document: str) -> tuple[bool, bool]:
+    """(first document is changed by the proposed rule, source is removed by the api's removal predicate)."""
+    return (
+        await pool.fetchval(CHANGED_SQL, uuid.UUID(first_document)),
+        await pool.fetchval(REMOVED_SQL, uuid.UUID(source_id)),
+    )
+
+
+async def test_a_page_is_edited_reverted_removed_and_comes_back_and_the_derivations_follow(
+    pool, storage, stub, events
+):
+    source_id = await seed(pool, stub)
+    original = (FIXTURES / "knf_warnings.html").read_bytes()
+    edited = original.replace(b"</body>", b"<p>Zmieniona tresc ostrzezenia</p></body>")
+    assert edited != original
+    page_requests = lambda: len([r for r in stub.requests if r.path == PAGE])  # noqa: E731
+
+    async def rescan(count: int) -> dict:
+        await scan(rt, source_id)
+        await wait_for(lambda: _has(events, source_id, count))
+        return (await finished(events, source_id))[count - 1]
+
+    async with stack(pool, storage, stub) as rt:
+        assert await rescan(1) == {"source_id": source_id, "documents": 1, "status": "ok"}
+        first = str(await pool.fetchval("SELECT id FROM documents WHERE source_id = $1", uuid.UUID(source_id)))
+        assert await derived(pool, source_id, first) == (False, False)
+
+        stub.route(PAGE, body=edited)  # edited: a second row, the first one is superseded
+        assert await rescan(2) == {"source_id": source_id, "documents": 1, "status": "ok"}
+        assert await document_count(pool, source_id) == 2
+        assert await derived(pool, source_id, first) == (True, False)
+
+        stub.route(PAGE, body=original)  # back to the first text: nothing is inserted
+        assert await rescan(3) == {"source_id": source_id, "documents": 0, "status": "ok"}
+        assert await document_count(pool, source_id) == 2
+        # KNOWN LIMIT (design decision 5): the page shows the first text again, yet the newest row is the edited one,
+        # so the derivation still says "changed". Exact state needs `documents.last_seen_at`; change this on purpose.
+        assert await derived(pool, source_id, first) == (True, False)
+
+        stub.route(PAGE, status=410, body=b"gone")  # removed: confirmed in the same run, then recorded once
+        before = page_requests()
+        assert await rescan(4) == {"source_id": source_id, "documents": 0, "status": "ok"}
+        assert page_requests() - before == 2
+        assert await document_count(pool, source_id) == 2
+        gone = await pool.fetch("SELECT url, detail FROM job_errors WHERE source_id = $1 AND reason = 'http_error' AND detail ~ '^HTTP (404|410)$'", uuid.UUID(source_id))
+        assert [(r["url"], r["detail"]) for r in gone] == [(stub.url(PAGE), "HTTP 410")]
+        assert await derived(pool, source_id, first) == (True, True)
+        assert (await pool.fetchrow("SELECT last_run_status FROM sources WHERE id = $1", uuid.UUID(source_id)))[0] == "ok"
+
+        before = page_requests()  # still removed: one request, no second row
+        assert await rescan(5) == {"source_id": source_id, "documents": 0, "status": "ok"}
+        assert page_requests() - before == 1
+        assert await pool.fetchval("SELECT count(*) FROM job_errors WHERE reason = 'http_error' AND detail ~ '^HTTP (404|410)$'") == 1
+
+        stub.route(PAGE, body=original)  # back, unchanged text
+        assert await rescan(6) == {"source_id": source_id, "documents": 0, "status": "ok"}
+        assert await document_count(pool, source_id) == 2
+        # KNOWN LIMIT (design decision 5): the page is back, yet the `gone` row is still newer than the newest document,
+        # so the derivation still says "removed". Exact state needs a `cleared_at`; change this on purpose.
+        assert await derived(pool, source_id, first) == (True, True)
