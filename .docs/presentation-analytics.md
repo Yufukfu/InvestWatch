@@ -176,10 +176,11 @@ Runbook (`analytics/README.md`, "LLM: hosted Gemma or local Ollama", PR #69), on
 
 1. In `.env`, comment out the hosted lines and set
    `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama`,
-   and the slower local limits `LLM_TIMEOUT_S=120`, `LLM_DOC_BUDGET_S=180`, `CLAIM_MIN_IDLE_MS=240000`, `LLM_MAX_CHUNKS=2`.
-2. Pull the model once (~3.3 GB): `docker compose --profile llm up ollama-pull`.
+   the slower local limits `LLM_TIMEOUT_S=240`, `LLM_DOC_BUDGET_S=300`, `CLAIM_MIN_IDLE_MS=360000`, `LLM_CHUNK_CHARS=1500`, `LLM_MAX_CHUNKS=1`,
+   and `EMBED_BASE_URL=http://ollama:11434/v1` for `bge-m3`.
+2. Pull the models once (~4.5 GB): `docker compose --profile llm up --exit-code-from ollama-pull ollama-pull`.
 3. Start: `docker compose --profile llm up -d` (stack already running: `docker compose --profile llm up -d ollama analytics`).
 4. Check: `docker compose logs analytics | grep llm_mode` shows `local`; LLM-decided findings carry `model.llm = "gemma3:4b"`.
-5. Back: restore the hosted lines, `docker compose up -d analytics`.
+5. Back: restore the hosted lines, drop the local-only chunk limits, `docker compose up -d analytics`.
 
-**Notes:** Safety nets: a failing endpoint opens a circuit breaker and findings stay rules-only (no automatic model switch); the worker refuses to start if `CLAIM_MIN_IDLE_MS` is not above the LLM budget; the cache key includes the model, so pages are re-analysed after a switch. Local timeouts are estimates and `gemma3:4b` quality is not measured on the gold set; the published LLM numbers are DeepSeek Flash, next to the rules-only numbers. Rehearsal on the demo machine: _not done yet (#74)_.
+**Notes:** Safety nets: a failing endpoint opens a circuit breaker and findings stay rules-only (no automatic model switch); the worker refuses to start if `CLAIM_MIN_IDLE_MS` is not above the LLM budget; the cache key includes the model, so pages are re-analysed after a switch. `gemma3:4b` quality is not measured on the gold set; the published LLM numbers are DeepSeek Flash, next to the rules-only numbers. Rehearsed on the demo machine on 2026-11-22 (#74): the switch takes about 40 s and the switch back about 60 s. On CPU one local M1 verdict took 182 s against 4.6 s hosted, and the M2 call timed out, so locally most checks stay rules-only. Say so, and show one `model.llm = "gemma3:4b"` finding rather than a live local scan.

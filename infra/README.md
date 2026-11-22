@@ -101,14 +101,14 @@ The consumer list also keeps the names of replicas that were stopped or replaced
 
 ```bash
 docker compose --profile llm up -d          # adds ollama and pulls gemma3:4b and bge-m3 (several GB, Docker Hub)
-docker compose --profile llm up ollama-pull # pre-pull before a demo
+docker compose --profile llm up --exit-code-from ollama-pull ollama-pull # pre-pull before a demo; plain `up` exits 0 even if the pull fails
 ```
 
 A plain `docker compose up` starts neither and downloads nothing.
 
 `ollama` runs with `OLLAMA_CONTEXT_LENGTH=8192` (override in `.env`). The OpenAI-compatible `/v1` endpoint cannot set the context length per request, and a stage-2 chunk (`analytics-llm-p0`, ADR 0304) is about 3k tokens plus the prompt. Ollama's own default context depends on the version and can be smaller, which truncates the input without an error to the client.
 
-`ollama-pull` pulls every model in `OLLAMA_MODELS` (space-separated, default `gemma3:4b bge-m3`; override in `.env`) and exits non-zero on the first failure. `bge-m3` (about 1.2 GB) serves `/v1/embeddings` for `analytics-embeddings` (ADR 0313); it is local only, with no hosted fallback. Without it analytics still runs with embeddings off. To add it to an existing volume, rerun `docker compose --profile llm up ollama-pull` (already pulled models are only checked). `docker compose exec ollama ollama pull bge-m3` does not work: the serving `ollama` is on `data` only, without internet. `ollama` keeps both models loaded side by side (`OLLAMA_MAX_LOADED_MODELS=2`) for 30 minutes after the last request (`OLLAMA_KEEP_ALIVE=30m`), so stage 2 and the embeddings do not evict each other on every document.
+`ollama-pull` pulls every model in `OLLAMA_PULL_MODELS` (space-separated, default `gemma3:4b bge-m3`; override in `.env`; not `OLLAMA_MODELS`, which Ollama reads as its model storage directory) and exits non-zero on the first failure. `bge-m3` (about 1.2 GB) serves `/v1/embeddings` for `analytics-embeddings` (ADR 0313); it is local only, with no hosted fallback. Without it analytics still runs with embeddings off. To add it to an existing volume, rerun `docker compose --profile llm up ollama-pull` (already pulled models are only checked). `docker compose exec ollama ollama pull bge-m3` does not work: the serving `ollama` is on `data` only, without internet. `ollama` keeps both models loaded side by side (`OLLAMA_MAX_LOADED_MODELS=2`) for 30 minutes after the last request (`OLLAMA_KEEP_ALIVE=30m`), so stage 2 and the embeddings do not evict each other on every document.
 
 ## Resource sizing
 
