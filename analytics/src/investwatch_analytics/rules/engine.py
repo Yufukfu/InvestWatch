@@ -377,7 +377,7 @@ def _refine(
 
     checks = [SemanticCheck(spec.id, spec.llm["question"]) for _, spec in deferred if spec.llm is not None]
     outcome = judge.judge(module=module, module_context=module_context, text=ctx.doc.text,
-                          content_hash=ctx.pre.content_hash, sentences=ctx.pre.sentences, checks=checks)
+                          content_hash=ctx.doc.content_hash, sentences=ctx.pre.sentences, checks=checks)
     out = list(out)
     for index, spec in deferred:
         verdict = outcome.verdicts.get(spec.id)

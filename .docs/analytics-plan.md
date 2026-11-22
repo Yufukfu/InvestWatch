@@ -31,7 +31,7 @@ iw:documents ─▶ [1] load + preprocessing ─▶ [2] gate: "is this investmen
 
 | Step | What it does | Technique |
 |---|---|---|
-| 1 | strip HTML (if raw), normalize (Unicode NFKC, whitespace, emoji→text), detect language, dedup by `content_hash` + near-dup (SimHash/MinHash), sentence split | `selectolax`, `langdetect`/`lingua`, `datasketch` |
+| 1 | strip HTML (if raw), normalize (Unicode NFKC, whitespace, emoji→text; NFKC is for matching only, and `content_hash` is the stored NFC value the scraper wrote, used as is, [ADR 0105](decisions/0105-content-hash-normalisation.md)), detect language, dedup by that stored `content_hash` + near-dup (SimHash/MinHash), sentence split | `selectolax`, `langdetect`/`lingua`, `datasketch` |
 | 2 | filters out non-financial content | dictionary (inwestycja, zysk, stopa zwrotu, akcje, CFD, forex, krypto, obligacje, ETF, portfel, makler…) + embedding similarity to class centroids; low threshold – we prefer to let content through |
 | 3 | firm names, handles, domains, NIP/KRS; fuzzy match against the registry | regex + alias dictionary from the registry, `rapidfuzz`; page domain ↔ firm domain; optional NER (spaCy `pl_core_news`) |
 | 4 | decides which modules to run (M1 and M3 may both run) | publisher identity first (a registered firm's own account → M2), then `source_kind` and the registry match by text or link host (change `analytics-m1-m3`, `analytics/README.md` "Modules and routing") |
@@ -99,6 +99,8 @@ Rule engine: each rule is a class with `applies(doc) → bool` and `evaluate(doc
 
 Built (2026-11-22): R1-R4, R6, R11, R12a, R12b, R14-R18 (R11, R12a, R12b, R15, R16 in change `analytics-m2-p1-rules`: rules-first, R11, R12a and R15 with an `llm:` block for their uncertain case). One owner rule per art. 44 element, R15 reports every forecast and R11 only violations ([ADR 0315](decisions/0315-m2-art44-element-ownership.md)). Not built: R13 is visual and needs `blocks` (#29), like R5, R7 and R8; R9 has no cheap rules signal and waits for an LLM-first change; R10 was not built in `analytics-llm-p0`.
 
+Where `blocks` come from (scraper, ADR 0107): a `firm_own` source with `M2` in `target_modules` is rendered at desktop 1440, mobile 390 and tablet 820 px when `SCRAPER_RENDER_ENABLED` is on; `blocks` holds one entry per text block per viewport (`region` is always set, `legal` by placement words such as `footer .legal`, `nota-prawna`, never by content words like `risk`), and `scrape_meta.render` carries `browser_version`, `truncated` or `skipped` (`budget`, `paused`). A document without `blocks` (render off, skipped or failed) means the visual rules return `not_applicable`, never a fabricated block.
+
 For social media content (no `blocks`) the visual rules return `not_applicable`; for images in a post – OCR (`tesseract` / `easyocr`) as P2.
 
 `score_M2 = Σ(weight_r · fail_r) / Σ(weight_r · applicable_r)`, weights: high = 3 (R3, R6, R14, R17, R18), medium = 2, low = 1.
@@ -126,7 +128,7 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 - **The LLM decides only checks the rules defer** ([ADR 0309](decisions/0309-llm-prompt-and-cache-contract.md)): a catalogue entry with an `llm:` block (`question`, `when: always|uncertain`) whose rule asks for it (R3 near-window proximity only; R17 a bare supervisor mention; R18 a safety word in a neighbouring sentence; M1 S1.4/S1.5; M3 S3.3/S3.4 only when the rules found a candidate). A deterministic rules-only verdict is never sent. One call per document and module (one request per chunk); `response_format` JSON object, `temperature: 0`.
 - Response shape: `{"results": [{ "rule_id", "result", "evidence_quote", "explanation" }]}` (an object, because JSON-object mode needs one); per-item Pydantic validation; a quote must be at least 8 characters and verbatim in the chunk sent, otherwise `uncertain`. A leading `<thought>…</thought>` (hosted Gemma 4) is stripped.
 - Prompt-injection resistance: the chunk goes into one `<document>…</document>` block with look-alike tags neutralized, the system prompt says to ignore instructions inside it. Chunks of `LLM_CHUNK_CHARS` (9000, ~3k tokens) on sentence boundaries with up to 4 sentences of overlap (at most half a chunk), at most `LLM_MAX_CHUNKS` (4), worst chunk wins ([ADR 0310](decisions/0310-llm-chunking-and-budget.md)).
-- Response cache in Redis keyed by `(content_hash, prompt_version, model)` plus module, chunk and checks; `prompt_version` is a hash of the rendered prompt; re-scans cost nothing. A per-document budget (`LLM_DOC_BUDGET_S`, below `CLAIM_MIN_IDLE_MS`) and a circuit breaker (`LLM_BREAKER_*`) degrade to rules-only; `model.llm` names the model only when a verdict was used.
+- Response cache in Redis keyed by `(content_hash, prompt_version, model)` plus module, chunk and checks (`content_hash` is the document's stored value; a document without one is not cached); `prompt_version` is a hash of the rendered prompt; re-scans cost nothing. A per-document budget (`LLM_DOC_BUDGET_S`, below `CLAIM_MIN_IDLE_MS`) and a circuit breaker (`LLM_BREAKER_*`) degrade to rules-only; `model.llm` names the model only when a verdict was used.
 - Embeddings (`bge-m3`) for: the topic gate, near-dup detection, grouping similar ads (dashboard bonus).
 
 ## 8. Evaluation and calibration

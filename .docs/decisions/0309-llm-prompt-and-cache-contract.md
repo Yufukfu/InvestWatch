@@ -44,7 +44,7 @@ Option 2, with this contract:
 - **Response:** `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}`, validated per item. A bad item is dropped and the check keeps its rules-only result. A body that is not this object is malformed: the module's checks keep their rules-only results.
 - **Verified quote:** a quote of at least 8 characters that occurs verbatim in the chunk sent. As a fallback, a whitespace-insensitive match is mapped back to the exact original span. A `fail` or `uncertain` without such a quote, or any verdict whose given quote fails, becomes `uncertain` with `evidence: null`.
 - **`prompt_version`:** `"v1:" + sha256(rendered system prompt)[:12]`.
-- **Cache key:** `iw:llm:v1:{module}:{sha256(content_hash|prompt_version|model|chunk_index|chunk_count|sorted rule ids)}`, where `content_hash` is analytics' own preprocessing hash. Only fully valid responses are cached, with a TTL. Verification re-runs on read.
+- **Cache key:** `iw:llm:v1:{module}:{sha256(content_hash|prompt_version|model|chunk_index|chunk_count|sorted rule ids)}`, where `content_hash` is the document's stored value (NFC, [ADR 0105](0105-content-hash-normalisation.md)); analytics computes none, and a document without one is not cached (amended by `analytics-stored-content-hash`, issue #31; it was analytics' own NFKC preprocessing hash). Only fully valid responses are cached, with a TTL. Verification re-runs on read.
 - **`model.llm`:** the configured model name only when at least one rule result in the finding has `method` `llm` or `hybrid`, and `null` otherwise.
 
 Rationale, from the evidence above:
