@@ -2,7 +2,7 @@
 
 ## 1. Spec delta (docs-only, no logic: no test or mutation check)
 
-- [x] 1.1 Checked the scraper container section of `.docs/security-audit.md` against `scraper/compose.yaml` and `scraper/Dockerfile` on `origin/main`: credentials, networks, `/health`, hardening, limits and image pin all match; nothing to fix
+- [x] 1.1 Checked the scraper container section of `.docs/security-audit.md` against `scraper/compose.yaml` and `scraper/Dockerfile` at the branch base (`origin/main` at 6f5f1b3): credentials, networks, `/health`, hardening, limits and image pin all match; nothing to fix
 - [x] 1.2 Grepped `scraper/CLAUDE.md`, `scraper/README.md`, `.claude/skills`, `.docs` for an instruction to add a dated `pip-audit` row: none left
 - [x] 1.3 MODIFIED delta for "Audited supply chain" in `specs/scraper-deployment/spec.md`; `openspec validate --all --strict` passes (`mutations: n/a, docs-only`)
 

@@ -7,7 +7,7 @@ Issue #66. The requirement "Audited supply chain" of `scraper-deployment` says t
 ## What Changes
 
 - MODIFIED requirement "Audited supply chain" (capability `scraper-deployment`): the `pip-audit` result for `scraper/requirements*.txt` goes in the PR body's "Security scans" section with no unresolved finding; the scraper container section in `.docs/security-audit.md` stays and its claims match `scraper/compose.yaml`.
-- No doc or code edit. The claims of the scraper container section in `.docs/security-audit.md` were checked against `scraper/compose.yaml` and the Dockerfile on `origin/main` and all match. `iw-pr-review`, `.docs/supply-chain.md`, `.docs/STATUS.md` and the security-audit header already follow ADR 0209, and no other doc or skill tells agents to add a dated `pip-audit` row (`iw-scraper-conventions` says only "`pip-audit` before merge; pin versions").
+- No doc or code edit. The claims of the scraper container section in `.docs/security-audit.md` were checked against `scraper/compose.yaml` and the Dockerfile at the branch base (`origin/main` at 6f5f1b3) and all match. `iw-pr-review`, `.docs/supply-chain.md`, `.docs/STATUS.md` and the security-audit header already follow ADR 0209, and no other doc or skill tells agents to add a dated `pip-audit` row (`iw-scraper-conventions` says only "`pip-audit` before merge; pin versions").
 
 ## Out of scope
 

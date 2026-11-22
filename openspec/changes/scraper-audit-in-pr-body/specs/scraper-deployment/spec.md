@@ -5,4 +5,4 @@ The scraper's pinned dependencies SHALL be scanned with `pip-audit` and the resu
 
 #### Scenario: Audit recorded
 - **WHEN** the change is ready for review
-- **THEN** the PR body's "Security scans" section has the `pip-audit` command for `scraper/requirements*.txt`, its version and its result with no unresolved finding, and `.docs/security-audit.md` has a scraper container section whose claims match `scraper/compose.yaml`
+- **THEN** the PR body's "Security scans" section has the `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt` command, its version and its result with no unresolved finding, and `.docs/security-audit.md` has a scraper container section whose claims match `scraper/compose.yaml`
