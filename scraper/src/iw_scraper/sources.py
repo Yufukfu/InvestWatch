@@ -20,6 +20,9 @@ class SourceStore(Protocol):
     async def schedulable(self) -> Sequence[Source]:
         """Every source the scheduler may look at (it filters on `collectable` and `schedule_cron`)."""
 
+    async def known_urls(self, urls: Sequence[str]) -> set[str]:
+        """The given permalinks that already have a stored document, whatever its source or transcript outcome."""
+
 
 def domain_of(source: Source) -> str:
     """The key of the per-domain controls: the lowercase host without a trailing dot, empty if the URL has none."""
