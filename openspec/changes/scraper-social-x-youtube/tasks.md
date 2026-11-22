@@ -12,7 +12,7 @@
 - [x] 2.1 Test first (`scraper/tests/test_social_dispatch.py`): a registration with no parser dispatches to its flow by platform; Telegram and web runs still read robots and use the identity, session and rotation; an X run reads no `robots.txt`, draws no identity and takes no proxy, but passes the URL guard and one `wait_turn`; a wrong URL or platform is `invalid_request` with no request
 - [x] 2.2 Split `run_source` and `_collect` per flow: robots check inside the fetch-path flows, X flow before identity and proxy; `Registration.parse` optional; `Post.extra` and its pass-through in `build_page`
 - [x] 2.3 Test first: secret scan of `scraper/tests/fixtures/` (`auth_token`, `ct0` with a value, a `cookie:` header, `visitorData`, `user:password@`); config reads `YOUTUBE_MAX_VIDEOS`, `YT_TRANSCRIPT_PROXY`, `X_AUTH_TOKEN`, `X_CT0` with validation, and no config error, log line, exception or traceback contains a value (reuse `ingest.errors.redact` and extend it to bare token values and proxy hosts where it does not cover them)
-- [ ] 2.4 `config.py` readers, `app.py` wiring into the flows, `compose.yaml` pass-through (including the X library's telemetry switch if it has one), `.env.example` entries without values; check the image builds with the chosen library's native wheels (compose pass-through, `.env.example` and the wheel build are done; the `app.py` wiring waits for the flows of groups 3 and 4)
+- [x] 2.4 `config.py` readers, `app.py` wiring into the flows, `compose.yaml` pass-through (including the X library's telemetry switch if it has one), `.env.example` entries without values; check the image builds with the chosen library's native wheels (compose pass-through, `.env.example` and the wheel build are done; no `app.py` wiring was needed: each flow reads its settings through `config.py` (`x_cookies`, `yt_transcript_proxy`, `youtube_max_videos`) when it runs; Scweet has no telemetry code, checked in gate 1.1, so there is no switch to set)
 - [x] 2.5 Mutation check — mutations: 14 tried, 14 caught
 
 ## 3. X collector
@@ -46,5 +46,5 @@
 
 ## 7. Closing
 
-- [ ] 7.1 Apply iw-docs-update (`scraper/README.md` and `scraper/CLAUDE.md` env keys, the exception and how to stop a lost account, `.docs/status/scraper.md`, ADR 0109 link) and add the iw-ai-log row
+- [x] 7.1 Apply iw-docs-update (`scraper/README.md` and `scraper/CLAUDE.md` env keys, the exception and how to stop a lost account, `.docs/status/scraper.md`, ADR 0109 link) and add the iw-ai-log row
 - [ ] 7.2 Run iw-pr-review and fix real findings
