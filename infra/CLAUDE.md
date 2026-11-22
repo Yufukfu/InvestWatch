@@ -11,7 +11,7 @@ Shared infrastructure: Postgres, Redis, object storage (MinIO), the optional Oll
 - Modules wait on `postgres`/`redis` with `service_healthy` and on `minio-init` with `service_completed_successfully` (joining contract in `README.md`).
 - Services use the MinIO app user (`MINIO_ACCESS_KEY`), never the root user. Redis keeps `appendonly yes` and `noeviction` (ADR 0305 thresholds must persist; stream entries must never be evicted).
 - `worker` and `analytics` must stay scalable: no `container_name`, no host port, no fixed consumer name. `infra/tests/smoke.sh scale` checks it; which services scale is in `README.md` "Scale-out".
-- `ollama`/`ollama-pull` stay behind `profiles: [llm]`: a plain `up` must download no weights.
+- `ollama`/`ollama-pull` stay behind `profiles: [llm]`: a default `.env` must download no weights. Only `init-env.sh --local-llm` turns the profile on (`COMPOSE_PROFILES=llm` in `.env`); `infra/tests/smoke.sh env` covers it.
 - The MinIO image has no curl, wget or grep: health checks and `minio/init.sh` use bash and shell patterns.
 - Services connect as `iw_app` (CRUD, no DDL). Migrations run as `iw_admin`: `iw_app` gets grants only on tables `iw_admin` creates.
 - `01-app-role.sh` runs only on an empty volume. A role or grant change needs `docker compose down -v` locally, plus a migration for existing databases.

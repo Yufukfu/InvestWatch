@@ -51,6 +51,8 @@ Every module is its own container image with its own `compose.yaml`; the root fi
 docker compose up -d --wait --scale worker=3 --scale analytics=2
 ```
 
+With a `--local-llm` `.env`, `--wait` exits 1 once `ollama-pull` finishes; add `worker analytics` to the command ([`infra/README.md`](../infra/README.md#scale-out)).
+
 | Service | Scales? | Evidence |
 |---|---|---|
 | `worker` (scraper) | **yes** | ran with 3; 17 scans, 223 documents; queue, locks and per-domain limits are in Redis |

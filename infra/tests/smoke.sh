@@ -143,6 +143,40 @@ init_env_llm_slots_empty() { # hosted-LLM settings are the operator's: present, 
     grep -qx "$v=" "$f" || { echo "$v: $(grep -E "^$v=" "$f" | cut -c1-20)… (missing or filled)"; return 1; }
   done
 }
+init_env_local_llm() { # --local-llm: Ollama wired, profile on, embeddings on, secrets still generated, no key printed
+  local f="$TMP/local.env" out v
+  out=$("$ROOT/scripts/init-env.sh" --local-llm "$f" 2>&1) || { echo "exit $?: $out"; return 1; }
+  for v in LLM_BASE_URL=http://ollama:11434/v1 LLM_MODEL=gemma3:4b LLM_API_KEY=ollama COMPOSE_PROFILES=llm \
+    EMBED_BASE_URL=http://ollama:11434/v1 'OLLAMA_PULL_MODELS="gemma3:4b bge-m3"'; do
+    [ "$(grep -cx "$v" "$f")" = 1 ] || { echo "missing or repeated: $v"; return 1; }
+  done
+  [ "$(grep -c '^LLM_' "$f")" = 3 ] || { echo "LLM_ lines repeated"; return 1; }
+  case $out in *ollama*|*"$(grep ^POSTGRES_APP_PASSWORD= "$f" | cut -d= -f2)"*) echo "output leaks: $out"; return 1 ;; esac
+  # compose must really start ollama from this file alone, with no --profile flag
+  # (captured first: `grep -q` closing the pipe early would fail compose under pipefail)
+  local services cfg
+  services=$(docker compose --env-file "$f" -f "$ROOT/compose.yaml" config --services) || return 1
+  echo "$services" | grep -qx ollama-pull || { echo "llm profile not active"; return 1; }
+  cfg=$(docker compose --env-file "$f" -f "$ROOT/compose.yaml" config) || return 1
+  echo "$cfg" | grep -q 'LLM_BASE_URL: http://ollama:11434/v1' || { echo "analytics not wired"; return 1; }
+}
+init_env_local_llm_model() { # LOCAL_LLM_MODEL picks another Ollama tag; a hostile value is refused and nothing is written
+  local f="$TMP/model.env" bad="$TMP/badmodel.env"
+  LOCAL_LLM_MODEL=gemma4:e2b-it-qat "$ROOT/scripts/init-env.sh" --local-llm "$f" >/dev/null || return 1
+  grep -qx 'LLM_MODEL=gemma4:e2b-it-qat' "$f" && grep -qx 'OLLAMA_PULL_MODELS="gemma4:e2b-it-qat bge-m3"' "$f" || return 1
+  if LOCAL_LLM_MODEL='x"; rm -rf /' "$ROOT/scripts/init-env.sh" --local-llm "$bad" >/dev/null 2>&1; then echo "accepted a bad tag"; return 1; fi
+  [ ! -e "$bad" ]
+}
+init_env_local_llm_keeps_existing() { # an existing file is never rewritten by the flag, and the output says it was not applied
+  local f="$TMP/keep-local.env" out; echo KEEP=1 >"$f"
+  out=$("$ROOT/scripts/init-env.sh" --local-llm "$f" 2>&1) || return 1
+  echo "$out"; [ "$(cat "$f")" = KEEP=1 ] && case $out in *"not applied"*) ;; *) return 1 ;; esac
+}
+init_env_default_has_no_profile() { # no flag: rules-only slots empty, llm profile off
+  local f="$TMP/plain.env"
+  "$ROOT/scripts/init-env.sh" "$f" >/dev/null || return 1
+  ! grep -q '^COMPOSE_PROFILES' "$f" && ! grep -q '^EMBED_BASE_URL' "$f" && grep -qx 'OLLAMA_PULL_MODELS="gemma3:4b bge-m3"' "$f"
+}
 init_env_without_openssl() { # stub openssl that behaves like "command not found"
   local bin="$TMP/noopenssl" f="$TMP/noopenssl.env" out code
   mkdir -p "$bin"; printf '#!/bin/sh\nexit 127\n' >"$bin/openssl"; chmod +x "$bin/openssl"
@@ -183,6 +217,10 @@ group_env() {
   check "init-env fills every secret with 32+ chars and compose config accepts it" generated_env_complete
   check "init-env keeps an existing file, says so, exits 0" init_env_no_overwrite
   check "init-env leaves LLM_BASE_URL, LLM_MODEL, LLM_API_KEY empty" init_env_llm_slots_empty
+  check "init-env --local-llm wires Ollama, the llm profile and embeddings" init_env_local_llm
+  check "init-env --local-llm takes LOCAL_LLM_MODEL and refuses a bad tag" init_env_local_llm_model
+  check "init-env --local-llm leaves an existing file alone and says so" init_env_local_llm_keeps_existing
+  check "init-env without the flag adds no llm profile" init_env_default_has_no_profile
   check "init-env without openssl fails naming it and writes nothing" init_env_without_openssl
   check "init-env resolves a relative path from the caller's directory" init_env_relative_to_caller
   check "init-env fills secrets from a CRLF .env.example" init_env_crlf
