@@ -32,7 +32,7 @@
 
 ## Risks / Trade-offs
 
-- **Three font families add bundle weight** (about 100 kB of woff2 for the used weights). Mitigation: only the weights used (Space Grotesk 400/700, Inter 400/500/600/700, Geist Mono 400/600) and `latin`/`latin-ext`; check the build size and drop Geist Mono to the system monospace if the main chunk grows beyond what the demo network tolerates.
+- **Three font families add bundle weight** (325 kB of woff2 for the used weights, measured on the build; see [ADR 0213](../../../.docs/decisions/0213-dashboard-fonts-fontsource.md)). Mitigation: only the weights used (Space Grotesk 400/700, Inter 400/500/600/700, Geist Mono 400/600) and `latin`/`latin-ext`; check the build size and drop Geist Mono to the system monospace if the main chunk grows beyond what the demo network tolerates.
 - **Table to cards with one DOM** can break table semantics for screen readers. Mitigation: keep a real `<table>` with `role` attributes restored on the phone layout, and test roles and names with Testing Library.
 - **Existing tests query by class names or text**; some will need updating. Mitigation: each task group starts with the failing or updated test and runs the full web suite.
 - **Merge overlap** with `web/untrusted-text-plain`: a one-line conflict in `FindingsTable.tsx`, resolved by rebasing whichever lands second.

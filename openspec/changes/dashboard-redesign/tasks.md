@@ -68,4 +68,4 @@ The first screenshot review (8.3) found the built look diverges from the mockups
 
 - [ ] 9.1 Apply the `iw-docs-update` skill (update `web/CLAUDE.md` if its rules changed, `.docs/status/dashboard.md` for the redesign, any ADR needed for the font dependencies), run `docs-check`, and add the `iw-ai-log` row
 - [ ] 9.2 Run the `iw-pr-review` skill and fix real findings
-- [ ] 9.3 Raise the bulk actions, export and M2 coverage strip as an issue assigned to Damian, noting that contracts are frozen
+- [x] 9.3 Raise the bulk actions, export and M2 coverage strip as an issue assigned to Damian, noting that contracts are frozen (issue #115)
