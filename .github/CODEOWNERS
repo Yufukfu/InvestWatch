@@ -2,7 +2,7 @@
 # docs-check fails on a module without a line here or a per-person ownership statement in a live doc.
 # GitHub requests the owners' review automatically, and the iw-watch runner reads this file (from the
 # default branch) to route reviews and defect reports.
-# Shared areas (infra/, .docs/, openspec/, .claude/, .github/, root files) have no owner on purpose: any
+# Shared areas (.docs/, openspec/, .claude/, .github/, root files) have no owner on purpose: any
 # teammate may change them, and a new top-level directory needs the whole team's OK.
 # Last matching pattern wins.
 
@@ -11,3 +11,4 @@
 /analytics/ @Yufukfu
 /api/       @Yufukfu
 /contracts/ @Yufukfu
+/infra/     @Yufukfu

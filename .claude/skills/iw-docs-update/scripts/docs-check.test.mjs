@@ -93,7 +93,7 @@ test('skips generated OpenSpec skills and node_modules', () => {
 
 // ---- CODEOWNERS is the only place that says who owns which path ----
 
-const OWNERS_OK = '# comment\n/scraper/ @hen68\n/web/ @kacpermalczyk\n/api/ @Yufukfu @org/team\n';
+const OWNERS_OK = '# comment\n/scraper/ @hen68\n/web/ @kacpermalczyk\n/api/ @Yufukfu @org/team\n/infra/ @Yufukfu\n';
 
 test('a service directory needs a CODEOWNERS file', () => {
   const problems = checkDocs(repo({ 'scraper/CLAUDE.md': '#' }));
@@ -101,7 +101,7 @@ test('a service directory needs a CODEOWNERS file', () => {
   assert.match(problems[0].problem, /\.github\/CODEOWNERS/);
 });
 
-test('every existing service directory needs a CODEOWNERS line with a handle; infra/ is shared', () => {
+test('every existing service directory and infra/ needs a CODEOWNERS line with a handle', () => {
   const root = repo({
     'scraper/CLAUDE.md': '#', 'web/CLAUDE.md': '#', 'api/CLAUDE.md': '#', 'infra/CLAUDE.md': '#',
     '.github/CODEOWNERS': OWNERS_OK,
@@ -117,6 +117,28 @@ test('flags a service directory missing from CODEOWNERS, a commented-out line an
   const problems = checkDocs(root).map((p) => p.problem).sort();
   assert.equal(problems.length, 3, problems.join('\n'));
   for (const dir of ['api', 'scraper', 'web']) assert.ok(problems.some((p) => p.includes(`/${dir}/`)), dir);
+});
+
+test('infra/ needs a CODEOWNERS line too', () => {
+  const root = repo({ 'infra/CLAUDE.md': '#', '.github/CODEOWNERS': '/scraper/ @hen68\n' });
+  const problems = checkDocs(root);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0].problem, /\/infra\//);
+});
+
+test('the last CODEOWNERS line for a directory wins, as on GitHub', () => {
+  const root = repo({ 'api/CLAUDE.md': '#', '.github/CODEOWNERS': '/api/ @Yufukfu\n/api/\n' });
+  assert.equal(checkDocs(root).length, 1, 'a later bare /api/ leaves api/ without an owner');
+  const back = repo({ 'api/CLAUDE.md': '#', '.github/CODEOWNERS': '/api/\n/api/ @Yufukfu\n' });
+  assert.deepEqual(checkDocs(back), []);
+});
+
+test('/dir, /dir/ and /dir/** name the same directory', () => {
+  for (const pattern of ['/api', '/api/', '/api/**']) {
+    assert.deepEqual(checkDocs(repo({ 'api/CLAUDE.md': '#', '.github/CODEOWNERS': `${pattern} @Yufukfu\n` })), [], pattern);
+  }
+  const mixed = repo({ 'api/CLAUDE.md': '#', '.github/CODEOWNERS': '/api/** @Yufukfu\n/api\n' });
+  assert.equal(checkDocs(mixed).length, 1, 'the later /api line has no owner');
 });
 
 test('a CODEOWNERS pattern only covers its own directory', () => {
@@ -140,11 +162,13 @@ const OWNERSHIP = [
   'The renderer is maintained by Adam.',
   'Damian owns `analytics/` and `api/`.',
   'Kacper owns web.',
+  'Owners: @hen68 (scraper)',
+  '| `api/` | @Yufukfu |',
 ];
 
 test('flags each per-person ownership statement in a live doc, with its line', () => {
   for (const [i, line] of OWNERSHIP.entries()) {
-    const problems = checkDocs(repo({ '.docs/a.md': `ok\n${line}\n` }));
+    const problems = checkDocs(repo({ '.docs/a.md': `ok\n${line}\n`, '.github/CODEOWNERS': '/scraper/ @hen68\n/api/ @Yufukfu\n' }));
     assert.equal(problems.length, 1, `${line} -> ${JSON.stringify(problems)}`);
     assert.equal(problems[0].line, 2, line);
     assert.match(problems[0].problem, /ownership/, `case ${i}`);
@@ -158,13 +182,28 @@ test('history, in-flight changes, prose about work and spec scenario steps may n
     '.docs/decisions/README.md': '0101-x.md',
     '.docs/ai-workflow.md': body,
     'openspec/changes/some-change/proposal.md': body,
-    'api/README.md': 'Scraper (Adam), insert a document. Kacper\'s review of PR #35. Fixed (Adam, PR #48). In mock-api (Adam, PR #48). Dashboard part (Kacper) and scraper part (Adam) pending.',
+    'api/README.md': 'Scraper (Adam), insert a document. Kacper\'s review of PR #35. Fixed (Adam, PR #48). In mock-api (Adam, PR #48). The mock-api (Adam) fix landed. Dashboard part (Kacper) and scraper part (Adam) pending. Fixed in api (Adam, PR #48). Reviewed by @hen68 (PR #39).',
     'openspec/specs/x/spec.md': '- **GIVEN** `analytics/` is owned by Damian\n- **THEN** the result is Adam\n',
     'README.md': 'Owners: [`.github/CODEOWNERS`](.github/CODEOWNERS)',
     '.github/CODEOWNERS': '/api/ @Yufukfu\n',
     'api/CLAUDE.md': '#',
   });
   assert.deepEqual(checkDocs(root), []);
+});
+
+test('a CODEOWNERS handle is an ownership claim only next to a module name, and not as a PR credit', () => {
+  const root = repo({
+    '.github/CODEOWNERS': '/scraper/ @hen68\n',
+    'scraper/CLAUDE.md': '#',
+    '.docs/a.md': 'The scraper fix was reviewed by @hen68 (PR #39).\n@hen68 approved it.\nweb builds with @types/node.\n',
+    '.docs/b.md': 'Ask @hen68 about scraper changes.\n',
+  });
+  assert.deepEqual(checkDocs(root).map((p) => `${p.file}:${p.line}`), ['.docs/b.md:1']);
+});
+
+test('the scenario-step exemption applies to specs only', () => {
+  const root = repo({ 'CLAUDE.md': '- **AND** Owner: Damian\n', 'openspec/specs/x/spec.md': '- **AND** Owner: Damian\n' });
+  assert.deepEqual(checkDocs(root).map((p) => p.file), ['CLAUDE.md']);
 });
 
 test('only ADR files are history: the decisions index is a live doc', () => {
@@ -193,7 +232,8 @@ test('also reads openspec/config.yaml and compose.yaml headers', () => {
     'infra/compose.dev-ports.yml': 'x: 1\n# owner Kacper\n',
     'compose.yaml': '# root compose\n',
     'api/CLAUDE.md': '#',
-    '.github/CODEOWNERS': '/api/ @Yufukfu\n',
+    'infra/CLAUDE.md': '#',
+    '.github/CODEOWNERS': '/api/ @Yufukfu\n/infra/ @Yufukfu\n',
   });
   const files = checkDocs(root).map((p) => `${p.file}:${p.line}`).sort();
   assert.deepEqual(files, ['api/compose.renderer.yaml:1', 'api/compose.yaml:1', 'infra/compose.dev-ports.yml:2', 'openspec/config.yaml:2']);

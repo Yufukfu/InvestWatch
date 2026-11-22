@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SERVICE_DIRS = ['scraper', 'analytics', 'web', 'api', 'contracts'];
+// Top-level directories that need a CLAUDE.md and an owner in .github/CODEOWNERS.
+const SERVICE_DIRS = ['scraper', 'analytics', 'web', 'api', 'contracts', 'infra'];
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.agents', '.venv', '__pycache__']);
 const SKIP_PREFIXES = ['.claude/skills/openspec-', 'openspec/changes/archive'];
 // Per-change OpenSpec files and generic names that are referred to without a fixed location.
@@ -16,14 +17,15 @@ const SKIP_PREFIXES = ['.claude/skills/openspec-', 'openspec/changes/archive'];
 // once the file exists so a later rename is caught.
 const IGNORED_NAMES = new Set(['follow-ups.md', 'tasks.md', 'proposal.md', 'design.md', 'spec.md', 'SKILL.md', 'security-audit.md']);
 
-// Ownership rule. People are named by first name in prose; their handles live in CODEOWNERS only.
+// Ownership rule. People are named by first name in prose; their handles live in CODEOWNERS only, so a handle
+// next to a module name in a live doc is flagged too (the handles are read from CODEOWNERS).
 const PEOPLE = ['Adam', 'Kacper', 'Damian'];
 // Directories plus the names of the status domains (`dashboard` is web/, `platform` is analytics/, api/, contracts/).
 const MODULE_WORDS = ['scraper', 'analytics', 'api', 'web', 'contracts', 'infra', 'dashboard', 'platform'];
 // History keeps the names it had (ADR files, the AI log); in-flight changes are archived (and skipped) later.
 // The decisions index (.docs/decisions/README.md) is a live doc, so only numbered ADR files are skipped.
 const OWNERSHIP_SKIP = [/^\.docs\/decisions\/\d{4}-[^/]+\.md$/, /^\.docs\/ai-workflow\.md$/, /^openspec\/changes\//];
-// Spec scenario steps are hypothetical examples ("GIVEN analytics/ is owned by Damian").
+// Spec scenario steps are hypothetical examples ("GIVEN analytics/ is owned by Damian"); only in openspec/specs/.
 const SCENARIO_STEP = /^\s*-\s*\*\*(?:GIVEN|WHEN|THEN|AND)\*\*/;
 const NAME = `(?:${PEOPLE.join('|')})\\b`;
 const MODULE = `(?<![\\w/-])\`?(?:${MODULE_WORDS.join('|')})/?\`?`;
@@ -31,10 +33,16 @@ const OWNERSHIP_PATTERNS = [
   new RegExp(`\\b(?:owners?|owned by|maintained by)\\b[\\s:*(]*${NAME}`, 'i'), // owner Damian, **Owner:** Damian, owned by Kacper, maintained by Adam
   new RegExp(`\\b${NAME}\\s+owns\\s+${MODULE}`), // Damian owns `analytics/`
   new RegExp(`\\b${NAME}'s module`), // Adam's module
-  new RegExp(`${MODULE}\\s*\\(${NAME}`), // scraper (Adam), web/ dashboard (Kacper)
+  new RegExp(`${MODULE}\\s*\\(${NAME}(?!,\\s*PR\\b)`), // scraper (Adam), web/ dashboard (Kacper); not "api (Adam, PR #48)"
   new RegExp(`\`(?:${MODULE_WORDS.join('|')})/\` ${NAME}`), // `scraper/` Adam
   /^\s*\|.*\|\s*Owners?\s*\|/i, // an Owner table column
 ];
+
+// A CODEOWNERS handle on the same line as a module name ("Owners: @hen68 (scraper)"), unless it credits a PR.
+function handleStatesOwner(text, handles) {
+  const named = [...text.matchAll(/@([A-Za-z0-9-]+)\b(?!\s*,?\s*\(?PR\b)/g)].some((m) => handles.has(m[1].toLowerCase()));
+  return named && new RegExp(MODULE).test(text);
+}
 
 function walk(root, rel = '') {
   const out = [];
@@ -96,13 +104,17 @@ export function checkDocs(root) {
     if (!fs.existsSync(path.join(root, dir, 'CLAUDE.md'))) problems.push({ file: dir, line: 1, problem: `${dir}/ has no CLAUDE.md` });
   }
 
+  const codeowners = path.join(root, '.github', 'CODEOWNERS');
+  const handles = new Set(fs.existsSync(codeowners) ? (fs.readFileSync(codeowners, 'utf8').match(/@[A-Za-z0-9-]+/g) || []).map((h) => h.slice(1).toLowerCase()) : []);
+  const statesOwner = (text) => OWNERSHIP_PATTERNS.some((re) => re.test(text)) || handleStatesOwner(text, handles);
+
   problems.push(...checkCodeowners(root, services));
 
   const extra = ['openspec/config.yaml', ...composeFiles(root)];
   for (const file of [...files, ...extra.filter((f) => fs.existsSync(path.join(root, f)))]) {
     if (OWNERSHIP_SKIP.some((re) => re.test(file))) continue;
     fs.readFileSync(path.join(root, file), 'utf8').split('\n').forEach((text, i) => {
-      if (SCENARIO_STEP.test(text) || !OWNERSHIP_PATTERNS.some((re) => re.test(text))) return;
+      if ((file.startsWith('openspec/specs/') && SCENARIO_STEP.test(text)) || !statesOwner(text)) return;
       problems.push({ file, line: i + 1, problem: 'per-person ownership statement: link .github/CODEOWNERS instead' });
     });
   }
@@ -111,26 +123,27 @@ export function checkDocs(root) {
 
 // compose*.yaml at the root and directly in each module directory (compose.yaml, compose.renderer.yaml, ...)
 function composeFiles(root) {
-  return ['', ...SERVICE_DIRS, 'infra'].flatMap((dir) => {
+  return ['', ...SERVICE_DIRS].flatMap((dir) => {
     const full = path.join(root, dir);
     if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) return [];
     return fs.readdirSync(full).filter((n) => /^compose[\w.-]*\.ya?ml$/.test(n)).map((n) => path.posix.join(dir, n));
   });
 }
 
-// Every existing service directory has a `/<dir>/` line with at least one @handle. infra/ and the other
-// shared areas have no owner on purpose, so they are not required.
+// Every existing service directory has an owner: its last `/<dir>`, `/<dir>/` or `/<dir>/**` line (the last
+// matching line wins, as on GitHub) has at least one @handle. The other shared areas have no owner on purpose.
 function checkCodeowners(root, services) {
   if (!services.length) return [];
   const file = '.github/CODEOWNERS';
   const full = path.join(root, file);
   if (!fs.existsSync(full)) return [{ file, line: 1, problem: `${file} is missing; it maps ${services.join(', ')} to owners` }];
-  const owned = new Set();
+  const owned = new Map();
   for (const raw of fs.readFileSync(full, 'utf8').split('\n')) {
     const [pattern, ...owners] = raw.replace(/#.*/, '').trim().split(/\s+/);
-    if (pattern && owners.some((o) => /^@[A-Za-z0-9-]+(?:\/[A-Za-z0-9._-]+)?$/.test(o))) owned.add(pattern);
+    if (!pattern) continue;
+    owned.set(pattern.replace(/\/\*\*$/, '').replace(/\/$/, ''), owners.some((o) => /^@[A-Za-z0-9-]+(?:\/[A-Za-z0-9._-]+)?$/.test(o)));
   }
-  return services.filter((dir) => !owned.has(`/${dir}/`)).map((dir) => ({ file, line: 1, problem: `no /${dir}/ line with an @owner in ${file}` }));
+  return services.filter((dir) => owned.get(`/${dir}`) !== true).map((dir) => ({ file, line: 1, problem: `no /${dir}/ line with an @owner in ${file}` }));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
