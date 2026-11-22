@@ -9,14 +9,17 @@ By publisher identity and registry result, not by `source_kind` alone:
 - the own material of a foreign firm without a Polish branch (`foreign_no_branch`) -> no module: M2 covers firms
   registered in Poland "w tym polskie oddziały firm zagranicznych", and the firm is authorized, so it is not M3
   (#35 review, item 12).
+- a page on a supervisor or official-register domain (`config.official_source_domains`) -> no module, reason
+  `official_source` (change analytics-post-integration-fixes).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..config import official_source_domains
 from ..models import Module, ScrapedDocument
-from ..registry import DOMAIN_CONFIDENCE, NAME_CONFIDENCE, Firm, FirmMatch, Registry
+from ..registry import DOMAIN_CONFIDENCE, NAME_CONFIDENCE, Firm, FirmMatch, Registry, _normalize_domain, http_host
 from .advertiser import publisher_firm
 
 
@@ -37,7 +40,28 @@ def _m2(match: FirmMatch) -> Route:
     return Route("M2", match)
 
 
-def route(doc: ScrapedDocument, registry: Registry) -> Route:
+def _on_domain(host: str | None, domains: tuple[str, ...]) -> bool:
+    host = _normalize_domain(host) if host else ""
+    return bool(host) and any(host == d or host.endswith("." + d) for d in domains)
+
+
+def is_official_source(doc: ScrapedDocument, domains: tuple[str, ...] | None = None) -> bool:
+    """The page, or the author's profile, is on a supervisor or official-register domain.
+
+    Links and mentions never count: a post linking to the KNF register is still the poster's.
+    """
+    domains = official_source_domains() if domains is None else domains
+    profile = doc.author.profile_url if doc.author is not None else None
+    profile_host = http_host(profile) if profile else None
+    if _on_domain(profile_host, domains):
+        return True
+    return _on_domain(http_host(doc.url), domains)
+
+
+def route(doc: ScrapedDocument, registry: Registry, *, official_domains: tuple[str, ...] | None = None) -> Route:
+    # The supervisor publishes warnings and registers, never ads or offers (KNF warnings page -> M1, 2026-11-22 run).
+    if is_official_source(doc, official_domains):
+        return Route(None, None, "official_source")
     publisher = publisher_firm(doc, registry)
     if publisher is not None:
         return _m2(_publisher_match(doc, registry, publisher))

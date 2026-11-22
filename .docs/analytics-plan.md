@@ -31,8 +31,8 @@ iw:documents ─▶ [1] load + preprocessing ─▶ [2] gate: "is this investmen
 
 | Step | What it does | Technique |
 |---|---|---|
-| 1 | strip HTML (if raw), normalize (Unicode NFKC, whitespace, emoji→text; NFKC is for matching only, and `content_hash` is the stored NFC value the scraper wrote, used as is, [ADR 0105](decisions/0105-content-hash-normalisation.md)), detect language, dedup by that stored `content_hash` + near-dup (SimHash/MinHash), sentence split | `selectolax`, `langdetect`/`lingua`, `datasketch` |
-| 2 | filters out non-financial content | dictionary (inwestycja, zysk, stopa zwrotu, akcje, CFD, forex, krypto, obligacje, ETF, portfel, makler…) + embedding similarity to class centroids; low threshold – we prefer to let content through |
+| 1 | strip HTML (if raw), normalize (Unicode NFKC, whitespace, emoji→text; NFKC is for matching only, and `content_hash` is the stored NFC value the scraper wrote, used as is, [ADR 0105](decisions/0105-content-hash-normalisation.md)), detect language, dedup by that stored `content_hash` + near-dup, sentence split; document vector (`bge-m3`, optional) | near-dup: MinHash over word 5-shingles with LSH buckets in Redis, our own numpy code (datasketch's legacy scheme; datasketch itself loads scipy). A near-dup is analyzed as usual, joins its group (`iw:neardup:v1:*`), its summary names the original's URL, and it fires no second `finding.high_risk` for the group and module ([ADR 0314](decisions/0314-topic-gate-and-near-duplicates.md)). Embeddings: [ADR 0313](decisions/0313-embeddings-model-and-serving.md) |
+| 2 | filters out non-financial content (`third_party` and `unknown`; `firm_own` is never gated, M2 checks every firm page) | dictionary `gate_terms.yaml` (diacritic-insensitive stems: inwest*, zysk*, stopa zwrotu, akcj*, CFD*, forex*, krypto*, obligacj*, ETF*, makler*… plus advisory cues such as co kupić, subskrypcj*, vip) and a registry match; a document is dropped only with no hit (logged `off_topic`, counted in `iw:stats:gate`). Embedding similarity to class centroids is a stretch item, not built ([ADR 0314](decisions/0314-topic-gate-and-near-duplicates.md)) |
 | 3 | firm names, handles, domains, NIP/KRS; fuzzy match against the registry | regex + alias dictionary from the registry, `rapidfuzz`; page domain ↔ firm domain; optional NER (spaCy `pl_core_news`) |
 | 4 | decides which modules to run (M1 and M3 may both run) | publisher identity first (a registered firm's own account → M2), then `source_kind` and the registry match by text or link host (change `analytics-m1-m3`, `analytics/README.md` "Modules and routing") |
 | 5 | merges results, computes `score`, title and summary | rule weights; summary from the LLM (optional) |
@@ -97,6 +97,8 @@ Rule engine: each rule is a class with `applies(doc) → bool` and `evaluate(doc
 | R17 Implying supervisory approval | text + LLM | mention of KNF/ESMA/"supervised" → LLM: does it suggest product approval | **P0** |
 | R18 Supervision as a safety argument | text + LLM | as above + safety words ("bezpieczna", "gwarantowana", "pewna") in the same sentence | **P0** |
 
+Built (2026-11-22): R1-R4, R6, R11, R12a, R12b, R14-R18 (R11, R12a, R12b, R15, R16 in change `analytics-m2-p1-rules`: rules-first, R11, R12a and R15 with an `llm:` block for their uncertain case). One owner rule per art. 44 element, R15 reports every forecast and R11 only violations ([ADR 0315](decisions/0315-m2-art44-element-ownership.md)). Not built: R13 is visual and needs `blocks` (#29), like R5, R7 and R8; R9 has no cheap rules signal and waits for an LLM-first change; R10 was not built in `analytics-llm-p0`.
+
 Where `blocks` come from (scraper, ADR 0107): a `firm_own` source with `M2` in `target_modules` is rendered at desktop 1440, mobile 390 and tablet 820 px when `SCRAPER_RENDER_ENABLED` is on; `blocks` holds one entry per text block per viewport (`region` is always set, `legal` by placement words such as `footer .legal`, `nota-prawna`, never by content words like `risk`), and `scrape_meta.render` carries `browser_version`, `truncated` or `skipped` (`budget`, `paused`). A document without `blocks` (render off, skipped or failed) means the visual rules return `not_applicable`, never a fabricated block.
 
 For social media content (no `blocks`) the visual rules return `not_applicable`; for images in a post – OCR (`tesseract` / `easyocr`) as P2.
@@ -118,6 +120,8 @@ For social media content (no `blocks`) the visual rules return `not_applicable`;
 | S3.7 | entity on the KNF public warnings list | registry (bonus) |
 
 Hard gate: no S3.4 ⇒ `score` capped at 0.4 (financial "education" or personalization alone is not advice; Art. 76 needs a recommendation concerning instruments). Changed from "no S3.4 and no S3.3" by `analytics-m1-m3`. Plain crypto-assets are outside Art. 2 (signal S3.8, capped). The LLM gets the definition from annex 3 in the system prompt and must return a quote of the recommendation.
+No offer, no finding: an M3-only document needs S3.3, S3.4, S3.5 or S3.8; S3.1, S3.2 and S3.6 only weigh in the score of an offer (`analytics-post-integration-fixes`, after EY's family-office page scored 0.269 on vocabulary alone). Pages of the supervisor and official registers (`knf.gov.pl`, `gov.pl`) are never M1 advertisers or M3 publishers (reason `official_source`).
+
 Output matches the UKNF requirement: **entity data, offer content, URL**.
 
 ## 7. LLM layer
@@ -127,7 +131,7 @@ Output matches the UKNF requirement: **entity data, offer content, URL**.
 - Response shape: `{"results": [{ "rule_id", "result", "evidence_quote", "explanation" }]}` (an object, because JSON-object mode needs one); per-item Pydantic validation; a quote must be at least 8 characters and verbatim in the chunk sent, otherwise `uncertain`. A leading `<thought>…</thought>` (hosted Gemma 4) is stripped.
 - Prompt-injection resistance: the chunk goes into one `<document>…</document>` block with look-alike tags neutralized, the system prompt says to ignore instructions inside it. Chunks of `LLM_CHUNK_CHARS` (9000, ~3k tokens) on sentence boundaries with up to 4 sentences of overlap (at most half a chunk), at most `LLM_MAX_CHUNKS` (4), worst chunk wins ([ADR 0310](decisions/0310-llm-chunking-and-budget.md)).
 - Response cache in Redis keyed by `(content_hash, prompt_version, model)` plus module, chunk and checks (`content_hash` is the document's stored value; a document without one is not cached); `prompt_version` is a hash of the rendered prompt; re-scans cost nothing. A per-document budget (`LLM_DOC_BUDGET_S`, below `CLAIM_MIN_IDLE_MS`) and a circuit breaker (`LLM_BREAKER_*`) degrade to rules-only; `model.llm` names the model only when a verdict was used.
-- Embeddings (`bge-m3`) for: the topic gate, near-dup detection, grouping similar ads (dashboard bonus).
+- Embeddings: `bge-m3` on the local `ollama` service through the OpenAI-compatible `/v1/embeddings`, env only (`EMBED_*`), local only: no hosted default, the mentor exception covers the LLM only ([ADR 0313](decisions/0313-embeddings-model-and-serving.md)). Off, down or malformed → `model.embedder = null`. Vectors are cached in Redis `iw:emb:v1:*` by the document's stored `content_hash` and the model (a document without one is embedded but not cached). Used for `model.embedder` today; the gate's similarity rescue and grouping similar ads (dashboard bonus) are follow-ups. Near-dup detection uses MinHash, not embeddings.
 
 ## 8. Evaluation and calibration
 
