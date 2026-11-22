@@ -84,7 +84,7 @@ services:
   # calibration panel has a curve after a plain `docker compose up`. Rules-only and deterministic; it writes a module's
   # run only when the gold set, the pipeline version or the results changed, so restarts add nothing.
   # Manual re-run: docker compose run --rm analytics-eval  (or: python analytics/eval/run.py --db).
-  # No `build:` here: `analytics` builds the shared image (like api-migrate/api). Two services building one tag run
+  # No `build:` here: `analytics` builds the shared image (like the scraper's worker). Two services building one tag run
   # two parallel exports, and with the containerd image store one fails "image ... already exists", aborting `up --build`.
   analytics-eval:
     image: investwatch/analytics:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
