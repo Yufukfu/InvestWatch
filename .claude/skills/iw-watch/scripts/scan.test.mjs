@@ -304,3 +304,36 @@ test('CLI: human output names the PR, the kind and the round, with control chara
   assert.ok(!text.includes('\u001b'));
   assert.equal(clean('a\u0007b\u009bc'), 'a?b?c');
 });
+
+test('--mine: an approved, green, mergeable PR is one approved item per head sha, with its approvers', () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const reviews = fx('reviews-11.json');
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': reviews, 'pulls/11/comments': [] });
+  const state = empty();
+  const items = run(gh, state).items.filter((i) => i.kind === 'approved');
+  assert.equal(items.length, 1);
+  assert.deepEqual(items[0].approvers, ['hen68']);
+  assert.equal(items[0].id, `11.approved.${pr.headRefOid}`);
+  ack(state, items[0].id);
+  assert.deepEqual(run(gh, state).items.filter((i) => i.kind === 'approved'), [], 'told once per head');
+  const moved = { ...pr, headRefOid: 'b'.repeat(40) };
+  assert.equal(run(fakeGh({ 'pr list mine': [moved], 'pulls/11/reviews': reviews, 'pulls/11/comments': [] }).gh, state).items.filter((i) => i.kind === 'approved').length, 1, 'a new head after the ack is told again');
+});
+
+test('--mine: no approved item without GitHub\'s approval, with a failed check, or with a conflict', () => {
+  const ok = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const routes = (pr) => ({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  for (const pr of [
+    { ...ok, reviewDecision: 'REVIEW_REQUIRED' },
+    { ...ok, reviewDecision: '' },
+    { ...ok, statusCheckRollup: fx('checks-failed.json') },
+    { ...ok, mergeable: 'CONFLICTING' },
+  ]) assert.deepEqual(run(fakeGh(routes(pr)).gh, empty()).items.filter((i) => i.kind === 'approved'), []);
+});
+
+test('--mine: an approved item is told even past the round cap', () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const mine = [1, 2, 3].map((i) => comment(100 + i, ME, `round ${i}\n${MARKER}`, `2026-11-21T2${i}:00:00Z`));
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [], 'issues/11/comments': mine });
+  assert.ok(run(gh, empty()).items.some((i) => i.kind === 'approved'));
+});

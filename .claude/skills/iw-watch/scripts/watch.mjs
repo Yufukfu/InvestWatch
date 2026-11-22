@@ -2,7 +2,7 @@
 // iw-watch runner. The runner decides what to do (poll, filter, dedupe, cap); the model decides how.
 //   watch.mjs scan [--mine] [--review-requested] [--author L] [--max-rounds N] [--json]
 //   watch.mjs ack <item-id>...
-//   watch.mjs notify <done|needs-human> --pr N [--link <comment url>] [--questions <file>] [--note <text>]
+//   watch.mjs notify <done|needs-human|approved> --pr N [--link <comment url>] [--questions <file>] [--note <text>]
 //     (in-session mode: the agent sends its Discord notice; the questions file becomes /iw comments to paste)
 //   watch.mjs run  [same filters] [--publish] [--limit N] [--budget-usd X] [--model M]   (a dry run unless --publish)
 // Exit codes: 0 ok (also "already running"), 2 GitHub or environment error, 64 usage error.
@@ -26,7 +26,7 @@ const USAGE = `usage: watch.mjs scan|run [--mine] [--review-requested] [--author
                  [--max-rounds N] [--json]                                  (scan)
                  [--publish] [--limit N] [--budget-usd X] [--model M]       (run; dry unless --publish)
        watch.mjs ack <item-id>...
-       watch.mjs notify <done|needs-human> --pr N [--link <url>] [--questions <file>] [--note <text>]`;
+       watch.mjs notify <done|needs-human|approved> --pr N [--link <url>] [--questions <file>] [--note <text>]`;
 
 class UsageError extends Error {}
 
@@ -161,8 +161,8 @@ function printItems(deps, items, json) {
     return;
   }
   for (const it of items) {
-    const who = it.kind === 'review' ? `by ${it.author}` : `${it.events.length} new`;
-    deps.stdout(`#${it.pr} ${it.kind.padEnd(14)} ${clean(who).padEnd(16)} round ${it.rounds}/${it.maxRounds}  ${clean(it.title)}\n    ${clean(it.url)}\n    id: ${it.id}\n`);
+    const who = it.kind === 'review' ? `by ${it.author}` : it.kind === 'approved' ? `by ${(it.approvers || []).join(',') || '?'}` : `${it.events.length} new`;
+    deps.stdout(`#${it.pr} ${it.kind.padEnd(14)} ${clean(who).padEnd(16)} ${it.kind === 'approved' ? 'can merge  ' : `round ${it.rounds}/${it.maxRounds}`}  ${clean(it.title)}\n    ${clean(it.url)}\n    id: ${it.id}\n`);
   }
 }
 
@@ -200,6 +200,8 @@ function withDomains(deps, ctx, o) {
 /** One item, one headless session. Returns the notice to emit. The item is acknowledged in every case but a crash. */
 function handle({ deps, ctx, o, state, sdir, mainRoot, it }) {
   const base = { pr: it.pr, title: it.title, url: it.url, item: it.id, kindOfItem: it.kind };
+  // nothing for an agent to do: tell the human they can merge
+  if (it.kind === 'approved') return { ...base, kind: 'approved', ...(it.approvers?.length ? { detail: `approved by ${it.approvers.map((a) => `@${clean(a)}`).join(', ')}` } : {}) };
   if (it.kind === 'cap-reached') {
     return { ...base, kind: 'needs-human', detail: `round cap ${it.maxRounds} reached on #${it.pr}; the agents stop here, over to you` };
   }

@@ -13,7 +13,7 @@ The deterministic part is `scripts/watch.mjs` (no model, plain `gh`): it polls, 
 
 | Flag | Work items |
 |---|---|
-| `--mine` | `address-review` (new review activity by teammates on my open PRs), `ci-failed` (a failed check on the head) |
+| `--mine` | `address-review` (new review activity by teammates on my open PRs), `ci-failed` (a failed check on the head), `approved` (GitHub says approved, no failed check, no conflict: I can merge) |
 | `--review-requested` | `review` (a ready PR waiting for my review at its current head; also a new head after I asked for changes) |
 | `--author <login>` | `review` of that login's PRs, or narrows the other flags |
 | `--domain <dir>` / `--domain mine` | `review` of PRs that touch a directory owned in `.github/CODEOWNERS` on the default branch (`mine`: every directory I own) |
@@ -33,6 +33,7 @@ Run `/loop 2m /iw-watch --mine` (or any flags above). On each tick:
    - `review`: review against `.claude/CODE_REVIEW.md`, post it with `gh pr comment` (never `gh pr review`), say that approval is left to a human. Questions for @me: ask them in this session, as above.
    - An `answer` event is my `/iw` comment: it picks one of the options you offered last round. Act on that choice only.
    - `cap-reached`: do nothing on GitHub; tell the human the PR needs them.
+   - `approved`: do nothing on GitHub and never merge. Send `watch.mjs notify approved --pr <n>` and ack it. It comes once per head sha and is not capped.
    - A defect in a path someone else owns (CODEOWNERS): don't edit it. Look for an open issue with the same title (`gh issue list --search "<title> in:title"`): if there is one, link it in your reply; otherwise `gh issue create --assignee <owner>` with the evidence and the marker.
 3. **Tell the human on Discord.** Before you ask a question, so they know to come back to the session:
    `node .claude/skills/iw-watch/scripts/watch.mjs notify needs-human --pr <n> --note "waiting for your answer in the Claude session"`
@@ -61,7 +62,7 @@ With `--publish` the runner publishes after the session:
 - it posts one comment that starts with `iw-watch agent for @<me>, round N/M` and ends with the marker;
 - it opens at most one issue, assigned to a CODEOWNERS owner, after a duplicate-title check.
 
-Each item ends in a notice, a JSON line on stdout. The kinds are `done` (clone removed), `draft-ready` (no `--publish`: nothing pushed or posted) and `needs-human`. `needs-human` covers a reached cap and a refused branch. With the clone kept, it also covers a refused publish, commits not pushed, uncommitted changes, no reply written and a failed session. An item that kept its clone is not acknowledged: look at the clone, then remove it and the next run retries the item. The agent's last message is always saved as summary.md next to the draft.
+Each item ends in a notice, a JSON line on stdout. The kinds are `done` (clone removed), `approved` (my PR can be merged; no session is started), `draft-ready` (no `--publish`: nothing pushed or posted) and `needs-human`. `needs-human` covers a reached cap and a refused branch. With the clone kept, it also covers a refused publish, commits not pushed, uncommitted changes, no reply written and a failed session. An item that kept its clone is not acknowledged: look at the clone, then remove it and the next run retries the item. The agent's last message is always saved as summary.md next to the draft.
 
 Drafts, session summaries (cost, denials) and the state live outside the repo in `${XDG_STATE_HOME:-~/.local/state}/iw-watch/<owner>__<repo>/`.
 
@@ -73,7 +74,7 @@ Drafts, session summaries (cost, denials) and the state live outside the repo in
 
 ### Notifications
 
-`IWATCH_NOTIFY_CMD` is run once per notice with `<kind> <"#pr title"> <url>` as separate arguments, never through a shell; use a script path without spaces. For a Discord channel: `IWATCH_DISCORD_WEBHOOK=<webhook URL>` (a secret: an environment variable in `~/.zshenv`, see the README next to this file) and `IWATCH_NOTIFY_CMD="node /abs/path/.claude/skills/iw-watch/scripts/notify-discord.mjs"`. With `IWATCH_DISCORD_USER_ID=<Discord user id>` a needs-human message starts with "hey, I need you @<you>"; nothing else can ping.
+`IWATCH_NOTIFY_CMD` is run once per notice with `<kind> <"#pr title"> <url>` as separate arguments, never through a shell; use a script path without spaces. For a Discord channel: `IWATCH_DISCORD_WEBHOOK=<webhook URL>` (a secret: an environment variable in `~/.zshenv`, see the README next to this file) and `IWATCH_NOTIFY_CMD="node /abs/path/.claude/skills/iw-watch/scripts/notify-discord.mjs"`. With `IWATCH_DISCORD_USER_ID=<Discord user id>` a needs-human message starts with "hey, I need you @<you>" and an approved one with "🎉 Hey @<you>, your PR is approved! You can merge it now."; nothing else can ping.
 
 ### Answering the agent
 
