@@ -12,15 +12,15 @@
 
 ## 2. Fix only what the run broke
 
-- [ ] 2.1 For each service claimed scalable that failed in group 1: failing test first, minimal fix in its compose file or, if the code is another owner's, an issue and a single-instance row instead
-- [ ] 2.2 Only if 1.6 showed a cheap fix: gateway change for `api` replicas plus a probe for it, and an ADR in `.docs/decisions/` with the evidence; otherwise skip and record `api` as single-instance with the Socket.IO reason
-- [ ] 2.3 Mutation check for each fix
+- [x] 2.1 For each service claimed scalable that failed in group 1: failing test first, minimal fix in its compose file or, if the code is another owner's, an issue and a single-instance row instead (none failed: `worker` and `analytics` needed no fix)
+- [x] 2.2 Only if 1.6 showed a cheap fix: gateway change for `api` replicas plus a probe for it, and an ADR in `.docs/decisions/` with the evidence; otherwise skip and record `api` as single-instance with the Socket.IO reason (1.6: the gateway sent every request to one replica, so no gateway change; `api` is single-instance)
+- [x] 2.3 Mutation check for each fix (mutations: n/a, no fix was made)
 
 ## 3. Runbook
 
-- [ ] 3.1 `infra/README.md`: "Scale-out" section with the start, show and return commands, the table of every service (scalable / single-instance, one-line reason, evidence), and the LLM and politeness caveats; every service of `docker compose config --services` (with `llm`) appears once
-- [ ] 3.2 Record the resource sums of the scaled stack and hand them to issue #75 (comment)
-- [ ] 3.3 One before/after number on the same input set, or write "not measured"
+- [x] 3.1 `infra/README.md`: "Scale-out" section with the start, show and return commands, the table of every service (scalable / single-instance, one-line reason, evidence), and the LLM and politeness caveats; every service of `docker compose config --services` (with `llm`) appears once
+- [x] 3.2 Record the resource sums of the scaled stack and hand them to issue #75 (comment)
+- [x] 3.3 One before/after number on the same input set, or write "not measured"
 
 ## 4. Diagram and slides
 

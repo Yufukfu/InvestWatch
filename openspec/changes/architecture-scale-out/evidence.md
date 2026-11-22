@@ -11,6 +11,7 @@ Machine: Docker Desktop, 12 CPUs, 8 GB for the VM, fresh volumes, project `iw-ar
 | `--scale scheduler=2` | both run; one `_job_id` per source and slot (`scheduler.py:68`), so a slot is enqueued once. Not run across a cron slot (6 h cron), so by code reading plus arq's job-id rule |
 | `--scale gateway=2` | the second replica fails: `Bind for 127.0.0.1:18080 failed: port is already allocated` |
 | `--scale api=2` through the gateway, 30 requests | all 30 reached one replica: Docker DNS returns both addresses but Caddy dials the name and Go takes the first, so nothing is balanced and no Socket.IO session is split. A second `api` replica would sit idle |
+| 892 re-announced entries (223 ids × 4), time until group lag 0 and nothing pending, twice each | 1 analytics replica: 21 s, 24 s; 2 replicas: 9 s, 10 s (about 2.3×). Rules-only, documents already seen, `worker=3`; says nothing about the LLM path or about a real scrape |
 
 Notes for the runbook:
 - `XINFO CONSUMERS` keeps the names of killed or replaced replicas (4 listed after one restart with 2 running). Count consumers whose `idle` is small, or compare with the running containers, not the raw list.
