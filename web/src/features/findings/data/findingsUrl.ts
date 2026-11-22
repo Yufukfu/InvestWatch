@@ -85,6 +85,20 @@ export function withFilter(f: FindingFilters, patch: Partial<FindingFilters>): F
   return { ...f, ...patch, page: patch.page ?? 1 };
 }
 
+// Triage: new, high-risk findings on page 1 with every other filter cleared. `triage=1` is a one-shot
+// flag: useFindings opens the first row when the result arrives and rewrites the URL without it.
+// serializeUrl never writes the flag, so any later filter change drops it too.
+const TRIAGE_FLAG = 'triage';
+
+export function triageUrl(): string {
+  const filters: FindingFilters = { ...DEFAULT_FILTERS, status: ['new'], riskLevel: 'high' };
+  return `${serializeUrl(filters, undefined)}&${TRIAGE_FLAG}=1`;
+}
+
+export function hasTriageFlag(search: string): boolean {
+  return new URLSearchParams(search).get(TRIAGE_FLAG) === '1';
+}
+
 export function toQueryArg(f: FindingFilters): GetFindingsApiArg {
   const arg: GetFindingsApiArg = { sort: f.sort, page: f.page, pageSize: f.pageSize };
   if (f.module) arg.module = f.module;

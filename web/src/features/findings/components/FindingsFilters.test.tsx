@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FindingFilters } from '../model';
 import { FindingsFilters } from './FindingsFilters';
@@ -81,6 +81,73 @@ describe('FindingsFilters', () => {
     setup();
     expect(screen.queryByRole('button', { name: /Wyczyść filtry/ })).toBeNull();
     screen.getByLabelText('Moduł'); // rendered
+  });
+
+  it('offers a Filtry disclosure that names the active count, starts closed and controls the other fields', () => {
+    setup({ module: 'M1', status: ['new'] });
+    const toggle = screen.getByRole('button', { name: 'Filtry 2' });
+    const more = screen.getByLabelText('Moduł').closest('.filters-more') as HTMLElement;
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', more.id);
+    expect(more.id).not.toBe('');
+    expect(more).not.toHaveClass('filters-open');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(more).toHaveClass('filters-open');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(more).not.toHaveClass('filters-open');
+  });
+
+  it('keeps the search field outside the collapsible part, beside the Filtry button', () => {
+    setup();
+    expect(screen.getByLabelText('Szukaj').closest('.filters-more')).toBeNull();
+    expect(screen.getByLabelText('Szukaj').closest('form')).toBe(screen.getByRole('button', { name: 'Filtry' }).closest('form'));
+  });
+
+  it('shows one removable chip per active filter, and each clears only its own filter', () => {
+    const { onChange } = setup({ status: ['new', 'closed'], riskLevel: 'high', module: 'M2', platform: 'tiktok', scoreMin: 0.7, dateFrom: '2026-11-20', dateTo: '2026-11-21', q: 'jan' });
+    const chips = within(screen.getByRole('group', { name: 'Aktywne filtry' })).getAllByRole('button');
+    expect(chips.map((c) => c.getAttribute('aria-label'))).toEqual([
+      'Usuń filtr: Nowe',
+      'Usuń filtr: Zamknięte',
+      'Usuń filtr: Wysoki',
+      'Usuń filtr: M2',
+      'Usuń filtr: TikTok',
+      'Usuń filtr: ≥ 0.7',
+      'Usuń filtr: od 2026-11-20',
+      'Usuń filtr: do 2026-11-21',
+      'Usuń filtr: \u2068„jan”\u2069',
+    ]);
+    expect(chips[0]).toHaveTextContent('Nowe');
+    const expected: Array<Partial<FindingFilters>> = [
+      { status: ['closed'] },
+      { status: ['new'] },
+      { riskLevel: undefined },
+      { module: undefined },
+      { platform: undefined },
+      { scoreMin: undefined },
+      { dateFrom: undefined },
+      { dateTo: undefined },
+      { q: undefined },
+    ];
+    chips.forEach((chip, i) => {
+      fireEvent.click(chip);
+      expect(onChange).toHaveBeenLastCalledWith(expected[i]);
+      // toHaveBeenCalledWith treats an undefined value as absent, so also pin which key the patch carries.
+      expect(Object.keys(onChange.mock.lastCall?.[0] ?? {})).toEqual(Object.keys(expected[i]));
+    });
+    expect(onChange).toHaveBeenCalledTimes(expected.length);
+  });
+
+  it('shows no chip group when no filter is active', () => {
+    setup();
+    expect(screen.queryByRole('group', { name: 'Aktywne filtry' })).toBeNull();
+  });
+
+  it('names the disclosure without a number when no filter is active', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'Filtry' })).toBeInTheDocument();
   });
 
   it('clears all filters', () => {
