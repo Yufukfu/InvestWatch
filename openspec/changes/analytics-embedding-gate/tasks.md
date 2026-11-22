@@ -22,8 +22,8 @@ Requested by Damian on 2026-11-22. Feature freeze 08:00, so if time runs short, 
 
 ## 4. Calibration and the real run (~45 min)
 
-- [ ] 4.1 `analytics/eval/gate_check.jsonl` (labelled, no seed repeated) and `analytics/eval/gate_calibrate.py`; run against real `bge-m3`; set the default `GATE_EMBED_MIN_MARGIN`; precision and recall into `design.md` §4
-- [ ] 4.2 `eval/run.py` recall unchanged; `test_eval_thresholds` green
+- [x] 4.1 `analytics/eval/gate_check.jsonl` (labelled, no seed repeated) and `analytics/eval/gate_calibrate.py`; run against real `bge-m3`; set the default `GATE_EMBED_MIN_MARGIN`; precision and recall into `design.md` §4 (0.03: P 1.0, R 1.0 on 30 no-hit lines); `tests/test_gate_calibrate.py` pins the set and the sweep: `mutations: 4 tried, 3 caught`, the survivor (`>=` to `>` in the sweep) got a boundary row, then `mutations: 4 tried, 4 caught`
+- [x] 4.2 `eval/run.py` recall unchanged (it calls `analyze` without a gate); `test_eval_thresholds` green (18 passed); full suite 2122 passed, 125 skipped
 - [ ] 4.3 Manual run with `bge-m3`: latency (cold, warm, centroid build), decisions on the mock documents and the demo sources (xtb, comparic, icobench, moneteo, tradingview, ey, KNF warnings page); results in the PR body
 
 ## 5. Closing

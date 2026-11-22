@@ -65,6 +65,19 @@ There is no "borderline" band above zero hits. One hit already passes, and the r
 
   The gold set's gated documents are added to it.
 - **Script.** `analytics/eval/gate_calibrate.py` runs by hand against a real embedder. It prints the margin of every no-hit item and the precision and recall for each candidate margin. The default is the smallest margin with precision ≥ 0.9 on the check set, rounded toward recall. The result goes into this section before archive.
+- **Result (2026-11-22, `bge-m3` in Ollama on CPU, `gate_check.jsonl`: 19 on-topic and 20 off-topic lines).** Nine on-topic lines already pass on the dictionary. The sweep runs over the 30 no-hit lines (10 on-topic, 20 off-topic):
+
+  | margin | precision | recall | tp / fp / fn |
+  |---|---|---|---|
+  | 0.00 | 0.769 | 1.0 | 10 / 3 / 0 |
+  | 0.02 | 0.909 | 1.0 | 10 / 1 / 0 |
+  | **0.03** | **1.0** | **1.0** | 10 / 0 / 0 |
+  | 0.04 | 1.0 | 0.9 | 9 / 0 / 1 |
+  | 0.06 | 1.0 | 0.7 | 7 / 0 / 3 |
+  | 0.10 | 1.0 | 0.6 | 6 / 0 / 4 |
+
+  The on-topic margins range from 0.039 to 0.200. The highest off-topic ones are a "like and tag a friend" giveaway (0.023), a used-bike ad (0.016) and a "13th salary" news line (0.0). The default is **0.03**: the smallest margin with precision ≥ 0.9 that keeps recall at 1.0. The gap to the nearest errors is only about 0.01 on each side, so a different model or seed set must be re-calibrated (`eval/gate_calibrate.py`).
+- **Gold set through the gate** (gated documents only, computed without a registry match, so the dictionary is weaker here than in production): every M1/M3 positive passes. Four vocabulary-free M1 positives (`m1-finfluencer-ref-link`, `m1-utm-link-only`, `m1-cta-link-in-bio`, `m1-giveaway`) have no dictionary hit and are rescued with margins 0.082-0.117. In production their registry match also passes them.
 - **Existing eval.** `eval/run.py` and `test_eval_thresholds` call `analyze` without a gate, so this change cannot affect them. A new test runs every gold M1/M3 positive through the gate with an embedder that votes off-topic, and asserts that none is dropped (all of them pass on the dictionary).
 
 ### 5. Degrade and logging
