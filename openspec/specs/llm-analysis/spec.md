@@ -3,9 +3,7 @@
 ## Purpose
 
 Let an LLM decide only the checks the rules defer, through an OpenAI-compatible endpoint configured by env, with scraped text delimited, quotes verified against the document, and every failure ending in the rules-only result.
-
 ## Requirements
-
 ### Requirement: Env-only LLM configuration
 Analytics SHALL configure the LLM only from environment variables (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` and the limits below). With `LLM_BASE_URL` empty or unset the LLM SHALL be disabled and analysis SHALL run rules-only. A bad value SHALL be a configuration error that names the variable, and the API key SHALL never appear in logs or error messages.
 
@@ -73,7 +71,7 @@ The engine SHALL ask the LLM only about checks whose catalogue entry has an `llm
 - **THEN** the R17 verdict is merged and the R2 item is ignored
 
 ### Requirement: Validated response with verified quotes
-The response content SHALL be a JSON object `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}` validated per item with Pydantic; an invalid item SHALL be dropped and its check keeps the rules-only result. An `evidence_quote` SHALL be accepted only when it is at least 8 characters long and occurs in the chunk sent; otherwise the verdict SHALL become `uncertain` with `evidence: null`. Accepted evidence SHALL be a verbatim substring of the document `text`.
+The response content SHALL be a JSON object `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}`, or a bare JSON array of those items, which SHALL be read as `{"results": <array>}` (hosted Gemma 4 `gemma-4-26b-a4b-it` answers so in JSON mode). It SHALL be validated per item with Pydantic; an invalid item SHALL be dropped and its check keeps the rules-only result. An `evidence_quote` SHALL be accepted only when it is at least 8 characters long and occurs in the chunk sent; otherwise the verdict SHALL become `uncertain` with `evidence: null`. Accepted evidence SHALL be a verbatim substring of the document `text`.
 
 #### Scenario: Hallucinated quote
 - **WHEN** the stub answers R17 `fail` with `evidence_quote` `Produkt zatwierdzony przez KNF`, which is not in the document
@@ -99,13 +97,18 @@ The response content SHALL be a JSON object `{"results": [{"rule_id", "result", 
 - **THEN** R18 is `pass` with `evidence: null` and `method: hybrid`
 - **AND** a `fail` or `uncertain` verdict without an accepted quote, or any verdict whose given quote is not accepted, SHALL become `uncertain`
 
+#### Scenario: Bare results array
+- **WHEN** the stub answers HTTP 200 with content `[{"rule_id": "R17", "result": "fail", "evidence_quote": "<a sentence of the document>", "explanation": "x"}]`, optionally after a `<thought>` block or in a code fence
+- **THEN** it is read as `{"results": [...]}`: R17 is `fail` with that quote, the same per-item validation and quote verification apply, and the response is cached like an object answer
+- **AND** an empty array SHALL be a valid answer with no verdicts, and an item in the array that fails validation SHALL be dropped as in an object answer
+
 ### Requirement: Degrade to rules-only on any LLM failure
 No LLM failure SHALL fail the document: the affected module's checks SHALL keep their rules-only results, the finding SHALL be produced and saved as usual, and a log line SHALL name the reason (`llm_unavailable`, `llm_timeout`, `llm_malformed`, `llm_budget_exhausted`) without document text. When any chunk of a module's call fails, all of that module's verdicts SHALL be dropped.
 
 #### Scenario: LLM down
 - **WHEN** `LLM_BASE_URL` points to a closed port and `m2-alfa-landing` is analyzed
 - **THEN** the M2 finding is produced with the rules-only results, `model.llm = null`, and the log reason `llm_unavailable`
-- **AND** a failure SHALL be a connection error, a timeout after `LLM_TIMEOUT_S`, HTTP 429, 401, 403 or 5xx, a body that is not chat-completions JSON, content that is not a JSON object, a missing `results` list, or an exhausted `LLM_DOC_BUDGET_S`
+- **AND** a failure SHALL be a connection error, a timeout after `LLM_TIMEOUT_S`, HTTP 429, 401, 403 or 5xx, a body that is not chat-completions JSON, content that is neither a JSON object nor a JSON array (a string, number, boolean or null), an object without a `results` list, or an exhausted `LLM_DOC_BUDGET_S`
 
 #### Scenario: Timeout
 - **WHEN** the stub sleeps longer than `LLM_TIMEOUT_S` before answering
@@ -117,7 +120,7 @@ No LLM failure SHALL fail the document: the affected module's checks SHALL keep 
 - **THEN** the finding has the rules-only results, `model.llm = null`, and the log reason `llm_malformed`
 
 #### Scenario: Wrong top-level shape
-- **WHEN** the stub answers content `[{"rule_id": "R17", "result": "fail"}]` (an array, not an object)
+- **WHEN** the stub answers content `"R17 fail"`, `5`, `true` or `null` (valid JSON that is neither an object nor an array), or an object without a `results` list
 - **THEN** it is treated as malformed and the rules-only results stay
 
 #### Scenario: Server error
@@ -219,3 +222,4 @@ Any catalogue entry (M1, M2 or M3) SHALL be able to declare `llm: {question, whe
 #### Scenario: No judge
 - **WHEN** `run_rules` is called without a judge on a catalogue with `llm:` blocks
 - **THEN** the results equal the rules-only results and no check is collected for sending
+
