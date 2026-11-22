@@ -25,6 +25,7 @@ BUDGET_KEY_TTL_SECONDS = 2 * 3600  # an hour's counter outlives its hour, so a l
 MAX_REPLY_BYTES = 16 * 1024 * 1024  # an 8 MB PNG in base64, with room
 DEADLINE_SLACK_SECONDS = 5.0  # the HTTP timeout runs a little past the renderer's own deadline, which answers first
 _ERROR_REASONS = {"blocked": Reason.BLOCKED, "refused": Reason.BLOCKED_TARGET}
+_DISCARDS_RENDER = frozenset({"blocked", "refused"})  # any other failed viewport keeps the ones already taken
 
 
 def wants_render(source: Source) -> bool:
@@ -157,7 +158,10 @@ class PageRenderer:
             try:
                 reply = await self._call(payload, remaining)
             except RenderCallError as error:
-                return await self._error(source, domain, error, proxies, choice)
+                failed = await self._error(source, domain, error, proxies, choice)
+                if error.kind in _DISCARDS_RENDER:
+                    return failed
+                return RenderOutput(shots, version, truncated, errors=failed.errors, blocks=tuple(blocks))
             shots[viewport], version, truncated = reply.png, reply.browser_version, truncated or reply.truncated
             blocks.extend(reply.blocks)
         return RenderOutput(shots, version, truncated, blocks=tuple(blocks))

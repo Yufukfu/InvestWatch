@@ -10,7 +10,7 @@ from iw_scraper.ingest.publisher import STREAM, mark_published, publish
 from iw_scraper.ingest.storage import Storage
 from iw_scraper.ingest.store import IngestResult, insert_document, is_duplicate
 from iw_scraper.ingest.validate import check_document
-from iw_scraper.rendering import RenderOutput
+from iw_scraper.rendering import VIEWPORT_ORDER, RenderOutput
 from iw_scraper.types import JobError, Reason, Source
 
 log = logging.getLogger("iw_scraper.ingest")
@@ -119,9 +119,10 @@ class Ingestor:
         """Upload the screenshots and set `screenshots` and `scrape_meta.render`.
 
         Each uploaded key is appended to `keys` at once, so a cancellation can remove what is already there.
-        A failure here costs the layout only: nothing of it is kept, and the error is recorded.
+        A failure here costs the layout only: nothing of it is kept, and the error is recorded. A viewport the renderer
+        failed to capture is `null` while the others are kept (its error is recorded by `_render`).
         """
-        if output is None or output.errors:
+        if output is None or (output.errors and not output.screenshots):
             return
         if output.skipped or not output.screenshots:
             doc["scrape_meta"] = {**doc["scrape_meta"], "render": {"skipped": output.skipped or "empty"}}
@@ -137,7 +138,7 @@ class Ingestor:
             return
         candidate = {
             **doc,
-            "screenshots": uploaded,
+            "screenshots": {viewport: uploaded.get(viewport) for viewport in VIEWPORT_ORDER},
             **({"blocks": list(output.blocks)} if output.blocks else {}),
             "scrape_meta": {
                 **doc["scrape_meta"], "render": {"browser_version": output.browser_version, "truncated": output.truncated}

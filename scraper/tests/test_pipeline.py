@@ -3,6 +3,7 @@
 import asyncio
 import json
 import uuid
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 import asyncpg
@@ -512,6 +513,23 @@ async def test_a_failed_render_keeps_the_document_and_records_one_error(
     assert "render" not in payload["scrape_meta"]  # a failed render leaves no render meta, only the job error
     assert await reasons(pool) == [reason]
     assert await storage.list_keys() == [f"html/{result.document_id}.html"]
+
+
+async def test_a_failed_viewport_is_null_and_the_others_are_stored_with_the_error(
+    pool, storage, redis_client, stream_name, seeded_source
+):
+    error = JobError(Reason.RENDER_FAILED, "screenshot exceeds size cap")
+    partial = replace(shots("desktop", "mobile"), errors=(error,))
+
+    result = await run(Ingestor(pool, storage, redis_client, stream=stream_name), seeded_source, rendering(partial))
+
+    payload = await payload_of(pool, result.document_id)
+    base = f"shot/{result.document_id}"
+    assert payload["screenshots"] == {"desktop": f"{base}/desktop.png", "mobile": f"{base}/mobile.png", "tablet": None}
+    assert [b["viewport"] for b in payload["blocks"]] == ["desktop", "mobile"]
+    assert payload["scrape_meta"]["render"] == {"browser_version": "147.0.7727.0", "truncated": False}
+    assert await reasons(pool) == ["render_failed"]
+    assert sorted(await storage.list_keys()) == sorted([f"html/{result.document_id}.html", f"{base}/desktop.png", f"{base}/mobile.png"])
 
 
 async def test_a_render_error_detail_is_redacted(pool, storage, redis_client, stream_name, seeded_source):

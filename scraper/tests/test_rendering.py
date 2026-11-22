@@ -206,6 +206,37 @@ async def test_other_failures_map_to_their_reason_and_cost_no_retry_after_or_pro
     assert not [e for e in log.events if e[0] == "defer"] and proxies.penalized == []
 
 
+async def test_a_failed_tablet_keeps_the_other_two_viewports_and_records_the_error():
+    page_renderer, renderer, _, proxies = make(fail={"tablet": RenderCallError("failed", "screenshot exceeds size cap")})
+
+    output = await page_renderer.render(SOURCE, SOURCE.url, IDENTITY, proxies)
+
+    assert list(output.screenshots) == ["desktop", "mobile"] and output.browser_version == "147.0.1"
+    assert [b["viewport"] for b in output.blocks] == ["desktop", "mobile"]
+    assert [(e.reason, e.detail) for e in output.errors] == [(Reason.RENDER_FAILED, "screenshot exceeds size cap")]
+    assert [payload["viewport"] for payload, _ in renderer.payloads] == ["desktop", "mobile", "tablet"]
+
+
+async def test_a_failure_in_the_second_viewport_keeps_the_first_and_does_not_try_the_third():
+    page_renderer, renderer, _, proxies = make(fail={"mobile": RenderCallError("unreachable", "renderer did not answer")})
+
+    output = await page_renderer.render(SOURCE, SOURCE.url, IDENTITY, proxies)
+
+    assert list(output.screenshots) == ["desktop"] and [e.reason for e in output.errors] == [Reason.RENDER_FAILED]
+    assert [payload["viewport"] for payload, _ in renderer.payloads] == ["desktop", "mobile"]
+
+
+@pytest.mark.parametrize(
+    "error", [RenderCallError("refused", "navigation away from the source site"), RenderCallError("blocked", "HTTP 403")]
+)
+async def test_a_refused_or_blocked_tablet_discards_the_viewports_already_taken(error):
+    page_renderer, _, _, proxies = make(fail={"tablet": error})
+
+    output = await page_renderer.render(SOURCE, SOURCE.url, IDENTITY, proxies)
+
+    assert output.screenshots == {} and output.blocks == () and len(output.errors) == 1
+
+
 async def test_each_call_gets_the_time_left_of_the_one_deadline():
     now = [100.0]
 

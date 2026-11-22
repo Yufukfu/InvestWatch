@@ -122,6 +122,14 @@ The scraper SHALL capture a full-page PNG for each of `desktop` (1440x900), `tab
 - **WHEN** capturing the `tablet` image fails but the other two succeed
 - **THEN** `screenshots.tablet` is `null`, the other two keys are set and a job error is recorded
 
+#### Scenario: Failure after the first viewport
+- **WHEN** a viewport other than a block or a refused target fails after an earlier one succeeded
+- **THEN** the viewports already taken and their blocks are stored, the failed and the not attempted viewports are `null`, and one job error is recorded
+
+#### Scenario: Block or refusal after the first viewport
+- **WHEN** a later viewport is blocked or its target is refused after an earlier one succeeded
+- **THEN** no screenshot and no block is stored and one job error with reason `blocked` or `blocked_target` is recorded
+
 ### Requirement: Describe the text blocks of each viewport
 For each viewport the scraper SHALL emit `blocks` in the contract's `block` shape: one entry per rendered block of text (the nearest block-level element with its own text), in document order, with `viewport`, `text`, `tag`, `font_size_px`, `font_weight` (an integer, rounded), `color`, `background_color` (both `#rrggbb`), `bbox` `[x, y, width, height]` in CSS pixels relative to the page, `visible`, `in_viewport_on_load`, `requires_interaction`, `region` and `overflow_clipped`. Text of `script`, `style`, `noscript` and `template` elements SHALL NOT appear. The text SHALL be taken verbatim and never interpreted.
 

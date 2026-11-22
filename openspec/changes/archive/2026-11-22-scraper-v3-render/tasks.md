@@ -55,6 +55,9 @@ Each group from 2 on is one commit. Its first task is the failing test and its l
 - [x] 8.1 Failing tests, then the fix: a redirect hop of any request (image, stylesheet, fetch, iframe, a later hop of a longer chain, a closed port) fails the render after the screenshot; `SharedWorker` removed in every frame
 - [x] 8.2 Mutation check; mutations: 3 tried, 3 caught (sweep disabled, `SharedWorker` left in place, only the first hop judged)
 
+- [x] 8.3 Failing tests, then the fix: a viewport that fails (any kind but `blocked` or `refused`) keeps the viewports already taken, with its error; the ingest stores `screenshots` with `null` for the missing ones. The render still stops at the first failure (no later viewport is tried), and a block or a refused target still discards everything
+- [x] 8.4 Mutation check; mutations: 6 tried, 6 caught (`blocked` or `refused` dropped from the discarding kinds, partial never returned, errors still discard in the ingest, `null` keys dropped, the ingest returns early on an empty output without noting it)
+
 ## Deferred follow-up (not part of this change's done criteria)
 
 - `occluded` on `block` (design open question 1; Damian suggests `boolean | null`, null = not measured): only if the whole team accepts the contract change after Integration #1 (`IW_CONTRACT_CHANGE=1`); then a failing test with a sticky bar over a risk text and a `document.elementFromPoint` measurement, as its own small change. Nothing in groups 1-7 depends on it.
