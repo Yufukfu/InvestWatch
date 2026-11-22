@@ -9,6 +9,10 @@ import { FINDINGS_SECTION, hasFindingsParams } from './url/section';
 
 // Recharts is the largest dependency; the chart sections load as their own chunks and share it.
 const TrendPage = lazy(() => import('./features/trend/TrendPage').then((m) => ({ default: m.TrendPage })));
+// The Powiązania page carries its own graph code; it loads on first visit, like the calibration panel.
+const AdvertisersPage = lazy(() =>
+  import('./features/advertisers/AdvertisersPage').then((m) => ({ default: m.AdvertisersPage })),
+);
 const CalibrationPage = lazy(() =>
   import('./features/calibration/CalibrationPage').then((m) => ({ default: m.CalibrationPage })),
 );
@@ -17,6 +21,7 @@ const CalibrationPage = lazy(() =>
 const SECTION_LINKS = [
   { id: 'przeglad', label: 'Przegląd' },
   { id: 'zgloszenia', label: 'Zgłoszenia' },
+  { id: 'powiazania', label: 'Powiązania' },
   { id: 'kalibracja', label: 'Kalibracja' },
 ];
 
@@ -57,6 +62,19 @@ const PAGES: Record<string, ReactNode> = {
     </div>
   ),
   zgloszenia: <FindingsPage />,
+  powiazania: (
+    <SectionBoundary
+      fallback={
+        <p className="trend-state" role="alert">
+          Nie udało się wczytać strony powiązań.
+        </p>
+      }
+    >
+      <Suspense fallback={<p className="trend-state" role="status">Ładowanie powiązań…</p>}>
+        <AdvertisersPage />
+      </Suspense>
+    </SectionBoundary>
+  ),
   kalibracja: (
     <SectionBoundary
       fallback={

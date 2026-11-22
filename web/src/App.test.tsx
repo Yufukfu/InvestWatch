@@ -58,7 +58,7 @@ describe('App (against contract mocks)', () => {
     expect(nav).not.toHaveClass('app-nav-open');
   });
 
-  it('labels the tool and links the header to the three sections', async () => {
+  it('labels the tool and links the header to the four sections', async () => {
     renderApp();
     expect(screen.getByText('NARZĘDZIE NADZORCZE')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'InvestWatch' })).toBeInTheDocument();
@@ -67,13 +67,14 @@ describe('App (against contract mocks)', () => {
     expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
       ['Przegląd', '#przeglad'],
       ['Zgłoszenia', '#zgloszenia'],
+      ['Powiązania', '#powiazania'],
       ['Kalibracja', '#kalibracja'],
     ]);
     // The first section is current until the user follows another link.
-    expect(links.map((a) => a.getAttribute('aria-current'))).toEqual(['location', null, null]);
-    fireEvent.click(links[2]);
+    expect(links.map((a) => a.getAttribute('aria-current'))).toEqual(['location', null, null, null]);
+    fireEvent.click(links[3]);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(links.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'location']));
+    await waitFor(() => expect(links.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, null, 'location']));
   });
 
   describe('sub-pages', () => {
@@ -263,5 +264,15 @@ describe('App (against contract mocks)', () => {
     renderApp('zgloszenia');
     expect(await screen.findByText('Brak połączenia z API')).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent('Nie udało się pobrać zgłoszeń.');
+  });
+
+  it('opens the Powiązania page from its hash, between Zgłoszenia and Kalibracja', async () => {
+    renderApp('powiazania');
+    const nav = screen.getByRole('navigation', { name: 'Sekcje' });
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['Przegląd', 'Zgłoszenia', 'Powiązania', 'Kalibracja']);
+    expect(within(nav).getByRole('link', { name: 'Powiązania' })).toHaveAttribute('aria-current', 'location');
+    expect(within(nav).getByRole('link', { name: 'Zgłoszenia' })).not.toHaveAttribute('aria-current');
+    expect(await screen.findByRole('heading', { name: 'POWIĄZANIA · M1 · FINFLUENCERZY I FIRMY Z REJESTRU' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Podsumowanie' })).toBeNull();
   });
 });
