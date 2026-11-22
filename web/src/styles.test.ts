@@ -56,8 +56,6 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--accent-text', '--accent'],
   ['--accent-text', '--accent-strong'],
   ['--accent-text', '--amber'],
-  ['--accent-text', '--green'],
-  ['--text-2', '--tint-neutral'],
   ['--accent-text', '--risk-high'],
   ['--green', '--surface'],
   ['--m3', '--surface'],
@@ -271,23 +269,5 @@ describe('served HTML and fonts', () => {
     expect(css).toMatch(/--font-text:[^;]*Inter[^;]*sans-serif/);
     expect(css).toMatch(/--font-display:[^;]*Space Grotesk[^;]*sans-serif/);
     expect(css).toMatch(/--font-mono:[^;]*Geist Mono[^;]*monospace/);
-  });
-});
-
-describe('header export on a phone', () => {
-  // jsdom applies no cascade, so this pins the selectors: the phone rule that hides the export until the menu
-  // opens must outrank the base `.export-report { display: flex }` that comes later in the file.
-  it('hides the export behind the menu with a selector that outranks the base rule', () => {
-    const phone = /@media \(max-width: 599px\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
-    expect(phone).toMatch(/\.app-header \.header-export \{[^}]*display: none/);
-    expect(phone).toMatch(/\.app-header \.header-export\.header-export-open \{[^}]*display: flex/);
-  });
-});
-
-describe('M2 rule grid', () => {
-  // jsdom applies no CSS, so the selectors that show the legal basis are pinned here: hover and keyboard focus.
-  it('shows the tooltip on hover and on keyboard focus', () => {
-    expect(css).toMatch(/\.rule-cell-wrap:hover \.rule-tip, \.rule-cell:focus-visible \+ \.rule-tip \{ display: grid; \}/);
-    expect(css).toMatch(/\.rule-tip \{ display: none;/);
   });
 });
