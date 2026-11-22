@@ -1,6 +1,6 @@
-# Status: dashboard (Kacper)
+# Status: dashboard
 
-Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat).
+Covers `web/` and `infra/`; whoever changes them updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS); `infra/` is shared). Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -18,9 +18,10 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-21 (Sat
 ## Active OpenSpec changes
 
 - web features: none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
-- `agent-watch` (branch `chore/agent-watch`, archived in its PR): the `iw-watch` skill and runner for agent-to-agent hand-offs through GitHub, plus `.github/CODEOWNERS` (owners need the team's OK in review).
+- `agent-watch` merged (PR #48): the `iw-watch` skill and runner, plus `.github/CODEOWNERS`.
+- `codeowners-single-source` (branch `chore/codeowners-single-source`, archived in its PR): `.github/CODEOWNERS` is the only place that names owners ([ADR 0211](../decisions/0211-codeowners-single-source.md)). Docs link to it, and `docs-check` fails on a module without a line there or on a per-person ownership statement in a live doc.
 
 ## Blockers and open decisions
 
-- Compose includes the `api` service (`api/compose.yaml`), and the gateway sends `/api` and `/socket.io` to it (`infra/gateway/Caddyfile`). The `npm run dev` server still proxies to the contract mock server started by hand (see `web/README.md`) until the api has real data; switching the dev server over is Kacper's, before the demo. Team-wide entry in `.docs/STATUS.md`.
+- Compose includes the `api` service (`api/compose.yaml`), and the gateway sends `/api` and `/socket.io` to it (`infra/gateway/Caddyfile`). The `npm run dev` server still proxies to the contract mock server started by hand (see `web/README.md`) until the api has real data; switching the dev server over is Kacper's task, before the demo. Team-wide entry in `.docs/STATUS.md`.
 - Root `README.md` exists; its Quick Start is pending the deployment ADR. Per-service READMEs are stubs.

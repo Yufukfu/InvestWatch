@@ -17,7 +17,7 @@
 
 ## 3. Closing
 
-- [ ] 3.1 `iw-docs-update`: ADR `.docs/decisions/0211-codeowners-single-source.md` (partly supersedes 0202 and 0205), listed in `.docs/decisions/README.md`; `.docs/status/dashboard.md` updated; `iw-ai-log` row. Verify: `docs-check` exits 0.
+- [x] 3.1 `iw-docs-update`: ADR `.docs/decisions/0211-codeowners-single-source.md` (partly supersedes 0202 and 0205), listed in `.docs/decisions/README.md`; `.docs/status/dashboard.md` updated; `iw-ai-log` row. Verify: `docs-check` exits 0.
 - [ ] 3.2 Run `iw-pr-review` and fix real findings.
 
 ## Workflow follow-up
