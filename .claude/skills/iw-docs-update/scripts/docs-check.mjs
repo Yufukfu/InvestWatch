@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Deterministic docs check, no LLM, no network. Usage: node docs-check.mjs [repoRoot]
 // Fails (exit 1) on: broken relative markdown links, backticked .md paths that do not
-// exist, ADR files missing from .docs/decisions/README.md, service dirs without CLAUDE.md.
+// exist, ADR files missing from .docs/decisions/README.md, service dirs without CLAUDE.md,
+// service dirs without a .github/CODEOWNERS line, and a per-person ownership statement in a
+// live doc (.github/CODEOWNERS is the only place that says who owns which path, ADR 0211).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +15,23 @@ const SKIP_PREFIXES = ['.claude/skills/openspec-', 'openspec/changes/archive'];
 // security-audit.md is a planned deliverable (integration-plan.md section 7); remove it from this set
 // once the file exists so a later rename is caught.
 const IGNORED_NAMES = new Set(['follow-ups.md', 'tasks.md', 'proposal.md', 'design.md', 'spec.md', 'SKILL.md', 'security-audit.md']);
+
+// Ownership rule. People are named by first name in prose; their handles live in CODEOWNERS only.
+const PEOPLE = ['Adam', 'Kacper', 'Damian'];
+const MODULE_WORDS = ['scraper', 'analytics', 'api', 'web', 'contracts', 'infra', 'dashboard'];
+// History keeps the names it had (ADRs, the AI log); in-flight changes are archived (and skipped) later.
+const OWNERSHIP_SKIP = ['.docs/decisions/', '.docs/ai-workflow.md', 'openspec/changes/'];
+// Spec scenario steps are hypothetical examples ("GIVEN analytics/ is owned by Damian").
+const SCENARIO_STEP = /^\s*-\s*\*\*(?:GIVEN|WHEN|THEN|AND)\*\*/;
+const NAME = `(?:${PEOPLE.join('|')})\\b`;
+const MODULE = `(?<![\\w/-])\`?(?:${MODULE_WORDS.join('|')})/?\`?`;
+const OWNERSHIP_PATTERNS = [
+  new RegExp(`\\b(?:owners?|owned by)\\b[\\s:*(]*${NAME}`, 'i'), // owner Damian, **Owner:** Damian, owned by Kacper
+  new RegExp(`\\b${NAME}'s module`), // Adam's module
+  new RegExp(`${MODULE}(?: [a-z]+)?\\s*\\((?:owner )?${NAME}`), // scraper (Adam), web/ dashboard (Kacper)
+  new RegExp(`\`(?:${MODULE_WORDS.join('|')})/\` ${NAME}`), // `scraper/` Adam
+  /^\s*\|.*\|\s*Owners?\s*\|/i, // an Owner table column
+];
 
 function walk(root, rel = '') {
   const out = [];
@@ -69,13 +88,37 @@ export function checkDocs(root) {
     }
   }
 
-  for (const dir of SERVICE_DIRS) {
-    const full = path.join(root, dir);
-    if (fs.existsSync(full) && fs.statSync(full).isDirectory() && !fs.existsSync(path.join(full, 'CLAUDE.md'))) {
-      problems.push({ file: dir, line: 1, problem: `${dir}/ has no CLAUDE.md` });
-    }
+  const services = SERVICE_DIRS.filter((dir) => fs.existsSync(path.join(root, dir)) && fs.statSync(path.join(root, dir)).isDirectory());
+  for (const dir of services) {
+    if (!fs.existsSync(path.join(root, dir, 'CLAUDE.md'))) problems.push({ file: dir, line: 1, problem: `${dir}/ has no CLAUDE.md` });
+  }
+
+  problems.push(...checkCodeowners(root, services));
+
+  const extra = ['openspec/config.yaml', 'compose.yaml', ...[...SERVICE_DIRS, 'infra'].map((d) => `${d}/compose.yaml`)];
+  for (const file of [...files, ...extra.filter((f) => fs.existsSync(path.join(root, f)))]) {
+    if (OWNERSHIP_SKIP.some((p) => file.startsWith(p))) continue;
+    fs.readFileSync(path.join(root, file), 'utf8').split('\n').forEach((text, i) => {
+      if (SCENARIO_STEP.test(text) || !OWNERSHIP_PATTERNS.some((re) => re.test(text))) return;
+      problems.push({ file, line: i + 1, problem: 'per-person ownership statement: link .github/CODEOWNERS instead' });
+    });
   }
   return problems;
+}
+
+// Every existing service directory has a `/<dir>/` line with at least one @handle. infra/ and the other
+// shared areas have no owner on purpose, so they are not required.
+function checkCodeowners(root, services) {
+  if (!services.length) return [];
+  const file = '.github/CODEOWNERS';
+  const full = path.join(root, file);
+  if (!fs.existsSync(full)) return [{ file, line: 1, problem: `${file} is missing; it maps ${services.join(', ')} to owners` }];
+  const owned = new Set();
+  for (const raw of fs.readFileSync(full, 'utf8').split('\n')) {
+    const [pattern, ...owners] = raw.replace(/#.*/, '').trim().split(/\s+/);
+    if (pattern && owners.some((o) => /^@[A-Za-z0-9-]+(?:\/[A-Za-z0-9._-]+)?$/.test(o))) owned.add(pattern);
+  }
+  return services.filter((dir) => !owned.has(`/${dir}/`)).map((dir) => ({ file, line: 1, problem: `no /${dir}/ line with an @owner in ${file}` }));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

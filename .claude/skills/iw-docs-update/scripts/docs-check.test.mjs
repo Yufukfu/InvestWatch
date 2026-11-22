@@ -71,6 +71,7 @@ test('every existing service directory needs its own CLAUDE.md', () => {
     'scraper/CLAUDE.md': '#',
     'analytics/main.py': 'x = 1',
     'web/CLAUDE.md': '#',
+    '.github/CODEOWNERS': '/scraper/ @a\n/analytics/ @b\n/web/ @c\n',
   });
   const problems = checkDocs(root);
   assert.equal(problems.length, 1);
@@ -88,4 +89,88 @@ test('skips generated OpenSpec skills and node_modules', () => {
     'node_modules/p/README.md': '[bad](nope.md)',
   });
   assert.deepEqual(checkDocs(root), []);
+});
+
+// ---- CODEOWNERS is the only place that says who owns which path ----
+
+const OWNERS_OK = '# comment\n/scraper/ @hen68\n/web/ @kacpermalczyk\n/api/ @Yufukfu @org/team\n';
+
+test('a service directory needs a CODEOWNERS file', () => {
+  const problems = checkDocs(repo({ 'scraper/CLAUDE.md': '#' }));
+  assert.equal(problems.length, 1);
+  assert.match(problems[0].problem, /\.github\/CODEOWNERS/);
+});
+
+test('every existing service directory needs a CODEOWNERS line with a handle; infra/ is shared', () => {
+  const root = repo({
+    'scraper/CLAUDE.md': '#', 'web/CLAUDE.md': '#', 'api/CLAUDE.md': '#', 'infra/CLAUDE.md': '#',
+    '.github/CODEOWNERS': OWNERS_OK,
+  });
+  assert.deepEqual(checkDocs(root), []);
+});
+
+test('flags a service directory missing from CODEOWNERS, a commented-out line and a line with no handle', () => {
+  const root = repo({
+    'scraper/CLAUDE.md': '#', 'web/CLAUDE.md': '#', 'api/CLAUDE.md': '#',
+    '.github/CODEOWNERS': '# /scraper/ @hen68\n/web/ # @kacpermalczyk\n/api/ hen68\n',
+  });
+  const problems = checkDocs(root).map((p) => p.problem).sort();
+  assert.equal(problems.length, 3, problems.join('\n'));
+  for (const dir of ['api', 'scraper', 'web']) assert.ok(problems.some((p) => p.includes(`/${dir}/`)), dir);
+});
+
+test('a CODEOWNERS pattern only covers its own directory', () => {
+  const root = repo({ 'web/CLAUDE.md': '#', '.github/CODEOWNERS': '/web-old/ @a\nweb/ @b\n' });
+  assert.equal(checkDocs(root).length, 1);
+});
+
+const OWNERSHIP = [
+  '# scraper (Adam\'s module)',
+  '- **Owner:** Damian',
+  'Shared infrastructure, owned by Kacper.',
+  'Schema from migrations (`api`, owner Damian).',
+  'Modules: `infra/` (owner Kacper).',
+  'ownership by directory (`scraper/` Adam, `web/` Kacper).',
+  'scheduler -> scraper (Adam) -> analytics',
+  'Rules for the web dashboard, Kacper\'s module.',
+  'Modules: web/ frontend (Kacper).',
+  'analytics/ (Damian; an api/ folder later).',
+  '| Folder | Purpose | Owner |',
+];
+
+test('flags each per-person ownership statement in a live doc, with its line', () => {
+  for (const [i, line] of OWNERSHIP.entries()) {
+    const problems = checkDocs(repo({ '.docs/a.md': `ok\n${line}\n` }));
+    assert.equal(problems.length, 1, `${line} -> ${JSON.stringify(problems)}`);
+    assert.equal(problems[0].line, 2, line);
+    assert.match(problems[0].problem, /ownership/, `case ${i}`);
+  }
+});
+
+test('history, in-flight changes, prose about work and spec scenario steps may name people', () => {
+  const body = OWNERSHIP.join('\n');
+  const root = repo({
+    '.docs/decisions/0101-x.md': body,
+    '.docs/decisions/README.md': '0101-x.md',
+    '.docs/ai-workflow.md': body,
+    'openspec/changes/some-change/proposal.md': body,
+    'api/README.md': 'Scraper (Adam), insert a document. Kacper\'s review of PR #35. Fixed (Adam, PR #48). In mock-api (Adam, PR #48).',
+    'openspec/specs/x/spec.md': '- **GIVEN** `analytics/` is owned by Damian\n- **THEN** the result is Adam\n',
+    'README.md': 'Owners: [`.github/CODEOWNERS`](.github/CODEOWNERS)',
+    '.github/CODEOWNERS': '/api/ @Yufukfu\n',
+    'api/CLAUDE.md': '#',
+  });
+  assert.deepEqual(checkDocs(root), []);
+});
+
+test('also reads openspec/config.yaml and compose.yaml headers', () => {
+  const root = repo({
+    'openspec/config.yaml': 'context: |\n  Modules: scraper/ (owner Adam)\n',
+    'api/compose.yaml': '# api/ deployment unit (owner Damian).\n',
+    'compose.yaml': '# root compose\n',
+    'api/CLAUDE.md': '#',
+    '.github/CODEOWNERS': '/api/ @Yufukfu\n',
+  });
+  const files = checkDocs(root).map((p) => `${p.file}:${p.line}`).sort();
+  assert.deepEqual(files, ['api/compose.yaml:1', 'openspec/config.yaml:2']);
 });
