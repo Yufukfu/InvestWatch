@@ -14,9 +14,9 @@
 
 ## 3. API filter
 
-- [ ] 3.1 Failing tests first (real Postgres): two findings on one document plus another document; `document_id` alone, with `module=`, with `sort` + pagination, unknown UUID, malformed value (422 naming `document_id`); the response validates against `contracts/openapi.yaml`
-- [ ] 3.2 `routes/findings.py`: `document_id: UUID | None` adds `findings.c.document_id == document_id`; `app.py` version 1.1.0
-- [ ] 3.3 Mutation check. mutations: _
+- [x] 3.1 Failing tests first (real Postgres): two findings on one document plus another document; `document_id` alone, with `module=`, with `sort` + pagination, unknown UUID, malformed value (422 naming `document_id`); the response validates against `contracts/openapi.yaml`
+- [x] 3.2 `routes/findings.py`: `document_id: UUID | None` adds `findings.c.document_id == document_id`; `app.py` version 1.1.0
+- [x] 3.3 Mutation check. mutations: 3 tried, 3 caught
 
 ## 4. Closing tasks
 
