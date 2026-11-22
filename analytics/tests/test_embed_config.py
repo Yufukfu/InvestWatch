@@ -24,7 +24,8 @@ def test_blank_base_url_disables():
 def test_defaults():
     s = EmbedSettings.from_env({"EMBED_BASE_URL": URL})
     assert s.enabled and s.model == "bge-m3" and s.api_key == ""
-    assert (s.dim, s.timeout_s, s.max_chars, s.cache_ttl_s) == (1024, 5, 4000, 604800)
+    # 15 s: warm bge-m3 on a loaded 16-core CPU took 4.4-12.3 s per mock document (task 9.4, 2026-11-22).
+    assert (s.dim, s.timeout_s, s.max_chars, s.cache_ttl_s) == (1024, 15, 4000, 604800)
     assert (s.breaker_failures, s.breaker_cooldown_s) == (3, 60)
 
 
@@ -95,6 +96,11 @@ def test_key_over_plain_http_to_local_host_accepted():
 def test_bad_port_or_whitespace_rejected_at_startup(url):
     with pytest.raises(ConfigError, match="EMBED_BASE_URL"):
         EmbedSettings.from_env({"EMBED_BASE_URL": url})
+
+
+def test_default_timeout_fits_the_default_llm_budget_and_claim_idle():
+    """LLM_DOC_BUDGET_S 40 + 3 s connect + the default embeddings timeout stays below the 60 s claim idle."""
+    EmbedSettings.from_env({"EMBED_BASE_URL": URL}, claim_min_idle_ms=60000, llm_doc_budget_s=43)
 
 
 def test_budget_with_llm_must_stay_below_claim_idle():

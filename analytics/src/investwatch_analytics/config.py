@@ -260,7 +260,7 @@ class EmbedSettings:
     model: str = "bge-m3"
     api_key: str = field(default="", repr=False)  # never in a repr, log or error message
     dim: int = 1024
-    timeout_s: float = 5
+    timeout_s: float = 15  # warm bge-m3 on a loaded CPU: 4-12 s per document (task 9.4)
     max_chars: int = 4000
     cache_ttl_s: int = 604800
     breaker_failures: int = 3
@@ -295,7 +295,7 @@ class EmbedSettings:
             model=model,
             api_key=api_key,
             dim=int(_positive_number(env, "EMBED_DIM", 1024, integer=True)),
-            timeout_s=_positive_number(env, "EMBED_TIMEOUT_S", 5),
+            timeout_s=_positive_number(env, "EMBED_TIMEOUT_S", 15),
             max_chars=int(_positive_number(env, "EMBED_MAX_CHARS", 4000, integer=True)),
             cache_ttl_s=int(_positive_number(env, "EMBED_CACHE_TTL_S", 604800, integer=True)),
             breaker_failures=int(_positive_number(env, "EMBED_BREAKER_FAILURES", 3, integer=True)),
