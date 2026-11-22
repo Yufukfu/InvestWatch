@@ -11,6 +11,7 @@ Service security notes, the aggregated scan at a milestone or the hand-in, and r
 | 2026-11-21 | scraper (`scraper-stack`) | `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt` (pip-audit 2.10.1; noble-tls 0.1.9, arq 0.28.0, croniter 7.0.0, redis 5.3.1, asyncpg 0.30.0, minio 7.2.15, lxml 6.1.3) | No known vulnerabilities found |
 | 2026-11-21 | analytics (`analytics-worker-review-fixes`) | `pip-audit -r analytics/requirements.txt -r analytics/requirements-dev.txt` (pip-audit 2.10.1; psycopg[binary] 3.3.9, redis 8.1.0, fakeredis 2.40.0) | No known vulnerabilities found |
 | 2026-11-21 | api (`api-v1`) | `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` (pip-audit 2.10.1; FastAPI 0.165.0, python-socketio 5.18.1, redis 8.1.0, minio 7.2.20) | No known vulnerabilities found |
+| 2026-11-22 | scraper (`scraper-social-x-youtube`) | `pip-audit -r scraper/requirements.txt -r scraper/requirements-dev.txt` (pip-audit 2.10.1; adds scweet 5.8.3 with curl_cffi 0.17.0, pydantic 2.14.4, sqlmodel 0.0.50, SQLAlchemy 2.1.9, beautifulsoup4 4.15.0, XClientTransaction 1.0.3; youtube-transcript-api 1.2.5) | No known vulnerabilities found |
 | 2026-11-21 | api (`api-db-schema`) | `pip-audit -r api/requirements.txt -r api/requirements-dev.txt` (pip-audit 2.10.1) | No known vulnerabilities found |
 
 ## Service notes

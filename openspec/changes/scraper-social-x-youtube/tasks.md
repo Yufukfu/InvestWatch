@@ -5,7 +5,7 @@
 - [x] 1.1 Gate: install `scweet==5.8.3` in the scraper image, read its real API, count its real calls for one account, check display name and follower count are returned and `pip show` its dependencies; if it needs a browser or an unpinnable dependency or hides call control, switch to `twscrape==0.21.0` and write the switch into `design.md` decision 5
 - [x] 1.2 Gate: through our fetch layer (scratch script in the scraper image, nothing committed) request the channel page of `@UKNFpolska` and one watch page; if the channel page ends in the consent redirect and a consent cookie in the identity does not fix it, cut group 4 and the YouTube seed from this change and say so in `design.md` decision 6, the proposal and ADR 0109's consequences
 - [ ] 1.3 Save the real responses as fixtures (`tests/fixtures/x_timeline_uknf.json`, `youtube_channel_uknf.html`, `youtube_watch_uknf.html`) with cookies, `visitorData`, tokens and viewer fields removed; the secret-scan test of group 2 must pass on them
-- [ ] 1.4 Pin the chosen X library and `youtube-transcript-api==1.2.5` in `requirements.txt`, run `pip-audit`, add the rows to `.docs/security-audit.md`
+- [x] 1.4 Pin the chosen X library and `youtube-transcript-api==1.2.5` in `requirements.txt`, run `pip-audit`, add the rows to `.docs/security-audit.md`
 
 ## 2. Dispatch, secrets and config
 
