@@ -408,6 +408,8 @@ rules:
         - '\b(?:opłat|prowizj|koszt|obciąż)\w*\s+(?:\w+\s+){0,3}(?:obniżaj|pomniejszaj|zmniejszaj|wpływaj)\w*'
         - '\b(?:net|gross)\s+of\s+(?:fees|charges|costs)\b'
         - '\b(?:before|after|excluding|including)\s+(?:all\s+)?(?:fees|charges|costs)\b'
+        # "po opłatach" / "po wszystkich kosztach" = after fees (analytics-m2-visual-rules: the gold R13 page, once detected)
+        - '\bpo\s+(?:wszystkich\s+)?(?:opłat|prowizj|koszt|obciąż)\w*'
       # Checked in the past-performance sentences; a sentence anywhere that also says "denominowany" counts too.
       foreign_currency_patterns:
         - '\b(?:EUR|USD|CHF|GBP|JPY)\b'

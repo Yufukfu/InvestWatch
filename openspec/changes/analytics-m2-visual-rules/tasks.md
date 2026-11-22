@@ -28,7 +28,7 @@ Order R5, then R7, R8 and R13 (feature freeze Sun 08:00). If time runs short, sh
 
 - [x] 4.1 Write the failing tests for every R13 scenario and the "Past year range" scenario.
 - [x] 4.2 Add the closed year range to `_PastPerformance`, implement R13. Tests green.
-- [x] 4.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 15 tried, 15 caught` (the year-range end bound and the range itself; sentence and figure links; the visibility filter; largest-font tie; the first-block size bound and the first-block check; position vs list order; worst viewport; the quote; the three not-applicable cases). First run one survivor (sentence containment, redundant for `%` figures); an amount-only test was added.
+- [x] 4.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 15 tried, 15 caught` (the year-range end bound and the range itself; sentence and figure links; the visibility filter; largest-font tie; the first-block size bound and the first-block check; position vs list order; worst viewport; the quote; the three not-applicable cases). First run one survivor (sentence containment, redundant for `%` figures); an amount-only test was added. R13 review fix (a fee or tax percentage never links a headline; `blank_exclusions` as in the detector) and the coordinator's detector checks (non-gold year-range wording with an en dash, a range that is not over yet, R12b reads Polish "po opłatach" as a fee statement): `mutations: 4 tried, 4 caught`. Over the 69 gold and 10 mock documents the detector change alters 3 results, all on gold `m2-r13-past-performance-dominates`: R12a, R12b and R14 go from `not_applicable` to `pass`.
 
 ## 5. Closing
 

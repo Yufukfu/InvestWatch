@@ -18,6 +18,7 @@ from .m2 import (
     VIEWPORTS,
     _PastPerformance,
     _RiskWarnings,
+    blank_exclusions,
     locate,
     locator_for,
     weighted_median,
@@ -228,6 +229,8 @@ class R13PastPerformanceDominance(_PastPerformance):
     rule_id = "R13"
 
     def _figures(self, text: str) -> set[str]:
+        """Return figures only: fee and tax percentages are blanked out first, as the detector does."""
+        text = blank_exclusions(text, self._pp["figure_x"])
         return {_figure_key(m.group(0)) for p in self._pp["figure"] for m in p.finditer(text)}
 
     def _quote(self, ctx: Context, b: Block, sentences: list) -> str | None:

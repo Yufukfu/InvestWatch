@@ -399,3 +399,38 @@ def test_r13_amount_only_past_performance_block_is_detected(registry, catalogue)
     r = run(text, registry, catalogue, blocks=blocks)["R13"]
     assert r.result == "fail"
     assert r.evidence == claim
+
+
+# ---- detector year range: effect on R12a, R12b and R14 (wording not in the gold set) ---------------
+
+
+def test_year_range_with_en_dash_triggers_the_past_performance_rules(registry, catalogue):
+    text = ("Fundusz Akcji Rynków Wschodzących 2019–2023: średnio 6,4% rocznie. "
+            "Wyniki historyczne nie są gwarancją przyszłych wyników.")
+    r = run(text, registry, catalogue)
+    assert r["R14"].result == "pass"
+    assert r["R12a"].result != "not_applicable" and r["R12b"].result != "not_applicable"
+    assert r["R12a"].evidence == "Fundusz Akcji Rynków Wschodzących 2019–2023: średnio 6,4% rocznie."
+
+
+def test_year_range_reaching_past_the_fetch_year_is_not_past_performance(registry, catalogue):
+    text = "Portfel modelowy 2023–2027: stopa zwrotu 7% rocznie."  # fetched in 2026: the range is not over yet
+    r = run(text, registry, catalogue)
+    assert r["R12a"].result == r["R12b"].result == r["R14"].result == "not_applicable"
+
+
+@pytest.mark.parametrize("fee", ["po opłatach", "po wszystkich kosztach", "po prowizjach"])
+def test_r12b_after_fees_in_polish_is_a_fee_statement(registry, catalogue, fee):
+    text = f"Portfel w latach 2021-2025 zyskał 120% ({fee}, w PLN). {PP_DISCLAIMER}"
+    assert run(text, registry, catalogue)["R12b"].result == "pass"
+
+
+def test_r13_a_fee_figure_in_the_past_sentence_is_not_linked(registry, catalogue):
+    past = "W 2025 r. fundusz zarobił 12%, a opłata za zarządzanie wyniosła 0%."
+    text = f"Prowizja 0% na start! Bank Kwarcowy S.A. Reklama. {past} {PP_DISCLAIMER}"
+    blocks = [block("Prowizja 0% na start!", size=48, bbox=(0, 0, 800, 60)),
+              block(f"Bank Kwarcowy S.A. Reklama. {past} {PP_DISCLAIMER}", size=16, bbox=(0, 80, 800, 80))]
+    assert run(text, registry, catalogue, blocks=blocks)["R13"].result == "pass"
+    blocks[0]["text"] = "Zarobiliśmy 12%!"
+    assert run(text.replace("Prowizja 0% na start!", "Zarobiliśmy 12%!"), registry, catalogue,
+               blocks=blocks)["R13"].result == "fail"
