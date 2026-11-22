@@ -16,6 +16,7 @@
 | Store, dedup and announce a document (DB, MinIO, `iw:documents`, republish sweep) | [../scraper/CLAUDE.md](../scraper/CLAUDE.md) (Ingest), [decisions/0104-ingest-order-and-republish-sweep.md](decisions/0104-ingest-order-and-republish-sweep.md) |
 | Produce or consume a finding | [integration-plan.md](integration-plan.md) §4, then [../analytics/CLAUDE.md](../analytics/CLAUDE.md) |
 | Run or operate the analytics worker (env, feeding a document, poison messages, `/health`, registry) | [../analytics/README.md](../analytics/README.md) "Run the worker" and "Configuration", then [../openspec/specs/document-stream-worker/spec.md](../openspec/specs/document-stream-worker/spec.md) |
+| Switch the LLM between hosted Gemma (Gemini API) and local Gemma (Ollama, `--profile llm`) | [../analytics/README.md](../analytics/README.md) "LLM: hosted Gemma or local Ollama", then [decisions/0317-hosted-llm-gemma-on-gemini-api.md](decisions/0317-hosted-llm-gemma-on-gemini-api.md) |
 | Refresh or check the KNF firm registry (`registry/knf.csv`, curated domains, ids) | [../analytics/registry/README.md](../analytics/registry/README.md), then [decisions/0311-knf-registry-source-and-ids.md](decisions/0311-knf-registry-source-and-ids.md) |
 | Build or call the REST API | [integration-plan.md](integration-plan.md) §5 |
 | Know what the API does beyond the contract (risk level, filters, calibration, Socket.IO relay, limits) | [../api/README.md](../api/README.md) "REST and Socket.IO", then [../openspec/specs/rest-api/spec.md](../openspec/specs/rest-api/spec.md) and [../openspec/specs/event-relay/spec.md](../openspec/specs/event-relay/spec.md) |
@@ -27,6 +28,7 @@
 | Work on the analytics pipeline, rules R1-R18, LLM layer or calibration | [analytics-plan.md](analytics-plan.md) §2, §5, §7, §8 |
 | Know which module a document goes to, or change the M1/M3 signals (S1.x, S3.x) | [../analytics/README.md](../analytics/README.md) "Modules and routing", then [../openspec/specs/m1-third-party-signals/spec.md](../openspec/specs/m1-third-party-signals/spec.md), [../openspec/specs/m3-unauthorized-advice-signals/spec.md](../openspec/specs/m3-unauthorized-advice-signals/spec.md) and [decisions/0308-m3-s34-gate.md](decisions/0308-m3-s34-gate.md) |
 | Add or relabel a gold-set document, run the evaluation | [../analytics/eval/README.md](../analytics/eval/README.md), then [../analytics/README.md](../analytics/README.md) "Gold-set evaluation" |
+| Get the analytics slide content for the hand-in PDF (M1/M2/M3, gold-set numbers, add-a-rule example, LLM swap) | [presentation-analytics.md](presentation-analytics.md) |
 | Read the UKNF challenge and the 18 rules | the Polish materials in [../doc/](../doc/) (read-only, removed before hand-in) |
 | Use or change a contract (a change needs the whole team and a version bump) | [../contracts/README.md](../contracts/README.md), [../contracts/CLAUDE.md](../contracts/CLAUDE.md), [integration-plan.md](integration-plan.md) §3-§6 |
 | Scan dependencies, vet a new package, fix a vulnerability, or keep a secret out of git | [supply-chain.md](supply-chain.md), results in [security-audit.md](security-audit.md), why in [decisions/0209-supply-chain-scanning.md](decisions/0209-supply-chain-scanning.md) |
@@ -35,6 +37,7 @@
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
 | Update docs after a change | [../.claude/skills/iw-docs-update/SKILL.md](../.claude/skills/iw-docs-update/SKILL.md) |
 | Log AI usage for the jury | [ai-workflow.md](ai-workflow.md) |
+| Let my agent watch GitHub for reviews, review requests and hand-offs from teammates' agents | [../.claude/skills/iw-watch/SKILL.md](../.claude/skills/iw-watch/SKILL.md) |
 
 ## Rules
 

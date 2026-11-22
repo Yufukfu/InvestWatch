@@ -3,7 +3,7 @@
 Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M1–M3, LLM integration.
 
 - **Owner:** Damian
-- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. No LLM yet (`model.llm = null`): S1.5 is always `uncertain`, and S3.3/S3.4 are `uncertain` when the rules find a candidate phrase, `pass` otherwise, until it lands.
+- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. LLM layer (change `analytics-llm-p0`): checks the rules defer go to an OpenAI-compatible model, hosted Gemma 4 by default, local Gemma through Ollama as the swap (section "LLM: hosted Gemma or local Ollama" below). Without a reachable model every finding is rules-only (`model.llm = null`, the summary ends with "Tryb regułowy (bez modelu językowego).").
 - **Registry:** the default registry is `registry/knf.csv`, the real KNF register of investment firms (749 firms, snapshot of 2026-11-21; change `analytics-knf-registry`). At start-up the worker logs `registry_loaded` with the snapshot date. R1 passes only on a firm's official name; a former or trade name alone makes it `uncertain`. `registry/seed.csv` (4 fictional firms) is the test fixture: it logs a `registry_seed` WARNING if used, and M3 findings then add "(dane demonstracyjne)" (`Registry.demo`: no firm has a `source_url`). Files, source and refresh: [`registry/README.md`](registry/README.md).
 - **Privacy:** rule `evidence` and `advertiser` copy scraped author names, handles, profile and referral links verbatim (cut to 200-300 characters) into `findings`, and the `iw:events` messages carry the title, which names the advertiser, so treat them as personal data taken from public posts.
 - **Evaluation:** gold-set evaluation (change `analytics-eval-calibration`): `eval/gold.jsonl`, `python eval/run.py`, and the one-shot `analytics-eval` service that feeds the calibration panel (section "Gold-set evaluation" below).
@@ -33,6 +33,52 @@ docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XADD 
 ```
 
 Per message the worker loads the row, runs the pipeline, saves all findings in one transaction, publishes the events and only then acknowledges (XACK). A redelivery or a second message for the same document updates the finding (`(document_id, module)`) and publishes nothing. A malformed message, a missing row or an invalid document is logged and acknowledged; an unexpected error is retried up to `MAX_DELIVERIES`; a Postgres or Redis outage is retried with backoff and never acknowledged. `GET /health` on port 8001 (inside the stack only) answers 200 or 503 with `redis` / `db` flags. Specs: [`document-stream-worker`](../openspec/specs/document-stream-worker/spec.md), [`finding-storage`](../openspec/specs/finding-storage/spec.md), [`finding-events`](../openspec/specs/finding-events/spec.md); design and review follow-ups: [`openspec/changes/archive/2026-11-21-analytics-worker/`](../openspec/changes/archive/2026-11-21-analytics-worker/design.md).
+
+## LLM: hosted Gemma or local Ollama
+
+The model is chosen by env only, in the root `.env` (compose passes it to `analytics`; [ADR 0304](../.docs/decisions/0304-llm-serving.md), [ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)). Empty `LLM_BASE_URL` means rules-only. At start-up the worker logs `llm_mode` (`hosted`, `local` or `disabled`) and the model, never the key. If the endpoint fails (timeout, 429, 503, malformed answer), the circuit breaker opens after `LLM_BREAKER_FAILURES` failures and findings are rules-only until it closes; there is no automatic switch to another model.
+
+**Hosted (default): Gemma 4 on the Gemini API.** Put these in the root `.env`:
+
+```bash
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_MODEL=gemma-4-31b-it            # gemma-4-26b-a4b-it if 31b keeps returning 503 "high demand"
+LLM_API_KEY=<Gemini API key>        # only in .env, never committed
+LLM_TIMEOUT_S=45
+LLM_DOC_BUDGET_S=50
+CLAIM_MIN_IDLE_MS=90000
+```
+
+**Local: Gemma through Ollama (`--profile llm`).**
+
+1. In the root `.env`, comment out the hosted lines and set:
+
+   ```bash
+   LLM_BASE_URL=http://ollama:11434/v1   # internal host on the data network, plain http is allowed
+   LLM_MODEL=gemma3:4b
+   LLM_API_KEY=ollama                    # any non-empty value; Ollama does not check it
+   LLM_TIMEOUT_S=120                     # a small model on CPU is much slower than the hosted one
+   LLM_DOC_BUDGET_S=180
+   CLAIM_MIN_IDLE_MS=240000              # must stay above (LLM_DOC_BUDGET_S + 3) * 1000 or the worker exits
+   LLM_MAX_CHUNKS=2                      # fewer calls on long pages
+   ```
+
+   `OLLAMA_MODEL=gemma3:4b` and `OLLAMA_CONTEXT_LENGTH=8192` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
+
+2. Pull the model once (about 3.3 GB), then start the stack with the profile:
+
+   ```bash
+   docker compose --profile llm up ollama-pull
+   docker compose --profile llm up -d
+   # stack already running: recreate only what changed
+   docker compose --profile llm up -d ollama analytics
+   ```
+
+3. Check: `docker compose logs analytics | grep llm_mode` shows `local`, and findings decided with the model carry `model.llm = "gemma3:4b"`.
+
+**Back to hosted:** restore the hosted lines and limits, then `docker compose up -d analytics`.
+
+Notes: the LLM cache key includes the model, so after a switch pages are analysed again. The default thresholds were measured rules-only (ADR 0316, 0317); quality on `gemma3:4b` is not measured.
 
 ## Gold-set evaluation (calibration panel)
 
@@ -103,7 +149,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 | `MAX_DELIVERIES` | `5` | unexpected errors on one message before it is acknowledged as `max_deliveries_exceeded` |
 | `HEALTH_PORT` | `8001` | `/health` |
 | `MAX_DOCUMENT_BYTES` | `2000000` | a bigger document (`text` + `payload`) is acknowledged as `invalid_document` instead of risking an out-of-memory kill |
-| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | empty | reserved for the LLM client (ADR 0304); unused, rules-only |
+| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | empty (rules-only) | the LLM endpoint; hosted and local values in "LLM: hosted Gemma or local Ollama" above, limits (`LLM_TIMEOUT_S`, `LLM_DOC_BUDGET_S`, `LLM_MAX_CHUNKS`, cache and breaker) in [`.env.example`](.env.example) |
 | `CONTRACTS_DIR`, `TEST_DATABASE_URL` (or CI's `TEST_DATABASE_ADMIN_URL`), `TEST_REDIS_URL` (or CI's `IW_TEST_REDIS_URL`) | unset | tests only |
 
 ## Where things are
