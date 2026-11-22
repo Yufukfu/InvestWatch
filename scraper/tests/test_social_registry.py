@@ -97,3 +97,9 @@ def test_registration_names_a_parser_or_a_flow_not_both_and_not_neither(kwargs):
     parse = kwargs.get("parse")
     with pytest.raises(ValueError, match="parser or a flow"):
         reg.register("x.com", parse, flow=kwargs.get("flow"))
+
+
+def test_home_ip_mode_needs_a_flow():
+    reg = CollectorRegistry()
+    with pytest.raises(ValueError, match="home_ip"):
+        reg.register("x.com", collector, home_ip=True)

@@ -37,6 +37,8 @@ class CollectorRegistry:
     ) -> None:
         if (parse is None) == (flow is None):
             raise ValueError("a registration names a page parser or a flow, not both and not neither")
+        if home_ip and flow is None:
+            raise ValueError("home_ip applies to a flow only")
         key = host_key(host.lower())
         if key in self._by_host:
             raise ValueError(f"a collector is already registered for {key}")
