@@ -97,11 +97,11 @@ The collector SHALL request the transcript of a video once, through the proxy `Y
 - **THEN** no transcript request is made, a log line says transcripts are off and the documents carry title and description only
 
 #### Scenario: Block on a transcript
-- **WHEN** a transcript request is refused with an IP block or a rate limit
+- **WHEN** a transcript request is refused with an IP block or a rate limit, or the proxy stalls past the request timeout
 - **THEN** that video's `scrape_meta.transcript` is `failed`, no further transcript is requested in the run, and the remaining videos are collected with `none`
 
 #### Scenario: Other transcript failure
-- **WHEN** a transcript request fails with a proxy timeout or an unknown library error
+- **WHEN** a transcript request fails with a request error or an unknown library error
 - **THEN** that video's `scrape_meta.transcript` is `failed` and the next video's transcript is still requested
 
 ### Requirement: Failures never produce a document
