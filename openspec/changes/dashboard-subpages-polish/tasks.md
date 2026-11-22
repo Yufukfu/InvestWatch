@@ -17,4 +17,4 @@
 ## 3. Closing
 
 - [x] 3.1 Apply `iw-docs-update` (`.docs/status/dashboard.md`, specs) and add the AI-log entry
-- [ ] 3.2 Run the `iw-pr-review` skill and fix real findings
+- [x] 3.2 Run the `iw-pr-review` skill and fix real findings (iw-reviewer on `47b00e99..f8f093c1`: no blocking findings; its one "could not check", a focus ring around the script-focused main region, was removed with `main:focus { outline: none }`)

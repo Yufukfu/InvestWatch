@@ -95,6 +95,8 @@
 body { margin: 0; }
 h1, h2, h3 { line-height: 1.2; font-family: var(--font-display); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The page container takes focus from script after a page change; it is not a control, so it gets no ring. */
+main:focus { outline: none; }
 ::placeholder { color: var(--placeholder); opacity: 1; }
 .muted { color: var(--muted); }
 /* Links: colour and weight, no underline at rest; hover darkens, keyboard focus gets the ring above. */
