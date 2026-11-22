@@ -4,16 +4,16 @@
 
 - [x] 1.1 Gate: install `scweet==5.8.3` in the scraper image, read its real API, count its real calls for one account, check display name and follower count are returned and `pip show` its dependencies; if it needs a browser or an unpinnable dependency or hides call control, switch to `twscrape==0.21.0` and write the switch into `design.md` decision 5
 - [x] 1.2 Gate: through our fetch layer (scratch script in the scraper image, nothing committed) request the channel page of `@UKNFpolska` and one watch page; if the channel page ends in the consent redirect and a consent cookie in the identity does not fix it, cut group 4 and the YouTube seed from this change and say so in `design.md` decision 6, the proposal and ADR 0109's consequences
-- [ ] 1.3 Save the real responses as fixtures (`tests/fixtures/x_timeline_uknf.json`, `youtube_channel_uknf.html`, `youtube_watch_uknf.html`) with cookies, `visitorData`, tokens and viewer fields removed; the secret-scan test of group 2 must pass on them
+- [x] 1.3 Save the real responses as fixtures (`tests/fixtures/x_timeline_uknf.json`, `youtube_channel_uknf.html`, `youtube_watch_uknf.html`) with cookies, `visitorData`, tokens and viewer fields removed; the secret-scan test of group 2 must pass on them
 - [x] 1.4 Pin the chosen X library and `youtube-transcript-api==1.2.5` in `requirements.txt`, run `pip-audit`, add the rows to `.docs/security-audit.md`
 
 ## 2. Dispatch, secrets and config
 
-- [ ] 2.1 Test first (`scraper/tests/test_social_dispatch.py`): a registration with no parser dispatches to its flow by platform; Telegram and web runs still read robots and use the identity, session and rotation; an X run reads no `robots.txt`, draws no identity and takes no proxy, but passes the URL guard and one `wait_turn`; a wrong URL or platform is `invalid_request` with no request
-- [ ] 2.2 Split `run_source` and `_collect` per flow: robots check inside the fetch-path flows, X flow before identity and proxy; `Registration.parse` optional; `Post.extra` and its pass-through in `build_page`
-- [ ] 2.3 Test first: secret scan of `scraper/tests/fixtures/` (`auth_token`, `ct0` with a value, a `cookie:` header, `visitorData`, `user:password@`); config reads `YOUTUBE_MAX_VIDEOS`, `YT_TRANSCRIPT_PROXY`, `X_AUTH_TOKEN`, `X_CT0` with validation, and no config error, log line, exception or traceback contains a value (reuse `ingest.errors.redact` and extend it to bare token values and proxy hosts where it does not cover them)
-- [ ] 2.4 `config.py` readers, `app.py` wiring into the flows, `compose.yaml` pass-through (including the X library's telemetry switch if it has one), `.env.example` entries without values; check the image builds with the chosen library's native wheels
-- [ ] 2.5 Mutation check — mutations: N tried, N caught
+- [x] 2.1 Test first (`scraper/tests/test_social_dispatch.py`): a registration with no parser dispatches to its flow by platform; Telegram and web runs still read robots and use the identity, session and rotation; an X run reads no `robots.txt`, draws no identity and takes no proxy, but passes the URL guard and one `wait_turn`; a wrong URL or platform is `invalid_request` with no request
+- [x] 2.2 Split `run_source` and `_collect` per flow: robots check inside the fetch-path flows, X flow before identity and proxy; `Registration.parse` optional; `Post.extra` and its pass-through in `build_page`
+- [x] 2.3 Test first: secret scan of `scraper/tests/fixtures/` (`auth_token`, `ct0` with a value, a `cookie:` header, `visitorData`, `user:password@`); config reads `YOUTUBE_MAX_VIDEOS`, `YT_TRANSCRIPT_PROXY`, `X_AUTH_TOKEN`, `X_CT0` with validation, and no config error, log line, exception or traceback contains a value (reuse `ingest.errors.redact` and extend it to bare token values and proxy hosts where it does not cover them)
+- [ ] 2.4 `config.py` readers, `app.py` wiring into the flows, `compose.yaml` pass-through (including the X library's telemetry switch if it has one), `.env.example` entries without values; check the image builds with the chosen library's native wheels (compose pass-through, `.env.example` and the wheel build are done; the `app.py` wiring waits for the flows of groups 3 and 4)
+- [x] 2.5 Mutation check — mutations: 14 tried, 14 caught
 
 ## 3. X collector
 
