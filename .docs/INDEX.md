@@ -6,7 +6,8 @@
 
 | I want to… | Open |
 |---|---|
-| See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then your domain: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
+| See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then the file for your directories: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
+| See who owns a directory, or who to ask for review | [`.github/CODEOWNERS`](../.github/CODEOWNERS), the only place that names owners; shared areas (`.docs/`, `.claude/`, `openspec/`, `.github/`, root files) have none ([ADR 0211](decisions/0211-codeowners-single-source.md)) |
 | Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
 | Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
 | What exactly `content_hash` hashes (normalisation, who computes it) | [integration-plan.md](integration-plan.md) §3, [decisions/0105-content-hash-normalisation.md](decisions/0105-content-hash-normalisation.md) |
@@ -43,5 +44,5 @@
 
 - Don't duplicate. Link to the owning file and section.
 - A doc claim that matters gets checked against the code before it is relied on.
-- A new service directory gets its own `CLAUDE.md`, a row in the root [`CLAUDE.md`](../CLAUDE.md) services table and a row here.
+- A new service directory gets its own `CLAUDE.md`, a line in [`.github/CODEOWNERS`](../.github/CODEOWNERS), a row in the root [`CLAUDE.md`](../CLAUDE.md) services table and a row here.
 - `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` checks paths, the ADR index and service `CLAUDE.md` files.

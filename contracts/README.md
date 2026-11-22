@@ -99,7 +99,7 @@ Run it before merging any change to `contracts/`.
 
 ## Changing a contract
 
-1. Propose the change (OpenSpec change proposal) and agree it with the affected owners (Adam, Kacper, Damian).
+1. Propose the change (OpenSpec change proposal) and agree it with the whole team (contracts are shared by every module; owners in [`.github/CODEOWNERS`](../.github/CODEOWNERS)).
 2. Update the schema, `openapi.yaml`, the mock generator and regenerate mocks.
 3. `python contracts/validate.py` must pass.
 4. Breaking changes bump the version (`v2`) in the stream message `schema` field.

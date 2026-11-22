@@ -2,7 +2,7 @@
 
 REST API and real-time (Socket.IO) gateway between the shared database and the dashboard, and the home of the database migrations for the whole stack.
 
-- **Owner:** Damian
+- **Owners:** [`.github/CODEOWNERS`](../.github/CODEOWNERS)
 - **Status:** implemented: the shared schema (`api-db-schema`: Alembic `0001` tables, `0002` query indexes, `0003` non-empty `documents.text`, the one-shot `api-migrate`) and the REST API plus Socket.IO relay (`api-v1`, service `api`), both in `api/compose.yaml`, which the root `compose.yaml` includes. Redis and MinIO come from `infra/compose.yaml` (`infra-compose`, PR #18, which PR #21 is stacked on); a fresh `scripts/init-env.sh` `.env` is enough for `docker compose up`.
 
 ## What it does

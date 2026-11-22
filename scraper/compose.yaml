@@ -1,4 +1,4 @@
-# scraper/ deployment unit (owner Adam). Included from the root compose.yaml next to infra/compose.yaml, which owns
+# scraper/ deployment unit. Included from the root compose.yaml next to infra/compose.yaml, which owns
 # postgres, redis, minio-init and the data and egress networks, and api/compose.yaml, whose one-shot api-migrate
 # creates the tables. None of them is declared here.
 # Without the root file: docker compose -f infra/compose.yaml -f api/compose.yaml -f scraper/compose.yaml up worker scheduler

@@ -4,7 +4,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 ## Who owns which fact (edit the owner, link from elsewhere)
 
-| Fact | Owner |
+| Fact | Lives in |
 |---|---|
 | Hard rules (push, secrets, contracts) | `CLAUDE.md` |
 | Stage order, gates, which skill when | this file |
@@ -24,7 +24,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 
 | # | Stage | Tool | Gate |
 |---|---|---|---|
-| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md` and your domain file in `.docs/status/`, the owning spec | agent | none |
+| 0 | Intake: docs first (`CLAUDE.md`), `.docs/STATUS.md` and the `.docs/status/` file for your directories, the owning spec | agent | none |
 | 1 | Size, worktree, branch | `iw-implement` | branch prefix = module |
 | 2 | Explore (only if scope is foggy) | `/openspec-explore` | none |
 | 3 | Spec | `/openspec-propose` | human approves; `openspec validate --strict` |
@@ -47,7 +47,7 @@ Anything real but out of scope goes into the change's `follow-ups.md` with one d
 
 ## Parallel work
 
-Three people, three modules, a worktree per change, ownership by directory (`scraper/` Adam, `web/` Kacper, `analytics/` and `contracts/` Damian, plus `api/` once created). To limit merge conflicts: edit only your own domain file in `.docs/status/` (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by owner (A 01xx, Kacper 02xx, Damian 03xx); the AI log is one file per entry in `.docs/ai-log/` ([ADR 0212](../.docs/decisions/0212-ai-log-one-file-per-entry.md)). Touching another owner's directory or a frozen contract is announced in the team chat first.
+Three people, a worktree per change, ownership by directory in [`.github/CODEOWNERS`](../.github/CODEOWNERS) (the only place that names owners; shared areas have none, [ADR 0211](../.docs/decisions/0211-codeowners-single-source.md)). To limit merge conflicts: edit only the `.docs/status/` file for the directories you changed (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by person (Adam 01xx, Kacper 02xx, Damian 03xx); the AI log is one file per entry in `.docs/ai-log/` ([ADR 0212](../.docs/decisions/0212-ai-log-one-file-per-entry.md)). Touching a directory someone else owns in `CODEOWNERS`, or a frozen contract, is announced in the team chat first.
 
 ## Not adopted from Neopadel (on purpose)
 
