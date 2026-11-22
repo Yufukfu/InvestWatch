@@ -7,5 +7,5 @@
 
 ## 2. Close
 
-- [x] 2.1 `docker compose -f infra/compose.yaml --profile llm config` resolves the three values; `infra/tests/smoke.sh` passes without `SMOKE_LLM`
+- [x] 2.1 `docker compose -f infra/compose.yaml --profile llm config` resolves the three values, with and without the `.env.example` lines; `infra/tests/smoke.sh` without `SMOKE_LLM`: every `llm` check passes, 36 passed and 3 failed overall. The 3 failures are in the `parallel` and `dev-ports` groups and were caused by other stacks running on the same machine (gateway port `127.0.0.1:18080` already allocated, Postgres unhealthy under load), not by this change
 - [x] 2.2 Status row, AI log row, `docs-check`
