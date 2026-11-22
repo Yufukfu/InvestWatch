@@ -8,6 +8,7 @@ hints and the TLS profile, stops the process before any request is made.
 import random
 import re
 from collections.abc import Iterable
+from dataclasses import replace
 
 from noble_tls import Client
 
@@ -117,6 +118,29 @@ TABLE: tuple[Identity, ...] = load_table(
         _chrome("X11; Linux x86_64", "Linux"),
     )
 )
+
+
+def mobile_variant(identity: Identity, version: int | None = None) -> Identity:
+    """The Android Chrome identity that goes with a desktop Chrome one: same version, same TLS profile.
+
+    `version` defaults to the identity's own. The renderer needs no other value: it adapts the version to its
+    browser itself, so a different `version` here exists to prove that the pairing check catches a mismatch.
+    """
+    headers = dict(identity.headers)
+    match = _UA_VERSION["chrome"].search(headers.get("user-agent", ""))
+    if match is None:
+        raise ValueError("a mobile variant needs a Chrome identity")
+    chrome = version if version is not None else int(match.group(1))
+    changed = {
+        "sec-ch-ua": f'"Chromium";v="{chrome}", "Not-A.Brand";v="24", "Google Chrome";v="{chrome}"',
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": '"Android"',
+        "user-agent": (
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) "
+            f"Chrome/{chrome}.0.0.0 Mobile Safari/537.36"
+        ),
+    }
+    return replace(identity, headers=tuple((name, changed.get(name, value)) for name, value in identity.headers))
 
 
 def draw_identity(rng: random.Random | None = None) -> Identity:

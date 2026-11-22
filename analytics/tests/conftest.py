@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -62,6 +64,12 @@ def make_doc(**overrides) -> dict:
     }
     doc.update(overrides)
     return doc
+
+
+def stored_hash(text: str) -> str:
+    """`content_hash` as the scraper stores it (`.docs/integration-plan.md` §3, ADR 0105: NFC, whitespace runs
+    collapsed, trimmed, case kept), written out independently of any service. Analytics never computes this."""
+    return hashlib.sha256(" ".join(unicodedata.normalize("NFC", text).split()).encode("utf-8")).hexdigest()
 
 
 # ---- LLM test doubles (analytics-llm-p0): tests never call a real LLM ----------------------------

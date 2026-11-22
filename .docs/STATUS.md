@@ -7,9 +7,9 @@ Team-wide state only: milestones and decisions that need the whole team. Module 
 | When | Milestone | State |
 |---|---|---|
 | Sat 14:30 | Contracts v1 frozen, compose infra up | contracts: required core frozen, optional fields provisional until Sat 17:00 ([ADR 0301](decisions/0301-contracts-v1.md), accepted); compose infra: Postgres + HTTPS gateway up (Kacper, PR #6); Redis, object storage (MinIO, bucket `iw-raw`) and the optional Ollama profile `llm` in PR #18 (`infra-compose`, Damian) |
-| Sat 17:00 | Integration #1: one real document, end to end | not started |
-| Sat 22:00 | Integration #2: all modules, one source each | not started |
-| Sun 03:00 | Integration #3: calibration, scheduled scans | not started |
+| Sat 17:00 | Integration #1: one real document, end to end | analytics + api verified on a clean stack from `main` c810a14 (#78, 2026-11-22): scan request → scraper → `iw:documents` → analytics → `findings` + `iw:events` → `GET /api/findings` through the gateway. Dashboard part (Kacper) and scraper part (Adam) pending a rerun in #78. Scraper part (Adam, from the recorded run and code, no rerun): 17 seeded sources (13 web, 4 Telegram), 17 manual scan requests (all 202), documents from all 17 sources, 0 `job_errors` ([status/scraper.md](status/scraper.md), "Demo rehearsal") |
+| Sat 22:00 | Integration #2: all modules, one source each | analytics: M1, M2 and M3 all fire on real seeded sources (#78): 223 documents from 17 sources, 72 findings (M1 54, M2 5, M3 13), 10 `finding.high_risk` events, 0 analytics errors. Gaps: hosted LLM unavailable (1 of 5 calls OK, then breaker, 71 of 72 findings rules-only); one negative control (Grant Thornton) is high-risk M3 0.78 because S3.4 stays `uncertain` without the LLM. Scraper: all 17 sources scraped in one run, 223 documents (13 web pages, 210 from 4 Telegram channels by difference); no `blocks` or screenshots, because the renderer (PR #67) merged after the run and is off by default |
+| Sun 03:00 | Integration #3: calibration, scheduled scans | analytics: `analytics-eval` stores the gold-set run on `up`, `GET /api/calibration` returns the curve per module through the gateway (#78). Moving the threshold in the dashboard and scheduled scans not checked by analytics. Scraper: scheduled scans not checked (the run used manual scan requests only; `scheduler` logs not recorded) |
 | Sun 08:00 | Feature freeze | not started |
 | Sun 10:30 | Hand-in | not started |
 

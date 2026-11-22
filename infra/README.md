@@ -71,7 +71,7 @@ networks:
 ## Local LLM (optional)
 
 ```bash
-docker compose --profile llm up -d          # adds ollama and pulls gemma3:4b (several GB, Docker Hub)
+docker compose --profile llm up -d          # adds ollama and pulls gemma3:4b and bge-m3 (several GB, Docker Hub)
 docker compose --profile llm up ollama-pull # pre-pull before a demo
 ```
 
@@ -79,10 +79,13 @@ A plain `docker compose up` starts neither and downloads nothing.
 
 `ollama` runs with `OLLAMA_CONTEXT_LENGTH=8192` (override in `.env`). The OpenAI-compatible `/v1` endpoint cannot set the context length per request, and a stage-2 chunk (`analytics-llm-p0`, ADR 0304) is about 3k tokens plus the prompt. Ollama's own default context depends on the version and can be smaller, which truncates the input without an error to the client.
 
+`ollama-pull` pulls every model in `OLLAMA_MODELS` (space-separated, default `gemma3:4b bge-m3`; override in `.env`) and exits non-zero on the first failure. `bge-m3` (about 1.2 GB) serves `/v1/embeddings` for `analytics-embeddings` (ADR 0313); it is local only, with no hosted fallback. Without it analytics still runs with embeddings off. To add it to an existing volume, rerun `docker compose --profile llm up ollama-pull` (already pulled models are only checked). `docker compose exec ollama ollama pull bge-m3` does not work: the serving `ollama` is on `data` only, without internet. `ollama` keeps both models loaded side by side (`OLLAMA_MAX_LOADED_MODELS=2`) for 30 minutes after the last request (`OLLAMA_KEEP_ALIVE=30m`), so stage 2 and the embeddings do not evict each other on every document.
+
 ## Development helpers
 
 - **Host ports** (for a module or its tests running on the host): `docker compose -f compose.yaml -f infra/compose.dev-ports.yaml up -d` publishes Postgres, Redis and the object store on `127.0.0.1:15432`, `16379` and `19000` (`IW_DEV_*_PORT`). Loopback only. While the override is loaded these three services also have internet access. Local development only.
 - **Parallel worktrees:** set a different `COMPOSE_PROJECT_NAME` (for example `iw-<slug>`) and gateway ports (`IW_HTTPS_PORT`, `IW_HTTP_PORT`) in that worktree's `.env`.
+- **Image tags:** the built images (`investwatch/web`, `api`, `analytics`, `scraper`, `renderer`) are tagged with the compose project name (`investwatch/web:iw-<slug>`), so a stack never starts an image another checkout built (issue #63). `IW_VERSION=<version>` replaces that tag with an explicit release tag. The building services set `pull_policy: build`: every `docker compose up` rebuilds from this checkout (cached layers, seconds when nothing changed), and a failed build stops `up` instead of starting the previous image. `docker compose up --no-build` starts the last image of this project on purpose. Old per-project tags pile up; `docker image ls 'investwatch/*'` lists them.
 - **Smoke test:** `infra/tests/smoke.sh` checks this whole file against throwaway projects (`SMOKE_LLM=1` also pulls the model). It needs bash, Docker and Node, and runs on Linux, macOS and Git Bash. CI does not run it (`.github/workflows/ci.yml` has no Docker step), so run it locally before changing `infra/`.
 
 ## TLS locally

@@ -14,11 +14,13 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-22 (Sun
 - Web rules in `.claude/rules/web-dashboard.md`.
 - Supply chain ([ADR 0209](../decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): `.github/workflows/security.yml` (change `security-ci`) runs Gitleaks over the full history, OSV-Scanner (online on every PR; offline database by hand and on PRs that change `security.yml`), `pip-audit` and `npm audit` on every PR to `main`, not as a required check. Actions are pinned by SHA and images by digest, enforced by `.github/tests/workflow-pins.test.mjs`. `.gitleaks.toml` allowlists the two mock ids. Still open: SHA pins in `ci.yml` and digests for Postgres, Caddy and the Dockerfile bases.
 - Frontend layering ([ADR 0204](../decisions/0204-frontend-architecture.md)) applied to health, summary, findings and trend, with a lint check on components.
+- `infra/per-project-image-tags` (fix for issue #63, no OpenSpec change): the five built images are tagged `investwatch/<service>:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}` instead of a shared `:dev`, and the building services (`web`, `api-migrate`, `analytics`, `worker`, `renderer`) set `pull_policy: build`, so a plain `up` rebuilds and a failed build stops it instead of starting another checkout's or an older image. `IW_VERSION` still names a release tag. Touches `api/`, `analytics/` and `scraper/` compose files (one line each, owners asked to review). Details: `infra/README.md`, "Image tags".
 
 ## Active OpenSpec changes
 
+- web features: none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
+- `agent-watch` (branch `chore/agent-watch`, archived in its PR): the `iw-watch` skill and runner for agent-to-agent hand-offs through GitHub, plus `.github/CODEOWNERS` (owners need the team's OK in review).
 - `security-ci` (branch `chore/security-ci`): ADR 0209 scans in CI on every PR.
-- none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
 
 ## Blockers and open decisions
 
