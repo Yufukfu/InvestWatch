@@ -80,6 +80,45 @@ class R2AdLabel(Rule):
         )
 
 
+
+_ANY_EXCLUSION: dict[int, tuple[list, re.Pattern | None]] = {}
+_ANY_EXCLUSION_MAX = 256
+
+
+def _any_exclusion(exclude: list[re.Pattern]) -> re.Pattern | None:
+    """One alternation of the exclusions, to test in one search whether any of them occurs; None when they cannot
+    be combined safely (different flags, inline flags, or backreferences whose numbering would shift).
+
+    Cached per list object: the entry keeps the list alive and is checked by identity, so a reused id can never
+    return another list's alternation."""
+    entry = _ANY_EXCLUSION.get(id(exclude))
+    if entry is not None and entry[0] is exclude:
+        return entry[1]
+    combined = None
+    flags = {x.flags for x in exclude}
+    if exclude and len(flags) == 1 and not any(re.search(r"\\[1-9]|\(\?P=|\(\?[aiLmsux-]+\)", x.pattern) for x in exclude):
+        try:
+            combined = re.compile("|".join(f"(?:{x.pattern})" for x in exclude), flags.pop())
+        except re.error:
+            combined = None
+    if len(_ANY_EXCLUSION) >= _ANY_EXCLUSION_MAX:  # rule lists are long-lived; never grow without bound
+        _ANY_EXCLUSION.clear()
+    _ANY_EXCLUSION[id(exclude)] = (exclude, combined)
+    return combined
+
+
+def blank_exclusions(text: str, exclude: list[re.Pattern]) -> str:
+    """Each exclusion in turn replaced by a space, exactly as before, but skipped when none occurs in the text: if
+    no exclusion matches the original text, every sequential `sub` is a no-op (hostile-input timing, test_redos)."""
+    if not exclude:
+        return text
+    combined = _any_exclusion(exclude)
+    if combined is not None and combined.search(text) is None:
+        return text
+    for x in exclude:
+        text = x.sub(" ", text)
+    return text
+
 @register
 class R3RiskNextToReturns(Rule):
     rule_id = "R3"
@@ -122,8 +161,7 @@ class R3RiskNextToReturns(Rule):
 
     @staticmethod
     def _hits(text: str, include: list[re.Pattern], exclude: list[re.Pattern]) -> bool:
-        for x in exclude:
-            text = x.sub(" ", text)
+        text = blank_exclusions(text, exclude)
         return any(p.search(text) for p in include)
 
     def evaluate(self, ctx: Context) -> RuleResult:
@@ -182,6 +220,8 @@ _YEAR = re.compile(
 # "year: figure" lists ("2021: 2,1%, 2022: -4,3%") date each figure as well (gold m2-r12-past-performance-compliant).
 _YEAR_TABLE = re.compile(r"(?<![\d.,])((?:19|20)\d{2})\s?:\s?[-+−]?\d")
 NO_PAST_PERFORMANCE = "Materiał nie prezentuje wyników historycznych."
+#: Last document's past-performance sentences per detector parameters: {(params, fetch_year): (pre, sentences)}.
+_PP_MEMO: dict[tuple, tuple] = {}
 
 
 class _PastPerformance(Rule):
@@ -225,10 +265,31 @@ class _PastPerformance(Rule):
         # Past results in any unit: an amount counts only next to return vocabulary ("zarobili 5 000 zł").
         return any(a.search(sentence) for a in p["amount"]) and any(r.search(sentence) for r in p["amount_return"])
 
+    @cached_property
+    def _pp_key(self) -> tuple:
+        """Identity of this detector's parameters: R14, R12a and R12b share one only when their lists are equal."""
+        p = self.spec.params
+        keys = ("figure_patterns", "figure_exclude_patterns", "figure_extra_exclude_patterns", "amount_patterns",
+                "amount_return_patterns", "past_patterns", "future_patterns", "forecast_patterns",
+                "forecast_verb_patterns")
+        return tuple(tuple(p.get(k, [])) for k in keys)
+
     def past_performance(self, ctx: Context) -> list:
-        """The past-performance sentences of the document, in order."""
+        """The past-performance sentences of the document, in order.
+
+        R14, R12a and R12b ask for the same document in a row; the result is computed once per document and
+        parameter set (the scan was 3 x the sentence count on hostile input, tests/test_redos.py). The memo holds
+        the last document only and checks it by identity, so a new document never sees a stale result.
+        """
         fetch_year = ctx.doc.fetched_at.year
-        return [s for s in ctx.pre.sentences if self.is_past_performance(s.text, fetch_year)]
+        key = (self._pp_key, fetch_year)
+        memo = _PP_MEMO.get(key)
+        if memo is not None and memo[0] is ctx.pre:
+            return list(memo[1])
+        found = [s for s in ctx.pre.sentences if self.is_past_performance(s.text, fetch_year)]
+        _PP_MEMO.clear()  # one document at a time: never keeps old documents alive
+        _PP_MEMO[key] = (ctx.pre, tuple(found))
+        return found
 
 
 @register
@@ -578,6 +639,12 @@ class R16TaxInformation(Rule):
             "subject": compile_patterns(p.get("tax_subject_patterns", [])),
         }
 
+    @cached_property
+    def _tax_x_stripped(self) -> list:
+        """`tax_x` plus the disclaimer patterns, built once (one list object, so `blank_exclusions` caches it)."""
+        p = self._p
+        return p["tax_x"] + p["individual"] + p["change"] + p["subject"]
+
     def evaluate(self, ctx: Context) -> RuleResult:
         p = self._p
         texts = [s.text for s in ctx.pre.sentences]
@@ -589,10 +656,9 @@ class R16TaxInformation(Rule):
         disclaimer = set(individual) | set(change)
         # A disclaimer sentence is a tax reference only through what is left once the disclaimer is stripped
         # ("W IKE nie płacisz podatku Belki, choć przepisy mogą ulec zmianie" is both; group 2 review).
-        stripped = p["individual"] + p["change"] + p["subject"]
         refs = [
             i for i, t in enumerate(texts)
-            if R3RiskNextToReturns._hits(t, p["tax"], p["tax_x"] + (stripped if i in disclaimer else []))
+            if R3RiskNextToReturns._hits(t, p["tax"], self._tax_x_stripped if i in disclaimer else p["tax_x"])
         ]
         if not refs:
             return self.result("not_applicable", None, "Materiał nie odwołuje się do traktowania podatkowego.")
@@ -644,8 +710,7 @@ class R15Forecasts(Rule):
     def _kind(self, sentence: str, fetch_year: int) -> str | None:
         """`forecast`, `candidate` (weak marker, no figure) or None."""
         p = self._p
-        for x in p["exclude"]:
-            sentence = x.sub(" ", sentence)
+        sentence = blank_exclusions(sentence, p["exclude"])
         figure = any(f.search(sentence) for f in p["figure"])
         results = figure or any(v.search(sentence) for v in p["performance"])
         if not results:
@@ -911,8 +976,14 @@ class R11ProductComparisons(Rule):
     def evaluate(self, ctx: Context) -> RuleResult:
         p = self._p
         texts = [s.text for s in ctx.pre.sentences]
-        comparisons = [t for t in texts if R3RiskNextToReturns._hits(t, p["comparison"], p["exclude"])]
-        superlatives = [t for t in texts if R3RiskNextToReturns._hits(t, p["superlative"], p["exclude"])]
+        comparisons, superlatives = [], []
+        for t in texts:
+            # Same as `_hits` for both lists, which share the exclusions: blank them out once per sentence.
+            blanked = blank_exclusions(t, p["exclude"])
+            if any(c.search(blanked) for c in p["comparison"]):
+                comparisons.append(t)
+            if any(s.search(blanked) for s in p["superlative"]):
+                superlatives.append(t)
         if not comparisons and not superlatives:
             return self.result("not_applicable", None, "Materiał nie zawiera porównań produktów ani usług.")
         text = ctx.doc.text
