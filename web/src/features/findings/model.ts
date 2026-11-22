@@ -93,4 +93,6 @@ export type FindingDetail = {
   screenshotUrl?: string;
   pipelineVersion?: string;
   llm?: string | null;
+  // Printable evidence pack (GET /findings/{id}/export?format=html) under the app's API base.
+  exportUrl?: string;
 };

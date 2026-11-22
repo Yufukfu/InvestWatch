@@ -41,6 +41,7 @@ describe('useFindingDetail', () => {
     expect(d.screenshotUrl).toBe(detail.screenshot_urls.desktop);
     expect(d.documentText).toBe(detail.document.text);
     expect(d.llm).toBe(detail.model.llm);
+    expect(d.exportUrl).toBe(`http://localhost/api/findings/${detail.id}/export?format=html`);
   });
 
   it('reports notFound on a 404', async () => {
