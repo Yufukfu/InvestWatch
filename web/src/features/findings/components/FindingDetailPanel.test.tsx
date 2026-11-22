@@ -17,6 +17,7 @@ const rule = (over: Partial<RuleView> = {}): RuleView => ({
 
 const detail = (over: Partial<FindingDetail> = {}): FindingDetail => ({
   id: 'f1',
+  documentId: 'doc-1',
   module: 'M2',
   title: 'Obietnica 18% zysku',
   summary: 'Materiał eksponuje stopę zwrotu.',

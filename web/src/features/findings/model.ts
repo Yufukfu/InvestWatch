@@ -38,6 +38,11 @@ export type FindingRow = {
   riskLevel?: RiskLevel;
   status: FindingStatus;
   detectedAt: string;
+  // Findings are unique per (document, module): rows of one post share documentId (issue #33).
+  documentId: string;
+  url: string;
+  // Hostname of an http(s) url, shown as text; undefined for anything else.
+  host?: string;
 };
 
 export type RuleOutcome = 'fail' | 'pass' | 'not_applicable' | 'uncertain';
@@ -79,6 +84,7 @@ export type RescanView = { state: RescanState; latestDocumentId?: string; checke
 
 export type FindingDetail = {
   id: string;
+  documentId: string;
   module: FindingModule;
   title: string;
   summary?: string | null;
@@ -100,4 +106,11 @@ export type FindingDetail = {
   // Printable evidence pack (GET /findings/{id}/export?format=html) under the app's API base.
   exportUrl?: string;
   rescan?: RescanView;
+};
+
+// One finding of the open material, as the detail's module switcher offers it (issue #33).
+export type ModuleOption = {
+  id: string;
+  module: FindingModule;
+  riskLevel?: RiskLevel;
 };

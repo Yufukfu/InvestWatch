@@ -35,6 +35,7 @@ const rule = (over: Partial<RuleView> = {}): RuleView => ({
 
 const detail = (over: Partial<FindingDetail> = {}): FindingDetail => ({
   id: 'f1',
+  documentId: 'doc-1',
   module: 'M2',
   title,
   summary,
@@ -128,6 +129,8 @@ describe('untrusted finding text', () => {
       riskLevel: 'high',
       status: 'new',
       detectedAt: '2026-11-21T15:00:00Z',
+      documentId: 'doc-1',
+      url: 'https://example.com/post/1',
     };
     const { container } = render(
       <FindingsTable

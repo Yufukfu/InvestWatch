@@ -7,6 +7,7 @@ import { parseRescan } from './rescan';
 function toDetail(f: GetFindingsByIdApiResponse): FindingDetail {
   return {
     id: f.id,
+    documentId: f.document_id,
     module: f.module,
     title: f.title,
     summary: f.summary,

@@ -20,6 +20,7 @@ describe('useFindingDetail', () => {
     await waitFor(() => expect(result.current.detail).toBeDefined());
     const d = result.current.detail!;
     expect(d.title).toBe(detail.title);
+    expect(d.documentId).toBe(detail.document_id);
     expect(d.riskLevel).toBe(detail.risk_level);
     expect(d.firm).toEqual({
       name: detail.firm.name,
