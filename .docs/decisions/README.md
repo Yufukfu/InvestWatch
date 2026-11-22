@@ -12,6 +12,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0104](0104-ingest-order-and-republish-sweep.md) | Ingest order, at-least-once delivery and the republish sweep | accepted (agent-written; effective on merge) |
 | [0105](0105-content-hash-normalisation.md) | One `content_hash` normalisation: NFC (the scraper's), written into integration-plan §3 | accepted (agent-written; effective on merge) |
 | [0106](0106-scraper-deployment-unit.md) | Scraper deployment unit: three services, networks, stop grace, merge order with the renderer | accepted (agent-written; effective on merge) |
+| [0107](0107-playwright-renderer-service.md) | Playwright renderer as a separate, hardened service (`--no-sandbox`, Chromium 147 pin) | accepted (agent-written; effective on merge) |
 | [0108](0108-source-discovery-candidates.md) | Source discovery: inactive candidate sources mined from stored links, approved by a human | accepted (agent-written; effective on merge) |
 | [0201](0201-web-stack-and-generated-client.md) | Dashboard stack: React + RTK Query client generated from the OpenAPI contract, MSW mocks | accepted; dev mocks superseded by [0206](0206-dashboard-data-from-backend.md) |
 | [0202](0202-deployment-topology.md) | Per-module compose, Caddy HTTPS gateway, Postgres on an internal network | accepted |
@@ -40,5 +41,4 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
-- **Playwright boundary:** which sources must be rendered, because `blocks` and screenshots (`.docs/integration-plan.md` §3) feed rules R4-R8 and R13 (`.docs/analytics-plan.md` §5). Owner Adam, with Damian.
 - **First social platform** (team decision: one platform first). Owner Adam.

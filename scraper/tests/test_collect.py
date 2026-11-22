@@ -289,3 +289,67 @@ async def test_every_proxy_cooling_defers_before_started_and_before_any_request(
 
     assert (result.deferral, result.error) == (Deferral(until), None)
     assert h.calls == []  # no `scan.started`, no request, no robots
+
+
+class RenderSpy:
+    def __init__(self):
+        self.calls = []
+
+    async def render(self, source, url, identity, proxy):
+        self.calls.append((source.id, url))
+        return "output"
+
+
+def render_make(harness, spy, **source_fields):
+    collector, limiter = make(harness)
+    collector._store.sources[SRC] = replace(make_source(SRC, url=URL), **source_fields)
+    collector._renderer = spy
+    return collector
+
+
+async def started():
+    return None
+
+
+@pytest.mark.parametrize(
+    ("fields", "renders"),
+    [
+        ({"source_kind": "firm_own", "target_modules": ("M2",)}, True),
+        ({"source_kind": "firm_own", "target_modules": ("M1", "M2")}, True),
+        ({"source_kind": "third_party", "target_modules": ("M2",)}, False),
+        ({"source_kind": "unknown", "target_modules": ("M2",)}, False),
+        ({"source_kind": "firm_own", "target_modules": ("M1",)}, False),
+    ],
+)
+async def test_only_a_firms_own_m2_page_gets_a_render_step(fields, renders):
+    harness, spy = Harness(), RenderSpy()
+    collector = render_make(harness, spy, **fields)
+
+    await collector.run_source(SRC, started)
+
+    (page, _, _), = harness.ingested
+    assert ("render" in page) is renders
+    if renders:
+        assert await page["render"]() == "output" and spy.calls == [(SRC, URL)]
+    else:
+        assert spy.calls == []
+
+
+async def test_without_a_renderer_no_document_carries_a_render_step():
+    harness = Harness()
+    collector, _ = make(harness)
+    collector._store.sources[SRC] = replace(make_source(SRC, url=URL), target_modules=("M2",))
+
+    await collector.run_source(SRC, started)
+
+    (page, _, _), = harness.ingested
+    assert "render" not in page
+
+
+async def test_a_robots_refusal_ends_the_run_before_any_render_step():
+    harness, spy = Harness(robots=RobotsVerdict(False, "disallowed")), RenderSpy()
+    collector = render_make(harness, spy, target_modules=("M2",))
+
+    await collector.run_source(SRC, started)
+
+    assert harness.ingested == [] and spy.calls == [] and "fetch" not in harness.calls

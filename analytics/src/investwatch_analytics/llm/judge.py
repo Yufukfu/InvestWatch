@@ -52,7 +52,7 @@ class LlmJudge(Protocol):
         module: str,
         module_context: str,
         text: str,
-        content_hash: str,
+        content_hash: str | None,
         sentences: Sequence[Sentence],
         checks: Sequence[SemanticCheck],
     ) -> JudgeOutcome: ...
@@ -195,7 +195,7 @@ class HttpJudge:
         module: str,
         module_context: str,
         text: str,
-        content_hash: str,
+        content_hash: str | None,
         sentences: Sequence[Sentence],
         checks: Sequence[SemanticCheck],
     ) -> JudgeOutcome:
@@ -209,24 +209,27 @@ class HttpJudge:
                                                    "chunks": len(chunks)})
         version = prompt_version(system)
         rule_ids = [c.rule_id for c in checks]
+        # The key is the document's stored `content_hash` (issue #31, ADR 0105); analytics never computes one. A
+        # document without it bypasses the cache: a missing hash must not become a key that documents share.
+        cache = self._cache if content_hash else None
         per_chunk: list[dict[str, LlmVerdict]] = []
         for index, chunk in enumerate(chunks):
             key = cache_key(module=module, content_hash=content_hash, prompt_version=version,
                             model=self.settings.model, chunk_index=index, chunk_count=len(chunks),
-                            chunk_span=(chunk.start, chunk.end), rule_ids=rule_ids)
-            content = self._cache.get(key) if self._cache is not None else None
+                            chunk_span=(chunk.start, chunk.end), rule_ids=rule_ids) if cache is not None else None
+            content = cache.get(key) if cache is not None else None
             if content is None:
                 outcome = self._call(system, chunk, module=module, content_hash=content_hash)
                 if isinstance(outcome, JudgeOutcome):
                     return outcome
                 content = outcome
-                if self._cache is not None:
-                    self._cache.set(key, content)
+                if cache is not None:
+                    cache.set(key, content)
             per_chunk.append(parse_results(content, chunk.text, checks))
         verdicts = merge_chunks(per_chunk)
         return JudgeOutcome(verdicts=verdicts, model=self.settings.model if verdicts else None, status="ok")
 
-    def _call(self, system: str, chunk: Chunk, *, module: str, content_hash: str) -> dict[str, Any] | JudgeOutcome:
+    def _call(self, system: str, chunk: Chunk, *, module: str, content_hash: str | None) -> dict[str, Any] | JudgeOutcome:
         """One request, inside the breaker and the document budget; a failure is a `JudgeOutcome`."""
         if self._breaker_open():
             return self._dropped("unavailable", "llm_breaker_open", module, content_hash)
@@ -252,7 +255,7 @@ class HttpJudge:
         return content
 
     @staticmethod
-    def _dropped(status: str, reason: str, module: str, content_hash: str) -> JudgeOutcome:
+    def _dropped(status: str, reason: str, module: str, content_hash: str | None) -> JudgeOutcome:
         log.warning("llm verdicts dropped", extra={"reason": reason, "llm_module": module, "content_hash": content_hash})
         return JudgeOutcome(status=status)  # type: ignore[arg-type]
 

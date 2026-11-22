@@ -26,14 +26,19 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
   - Decided by Damian: the default model stays `gemma-4-31b-it` (`gemma-4-26b-a4b-it` is the documented fallback), and the M2 default 0.1 is accepted (ADR 0317). It is re-measured with the LLM after merge.
 - `analytics/compose-single-build` (fix, no OpenSpec change): only `analytics` builds `investwatch/analytics`; `analytics-eval` reuses the image like `api` does with `api-migrate`, so `docker compose up --build` no longer aborts on two parallel exports to one tag ("image ... already exists" with the containerd store). The build context is `../analytics`, so the `-f infra/compose.yaml -f api/compose.yaml -f analytics/compose.yaml` command in the file header builds too (before, `.` resolved to `infra/`).
 - `analytics/eval-wait-healthcheck` (fix, no OpenSpec change): `docker compose up -d --wait` exits 0 again. Before, it exited 1 with "analytics-eval has no healthcheck configured" although every service was healthy or exited 0. `--wait` checks a service nobody depends on for "running or healthy", which a one-shot fails either way: with `healthcheck: disable: true` it is "no healthcheck configured", and with no healthcheck it is "exited (0)" once the run has finished. `analytics` now depends on `analytics-eval` with `service_completed_successfully` and `required: false`, so `--wait` checks completion, as for `api-migrate`. The worker still starts if the evaluation fails, and `--wait` then exits 1 with "didn't complete successfully". The image `HEALTHCHECK` stays in `analytics/Dockerfile` as the `document-stream-worker` spec requires.
+- `analytics-stored-content-hash` (issue #31, Damian's decision): analytics no longer computes a `content_hash` (`preprocess()` had an NFKC one, used only as the LLM cache key); it uses the stored NFC value the scraper writes as is, also for the LLM cache key, and a document without one is not cached ([ADR 0105](../decisions/0105-content-hash-normalisation.md)). NFKC `normalize()` stays for matching, language guess and excerpts. Open: `contracts/mocks/generate_mocks.py` still lowercases before hashing (`content-hash-definition` follow-up 4, Damian's own decision).
 - Presentation (#77, #74): analytics slide content in `.docs/presentation-analytics.md` (rules-only gold-set numbers on the synthetic set, R14 add-a-rule example, LLM swap summary). Open: real UKNF samples (#73) and the Ollama rehearsal on the demo machine.
+
+### rehearsal on real data (#78, 2026-11-22, `main` c810a14)
+- Clean stack, 17 seeded sources, one scan request each: analytics handled all 223 documents (71 stored, 152 `no_findings`), 72 findings, 10 `finding.high_risk` events (equal to the findings above M1 0.65 / M2 0.1 / M3 0.4), 0 errors, no poison messages. The API returns the same 72 through the gateway (`/api/findings`, `/api/stats/summary` high 10, detail, `/api/calibration`).
+- Demo risks: the hosted Gemma answered 1 of 5 calls (2× 503, 2× timeout), then the breaker kept the rest rules-only; pre-warm or use the Ollama profile. Without the LLM, S3.4 stays `uncertain` and opens the M3 gate, so the Grant Thornton negative control is high-risk (0.78). The KDP news control has 17 low M1 findings (16 on "OKX" mentions matched to OKX Europe Markets, 1 on "Capital Markets").
 
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
 - Merged with PR #15 (Kacper's review fixed in `api-db-schema-review-fixes`).
 - `api-v1` applied and archived: REST under `/api` (all 11 contract paths), Socket.IO relay `iw:events` → `/events`, calibration curve from analyst labels, the `api` service in `api/compose.yaml`.
 - In PR #21, stacked on PR #18 (`infra-compose`) and merging after it; Kacper's review fixed in `api-v1-review-fixes`.
-- Open for Adam: nothing consumes `iw:scan-requests` yet, so `POST /api/scans` queues without running a scan (`.docs/integration-plan.md` §5).
+- `POST /api/scans` runs a scan: the scraper consumes `iw:scan-requests` (#30). Verified in the #78 rehearsal: 17 requests through the gateway, all answered 202 and scanned.
 
 ### infra-compose
 - Redis 8, object storage (MinIO, bucket `iw-raw`), the optional Ollama profile `llm`, project-scoped networks (`data`, `edge`, `egress`) and the smoke test `infra/tests/smoke.sh`: applied and archived, in PR #18.
@@ -48,6 +53,7 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `infra-compose` and `infra-compose-review-fixes` archived in PR #18
 - `analytics-worker` archived; `analytics-worker-review-fixes` (Kacper's PR #26 review) in PR #26
 - `openspec-strict-format` archived in its own PR: 14 requirements across `database-schema`, `document-analysis`, `m2-compliance-rules`, `rest-api` and `shared-infrastructure` brought under OpenSpec 2.1.1's 500-character limit (text moved into scenarios, no behaviour change), so the CI job `Specs and hooks` passes. Its follow-ups name the fixes still due on `analytics-llm-p0` and `analytics-m1-m3`.
+- `analytics-stored-content-hash` archived in its own PR (issue #31)
 
 ## Blockers and open decisions
 
