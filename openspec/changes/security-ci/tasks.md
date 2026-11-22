@@ -20,6 +20,7 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
   - added: the Gitleaks step fails when its log has no `N commits scanned` with N > 0, because Gitleaks over an unreadable history exits 0 (checked locally: 0 commits, exit 0). `safe.directory` is passed by env for the root container.
 - [x] 2.3 The pin test from group 1 is green against the real workflow. Run `node --test` for the hook, script and `.github/tests` suites. Result: 88 tests, 88 pass.
 - [x] 2.4 Mutation check: tag one `uses:`, drop one image digest, unpin `pip-audit` (each must turn the pin test red); `mutations: 3 tried, 3 caught`
+- [x] 2.5 Review fix (`iw-reviewer`, group 2): the image rule needed a `/`, so `docker run alpine:3.20` and `IMAGE_OSV2: …:v2.2.4` passed unpinned. `docker run` arguments are now parsed: the first word that is not an option is the image, unknown options fail closed, a variable image must be an `IMAGE_*` env, and continued lines are joined. `mutations: 10 tried, 10 caught`
 
 ## 3. First runs in GitHub Actions (~30 min, after the push)
 
