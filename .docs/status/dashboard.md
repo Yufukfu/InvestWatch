@@ -18,6 +18,7 @@ Covers `web/` and `infra/`; whoever changes them updates this file (owners: [`.g
 - Supply chain ([ADR 0209](../decisions/0209-supply-chain-scanning.md), runbook [supply-chain.md](../supply-chain.md)): decision and runbook in a docs-only PR. OSV-Scanner (offline) and Gitleaks are run by hand until the CI follow-up adds their jobs, `.gitleaks.toml` and SHA-pinned actions.
 - Frontend layering ([ADR 0204](../decisions/0204-frontend-architecture.md)) applied to health, summary, findings and trend, with a lint check on components.
 - `infra/per-project-image-tags` (fix for issue #63, no OpenSpec change): the five built images are tagged `investwatch/<service>:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}` instead of a shared `:dev`, and the building services (`web`, `api-migrate`, `analytics`, `worker`, `renderer`) set `pull_policy: build`, so a plain `up` rebuilds and a failed build stops it instead of starting another checkout's or an older image. `IW_VERSION` still names a release tag. Touches `api/`, `analytics/` and `scraper/` compose files (one line each, owners asked to review). Details: `infra/README.md`, "Image tags".
+- `chore/readme-hardware` (issue #75, docs only, no OpenSpec change): root README "Hardware requirements" (from compose memory/CPU limits, `docker image ls` sizes and the published Ollama model manifests) and "Configuration" (every env var per service from the compose files, plus the ones the code reads but compose does not forward); `VITE_EVENTS_URL` added to `web/.env.example`.
 
 ## Active OpenSpec changes
 
