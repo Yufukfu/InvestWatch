@@ -132,6 +132,7 @@ const OWNERSHIP = [
   'Modules: `infra/` (owner Kacper).',
   'ownership by directory (`scraper/` Adam, `web/` Kacper).',
   'scheduler -> scraper (Adam) -> analytics',
+  '# Status: platform (Damian)',
   'Rules for the web dashboard, Kacper\'s module.',
   'Modules: web/ dashboard (Kacper).',
   'analytics/ (Damian; an api/ folder later).',
@@ -167,10 +168,12 @@ test('also reads openspec/config.yaml and compose.yaml headers', () => {
   const root = repo({
     'openspec/config.yaml': 'context: |\n  Modules: scraper/ (owner Adam)\n',
     'api/compose.yaml': '# api/ deployment unit (owner Damian).\n',
+    'api/compose.renderer.yaml': '# Page renderer (owner Adam)\n',
+    'infra/compose.dev-ports.yml': 'x: 1\n# owner Kacper\n',
     'compose.yaml': '# root compose\n',
     'api/CLAUDE.md': '#',
     '.github/CODEOWNERS': '/api/ @Yufukfu\n',
   });
   const files = checkDocs(root).map((p) => `${p.file}:${p.line}`).sort();
-  assert.deepEqual(files, ['api/compose.yaml:1', 'openspec/config.yaml:2']);
+  assert.deepEqual(files, ['api/compose.renderer.yaml:1', 'api/compose.yaml:1', 'infra/compose.dev-ports.yml:2', 'openspec/config.yaml:2']);
 });

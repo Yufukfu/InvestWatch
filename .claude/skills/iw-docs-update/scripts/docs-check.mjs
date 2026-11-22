@@ -18,7 +18,8 @@ const IGNORED_NAMES = new Set(['follow-ups.md', 'tasks.md', 'proposal.md', 'desi
 
 // Ownership rule. People are named by first name in prose; their handles live in CODEOWNERS only.
 const PEOPLE = ['Adam', 'Kacper', 'Damian'];
-const MODULE_WORDS = ['scraper', 'analytics', 'api', 'web', 'contracts', 'infra', 'dashboard'];
+// Directories plus the names of the status domains (`dashboard` is web/, `platform` is analytics/, api/, contracts/).
+const MODULE_WORDS = ['scraper', 'analytics', 'api', 'web', 'contracts', 'infra', 'dashboard', 'platform'];
 // History keeps the names it had (ADRs, the AI log); in-flight changes are archived (and skipped) later.
 const OWNERSHIP_SKIP = ['.docs/decisions/', '.docs/ai-workflow.md', 'openspec/changes/'];
 // Spec scenario steps are hypothetical examples ("GIVEN analytics/ is owned by Damian").
@@ -95,7 +96,7 @@ export function checkDocs(root) {
 
   problems.push(...checkCodeowners(root, services));
 
-  const extra = ['openspec/config.yaml', 'compose.yaml', ...[...SERVICE_DIRS, 'infra'].map((d) => `${d}/compose.yaml`)];
+  const extra = ['openspec/config.yaml', ...composeFiles(root)];
   for (const file of [...files, ...extra.filter((f) => fs.existsSync(path.join(root, f)))]) {
     if (OWNERSHIP_SKIP.some((p) => file.startsWith(p))) continue;
     fs.readFileSync(path.join(root, file), 'utf8').split('\n').forEach((text, i) => {
@@ -104,6 +105,15 @@ export function checkDocs(root) {
     });
   }
   return problems;
+}
+
+// compose*.yaml at the root and directly in each module directory (compose.yaml, compose.renderer.yaml, ...)
+function composeFiles(root) {
+  return ['', ...SERVICE_DIRS, 'infra'].flatMap((dir) => {
+    const full = path.join(root, dir);
+    if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) return [];
+    return fs.readdirSync(full).filter((n) => /^compose[\w.-]*\.ya?ml$/.test(n)).map((n) => path.posix.join(dir, n));
+  });
 }
 
 // Every existing service directory has a `/<dir>/` line with at least one @handle. infra/ and the other
