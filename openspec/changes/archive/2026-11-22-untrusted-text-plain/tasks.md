@@ -9,4 +9,4 @@
 ## 2. Closing
 
 - [x] 2.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` row.
-- [ ] 2.2 Run `iw-pr-review` and fix real findings.
+- [x] 2.2 Run `iw-pr-review` and fix real findings. Group and whole-branch review (one commit of logic): no blocking findings. Could not check: real-browser bidi rendering (jsdom checks DOM structure only).
