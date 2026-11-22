@@ -39,9 +39,14 @@ async def summary(request: Request):
             for key, count in rows:
                 by[name][key] = count
         last_scan = (await conn.execute(select(func.max(sources.c.last_run_at)))).scalar_one()
+        # M2 coverage strip (contract 1.3.0, issue #115): M2 findings matched to a register entry.
+        m2_total, m2_matched = (await conn.execute(
+            select(func.count(), func.count().filter(findings.c.firm["registry_id"].astext.isnot(None)))
+            .where(findings.c.module == "M2"))).one()
     return {"total": sum(by["module"].values()), "by_module": by["module"], "by_status": by["status"],
             "by_platform": dict(sorted(by["platform"].items())), "by_risk_level": by["risk"],
-            "last_scan_at": format_time(last_scan) if last_scan else None}
+            "last_scan_at": format_time(last_scan) if last_scan else None,
+            "m2_coverage": {"total": m2_total, "registry_matched": m2_matched}}
 
 
 def _floor(dt: datetime, bucket: str) -> datetime:

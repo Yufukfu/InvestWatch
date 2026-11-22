@@ -288,4 +288,31 @@ describe('FindingDetailPanel', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Obietnica 18% zysku' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Naruszenia/ })).toBeInTheDocument();
   });
+
+  describe('Eksportuj', () => {
+    const exportUrl = 'http://localhost/api/findings/f1/export?format=html';
+
+    it('links a loaded detail to its printable evidence pack in a new tab', () => {
+      render(<FindingDetailPanel {...base} detail={detail({ exportUrl })} />);
+      const link = within(screen.getByRole('dialog')).getByRole('link', { name: /^Eksportuj/ });
+      expect(link).toHaveAttribute('href', exportUrl);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
+    it('keeps the link while a failed refetch shows the last detail', () => {
+      render(<FindingDetailPanel {...base} isError detail={detail({ exportUrl })} />);
+      expect(screen.getByRole('link', { name: /^Eksportuj/ })).toHaveAttribute('href', exportUrl);
+    });
+
+    // By text, not by role: an <a> without href has no link role and would slip through.
+    it('shows no link while loading, on an error without data, or for an unknown finding', () => {
+      const { rerender } = render(<FindingDetailPanel {...base} isLoading detail={undefined} />);
+      expect(screen.queryByText(/Eksportuj/)).toBeNull();
+      rerender(<FindingDetailPanel {...base} isError detail={undefined} />);
+      expect(screen.queryByText(/Eksportuj/)).toBeNull();
+      rerender(<FindingDetailPanel {...base} isError notFound detail={detail({ exportUrl })} />);
+      expect(screen.queryByText(/Eksportuj/)).toBeNull();
+    });
+  });
 });

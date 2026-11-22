@@ -143,7 +143,7 @@ Finding fields written by a model or copied from scraped pages (`title`, `summar
 
 #### Scenario: Bare URL in evidence
 - **WHEN** the evidence contains `https://evil.example/x`
-- **THEN** it is shown as text and the only links in the detail are the source link and the advertiser profile
+- **THEN** it is shown as text and the only links in the detail are the export link, the source link and the advertiser profile
 
 ### Requirement: Untrusted text has its own direction
 Each untrusted value listed above SHALL be shown in an element that holds only that value and has `dir="auto"`, so a quote in any language gets its own direction and a bidi control inside it cannot reorder the UI text around it.
@@ -162,6 +162,17 @@ When a status change is rejected and the API returns its own error text, that te
 #### Scenario: Right-to-left override in the server detail
 - **WHEN** the API rejects a status change with an error text that contains U+202E
 - **THEN** the text is shown in an element with `dir="auto"` whose text is exactly the error text, and `Odpowiedź serwera:` is outside that element
+
+### Requirement: Export a finding's evidence pack
+The finding detail SHALL offer an `Eksportuj` link that opens the printable evidence pack of that finding, `GET /findings/{id}/export?format=html` (contracts 1.2.0), under the app's API base URL, in a new tab. The link SHALL be shown only while that finding's detail is loaded, and it SHALL be keyboard-reachable inside the modal detail.
+
+#### Scenario: Loaded detail
+- **WHEN** the detail of a finding is loaded
+- **THEN** the header shows a link named `Eksportuj` whose `href` is `<API base>/findings/<id>/export?format=html` and which opens in a new tab with `rel="noopener noreferrer"`
+
+#### Scenario: Not loaded or unknown
+- **WHEN** the detail is still loading, failed to load with no earlier data, or the finding does not exist (404)
+- **THEN** no `Eksportuj` link is shown
 
 ### Requirement: Re-scan state in the finding detail
 The finding detail SHALL show the re-scan state that `GET /findings/{id}` serves as `document.scrape_meta.rescan` (`rest-api` "Finding detail with its document"): a text badge `Zmieniona` with a Polish line naming `latest_document_id` for `changed`, a text badge `Usunięta` with a Polish line for `removed`, each with `checked_at` in UTC, and nothing otherwise. The web SHALL parse `scrape_meta` as untrusted data and show only a known state, a UUID id and a valid timestamp.

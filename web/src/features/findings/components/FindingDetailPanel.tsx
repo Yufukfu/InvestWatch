@@ -348,9 +348,16 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
         <h2 id="detail-title" dir="auto">
           {detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}
         </h2>
-        <button ref={closeRef} type="button" className="btn" onClick={onClose}>
-          Zamknij
-        </button>
+        <div className="detail-actions">
+          {detail?.exportUrl && !notFound && (
+            <a className="btn" href={detail.exportUrl} target="_blank" rel="noopener noreferrer">
+              Eksportuj<span className="sr-label"> (pakiet dowodowy do druku, nowa karta)</span>
+            </a>
+          )}
+          <button ref={closeRef} type="button" className="btn" onClick={onClose}>
+            Zamknij
+          </button>
+        </div>
       </div>
       <div ref={setAlertSlot} className="detail-alerts" />
       {content}
