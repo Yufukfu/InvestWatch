@@ -107,7 +107,7 @@ function capItem(b, r, maxRounds, st) {
 }
 
 /** Work on my own PRs: review activity by others not handled yet, and failed checks on the head sha */
-function minePr(gh, repo, me, pr, st, maxRounds, state) {
+function minePr(gh, repo, me, pr, st, maxRounds, state, defaultBranch) {
   const b = base(pr, repo);
   const act = activity(gh, repo, pr.number);
   // my own comments are not work, except an answer that starts with /iw (questions.mjs). The agents post from
@@ -134,10 +134,12 @@ function minePr(gh, repo, me, pr, st, maxRounds, state) {
   const pending = {};
   let items = [];
   // GitHub's own verdict (branch protection, dismissed reviews): approved, every check finished with none failed, and
-  // no conflict means the human can merge. A running check holds it back until a later scan.
+  // no conflict means the human can merge. A running check holds it back until a later scan. A draft cannot be
+  // merged, and a PR into another branch (a stack) does not land yet: neither is told (Adam, PR #102).
   // No agent acts on it, so it is not capped; once per head sha.
   const checksDone = !(pr.statusCheckRollup || []).some(running);
-  if (pr.reviewDecision === 'APPROVED' && !checks.length && checksDone && pr.mergeable !== 'CONFLICTING' && st.approvedSha !== b.headSha) {
+  const mergeTarget = !pr.isDraft && pr.baseRefName === defaultBranch;
+  if (pr.reviewDecision === 'APPROVED' && mergeTarget && !checks.length && checksDone && pr.mergeable !== 'CONFLICTING' && st.approvedSha !== b.headSha) {
     const latest = new Map();
     for (const r of act.reviews) if (r.state !== 'PENDING' && r.state !== 'COMMENTED' && lc(r.user?.login) !== lc(me) && !isBot(r.user)) latest.set(lc(r.user?.login), r);
     const approvers = [...latest.values()].filter((r) => r.state === 'APPROVED').map((r) => r.user.login);
@@ -189,10 +191,11 @@ function reviewPr(gh, repo, me, pr, st, maxRounds, { rereview = false, warn = ()
 
 /**
  * mode: { mine, reviewRequested, author, domainFilter } where domainFilter(files) -> boolean.
+ * defaultBranch: the repository's default branch; only an approved PR into it is told as `approved`.
  * Returns { items, open }: `open` is the set of open PR numbers, or null when it may be incomplete
  * (then the caller must not drop anything from the state).
  */
-export function scan({ gh, repo, me, mode, state, maxRounds = 3, warn = () => {} }) {
+export function scan({ gh, repo, me, mode, state, maxRounds = 3, defaultBranch = 'main', warn = () => {} }) {
   const openList = gh(['pr', 'list', '--state', 'open', '--limit', String(OPEN_LIMIT), '--json', 'number']) || [];
   const open = openList.length >= OPEN_LIMIT ? null : new Set(openList.map((p) => p.number));
   const st = (n) => state.prs[n] || {};
@@ -208,7 +211,7 @@ export function scan({ gh, repo, me, mode, state, maxRounds = 3, warn = () => {}
   if (mode.mine) {
     for (const pr of listPrs(gh, ['--author', '@me'], warn).filter(keep)) {
       done.add(pr.number);
-      items.push(...minePr(gh, repo, me, pr, st(pr.number), maxRounds, state));
+      items.push(...minePr(gh, repo, me, pr, st(pr.number), maxRounds, state, defaultBranch));
     }
   }
   const sources = [];
