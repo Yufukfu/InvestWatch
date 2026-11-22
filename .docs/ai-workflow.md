@@ -1,6 +1,6 @@
 # AI-Assisted Development Log
 
-This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
+This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry in [`ai-log/`](ai-log/README.md) at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
 
 ## Process
 
@@ -27,7 +27,7 @@ All of it is committed, so the three of us run identical agents. The AI assistan
 
 ## Lifecycle of one change
 
-Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log row, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
+Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log entry, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
 
 ## Controls on generated code
 
@@ -134,3 +134,8 @@ Known limits: review is a practice, not enforced by a hook; the hook reads only 
 | Sun ~12:00 | Adam | A Claude Code session wrote the scraper slides of the hand-in (`.docs/presentation-scraper.md`, issues #77 and #74), docs-only: every number recomputed from `origin/main`, `git show --numstat` and `gh`, then `iw-reviewer` on the range for factual accuracy | Branch `chore/presentation-scraper`. The brief said the renderer PR was not on `main`; `gh pr view 67` showed it merged at 00:24 and the status file still said "PR pending", so both were fixed from the evidence. "Add a collector in N lines" is true for a source (7 TOML lines, `b3b37bd`) but the one real collector commit (`49ca3e6`) is +247 source lines and +464 test lines, and the slide says so. Redaction exists three times (`logs.py`, `reporting.py`, `ingest/errors.py`), not twice as the status file said. |
 | Sun ~12:00 | Adam | A Claude Code session fixed issue #97 autonomously: reproduced the failing `-f infra -f api -f scraper` chain with the installed Compose v5.2.0 before touching anything, tried the issue's suggested `../scraper/` include against five chains, and wrote a `stack.sh` scenario that goes red on the bare include | Branch `scraper/compose-include-chain`, OpenSpec change of the same name. The issue's claim that `-f scraper/compose.yaml` alone works was wrong (it fails on the undefined `data` network with or without the fix, since infra owns it); the other claims held. A mutation (bare include) turns the scenario red. |
 | Sun ~11:30 | Adam | A Claude Code session did the scraper side of issue #78: read Damian's recorded run against the code on `main` (seed files, scan-request consumer, scheduler, retry and job-error paths, merge time of PR #67) instead of restarting the shared stack, and wrote only what the run shows, with "not checked" for the rest | Branch `scraper/demo-rehearsal-evidence`, docs only (`.docs/STATUS.md` scraper evidence, `.docs/status/scraper.md`). The per-source document split, scraper logs and scheduled scans are not in the issue, so they stay open. Found `.docs/status/scraper.md` still calling the renderer PR pending after it merged. |
+One file per entry in [`ai-log/`](ai-log/README.md), named `YYYY-MM-DDTHHMM-<who>-<slug>.md`, so the listing reads in time order and parallel PRs never edit the same file ([ADR 0212](decisions/0212-ai-log-one-file-per-entry.md)). How to add one: the `iw-ai-log` skill. The whole log as one table, oldest first:
+
+```sh
+node .claude/skills/iw-ai-log/scripts/ai-log.mjs render
+```

@@ -6,7 +6,8 @@
 
 | I want to… | Open |
 |---|---|
-| See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then your domain: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
+| See where we are and what is blocked | [STATUS.md](STATUS.md) (milestones, team-wide), then the file for your directories: [status/scraper.md](status/scraper.md), [status/dashboard.md](status/dashboard.md), [status/platform.md](status/platform.md) |
+| See who owns a directory, or who to ask for review | [`.github/CODEOWNERS`](../.github/CODEOWNERS), the only place that names owners; shared areas (`.docs/`, `.claude/`, `openspec/`, `.github/`, root files) have none ([ADR 0211](decisions/0211-codeowners-single-source.md)) |
 | Understand the architecture and how services connect | [integration-plan.md](integration-plan.md) §1-2 |
 | Produce or consume a scraped document | [integration-plan.md](integration-plan.md) §3, then [../scraper/CLAUDE.md](../scraper/CLAUDE.md) |
 | What exactly `content_hash` hashes (normalisation, who computes it) | [integration-plan.md](integration-plan.md) §3, [decisions/0105-content-hash-normalisation.md](decisions/0105-content-hash-normalisation.md) |
@@ -32,17 +33,17 @@
 | Get the scraper slide content for the hand-in PDF (architecture, safety, real-data coverage, add-a-source example, AI-assisted process) | [presentation-scraper.md](presentation-scraper.md) |
 | Read the UKNF challenge and the 18 rules | the Polish materials in [../doc/](../doc/) (read-only, removed before hand-in) |
 | Use or change a contract (a change needs the whole team and a version bump) | [../contracts/README.md](../contracts/README.md), [../contracts/CLAUDE.md](../contracts/CLAUDE.md), [integration-plan.md](integration-plan.md) §3-§6 |
-| Scan dependencies, vet a new package, fix a vulnerability, or keep a secret out of git | [supply-chain.md](supply-chain.md), results in [security-audit.md](security-audit.md), why in [decisions/0209-supply-chain-scanning.md](decisions/0209-supply-chain-scanning.md) |
+| Scan dependencies, vet a new package, fix a vulnerability, or keep a secret out of git; read or bump the PR security scans (`.github/workflows/security.yml`) | [supply-chain.md](supply-chain.md) (§5 for the CI jobs), results in [security-audit.md](security-audit.md), why in [decisions/0209-supply-chain-scanning.md](decisions/0209-supply-chain-scanning.md) |
 | Find out why we chose X, or record a decision | [decisions/README.md](decisions/README.md) |
 | See what the system does now, or what is in flight | [../openspec/specs/](../openspec/specs/), [../openspec/changes/](../openspec/changes/) |
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
 | Update docs after a change | [../.claude/skills/iw-docs-update/SKILL.md](../.claude/skills/iw-docs-update/SKILL.md) |
-| Log AI usage for the jury | [ai-workflow.md](ai-workflow.md) |
+| Log AI usage for the jury, or read the log | [ai-workflow.md](ai-workflow.md) (process), [ai-log/](ai-log/README.md) (one file per entry, `iw-ai-log` skill) |
 | Let my agent watch GitHub for reviews, review requests and hand-offs from teammates' agents | [../.claude/skills/iw-watch/SKILL.md](../.claude/skills/iw-watch/SKILL.md) |
 
 ## Rules
 
 - Don't duplicate. Link to the owning file and section.
 - A doc claim that matters gets checked against the code before it is relied on.
-- A new service directory gets its own `CLAUDE.md`, a row in the root [`CLAUDE.md`](../CLAUDE.md) services table and a row here.
+- A new service directory gets its own `CLAUDE.md`, a line in [`.github/CODEOWNERS`](../.github/CODEOWNERS), a row in the root [`CLAUDE.md`](../CLAUDE.md) services table and a row here.
 - `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` checks paths, the ADR index and service `CLAUDE.md` files.

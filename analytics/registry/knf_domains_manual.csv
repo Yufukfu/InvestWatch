@@ -1,32 +1,32 @@
 name,website_domains,source_url,verified_by_human
-CASPAR ASSET MANAGEMENT S.A.,caspar.com.pl,https://www.caspar.com.pl/,false
-CERES DOM INWESTYCYJNY S.A.,ceresdi.pl,https://www.ceresdi.pl/,false
-CVI DOM MAKLERSKI SP. Z O.O.,cvi.pl,https://cvi.pl/pl/,false
-DOM INWESTYCYJNY XELION SP. Z O.O.,xelion.pl,https://www.xelion.pl/,false
-DOM MAKLERSKI AFS Sp. z o.o.,dmafs.pl,https://dmafs.pl/,false
-DOM MAKLERSKI BANKU OCHRONY ŚRODOWISKA S.A.,bossa.pl,https://bossa.pl/,false
-DOM MAKLERSKI BDM S.A.,bdm.pl,https://www.bdm.pl/,false
-DOM MAKLERSKI INC S.A.,dminc.pl,https://www.dminc.pl/,false
-DOM MAKLERSKI NAVIGATOR S.A.,dmnavigator.pl,https://dmnavigator.pl/,false
-ERSTE SECURITIES POLSKA S.A.,esp.pl,https://www.esp.pl/en/home,false
-EVO DOM MAKLERSKI S.A.,evodm.pl,https://www.evodm.pl/,false
-IPOPEMA SECURITIES S.A.,ipopema.pl,https://ipopema.pl/,false
-IX ASSET MANAGEMENT S.A.,ixam.pl,https://ixam.pl/,false
-MICHAEL/STRÖM DOM MAKLERSKI S.A.,michaelstrom.pl,https://michaelstrom.pl/,false
-NOBLE Securities S.A.,noblesecurities.pl,https://www.noblesecurities.pl/,false
-NWAI DOM MAKLERSKI S.A.,nwai.pl,https://nwai.pl/,false
-OANDA TMS BROKERS S.A.,tms.pl,https://www.tms.pl/,false
-PEKAO INVESTMENT BANKING S.A.,pekaoib.pl,https://www.pekaoib.pl/,false
-Q SECURITIES S.A.,qsecurities.com,https://qsecurities.com/pl/,false
-TRIGON DOM MAKLERSKI S.A.,trigon.pl,https://www.trigon.pl/,false
-XTB S.A.,xtb.com,https://www.xtb.com/pl,false
-ALIOR BANK S.A. – Biuro Maklerskie ALIOR Bank,aliorbank.pl,https://www.aliorbank.pl/,false
-BANK HANDLOWY S.A. – Departament Maklerski Banku Handlowego,citihandlowy.pl,https://www.citihandlowy.pl/,false
-BANK MILLENNIUM S.A. – Biuro Maklerskie Banku Millennium,bankmillennium.pl,https://www.bankmillennium.pl/,false
-BANK PEKAO S.A. (BANK POLSKA KASA OPIEKI S.A.) – Biuro Maklerskie PEKAO,pekao.com.pl,https://www.pekao.com.pl/,false
-BNP Paribas Bank Polska S.A. – Biuro Maklerskie BNP Paribas Bank Polska,bnpparibas.pl,https://www.bnpparibas.pl/,false
-ERSTE BANK POLSKA S.A. – Erste Biuro Maklerskie,erste.pl,https://www.erste.pl/klient-indywidualny,false
-ING BANK ŚLĄSKI S.A. – Biuro Maklerskie ING Bank Śląski,ing.pl,https://www.ing.pl/,false
-mBANK S.A. – Biuro Maklerskie mBank,mbank.pl,https://www.mbank.pl/indywidualny/,false
-POWSZECHNA KASA OSZCZĘDNOŚCI BANK POLSKI S.A. (PKO BP S.A.) – Biuro Maklerskie PKO Banku Polskiego,pkobp.pl,https://www.pkobp.pl/,false
-VeloBank S.A. – Departament Maklerski VeloBank,velobank.pl,https://www.velobank.pl/,false
+CASPAR ASSET MANAGEMENT S.A.,caspar.com.pl,https://www.caspar.com.pl/,true
+CERES DOM INWESTYCYJNY S.A.,ceresdi.pl,https://www.ceresdi.pl/,true
+CVI DOM MAKLERSKI SP. Z O.O.,cvi.pl,https://cvi.pl/pl/,true
+DOM INWESTYCYJNY XELION SP. Z O.O.,xelion.pl,https://www.xelion.pl/,true
+DOM MAKLERSKI AFS Sp. z o.o.,dmafs.pl,https://dmafs.pl/,true
+DOM MAKLERSKI BANKU OCHRONY ŚRODOWISKA S.A.,bossa.pl,https://bossa.pl/,true
+DOM MAKLERSKI BDM S.A.,bdm.pl,https://www.bdm.pl/,true
+DOM MAKLERSKI INC S.A.,dminc.pl,https://www.dminc.pl/,true
+DOM MAKLERSKI NAVIGATOR S.A.,dmnavigator.pl,https://dmnavigator.pl/,true
+ERSTE SECURITIES POLSKA S.A.,esp.pl,https://www.esp.pl/en/home,true
+EVO DOM MAKLERSKI S.A.,evodm.pl,https://www.evodm.pl/,true
+IPOPEMA SECURITIES S.A.,ipopema.pl,https://ipopema.pl/,true
+IX ASSET MANAGEMENT S.A.,ixam.pl,https://ixam.pl/,true
+MICHAEL/STRÖM DOM MAKLERSKI S.A.,michaelstrom.pl,https://michaelstrom.pl/,true
+NOBLE Securities S.A.,noblesecurities.pl,https://www.noblesecurities.pl/,true
+NWAI DOM MAKLERSKI S.A.,nwai.pl,https://nwai.pl/,true
+OANDA TMS BROKERS S.A.,tms.pl,https://www.tms.pl/,true
+PEKAO INVESTMENT BANKING S.A.,pekaoib.pl,https://www.pekaoib.pl/,true
+Q SECURITIES S.A.,qsecurities.com,https://qsecurities.com/pl/,true
+TRIGON DOM MAKLERSKI S.A.,trigon.pl,https://www.trigon.pl/,true
+XTB S.A.,xtb.com,https://www.xtb.com/pl,true
+ALIOR BANK S.A. – Biuro Maklerskie ALIOR Bank,aliorbank.pl,https://www.aliorbank.pl/,true
+BANK HANDLOWY S.A. – Departament Maklerski Banku Handlowego,citihandlowy.pl,https://www.citihandlowy.pl/,true
+BANK MILLENNIUM S.A. – Biuro Maklerskie Banku Millennium,bankmillennium.pl,https://www.bankmillennium.pl/,true
+BANK PEKAO S.A. (BANK POLSKA KASA OPIEKI S.A.) – Biuro Maklerskie PEKAO,pekao.com.pl,https://www.pekao.com.pl/,true
+BNP Paribas Bank Polska S.A. – Biuro Maklerskie BNP Paribas Bank Polska,bnpparibas.pl,https://www.bnpparibas.pl/,true
+ERSTE BANK POLSKA S.A. – Erste Biuro Maklerskie,erste.pl,https://www.erste.pl/klient-indywidualny,true
+ING BANK ŚLĄSKI S.A. – Biuro Maklerskie ING Bank Śląski,ing.pl,https://www.ing.pl/,true
+mBANK S.A. – Biuro Maklerskie mBank,mbank.pl,https://www.mbank.pl/indywidualny/,true
+POWSZECHNA KASA OSZCZĘDNOŚCI BANK POLSKI S.A. (PKO BP S.A.) – Biuro Maklerskie PKO Banku Polskiego,pkobp.pl,https://www.pkobp.pl/,true
+VeloBank S.A. – Departament Maklerski VeloBank,velobank.pl,https://www.velobank.pl/,true

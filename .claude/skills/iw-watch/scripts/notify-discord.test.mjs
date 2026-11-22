@@ -46,3 +46,13 @@ test('a failing webhook exits non-zero without printing the URL (it is a secret)
   assert.match(err.join(''), /404/);
   assert.ok(!err.join('').includes('SECRET-TOKEN'));
 });
+
+test('approved says the PR can be merged and pings only the configured user', () => {
+  const m = message(['approved', '#40 feat @everyone', 'https://github.com/x/y/pull/40', 'approved by @hen68'], { userId: '123456789012345678' });
+  assert.equal(m.content, '🎉 Hey <@123456789012345678>, your PR is approved! You can merge it now.\n**#40 feat @everyone**\n<https://github.com/x/y/pull/40>\n✅ Approved by @hen68');
+  assert.deepEqual(m.allowed_mentions, { parse: [], users: ['123456789012345678'] });
+  const n = message(['approved', '#40 t', 'u']);
+  assert.ok(n.content.startsWith('🎉 Hey, your PR is approved! You can merge it now.\n'), n.content);
+  assert.ok(!n.content.includes('Approved by'), 'no approvers line without approvers');
+  assert.deepEqual(n.allowed_mentions, { parse: [] });
+});

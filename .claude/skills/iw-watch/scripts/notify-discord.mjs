@@ -2,22 +2,33 @@
 // A notifier for IWATCH_NOTIFY_CMD: posts each iw-watch notice to a Discord channel through a webhook.
 //   export IWATCH_DISCORD_WEBHOOK=https://discord.com/api/webhooks/<id>/<token>   (a secret: .env, never committed)
 //   export IWATCH_NOTIFY_CMD="node /abs/path/.claude/skills/iw-watch/scripts/notify-discord.mjs"
-//   export IWATCH_DISCORD_USER_ID=<your Discord user id>   (optional: "hey, I need you @you" on needs-human)
+//   export IWATCH_DISCORD_USER_ID=<your Discord user id>   (optional: pings you on needs-human and approved)
 // The watcher calls it as: notify-discord.mjs <kind> <"#pr title"> <url>. Mentions are never parsed from the
 // text, so a PR title cannot ping @everyone; the only ping allowed is the configured user id.
 import { pathToFileURL } from 'node:url';
 
-const LABEL = { done: '✅ done', 'draft-ready': '📝 draft ready', 'needs-human': '🙋 needs you' };
+const LABEL = { done: '✅ done', 'draft-ready': '📝 draft ready', 'needs-human': '🙋 needs you', approved: '🎉 approved' };
 const WEBHOOK = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/;
 
 const USER_ID = /^\d{15,22}$/;
 
 export function message([kind, title, url, text], { userId } = {}) {
-  const ping = kind === 'needs-human' && USER_ID.test(String(userId || '')) ? String(userId) : null;
+  const ping = (kind === 'needs-human' || kind === 'approved') && USER_ID.test(String(userId || '')) ? String(userId) : null;
   // <url> keeps Discord from embedding a preview; the link points at the agent's comment when there is one
+  const fence = (s) => s.replace(/\`/g, "'");
+  if (kind === 'approved') {
+    // its own layout: good news first, then the PR, then who approved it
+    const by = /^approved by (.+)$/i.exec(String(text || '').split('\n')[0].trim());
+    const lines = [
+      `🎉 Hey${ping ? ` <@${ping}>` : ''}, your PR is approved! You can merge it now.`,
+      `**${fence(String(title)).slice(0, 300)}**`,
+      `<${url}>`,
+      ...(by ? [`✅ Approved by ${fence(by[1]).slice(0, 200)}`] : []),
+    ];
+    return { content: lines.join('\n'), allowed_mentions: { parse: [], ...(ping ? { users: [ping] } : {}) } };
+  }
   const hey = ping ? `hey, I need you <@${ping}>\n` : '';
   const head = `${hey}**iw-watch** ${LABEL[kind] || kind}: ${title} <${url}>`.slice(0, 600);
-  const fence = (s) => s.replace(/\`/g, "'");
   const lines = String(text || "").slice(0, 1300).split("\n");
   const answers = lines.filter((l) => /^\s*\/iw /.test(l));
   const notes = lines.filter((l) => !/^\s*\/iw /.test(l) && l.trim());
