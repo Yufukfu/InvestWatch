@@ -1,6 +1,6 @@
 # AI-Assisted Development Log
 
-This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
+This log documents how the team builds InvestWatch with AI assistants (evaluation criterion: "standardized software development process with AI assistants", 20%). Add a short entry in [`ai-log/`](ai-log/README.md) at every milestone and whenever the process changes. Process detail: `../.claude/SDLC.md`, `../.claude/CODE_REVIEW.md`.
 
 ## Process
 
@@ -27,7 +27,7 @@ All of it is committed, so the three of us run identical agents. The AI assistan
 
 ## Lifecycle of one change
 
-Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log row, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
+Intake (docs first, STATUS) → `iw-implement` (size, worktree) → `/openspec-propose`, human approves → `/openspec-apply-change` with `iw-commit-cycle` per task group → closing tasks (docs, log entry, whole-branch review) → `/openspec-archive-change` as the last commit → agent pushes and opens the PR → human approves and merges. Canonical stages and gates: `../.claude/SDLC.md`.
 
 ## Controls on generated code
 
@@ -131,3 +131,8 @@ Known limits: review is a practice, not enforced by a hook; the hook reads only 
 | Sun ~11:00 | Adam | A Claude Code session resolved issue #66 autonomously: checked open scraper PRs for overlap first, verified the scraper container section of `security-audit.md` against `scraper/compose.yaml`, wrote a MODIFIED delta for `scraper-deployment` "Audited supply chain" with the CLI's own delta rules, ran `pip-audit` for the PR body | Branch `scraper/scraper-audit-in-pr-body`, spec-only. Docs already followed ADR 0209, so no doc edit was needed. The local `pip-audit` 2.10.1 needed Python 3.14 (not the 3.9 system python). |
 | Sun ~11:30 | Adam | A Claude Code session did the scraper side of issue #78: read Damian's recorded run against the code on `main` (seed files, scan-request consumer, scheduler, retry and job-error paths, merge time of PR #67) instead of restarting the shared stack, and wrote only what the run shows, with "not checked" for the rest | Branch `scraper/demo-rehearsal-evidence`, docs only (`.docs/STATUS.md` scraper evidence, `.docs/status/scraper.md`). The per-source document split, scraper logs and scheduled scans are not in the issue, so they stay open. Found `.docs/status/scraper.md` still calling the renderer PR pending after it merged. |
 | Sun ~02:00 | Kacper | A Claude Code session added an `approved` notice to `iw-watch`: scan reads `reviewDecision`, the runner notifies without starting a session, and the Discord notifier pings the user with "your PR is approved! You can merge it now" | Branch `chore/iw-watch-approved`. A first run test failed because the fixture's approval had a body, which the scan also (correctly) treats as review feedback; the test now uses an empty approval. Not sent through a real webhook yet |
+One file per entry in [`ai-log/`](ai-log/README.md), named `YYYY-MM-DDTHHMM-<who>-<slug>.md`, so the listing reads in time order and parallel PRs never edit the same file ([ADR 0212](decisions/0212-ai-log-one-file-per-entry.md)). How to add one: the `iw-ai-log` skill. The whole log as one table, oldest first:
+
+```sh
+node .claude/skills/iw-ai-log/scripts/ai-log.mjs render
+```

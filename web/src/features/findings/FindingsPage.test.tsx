@@ -156,7 +156,7 @@ describe('FindingsPage', () => {
     fireEvent.change(screen.getByLabelText('Od dnia'), { target: { value: '2026-11-20' } });
     await waitFor(() => expect(seen.at(-1)?.get('date_from')).toBe('2026-11-20T00:00:00Z'));
     fireEvent.change(screen.getByLabelText('Szukaj'), { target: { value: 'inwestor jan' } });
-    await waitFor(() => expect(seen.at(-1)?.get('q')).toBe('inwestor jan'), { timeout: 2000 });
+    await waitFor(() => expect(seen.at(-1)?.get('q')).toBe('inwestor jan'));
   });
 
   it('the first-page action on an empty page past the end goes to page 1', async () => {

@@ -43,7 +43,7 @@ def test_every_contract_path_has_a_route(client):
     norm = lambda path: re.sub(r"\{[a-z_]+\}", "{x}", path)
     served = {(norm(p.removeprefix("/api")), m) for p, ops in client.app.openapi()["paths"].items() for m in ops}
     wanted = {(norm(p), m) for p, ops in spec["paths"].items() for m in ops if m != "parameters"}
-    assert len(spec["paths"]) == 11
+    assert len(spec["paths"]) == 12
     assert wanted <= served, sorted(wanted - served)
 
 
