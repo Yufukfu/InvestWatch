@@ -27,9 +27,9 @@
 
 ## 5. End to end and the derivation for Damian
 
-- [ ] 5.1 End to end on the test stack (real Redis, PostgreSQL, MinIO, stub web server): scan a page, edit it, scan again, remove it, scan again; assert the two rows, the `gone` row with its URL, and `scan.finished` `ok` each time
-- [ ] 5.2 Pin the api derivation as a test: the two SQL queries of design decisions 1 and 2, run on the state of 5.1, return `changed` for the first document and `removed` for the source; also pin the two known-wrong cases (revert to an earlier text still derives "changed", unchanged return after a removal still derives "removed") with a comment naming design decision 5; these queries are what goes to Damian
-- [ ] 5.3 Mutation check — mutations: n/a, wiring group; behaviour verified by the end-to-end run
+- [x] 5.1 End to end on the test stack (real Redis, PostgreSQL, MinIO, stub web server): scan a page, edit it, scan again, remove it, scan again; assert the two rows, the `gone` row with its URL, and `scan.finished` `ok` each time
+- [x] 5.2 Pin the api derivation as a test: the two SQL queries of design decisions 1 and 2, run on the state of 5.1, return `changed` for the first document and `removed` for the source; also pin the two known-wrong cases (revert to an earlier text still derives "changed", unchanged return after a removal still derives "removed") with a comment naming design decision 5; these queries are what goes to Damian
+- [x] 5.3 Mutation check — mutations: n/a, wiring group; behaviour verified by the end-to-end run
 
 ## 6. Closing
 
