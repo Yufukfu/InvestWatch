@@ -206,7 +206,7 @@ button.link:hover { color: var(--link); }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label, .field legend { font-size: 13px; font-weight: 600; color: var(--muted); }
 .field input, .field select { border-color: var(--control-border); font-size: 14px; }
-.field select { appearance: none; padding-right: 36px; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; }
+select { appearance: none; padding-right: 36px; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; }
 .field-status { grid-column: 1 / -1; border: 0; margin: 0; padding: 0; }
 .field-status legend { padding: 0; margin-bottom: 4px; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -397,8 +397,9 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 .trend-state { color: var(--muted); margin: 16px 0; }
 .trend-note { color: var(--muted); margin: 8px 0 0; }
 .trend-table { margin: var(--space-4) 0 0; }
+.trend-footer > .trend-table { margin-left: auto; }
 .trend-table[open] { flex-basis: 100%; order: 4; }
-.trend-table summary { cursor: pointer; background: var(--surface); display: inline-flex; align-items: center; gap: 8px; min-height: var(--tap); padding: 0 var(--space-4); border: 1px solid var(--control-border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; font-weight: 600; list-style: none; }
+.trend-table summary { cursor: pointer; background: var(--surface); display: flex; width: fit-content; margin-left: auto; align-items: center; gap: 8px; min-height: var(--tap); padding: 0 var(--space-4); border: 1px solid var(--control-border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; font-weight: 600; list-style: none; }
 .trend-table summary::-webkit-details-marker { display: none; }
 .trend-table summary::after { content: '↓'; color: var(--muted); transition: transform var(--dur) var(--ease); }
 .trend-table[open] summary::after { transform: rotate(180deg); }

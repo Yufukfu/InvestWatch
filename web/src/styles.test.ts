@@ -181,6 +181,16 @@ describe('interaction styling', () => {
     expect(px(top ?? '0px')).toBeGreaterThanOrEqual(16);
   });
 
+  it('keeps the data-table button on the right whether the table is open or closed', () => {
+    expect(declared('.trend-table summary', 'margin-left')).toBe('auto');
+    expect(declared('.trend-table summary', 'width')).toBe('fit-content');
+  });
+
+  it('draws the same inset arrow on every select, not only the filter ones', () => {
+    expect(declared('select', 'appearance')).toBe('none');
+    expect(px(declared('select', 'padding-right') ?? '0px')).toBeGreaterThanOrEqual(36);
+  });
+
   it('gives every control a 120-150ms transition from tokens', () => {
     const dur = Number(/^(\d+)ms$/.exec(tokens.get('--dur') ?? '')?.[1]);
     expect(dur).toBeGreaterThanOrEqual(120);
