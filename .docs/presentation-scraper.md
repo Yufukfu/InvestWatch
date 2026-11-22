@@ -2,7 +2,7 @@
 
 Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into the deck; each `##` below is one slide, with speaker notes under **Notes**. Owner: Adam.
 
-Every number was checked on `origin/main` at `a706474` (2026-11-22), against the code, the ADRs, `git` or `gh`; the source of each is named on its slide. Coverage numbers (slide 3) are Damian's recorded run in issue #78 (clean `docker compose up` from `main` at `c810a14`, 17 seeded sources, one `POST /api/scans` each); they are not recomputed here. Counts that move (PRs, log rows) were taken at the commit above: refresh them with the commands under slide 5.
+Every number was checked on `origin/main` at `a706474` (2026-11-22), against the code, the ADRs, `git` or `gh`; the source of each is named on its slide. Coverage numbers (slide 3) are Damian's recorded run in issue #78 (clean `docker compose up` from `main`, 17 seeded sources, one `POST /api/scans` each); they are not recomputed here. Counts that move (PRs, log rows) were taken at the commit above: refresh them with the commands under slide 5.
 
 **Not on `main` at the time of writing** and therefore not claimed as capabilities: X and YouTube collectors (branch `scraper/scraper-social-x-youtube`, local, not pushed) and re-scan tracking of removed or changed pages (branch `scraper/scraper-rescan-tracking`, local, not pushed). They appear only on slide 3, labelled "in progress, not merged".
 
@@ -26,7 +26,7 @@ scheduler / POST /api/scans ─▶ arq queue (Redis) ─▶ worker: run_source
 - **One writer:** `Ingestor` is the only path to `documents`: upload HTML, insert with a named `ON CONFLICT (source_id, content_hash)`, then `XADD`. Delivery is at-least-once; a sweep republishes rows whose announcement was lost (60 s grace); the stream is capped with `MAXLEN ~ 10000` (ADR 0104).
 - **Deploy:** one image, three services: `worker` (scale with `docker compose up --scale worker=3`), exactly one `scheduler`, a one-shot `seed` (ADR 0106). No scraper container publishes a host port.
 
-**Notes:** The ladder is a rule, not a hope: anything that fetches goes through the same guards, limiter and identity, including the renderer, so a heavier rung never bypasses politeness. Limits (`worker` 1 CPU / 768 MB, `scheduler` 0.5 CPU / 256 MB, `seed` 0.5 CPU / 128 MB) are first estimates, not measured on the demo machine; the renderer is another container (about 360 MB image, 1.5 CPU / 1 GB at most) and was not part of the recorded run on slide 3. Scaling is safe for `worker` (queue, per-domain limits and the run lock are in Redis); `scheduler` stays at one. Scan events (`scan.started`, `scan.finished`) go to `iw:events` for the dashboard. Sources: `scraper/README.md`, `scraper/CLAUDE.md`, ADRs 0101, 0102, 0104, 0106, 0107, `.docs/integration-plan.md` §2, §3.
+**Notes:** The ladder is a rule, not a hope: anything that fetches goes through the same guards, limiter and identity, including the renderer, so a heavier rung never bypasses politeness. Limits (`worker` 1 CPU / 768 MB, `scheduler` 0.5 CPU / 256 MB, `seed` 0.5 CPU / 128 MB) are first estimates, not measured on the demo machine; the renderer is another container (about 360 MB image, 1.5 CPU / 1 GB at most) and #78 does not say it ran. Scaling is safe for `worker` (queue, per-domain limits and the run lock are in Redis); `scheduler` stays at one. Scan events (`scan.started`, `scan.finished`) go to `iw:events` for the dashboard. Sources: `scraper/README.md`, `scraper/CLAUDE.md`, ADRs 0101, 0102, 0104, 0106, 0107, `.docs/integration-plan.md` §2, §3.
 
 ---
 
@@ -50,15 +50,15 @@ One clean `docker compose up` from `main`, one scan request per seeded source (a
 
 | Source kind | Sources | Documents |
 |---|---|---|
-| Web pages (KNF warnings list plus 12 vetted pages: 5 firm sites for M2, 4 third-party for M1, 2 negative controls and 1 list page for M3) | 13 | 1 each (13) |
+| Web pages (KNF warnings list plus 12 vetted pages: 5 firm sites for M2, 4 third-party for M1, 2 negative controls for M3 and 1 list page for M1 and M3) | 13 | 1 each (13) |
 | Telegram public channels (`t.me/s/<handle>`) | 4 | 50-55 posts each (the rest of the 223) |
 
 - **What came out of it:** all 223 documents were consumed by analytics with 0 errors and 0 poison messages; 72 findings (M1 54, M2 5, M3 13) and 10 `finding.high_risk` events (analytics' own result, #78).
 - **Social on `main`:** Telegram public channels only, one document per text post, with its permalink and the channel as author (ADR 0103, PR #61). Facebook, Instagram and TikTok (named in the brief) are **not** covered: login walls or a JavaScript shell (evidence in ADR 0103).
 - **In progress, not merged:** X (with a dedicated account's cookies) and YouTube metadata collectors, accepted as a decision in ADR 0109 (merged) but implemented only on a local branch; re-scan tracking (a removed or changed page). Neither runs in the product today.
-- **Gaps we know:** the renderer (screenshots, layout blocks) is merged but was off in this run, so the visual M2 rules saw no layout; no real UKNF samples yet (`sample_import` is ready for them, #73).
+- **Gaps we know:** the renderer (screenshots, layout blocks) is merged and off by default, so presumably off in this run (#78 does not say); the visual M2 rules need its layout blocks; no real UKNF samples yet (`sample_import` is ready for them, #73).
 
-**Notes:** The 13 web pages and 4 channels are 17 rows in `sources`, which is what `seed` loads (`scraper/seeds/sources.toml` has 12 tables, `telegram.toml` 4, plus the KNF row from the loader). 223 minus the 13 web pages gives the 210 Telegram posts; Damian reported the per-channel range, not the sum. `SOCIAL_MAX_POSTS` defaults to 40, read in whole pages of twenty, so a channel gives up to 60 posts per run. No source row says that a named business breaks a rule: each is a page that matches a signal, a negative control, or a list page. The Grant Thornton negative control produced a high-risk finding because the hosted LLM was down (#78, gap 2): that is an analytics-side result (#78). Sources: issue #78 comment, `scraper/seeds/*.toml`, `scraper/README.md`, ADRs 0103 and 0109, `git ls-tree origin/main`, `gh pr list`.
+**Notes:** The 13 web pages and 4 channels are 17 rows in `sources`, which is what `seed` loads (`scraper/seeds/sources.toml` has 12 tables, `telegram.toml` 4, plus the KNF row from the loader). 223 minus the 13 web pages gives the 210 Telegram posts; Damian reported the per-channel range, not the sum. `SOCIAL_MAX_POSTS` defaults to 40 posts seen (`collect.py`, documented as two pages of twenty), yet #78 recorded 50-55 per channel; the reason is not checked, so do not present 40 as the observed size. No source row says that a named business breaks a rule: each is a page that matches a signal, a negative control, or a list page. The Grant Thornton negative control produced a high-risk finding because the hosted LLM was down (#78, gap 2): that is an analytics-side result (#78). Sources: issue #78 comment, `scraper/seeds/*.toml`, `scraper/README.md`, ADRs 0103 and 0109, `git ls-tree origin/main`, `gh pr list`.
 
 ---
 
