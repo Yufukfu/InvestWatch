@@ -1,6 +1,6 @@
 # Status: platform (Damian)
 
-Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their state. Last updated: 2026-11-21 (Sat).
+Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their state. Last updated: 2026-11-22 (Sun).
 
 ## State
 
@@ -28,12 +28,16 @@ Covers `analytics/`, `api/` and `contracts/`. Edit only this file for their stat
 - `analytics-stored-content-hash` (issue #31, Damian's decision): analytics no longer computes a `content_hash` (`preprocess()` had an NFKC one, used only as the LLM cache key); it uses the stored NFC value the scraper writes as is, also for the LLM cache key, and a document without one is not cached ([ADR 0105](../decisions/0105-content-hash-normalisation.md)). NFKC `normalize()` stays for matching, language guess and excerpts. Open: `contracts/mocks/generate_mocks.py` still lowercases before hashing (`content-hash-definition` follow-up 4, Damian's own decision).
 - Presentation (#77, #74): analytics slide content in `.docs/presentation-analytics.md` (rules-only gold-set numbers on the synthetic set, R14 add-a-rule example, LLM swap summary). Open: real UKNF samples (#73) and the Ollama rehearsal on the demo machine.
 
+### rehearsal on real data (#78, 2026-11-22, `main` c810a14)
+- Clean stack, 17 seeded sources, one scan request each: analytics handled all 223 documents (71 stored, 152 `no_findings`), 72 findings, 10 `finding.high_risk` events (equal to the findings above M1 0.65 / M2 0.1 / M3 0.4), 0 errors, no poison messages. The API returns the same 72 through the gateway (`/api/findings`, `/api/stats/summary` high 10, detail, `/api/calibration`).
+- Demo risks: the hosted Gemma answered 1 of 5 calls (2× 503, 2× timeout), then the breaker kept the rest rules-only; pre-warm or use the Ollama profile. Without the LLM, S3.4 stays `uncertain` and opens the M3 gate, so the Grant Thornton negative control is high-risk (0.78). The KDP news control has 17 low M1 findings (16 on "OKX" mentions matched to OKX Europe Markets, 1 on "Capital Markets").
+
 ### api
 - `api-db-schema` applied and archived: Alembic `0001`-`0003` for `sources`, `documents`, `findings`, `job_errors`, `calibration_points`; one-shot `api-migrate` in the root stack.
 - Merged with PR #15 (Kacper's review fixed in `api-db-schema-review-fixes`).
 - `api-v1` applied and archived: REST under `/api` (all 11 contract paths), Socket.IO relay `iw:events` → `/events`, calibration curve from analyst labels, the `api` service in `api/compose.yaml`.
 - In PR #21, stacked on PR #18 (`infra-compose`) and merging after it; Kacper's review fixed in `api-v1-review-fixes`.
-- Open for Adam: nothing consumes `iw:scan-requests` yet, so `POST /api/scans` queues without running a scan (`.docs/integration-plan.md` §5).
+- `POST /api/scans` runs a scan: the scraper consumes `iw:scan-requests` (#30). Verified in the #78 rehearsal: 17 requests through the gateway, all answered 202 and scanned.
 
 ### infra-compose
 - Redis 8, object storage (MinIO, bucket `iw-raw`), the optional Ollama profile `llm`, project-scoped networks (`data`, `edge`, `egress`) and the smoke test `infra/tests/smoke.sh`: applied and archived, in PR #18.
