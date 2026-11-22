@@ -32,14 +32,14 @@ async def wait_for(condition, timeout=20.0):
 
 
 @asynccontextmanager
-async def stack(pool, storage, *, urls, addresses, workers=1, stages=None):
+async def stack(pool, storage, *, urls, addresses, workers=1, stages=None, renderer=None):
     redis_url = os.environ["IW_TEST_REDIS_URL"]
     redis = await create_queue_pool(RedisSettings.from_dsn(redis_url))
     await redis.flushdb()
     rt = assemble(
         pool, storage, redis, urls=urls, addresses=addresses, rotator=ProxyRotator([], "per_request", 90.0),
         limiter=DomainLimiter(redis, 0.05), timeout=10.0, max_bytes=5 * 1024 * 1024,
-        stages=stages,
+        stages=stages, renderer=renderer,
     )
     runner = RunnerSettings(redis_url=redis_url, poll_delay=0.05, consumer_block=0.2, shutdown_deadline=5.0)
     queue = fast_settings(attempt_timeout=20.0, lease_ttl=5.0)

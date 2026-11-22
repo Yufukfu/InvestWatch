@@ -9,6 +9,7 @@ migration) and drops it at the end.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import threading
@@ -18,7 +19,7 @@ from datetime import timedelta
 
 import pytest
 
-from conftest import NOW, make_doc, pg_test_url
+from conftest import NOW, make_doc, pg_test_url, stored_hash
 from investwatch_analytics.models import AdvertiserRef, Finding, ScrapedDocument
 from investwatch_analytics.storage import (
     InvalidDocument,
@@ -175,6 +176,37 @@ def test_load_merges_payload_with_columns(backend):
 def test_load_without_payload(backend):
     backend.seed(columns(), None)
     assert load(backend).id == DOC_ID
+
+
+def test_stored_content_hash_is_used_as_is(backend):
+    """Issue #31: analytics passes the scraper's NFC hash through; it never recomputes it from its NFKC text."""
+    from investwatch_analytics.config import SEED_REGISTRY
+    from investwatch_analytics.pipeline import analyze
+    from investwatch_analytics.preprocessing import normalize
+    from investwatch_analytics.registry import Registry
+    from investwatch_analytics.rules.engine import Catalogue
+
+    text = "Reklama. Zysk ﬁrmy do 20%² rocznie."
+    stored = stored_hash(text)
+    assert stored != hashlib.sha256(normalize(text).encode("utf-8")).hexdigest()  # NFKC would give another value
+    backend.seed(columns(text=text, content_hash=stored))
+    doc = load(backend)
+    assert doc.content_hash == stored
+    analyze(doc, registry=Registry.from_csv(SEED_REGISTRY), catalogue=Catalogue.load(), now=NOW)
+    assert doc.content_hash == stored
+
+
+def test_document_without_a_stored_hash_stays_without_one(backend):
+    from investwatch_analytics.config import SEED_REGISTRY
+    from investwatch_analytics.pipeline import analyze
+    from investwatch_analytics.registry import Registry
+    from investwatch_analytics.rules.engine import Catalogue
+
+    backend.seed(columns(content_hash=None))
+    doc = load(backend)
+    assert doc.content_hash is None
+    analyze(doc, registry=Registry.from_csv(SEED_REGISTRY), catalogue=Catalogue.load(), now=NOW)
+    assert doc.content_hash is None
 
 
 def test_load_unknown_id_is_not_found(backend):

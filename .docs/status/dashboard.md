@@ -18,7 +18,8 @@ Edit only this file for `web/` and `infra/` state. Last updated: 2026-11-22 (Sun
 
 ## Active OpenSpec changes
 
-- `untrusted-text-plain` (issue #54), in review; archived in the same PR. Otherwise none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
+- web features: `untrusted-text-plain` (issue #54), in review; archived in the same PR. Otherwise none (`calibration-panel` archived, stacked on PR #40). All features from `web/CLAUDE.md` "Done" are built on the mock; next: swap in the real api once there is real data
+- `agent-watch` (branch `chore/agent-watch`, archived in its PR): the `iw-watch` skill and runner for agent-to-agent hand-offs through GitHub, plus `.github/CODEOWNERS` (owners need the team's OK in review).
 
 ## Blockers and open decisions
 

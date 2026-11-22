@@ -3,7 +3,7 @@
 Analytics service: preprocessing, KNF firm registry, UKNF rule engine, modules M1–M3, LLM integration.
 
 - **Owner:** Damian
-- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (rules-only R1–R3) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. LLM layer (change `analytics-llm-p0`): checks the rules defer go to an OpenAI-compatible model, hosted Gemma 4 by default, local Gemma through Ollama as the swap (section "LLM: hosted Gemma or local Ollama" below). Without a reachable model every finding is rules-only (`model.llm = null`, the summary ends with "Tryb regułowy (bez modelu językowego).").
+- **Status:** pipeline (changes `analytics-skeleton`, `analytics-m1-m3`): M2 (R1–R4, R6, R11, R12a, R12b, R14–R18; R11, R12a, R12b, R15 and R16 from change `analytics-m2-p1-rules`) for a registered firm's own material, M1 (signals S1.1–S1.7) for third-party ads of a registered firm, M3 (signals S3.1–S3.8) for offers that may indicate investment advice by an entity outside the registry. Service (change `analytics-worker`): a worker consumes the Redis Stream `iw:documents`, upserts `findings` in Postgres and publishes `finding.created` / `finding.high_risk` on `iw:events`. LLM layer (change `analytics-llm-p0`): checks the rules defer go to an OpenAI-compatible model, hosted Gemma 4 by default, local Gemma through Ollama as the swap (section "LLM: hosted Gemma or local Ollama" below). Without a reachable model every finding is rules-only (`model.llm = null`, the summary ends with "Tryb regułowy (bez modelu językowego).").
 - **Registry:** the default registry is `registry/knf.csv`, the real KNF register of investment firms (749 firms, snapshot of 2026-11-21; change `analytics-knf-registry`). At start-up the worker logs `registry_loaded` with the snapshot date. R1 passes only on a firm's official name; a former or trade name alone makes it `uncertain`. `registry/seed.csv` (4 fictional firms) is the test fixture: it logs a `registry_seed` WARNING if used, and M3 findings then add "(dane demonstracyjne)" (`Registry.demo`: no firm has a `source_url`). Files, source and refresh: [`registry/README.md`](registry/README.md).
 - **Privacy:** rule `evidence` and `advertiser` copy scraped author names, handles, profile and referral links verbatim (cut to 200-300 characters) into `findings`, and the `iw:events` messages carry the title, which names the advertiser, so treat them as personal data taken from public posts.
 - **Evaluation:** gold-set evaluation (change `analytics-eval-calibration`): `eval/gold.jsonl`, `python eval/run.py`, and the one-shot `analytics-eval` service that feeds the calibration panel (section "Gold-set evaluation" below).
@@ -14,12 +14,13 @@ A document gives at most one finding per module ([`modules/router.py`](src/inves
 
 | Who publishes | Registry | Module |
 |---|---|---|
+| the supervisor or an official register (page or author profile host on `knf.gov.pl`, `uknf.gov.pl`, `gov.pl` or a subdomain; `OFFICIAL_SOURCE_DOMAINS` replaces the list) | — | nothing (`official_source`): it warns about firms, it does not advertise them |
 | a registered firm (the page host or the author's profile host is its domain; any platform; a handle alone is not enough) | — | M2 for that firm |
 | a foreign firm without a Polish branch (`foreign_no_branch`), its own material | — | nothing (`out_of_scope_m2_foreign_no_branch`): M2 is for firms registered in Poland, including Polish branches |
 | `firm_own` source | firm named or page on a firm domain | M2 |
-| `firm_own` source | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| `firm_own` source | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`); service vocabulary alone is no offer |
 | a third party | firm named in the text or linked | M1 (a foreign firm without a Polish branch only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
-| a third party | no firm | M3 if advisory signals, else nothing (`no_signals`) |
+| a third party | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`) |
 
 M1 score: σ(bias + Σ w·x), how certain this is a third-party ad of the firm. M3 score: the same form, capped at 0.4 unless S3.4 (a recommendation to buy, sell or hold financial instruments) is found; M3 means "may indicate" investment advice, and the summary says when personalisation (art. 76) is unconfirmed ([ADR 0308](../.docs/decisions/0308-m3-s34-gate.md)). Signals, weights and dictionaries: [`rules/m1_signals.yaml`](src/investwatch_analytics/rules/m1_signals.yaml), [`rules/m3_signals.yaml`](src/investwatch_analytics/rules/m3_signals.yaml). Evidence may quote the author handle, a link or the page URL as well as the text. Routing and the M1/M3 rules read at most the first 200 000 characters (`SCAN_MAX` in `pipeline.py`); firm names are compared after NFKC and removal of zero-width characters, with quotes cut from the original text. Specs: [`m1-third-party-signals`](../openspec/specs/m1-third-party-signals/spec.md), [`m3-unauthorized-advice-signals`](../openspec/specs/m3-unauthorized-advice-signals/spec.md).
 
@@ -63,9 +64,9 @@ CLAIM_MIN_IDLE_MS=90000
    LLM_MAX_CHUNKS=2                      # fewer calls on long pages
    ```
 
-   `OLLAMA_MODEL=gemma3:4b` and `OLLAMA_CONTEXT_LENGTH=8192` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
+   `OLLAMA_MODELS="gemma3:4b bge-m3"`, `OLLAMA_CONTEXT_LENGTH=8192`, `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
 
-2. Pull the model once (about 3.3 GB), then start the stack with the profile:
+2. Pull the models once (`gemma3:4b` about 3.3 GB, `bge-m3` for embeddings about 1.2 GB), then start the stack with the profile:
 
    ```bash
    docker compose --profile llm up ollama-pull
@@ -92,12 +93,12 @@ docker compose run --rm analytics-eval        # the same in the stack
 
 The one-shot `analytics-eval` service runs `--db` on every `docker compose up`, after `api-migrate`. It stores a module's run only when the gold set, the pipeline version or the results changed, so restarts add nothing. `GET /api/calibration` adds analysts' `confirmed` / `false_positive` labels to that run's counts. The report gives precision, recall and F1 per module on the thresholds 0.05-0.95, counted the same way as the API. Per rule or signal it gives two readings: **`strict` (the headline: `uncertain` counts as not flagged)** and `review` (`uncertain` counts as flagged). Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`, no rows stored for it) or a gold document crashed the pipeline (nothing stored); 2 invalid gold set or configuration; 3 the database write failed.
 
-Latest rules-only numbers (build `main` bb770a0 with this change). Recommended threshold = higher end of the plateau of thresholds whose F1 is within 0.02 of the best; rules as `strict` precision / recall:
+Latest rules-only numbers (M1 and M3: build `main` bb770a0; M2: re-run on `analytics-m2-p1-rules` de53bbe, defaults unchanged). Recommended threshold = higher end of the plateau of thresholds whose F1 is within 0.02 of the best; rules as `strict` precision / recall:
 
 | Module (gold cases) | Recommended (plateau) | At it | At the old ADR 0305 default | Rules |
 |---|---|---|---|---|
 | M1 (18: 10 / 8) | 0.65 (0.40-0.65) | precision 1.0, recall 0.8, F1 0.889 | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
-| M2 (35: 23 / 12) | 0.1 (0.05-0.1) | precision 0.933, recall 0.609, F1 0.737 | 0.5: F1 0.414 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R14 1.0 / 1.0, R17 1.0 / 0.33, R18 1.0 / 1.0 (with `analytics-llm-p0`; R5, R7-R13, R15, R16 not built) |
+| M2 (35: 23 / 12) | 0.1 (0.05-0.1) | precision 0.944, recall 0.739, F1 0.829 | 0.5: F1 0.516 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R11 1.0 / 1.0, R12a 1.0 / 1.0, R12b 1.0 / 1.0, R14 1.0 / 1.0, R15 1.0 / 1.0, R16 1.0 / 1.0, R17 1.0 / 0.33, R18 1.0 / 1.0 (R5, R7-R10, R13 not built) |
 | M3 (18: 10 / 8) | 0.25 (0.25 only); **default 0.4** (gate cap) | at 0.25: precision 0.875, recall 0.7, F1 0.778; at 0.4: precision 1.0, recall 0.4, F1 0.571 | 0.7: F1 0 | S3.1 1.0 / 0.67, S3.2 1.0 / 0.71, S3.8 1.0 / 1.0 |
 
 M3's default is raised to the S3.4 gate cap (0.4, ADR 0308) so capped findings never alert by default; it is re-evaluated once the LLM scores S3.4 (ADR 0316). S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
@@ -141,6 +142,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 |---|---|---|
 | `REGISTRY_CSV` | `registry/knf.csv` (the real KNF register snapshot; found from a source checkout, `pip install -e` or the image, which keeps `registry/` next to `src/`) | firm registry, files and refresh in [`registry/README.md`](registry/README.md) |
 | `LOG_LEVEL` | `INFO` | log level |
+| `OFFICIAL_SOURCE_DOMAINS` | `knf.gov.pl,uknf.gov.pl,gov.pl` | comma-separated domains (subdomains included) whose pages never become findings (`official_source`); a value replaces the default; a malformed entry stops the worker and the CLI with exit 2 |
 | `DATABASE_URL` | worker: required | Postgres, app role (`postgresql://iw_app:...@postgres:5432/investwatch`) |
 | `REDIS_URL` | worker: required | Redis (`redis://:<password>@redis:6379/0`) |
 | `WORKER_CONSUMER` | hostname | consumer name in the group `analytics` |
@@ -156,7 +158,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 
 - `src/investwatch_analytics/pipeline.py`: `analyze(doc, *, registry, catalogue, now, signals=None)` → findings (`signals`: the M1/M3 catalogues, shipped ones by default). Pure, no I/O.
 - `src/investwatch_analytics/rules/m2_rules.yaml`: all 18 UKNF rules (name, severity, legal basis, dictionaries). Only entries with `implemented: true` run.
-- `src/investwatch_analytics/rules/m2.py`: R1 firm identification, R2 ad labeling, R3 risk information next to return claims.
+- `src/investwatch_analytics/rules/m2.py`: the M2 rule classes: R1 firm identification, R2 ad labeling, R3 risk information next to return claims, R4 and R6 (visual, `blocks`), R11 product comparisons, R12a and R12b past performance (period and scope; currency and costs), R14 past-performance disclaimer, R15 forecasts, R16 tax information, R17 and R18 supervisor mentions. R12a, R12b and R14 share one past-performance detector; each art. 44 element has one owner rule ([ADR 0315](../.docs/decisions/0315-m2-art44-element-ownership.md)). The loader rejects a catalogue pattern with a nested unbounded repetition (ReDoS lint).
 - `src/investwatch_analytics/rules/m1.py`, `rules/m3.py`: the M1/M3 signal classes; `modules/m1.py`, `modules/m3.py`: the M1/M3 findings; `modules/advertiser.py`: publisher identity and `advertiser`; `rules/scoring.py`: the sigmoid score.
 - `src/investwatch_analytics/worker.py`: the stream consumer (`python -m investwatch_analytics.worker`); `storage.py`: the store interface and the Postgres store; `events.py`: `iw:events` publisher and the live threshold read (ADR 0305); `health.py`: `/health`; `testing.py`: test doubles (`InMemoryStore`, `NoopPublisher`), never imported by the worker.
 - `src/investwatch_analytics/evaluation/`: gold-set loader and validation (`gold.py`, `known_ids.py`), metrics with the API's counting (`metrics.py`), runner (`runner.py`), `calibration_points` writer (`store.py`), command line (`__main__.py`); `eval/`: the gold set, its fictional registry and `run.py`.

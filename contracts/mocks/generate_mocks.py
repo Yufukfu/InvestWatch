@@ -268,6 +268,52 @@ SCENARIOS = [
             ],
         ),
     ),
+    # ---------------- M1 + M3 on one post (issue #33) -----------------------
+    dict(
+        key="m1-m3-ig-marek", source="src-ig-hashtag", platform="instagram", source_kind="third_party", hours_ago=4,
+        url="https://www.instagram.com/p/MOCK0005/",
+        title=None,
+        text=("Załóż rachunek w Alfa Inwestycje DM z moim kodem MAREK100 i odbierz 100 zł na start 💸 "
+              "Moi subskrybenci wiedzą więcej: w tym tygodniu kupuję akcje spółki Przykład S.A., a CFD na złoto sprzedaję. "
+              "Pełna lista sygnałów w grupie premium za 149 zł/mies. – link w bio!"),
+        author=dict(name="Marek Trader", handle="@marek_trader", profile_url="https://www.instagram.com/marek_trader/",
+                    followers=67400),
+        links=[dict(href="https://alfa-inwestycje.example.com/rachunek?ref=MAREK100", text="link w bio", rel=None)],
+        blocks=[],
+        findings=[
+            dict(
+                module="M1", score=0.88, status="new", firm="alfa",
+                advertiser=dict(name="Marek Trader", handle="@marek_trader",
+                                profile_url="https://www.instagram.com/marek_trader/", in_registry=False),
+                title="Finfluencer @marek_trader reklamuje Alfa Inwestycje DM z kodem polecającym",
+                summary=("Post promuje rachunek w Alfa Inwestycje DM z kodem MAREK100 i bonusem 100 zł. "
+                         "Brak oznaczenia współpracy i informacji o ryzyku."),
+                rules=[
+                    signal("S1.1", "Wzmianka o firmie z rejestru", "fail", "medium", "Alfa Inwestycje DM"),
+                    signal("S1.2", "Link afiliacyjny / kod polecający", "fail", "high", "kodem MAREK100"),
+                    signal("S1.3", "Oznaczenie współpracy", "pass", "medium", None, "Brak #reklama / #współpraca."),
+                    signal("S1.4", "Wezwanie do działania", "fail", "medium", "link w bio!"),
+                    signal("S1.6", "Autor inny niż firma", "fail", "medium", "@marek_trader"),
+                ],
+            ),
+            dict(
+                module="M3", score=0.84, status="new", firm=None, delay_s=20,
+                advertiser=dict(name="Marek Trader", handle="@marek_trader",
+                                profile_url="https://www.instagram.com/marek_trader/", in_registry=False,
+                                on_warning_list=None),
+                title="Płatne sygnały kup/sprzedaj od @marek_trader, podmiotu spoza rejestru",
+                summary=("Ten sam post oferuje odpłatne rekomendacje kupna akcji i sprzedaży CFD. "
+                         "Autor nie występuje w rejestrze firm inwestycyjnych KNF."),
+                rules=[
+                    signal("S3.1", "Podmiot spoza rejestru", "fail", "high", "@marek_trader"),
+                    signal("S3.4", "Rekomendacja konkretnych instrumentów", "fail", "high",
+                           "kupuję akcje spółki Przykład S.A., a CFD na złoto sprzedaję", method="llm"),
+                    signal("S3.5", "Model odpłatny", "fail", "medium", "grupie premium za 149 zł/mies."),
+                    signal("S3.6", "Kierowanie do Polski", "fail", "low", "149 zł"),
+                ],
+            ),
+        ],
+    ),
     # ---------------- M3: shadow advisory ------------------------------------
     dict(
         key="m3-zloty-kapital", source="src-web-advisory", platform="web", source_kind="unknown", hours_ago=3,
@@ -371,27 +417,35 @@ def build():
                              user_agent="Mozilla/5.0 (mock)", proxy=None, duration_ms=1500),
         ))
 
-        f = sc["finding"]
-        firm = None
-        if f.get("firm"):
-            fd = FIRMS[f["firm"]]
-            firm = dict(name=fd["name"], registry_id=uid("firm-" + f["firm"]), registry_type=fd["registry_type"],
-                        authorized=True, match_confidence=0.95)
-        detected = fetched + timedelta(seconds=40)
-        findings.append(dict(
-            id=uid("finding-" + sc["key"]), document_id=doc_id, module=f["module"], score=f["score"],
-            risk_level=risk_level(f["module"], f["score"]), status=f["status"], title=f["title"],
-            summary=f["summary"], firm=firm, advertiser=f.get("advertiser"), rules=f["rules"],
-            content_excerpt=sc["text"][:200], url=sc["url"], platform=sc["platform"], note=None,
-            detected_at=iso(detected), updated_at=iso(detected),
-            model=dict(pipeline_version="0.1.0-mock", llm="gemma3:4b", embedder="bge-m3"),
-        ))
+        # One finding per module and document (uq_findings_document_module). Single-finding scenarios keep their
+        # original ids; a scenario with `findings=[...]` gets one id per module.
+        several = "findings" in sc
+        for f in sc["findings"] if several else [sc["finding"]]:
+            findings.append(_finding(sc, f, doc_id, fetched, several))
 
     for s in sources:
         s["documents_count"] = sum(1 for d in documents if d["source_id"] == s["id"])
 
     findings.sort(key=lambda x: x["detected_at"], reverse=True)
     return sources, documents, findings
+
+
+def _finding(sc, f, doc_id, fetched, several):
+    firm = None
+    if f.get("firm"):
+        fd = FIRMS[f["firm"]]
+        firm = dict(name=fd["name"], registry_id=uid("firm-" + f["firm"]), registry_type=fd["registry_type"],
+                    authorized=True, match_confidence=0.95)
+    detected = fetched + timedelta(seconds=40 + f.get("delay_s", 0))
+    return dict(
+        id=uid(f"finding-{sc['key']}-{f['module']}" if several else "finding-" + sc["key"]),
+        document_id=doc_id, module=f["module"], score=f["score"],
+        risk_level=risk_level(f["module"], f["score"]), status=f["status"], title=f["title"],
+        summary=f["summary"], firm=firm, advertiser=f.get("advertiser"), rules=f["rules"],
+        content_excerpt=sc["text"][:200], url=sc["url"], platform=sc["platform"], note=None,
+        detected_at=iso(detected), updated_at=iso(detected),
+        model=dict(pipeline_version="0.1.0-mock", llm="gemma3:4b", embedder="bge-m3"),
+    )
 
 
 def trend(findings):
