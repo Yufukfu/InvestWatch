@@ -1,5 +1,6 @@
 """`PgSourceStore` against the real `sources` table (the columns of `api/migrations` 0001)."""
 
+import json
 import uuid
 from datetime import UTC, datetime
 
@@ -102,3 +103,34 @@ async def test_a_row_of_platform_other_on_a_host_without_a_collector_is_not_list
 
     assert [s.id for s in await store.schedulable()] == []
     assert [s.id for s in await store.collectable()] == []
+
+
+async def add_document(pool, url, *, transcript=None):
+    meta = {} if transcript is None else {"scrape_meta": {"transcript": transcript}}
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO documents (id, platform, source_kind, url, fetched_at, text, payload)"
+            " VALUES ($1, 'youtube', 'unknown', $2, now(), 'tekst', $3::jsonb)",
+            uuid.uuid4(), url, json.dumps(meta),
+        )
+
+
+async def test_known_urls_returns_only_the_urls_that_have_a_stored_document(pool):
+    stored, other = "https://www.youtube.com/watch?v=AAAAAAAAAAA", "https://www.youtube.com/watch?v=BBBBBBBBBBB"
+    await add_document(pool, stored)
+
+    known = await PgSourceStore(pool).known_urls([stored, other])
+
+    assert known == {stored}
+
+
+@pytest.mark.parametrize("transcript", ["failed", "none", "caption"])
+async def test_a_stored_video_is_known_whatever_its_transcript_outcome(pool, transcript):
+    url = "https://www.youtube.com/watch?v=CCCCCCCCCCC"
+    await add_document(pool, url, transcript=transcript)
+
+    assert await PgSourceStore(pool).known_urls([url]) == {url}
+
+
+async def test_known_urls_of_nothing_is_empty_and_asks_nothing(pool):
+    assert await PgSourceStore(pool).known_urls([]) == set()

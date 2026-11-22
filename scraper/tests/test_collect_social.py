@@ -38,6 +38,7 @@ class Harness:
     failing: str | None = None  # a permalink whose ingest fails
     calls: list = field(default_factory=list)
     fetched: list = field(default_factory=list)  # (url, identity, proxy)
+    fetch_kwargs: list = field(default_factory=list)  # the keyword arguments of each fetch
     ingested: list = field(default_factory=list)
     authors: list = field(default_factory=list)
     identity: object = field(default_factory=object)
@@ -50,6 +51,7 @@ class Harness:
         async def fetch(url, identity, proxy, **kw):
             self.calls.append("fetch")
             self.fetched.append((url, identity, proxy))
+            self.fetch_kwargs.append(kw)
             outcome = self.pages[url]
             if isinstance(outcome, Exception):
                 raise outcome

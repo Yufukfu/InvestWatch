@@ -98,3 +98,84 @@ def test_social_max_posts_refuses_anything_else(monkeypatch, value):
 
     with pytest.raises(ValueError, match="SOCIAL_MAX_POSTS"):
         social_max_posts()
+
+
+def test_youtube_max_videos_defaults_to_ten(monkeypatch):
+    from iw_scraper.config import youtube_max_videos
+
+    monkeypatch.delenv("YOUTUBE_MAX_VIDEOS", raising=False)
+
+    assert youtube_max_videos() == 10
+
+
+def test_youtube_max_videos_is_read_as_a_whole_number(monkeypatch):
+    from iw_scraper.config import youtube_max_videos
+
+    monkeypatch.setenv("YOUTUBE_MAX_VIDEOS", "3")
+
+    assert youtube_max_videos() == 3
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "many", "2.5", ""])
+def test_youtube_max_videos_refuses_anything_else(monkeypatch, value):
+    from iw_scraper.config import youtube_max_videos
+
+    monkeypatch.setenv("YOUTUBE_MAX_VIDEOS", value)
+
+    with pytest.raises(ValueError, match="YOUTUBE_MAX_VIDEOS"):
+        youtube_max_videos()
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_an_unset_or_empty_transcript_proxy_means_transcripts_are_off(monkeypatch, value):
+    from iw_scraper.config import yt_transcript_proxy
+
+    monkeypatch.delenv("YT_TRANSCRIPT_PROXY", raising=False)
+    if value is not None:
+        monkeypatch.setenv("YT_TRANSCRIPT_PROXY", value)
+
+    assert yt_transcript_proxy() is None
+
+
+def test_a_transcript_proxy_is_an_http_url(monkeypatch):
+    from iw_scraper.config import yt_transcript_proxy
+
+    monkeypatch.setenv("YT_TRANSCRIPT_PROXY", "http://user:pa55word@resi.example:8080")
+
+    assert yt_transcript_proxy() == "http://user:pa55word@resi.example:8080"
+
+
+@pytest.mark.parametrize("value", ["socks5://user:pa55word@resi.example:1080", "user:pa55word@resi.example:8080", "http://"])
+def test_a_bad_transcript_proxy_names_the_variable_and_never_echoes_it(monkeypatch, value):
+    from iw_scraper.config import yt_transcript_proxy
+
+    monkeypatch.setenv("YT_TRANSCRIPT_PROXY", value)
+
+    with pytest.raises(ValueError, match="YT_TRANSCRIPT_PROXY") as error:
+        yt_transcript_proxy()
+
+    assert "pa55word" not in str(error.value) and "resi.example" not in str(error.value)
+    assert error.value.__cause__ is None and error.value.__suppress_context__
+
+
+def test_x_cookies_are_both_values_when_both_are_set(monkeypatch):
+    from iw_scraper.config import x_cookies
+
+    monkeypatch.setenv("X_AUTH_TOKEN", " tok-123 ")
+    monkeypatch.setenv("X_CT0", "ct0-456")
+
+    assert x_cookies() == ("tok-123", "ct0-456")
+
+
+@pytest.mark.parametrize(
+    "auth, ct0", [(None, "ct0-456"), ("tok-123", None), ("", "ct0-456"), ("tok-123", "  ")]
+)
+def test_x_cookies_are_none_when_either_is_missing_or_empty(monkeypatch, auth, ct0):
+    from iw_scraper.config import x_cookies
+
+    for name, value in (("X_AUTH_TOKEN", auth), ("X_CT0", ct0)):
+        monkeypatch.delenv(name, raising=False)
+        if value is not None:
+            monkeypatch.setenv(name, value)
+
+    assert x_cookies() is None

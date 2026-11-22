@@ -143,7 +143,7 @@ Finding fields written by a model or copied from scraped pages (`title`, `summar
 
 #### Scenario: Bare URL in evidence
 - **WHEN** the evidence contains `https://evil.example/x`
-- **THEN** it is shown as text and the only links in the detail are the source link and the advertiser profile
+- **THEN** it is shown as text and the only links in the detail are the export link, the source link and the advertiser profile
 
 ### Requirement: Untrusted text has its own direction
 Each untrusted value listed above SHALL be shown in an element that holds only that value and has `dir="auto"`, so a quote in any language gets its own direction and a bidi control inside it cannot reorder the UI text around it.
@@ -155,3 +155,78 @@ Each untrusted value listed above SHALL be shown in an element that holds only t
 #### Scenario: Title in the table
 - **WHEN** a row's title contains U+202E
 - **THEN** the title button has `dir="auto"` and its text is exactly the title
+
+### Requirement: Server error detail has its own direction
+When a status change is rejected and the API returns its own error text, that text SHALL be shown alone in an element with `dir="auto"` (and `lang="en"`), outside the Polish label `Odpowiedź serwera:`, so a bidi control in it cannot reorder the label.
+
+#### Scenario: Right-to-left override in the server detail
+- **WHEN** the API rejects a status change with an error text that contains U+202E
+- **THEN** the text is shown in an element with `dir="auto"` whose text is exactly the error text, and `Odpowiedź serwera:` is outside that element
+
+### Requirement: Rows show the source host
+Each findings row SHALL show the host of the finding's `url` as text, and the list SHALL keep one row per finding, never merged or deduplicated by URL or document.
+
+#### Scenario: Host as text
+- **WHEN** a finding's `url` is `https://example.com/post/1?x=<b>`
+- **THEN** its row shows `example.com` as text
+
+#### Scenario: Unusable URL
+- **WHEN** a finding's `url` is not an http(s) URL
+- **THEN** its row shows no host and the rest of the row is unchanged
+
+#### Scenario: Two modules on one post in the list
+- **WHEN** the response holds an M1 and an M3 finding with the same `document_id`
+- **THEN** both are shown as separate rows, each with its own status
+
+### Requirement: Detail shows every module of the material
+When a finding's detail is open, the dashboard SHALL load the findings of the same document with `GET /findings?document_id=<document_id>` and, when there is more than one, SHALL show a keyboard-operable module switcher listing each module with its risk level as text. Choosing a module SHALL set `finding=<id>` in the URL and show that finding's rules, score, risk and analyst decision, while the source, excerpt and screenshot stay shown once.
+
+#### Scenario: Switch from M1 to M3
+- **WHEN** the detail of an M1 finding is open and its document also has an M3 finding
+- **THEN** the switcher shows `M1` (current) and `M3`, and activating `M3` sets `finding=<M3 id>`, shows the M3 rules and decision, and keeps focus on the switcher
+
+#### Scenario: Single module
+- **WHEN** the document has only the open finding
+- **THEN** no switcher is shown
+
+#### Scenario: Sibling request fails
+- **WHEN** the `GET /findings?document_id=…` request fails
+- **THEN** no switcher is shown, the detail of the open finding stays fully usable, and no error replaces it
+
+#### Scenario: Deep link and back
+- **WHEN** the user switches from M1 to M3 and presses the browser back button
+- **THEN** the M1 detail is shown again
+
+#### Scenario: Module filter does not hide siblings
+- **WHEN** the list is filtered to `M1` and the user opens an M1 finding whose document also has M3
+- **THEN** the switcher still offers `M3`, because the sibling request carries no module filter
+
+### Requirement: Export a finding's evidence pack
+The finding detail SHALL offer an `Eksportuj` link that opens the printable evidence pack of that finding, `GET /findings/{id}/export?format=html` (contracts 1.2.0), under the app's API base URL, in a new tab. The link SHALL be shown only while that finding's detail is loaded, and it SHALL be keyboard-reachable inside the modal detail.
+
+#### Scenario: Loaded detail
+- **WHEN** the detail of a finding is loaded
+- **THEN** the header shows a link named `Eksportuj` whose `href` is `<API base>/findings/<id>/export?format=html` and which opens in a new tab with `rel="noopener noreferrer"`
+
+#### Scenario: Not loaded or unknown
+- **WHEN** the detail is still loading, failed to load with no earlier data, or the finding does not exist (404)
+- **THEN** no `Eksportuj` link is shown
+
+### Requirement: Re-scan state in the finding detail
+The finding detail SHALL show the re-scan state that `GET /findings/{id}` serves as `document.scrape_meta.rescan` (`rest-api` "Finding detail with its document"): a text badge `Zmieniona` with a Polish line naming `latest_document_id` for `changed`, a text badge `Usunięta` with a Polish line for `removed`, each with `checked_at` in UTC, and nothing otherwise. The web SHALL parse `scrape_meta` as untrusted data and show only a known state, a UUID id and a valid timestamp.
+
+#### Scenario: Page changed after the finding
+- **WHEN** the detail has `rescan` `{state: "changed", latest_document_id: <uuid>, checked_at: <time>}`
+- **THEN** the panel shows the badge `Zmieniona`, a line naming `<uuid>` as the newer version, and the check time in UTC
+
+#### Scenario: Page removed after the finding
+- **WHEN** the detail has `rescan` `{state: "removed", latest_document_id: null, checked_at: <time>}`
+- **THEN** the panel shows the badge `Usunięta` and a line that the page was removed
+
+#### Scenario: No re-scan data (mock mode)
+- **WHEN** the detail comes from `contracts/mocks/finding-detail.json`, which has no `scrape_meta.rescan`, or `rescan.state` is `current`
+- **THEN** the panel shows no re-scan badge or line
+
+#### Scenario: Malformed re-scan data
+- **WHEN** `rescan` is a string, has an unknown `state`, a `latest_document_id` that is not a UUID, or a `checked_at` that is not a timestamp
+- **THEN** an unknown state shows no badge, and the invalid id or time is left out of the line instead of being shown
