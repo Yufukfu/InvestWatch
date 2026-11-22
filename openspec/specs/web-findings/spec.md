@@ -143,7 +143,7 @@ Finding fields written by a model or copied from scraped pages (`title`, `summar
 
 #### Scenario: Bare URL in evidence
 - **WHEN** the evidence contains `https://evil.example/x`
-- **THEN** it is shown as text and the only links in the detail are the source link and the advertiser profile
+- **THEN** it is shown as text and the only links in the detail are the export link, the source link and the advertiser profile
 
 ### Requirement: Untrusted text has its own direction
 Each untrusted value listed above SHALL be shown in an element that holds only that value and has `dir="auto"`, so a quote in any language gets its own direction and a bidi control inside it cannot reorder the UI text around it.
@@ -155,3 +155,14 @@ Each untrusted value listed above SHALL be shown in an element that holds only t
 #### Scenario: Title in the table
 - **WHEN** a row's title contains U+202E
 - **THEN** the title button has `dir="auto"` and its text is exactly the title
+
+### Requirement: Export a finding's evidence pack
+The finding detail SHALL offer an `Eksportuj` link that opens the printable evidence pack of that finding, `GET /findings/{id}/export?format=html` (contracts 1.2.0), under the app's API base URL, in a new tab. The link SHALL be shown only while that finding's detail is loaded, and it SHALL be keyboard-reachable inside the modal detail.
+
+#### Scenario: Loaded detail
+- **WHEN** the detail of a finding is loaded
+- **THEN** the header shows a link named `Eksportuj` whose `href` is `<API base>/findings/<id>/export?format=html` and which opens in a new tab with `rel="noopener noreferrer"`
+
+#### Scenario: Not loaded or unknown
+- **WHEN** the detail is still loading, failed to load with no earlier data, or the finding does not exist (404)
+- **THEN** no `Eksportuj` link is shown
