@@ -167,6 +167,12 @@ main > [id] { scroll-margin-top: var(--space-4); }
 .kpis li { display: flex; flex-direction: column; gap: var(--space-1); }
 .kpi-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; line-height: 1.1; }
 .kpi-label { color: var(--muted); font-size: 13px; }
+/* M2 register coverage: eyebrow, one sentence with the numbers, and a bar of the same share (decorative). */
+.coverage { display: grid; gap: var(--space-2); padding-top: var(--space-6); border-top: 1px solid var(--border); }
+.coverage-eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.coverage-text { margin: 0; font-size: 15px; }
+.coverage-bar { height: 10px; border-radius: 999px; background: var(--tint-neutral); overflow: hidden; }
+.coverage-bar > span { display: block; height: 100%; background: var(--accent); }
 @media (min-width: 600px) { .kpis { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-4) var(--space-8); } .hero-value { font-size: 80px; } .hero-label { font-size: 26px; } }
 .hero-sep { display: inline; }
 @media (max-width: 599px) {
@@ -197,6 +203,7 @@ main > [id] { scroll-margin-top: var(--space-4); }
 .btn-ghost { border-color: transparent; background: transparent; color: var(--link); font-weight: 600; }
 .btn-ghost:hover:not(:disabled) { background: rgb(15 23 42 / 6%); border-color: transparent; color: var(--link-strong); }
 .btn-ghost:active:not(:disabled) { background: rgb(15 23 42 / 10%); }
+.btn-outline { border-color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; }
 input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: var(--text-2); }
 input:focus-visible, select:focus-visible, textarea:focus-visible, .field input:focus-visible, .field select:focus-visible, .status-editor textarea:focus-visible { border-color: var(--control-border); }
 input:disabled, select:disabled, textarea:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
@@ -254,6 +261,29 @@ select { appearance: none; padding-right: 36px; background-image: linear-gradien
 kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; line-height: 16px; font-weight: 600; padding: 3px 8px; white-space: nowrap; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--text); }
 
 /* Findings table */
+/* Bulk actions ("Masowe działania" in the mockup): a navy bar like the toast, white primary, outlined others. */
+.bulk-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-4); margin-bottom: var(--space-4); padding: 12px 16px; border-radius: 10px; background: var(--toast-bg); color: var(--accent-text); }
+.bulk-count { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); font-size: 14px; }
+.bulk-hint { color: var(--toast-meta); font-size: 13px; }
+.bulk-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bulk-btn { font-size: 13px; font-weight: 600; background: transparent; color: var(--accent-text); border-color: var(--toast-line); }
+.bulk-btn:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-text); }
+.bulk-btn-primary { background: var(--accent-text); color: var(--toast-bg); border-color: var(--accent-text); font-weight: 700; }
+.bulk-btn-primary:hover:not(:disabled) { background: var(--toast-ghost); color: var(--toast-bg); }
+.bulk-btn-ghost { border-color: transparent; color: var(--toast-ghost); }
+.bulk-bar :focus-visible { outline-color: var(--accent-text); }
+.bulk-error { flex-basis: 100%; margin: 0; color: var(--accent-text); font-weight: 600; }
+.bulk-result { display: grid; gap: var(--space-2); justify-items: start; margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius-sm); background: var(--surface-2); }
+.bulk-result-summary { margin: 0; font-weight: 600; }
+.bulk-result-list { margin: 0; padding-left: var(--space-6); max-height: 12rem; overflow-y: auto; font-size: 14px; }
+.bulk-item-not_found { color: var(--muted); }
+.col-select { width: 44px; }
+.row-check { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+/* Report export: the mockup's outlined "Eksportuj raport" with the row cap beside it. */
+.export-report { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-left: auto; }
+.export-report-note { color: var(--muted); font-size: 13px; }
+/* On a phone the export block wraps under the heading: start it at the left edge, not pushed right by margin-left: auto. */
+@media (max-width: 599px) { .export-report { margin-left: 0; } }
 .findings-count { margin: 0 0 8px; color: var(--muted); font-weight: 600; }
 .table-scroll { overflow-x: auto; }
 .findings { width: 100%; border-collapse: collapse; background: var(--surface); }
@@ -295,10 +325,12 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
   .findings thead tr { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--border); background: var(--surface-2); }
   /* The sort buttons stay; the other headers are kept for assistive technology but not drawn. */
   .findings thead th { padding: 0; border: 0; }
-  .findings thead th:not(.col-score):not(.col-date) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .findings thead th:not(.col-score):not(.col-date):not(.col-select) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .findings tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); padding: var(--space-3); }
   .findings tbody td { padding: 0; border: 0; min-width: 0; }
   .findings tbody tr::after { content: ''; order: 5; flex-basis: 100%; height: 0; }
+  .findings .col-select { order: 0; flex: 0 0 auto; width: auto; }
+  .findings thead th.col-select { margin-right: auto; }
   .col-risk { order: 1; flex: 0 0 84px; }
   .col-title { order: 2; flex: 1 1 0; min-width: 0; }
   .col-module { order: 3; flex: 0 0 48px; }

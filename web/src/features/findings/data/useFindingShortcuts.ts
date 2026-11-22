@@ -18,6 +18,8 @@ type Args = {
   select: (id: string) => void;
   targetRef: RefObject<ShortcutTarget | null>;
   focusSearch: () => void;
+  /** Set while findings are selected for a bulk action; Esc calls it when no detail is open. */
+  clearSelection?: () => void;
 };
 
 // Fields that take text, and anything editable: a shortcut there would eat what the user types.
@@ -30,12 +32,17 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 // J/K move within the loaded page, 1-5 set the status of the open finding, O opens its source, / goes to
-// the search field. Esc is not handled here: the detail's own two-step Escape stays the only handler.
-export function useFindingShortcuts({ rows, selectedId, select, targetRef, focusSearch }: Args): void {
+// the search field. With a detail open, Esc is not handled here: the detail's own two-step Escape stays the
+// only handler. With no detail open, Esc clears the bulk selection.
+export function useFindingShortcuts({ rows, selectedId, select, targetRef, focusSearch, clearSelection }: Args): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || isTyping(e.target)) return;
       const key = e.key.toLowerCase();
+      if (key === 'escape') {
+        if (selectedId === undefined && clearSelection) clearSelection();
+        return;
+      }
       const index = rows?.findIndex((r) => r.id === selectedId) ?? -1;
 
       if (key === 'j' && rows && rows.length > 0) {
@@ -64,5 +71,5 @@ export function useFindingShortcuts({ rows, selectedId, select, targetRef, focus
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [rows, selectedId, select, targetRef, focusSearch]);
+  }, [rows, selectedId, select, targetRef, focusSearch, clearSelection]);
 }

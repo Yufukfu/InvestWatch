@@ -21,7 +21,7 @@ const BY_STATUS: Record<number, string> = {
 
 // A Polish message chosen by HTTP status; the API's own `{ error }` text is kept as a separate detail
 // (it is English), so the alert itself never mixes languages.
-function toSaveError(error: unknown): SaveError {
+export function toSaveError(error: unknown): SaveError {
   const e = (typeof error === 'object' && error !== null ? error : {}) as { status?: unknown; data?: unknown };
   const data = e.data as { error?: unknown } | undefined;
   const detail = typeof data === 'object' && data !== null && typeof data.error === 'string' ? data.error : undefined;
