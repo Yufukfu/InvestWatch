@@ -23,10 +23,11 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0206](0206-dashboard-data-from-backend.md) | Dashboard data from the backend only; MSW only in tests (supersedes 0201's dev mocks) | accepted (takes effect when PR merges) |
 | [0207](0207-agent-push-and-pr.md) | Agents push their branch and open the PR; humans approve and merge | accepted (takes effect when the PR merges) |
 | [0208](0208-dashboard-realtime-socketio-client.md) | Dashboard real-time client: socket.io-client, one connection owned by the alerts feature | accepted (takes effect when the `realtime-alerts` PR merges) |
-| [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted (takes effect when the PR merges) |
+| [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted; "CI stays `workflow_dispatch`" superseded by [0213](0213-ci-on-every-pr.md) |
 | [0210](0210-unattended-pr-watcher.md) | An unattended PR watcher runs sandboxed agent sessions and publishes from the runner | accepted (takes effect when PR #48 merges; needs Adam's and Damian's approval) |
 | [0211](0211-codeowners-single-source.md) | `.github/CODEOWNERS` is the only place that names owners; shared areas have none (partly supersedes 0202 and 0205) | accepted (takes effect when the `codeowners-single-source` PR merges) |
 | [0212](0212-ai-log-one-file-per-entry.md) | AI log: one file per entry in `.docs/ai-log/`, table rendered on demand (replaces the `merge=union` table) | accepted (takes effect when the PR merges) |
+| [0213](0213-ci-on-every-pr.md) | `ci.yml` runs on every PR to `main` as an advisory check (not required: needs a paid plan or a public repo) | accepted (takes effect when the PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
