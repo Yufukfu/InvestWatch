@@ -46,6 +46,8 @@ export type RealtimeState = {
   open: (id: string) => void;
   hold: (id: string) => void;
   release: (id: string) => void;
+  // Asks the socket to connect again; its connect handler then refetches over REST.
+  reconnect: () => void;
 };
 
 // The single real-time subscription of the app (web-dashboard rules): finding.created/high_risk
@@ -57,6 +59,7 @@ export function useRealtime(): RealtimeState {
   const [announcement, setAnnouncement] = useState('');
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const held = useRef(new Set<string>());
+  const socketRef = useRef<ReturnType<typeof connectEvents> | null>(null);
 
   const dismiss = useCallback((id: string) => {
     clearTimeout(timers.current.get(id));
@@ -118,6 +121,7 @@ export function useRealtime(): RealtimeState {
     const live = timers.current;
     const heldIds = held.current;
     const socket = connectEvents();
+    socketRef.current = socket;
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => dispatch(investWatchApi.util.invalidateTags(['findings', 'stats']));
     const refreshSoon = () => {
@@ -179,6 +183,7 @@ export function useRealtime(): RealtimeState {
 
     return () => {
       socket.disconnect();
+      socketRef.current = null;
       clearTimeout(refreshTimer);
       live.forEach(clearTimeout);
       live.clear();
@@ -186,5 +191,10 @@ export function useRealtime(): RealtimeState {
     };
   }, [dispatch, schedule]);
 
-  return { connection, alerts, announcement, dismiss, open, hold, release };
+  const reconnect = useCallback(() => {
+    socketRef.current?.connect();
+    dispatch(investWatchApi.util.invalidateTags(['findings', 'stats']));
+  }, [dispatch]);
+
+  return { connection, alerts, announcement, dismiss, open, hold, release, reconnect };
 }

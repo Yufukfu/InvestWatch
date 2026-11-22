@@ -8,6 +8,9 @@
   --border: #e4e7ec;
   --control-border: #8a919e;
   --border-strong: #cbd2dc;
+  --banner-bg: #fff6dd;
+  --banner-border: #b7791f;
+  --banner-fg: #5a3a00;
   --skeleton: #eef0f4;
   --skeleton-shine: #f8f9fb;
   --tint-hover: #f6f7f9;
@@ -448,6 +451,11 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 .live-live::before { background: var(--green); }
 .live-offline { color: var(--risk-high-fg); }
 .live-offline::before { background: var(--risk-high); }
+/* Components sheet: amber connection-lost banner (the slot is empty while connected). */
+.connection-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin: var(--space-4) 0 0; padding: 12px 16px; background: var(--banner-bg); border-left: 5px solid var(--banner-border); border-radius: 6px; color: var(--banner-fg); }
+.connection-banner p { margin: 0; font-size: 14px; line-height: 18px; font-weight: 600; }
+.connection-banner .btn-ghost { flex-shrink: 0; font-size: 13px; font-weight: 700; text-decoration: none; }
+@media (max-width: 599px) { .connection-banner { flex-direction: column; align-items: flex-start; gap: var(--space-2); } }
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: grid; gap: 10px; width: min(380px, calc(100vw - 32px)); }
 .toast-actions .btn { flex: 0 1 auto; padding: 0 18px; font-size: 13px; font-weight: 600; }
 /* Inside the detail dialog the toasts are in its flow, above the content, not floating over the Save button. */

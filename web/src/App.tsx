@@ -35,6 +35,8 @@ export function App() {
   const navId = useId();
   // Only meaningful below 600px, where the CSS hides the section links until the menu button opens them.
   const [menuOpen, setMenuOpen] = useState(false);
+  // Where the connection-lost banner is drawn: above the page content, outside the header row.
+  const [bannerNode, setBannerNode] = useState<HTMLElement | null>(null);
   return (
     <ToastSlotProvider>
       <header className="app-header">
@@ -51,7 +53,7 @@ export function App() {
             ))}
           </nav>
           <div className="header-status">
-            <AlertsPage />
+            <AlertsPage bannerNode={bannerNode} />
             <HealthPage />
           </div>
           <button
@@ -67,6 +69,7 @@ export function App() {
         </div>
       </header>
       <div className="app">
+        <div ref={setBannerNode} className="banner-slot" />
         <main>
           <div id="przeglad" className="stack">
             <SummaryPage />
