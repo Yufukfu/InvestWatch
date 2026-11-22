@@ -54,7 +54,7 @@ The first screenshot review (8.3) found the built look diverges from the mockups
 - [x] 8a.2 Filters and findings table: plain label row and ink pills, uppercase table headers, plain title text, score bar coloured by risk, `dd.mm.rrrr · hh:mm` dates, `Strona n z m` pager (mutations: 8 tried, 8 caught)
 - [x] 8a.3 Trend chart: ink solid, blue dashed and teal dotted lines, mono ticks, two-line legend with counts, `Godzina | Dzień` segmented control (mutations: 8 tried, 8 caught)
 - [x] 8a.4 Phone and tablet: hamburger menu, `Filtry n` button with removable filter chips, bordered finding cards, tablet four-column list with the meta line under the title (mutations: 18 tried, 18 caught)
-- [ ] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` tags, navy toast, labelled proportion bar and selection markers
+- [x] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` / `Zgodne` tags, status radio pills, navy toast, labelled proportion bar and selection markers (mutations: 37 tried, 37 caught)
 - [ ] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real
 
 ## 8. Responsive evidence
