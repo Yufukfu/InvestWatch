@@ -44,6 +44,23 @@ class FindingPatch(_Strict):
         return self
 
 
+MAX_BULK_IDS = 200
+
+
+class BulkStatus(_Strict):
+    """POST /findings/bulk-status (contract 1.3.0): 1 to 200 unique ids and one non-null status."""
+
+    ids: list[UUID] = Field(min_length=1, max_length=MAX_BULK_IDS)
+    status: Status
+
+    @field_validator("ids")
+    @classmethod
+    def _unique(cls, ids: list[UUID]) -> list[UUID]:
+        if len(set(ids)) != len(ids):
+            raise ValueError("ids must be unique")
+        return ids
+
+
 class Thresholds(_Strict):
     M1: _Unit = Field(ge=0, le=1)
     M2: _Unit = Field(ge=0, le=1)

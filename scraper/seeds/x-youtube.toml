@@ -1,0 +1,19 @@
+# The regulator's own X account and YouTube channel (OpenSpec change scraper-social-x-youtube, design.md decision 10).
+# Read by the seed loader (`python -m iw_scraper.seed`) together with every other `*.toml` here: a source whose URL is already in `sources` is left alone.
+# No `schedule_cron` on purpose: the dedicated X account is at risk (X suspends automation accounts) and YouTube transcripts
+# cost proxy traffic, so these rows run only when someone asks for a scan; add a cron in the dashboard once a run looks healthy.
+# `source_kind = "unknown"` and `M1`: the regulator's own channels are the demo's neutral source; the owner edits them later.
+
+[[source]]
+name = "UKNF on X"
+platform = "x"
+url = "https://x.com/uknf"
+source_kind = "unknown"
+target_modules = ["M1"]
+
+[[source]]
+name = "UKNF on YouTube"
+platform = "youtube"
+url = "https://www.youtube.com/@UKNFpolska"
+source_kind = "unknown"
+target_modules = ["M1"]

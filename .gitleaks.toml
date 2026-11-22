@@ -18,3 +18,10 @@ condition = "AND"
 paths = ['''^contracts/mocks/generate_mocks\.py$''']
 regexTarget = "line"
 regexes = ['''^\s*key="m\d-[a-z0-9-]+",''']
+
+[[rules.allowlists]]
+description = "UUID v5 firm keys in web test fixtures (lines like key: '<uuid>',), not credentials. First hit: web/src/features/advertisers/data/useAdvertisers.test.tsx, commit b14d0b53 (PR #129). Only a line whose value is exactly a UUID, in a web test file, is skipped."
+condition = "AND"
+paths = ['''^web/src/.+\.test\.tsx?$''']
+regexTarget = "line"
+regexes = ['''^\s*(\{\s*)?key:\s*'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',''']
