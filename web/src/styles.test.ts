@@ -68,6 +68,12 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['--risk-high-fg', '--surface'],
   ['--risk-high', '--surface'],
   ['--green-text', '--surface'],
+  ['--text-2', '--surface'],
+  ['--text-2', '--tint-hover'],
+  ['--text', '--tint-hover'],
+  ['--green-text', '--tint-hover'],
+  ['--accent-text', '--link'],
+  ['--accent-text', '--link-strong'],
 ];
 
 // Non-text parts (control borders, focus ring, slider) need 3:1.

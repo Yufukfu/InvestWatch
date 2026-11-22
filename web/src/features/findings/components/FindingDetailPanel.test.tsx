@@ -78,11 +78,57 @@ describe('FindingDetailPanel', () => {
     expect(items.map((i) => i.querySelector('.rule-id')?.textContent)).toEqual(['R6', 'R5', 'R8']);
   });
 
-  it('labels M1/M3 signals as detected signals', () => {
+  it('tags each result with its own word, so greyscale tells them apart: Naruszenie, Niepewne, Zgodne', () => {
+    for (const module of ['M1', 'M2'] as const) {
+      const { unmount } = render(<FindingDetailPanel {...base} detail={detail({ module })} />);
+      const items = within(screen.getByRole('region', { name: /Naruszenia|Sygnały/ })).getAllByRole('listitem');
+      expect(items[0]).toHaveTextContent('Naruszenie');
+      expect(items[0]).not.toHaveTextContent('Niepewne');
+      expect(items[1]).toHaveTextContent('Niepewne');
+      expect(items[1]).not.toHaveTextContent('Naruszenie');
+      const passed = screen.getByText('Spełnione (2)').closest('details')!;
+      expect(within(passed).getAllByText('Zgodne')).toHaveLength(2);
+      unmount();
+    }
+  });
+
+  it('titles M1/M3 findings Sygnały ryzyka', () => {
     render(<FindingDetailPanel {...base} detail={detail({ module: 'M1', rules: [rule({ ruleId: 'S1.2', name: 'Kod polecający' })] })} />);
-    const item = within(screen.getByRole('region', { name: /Sygnały/ })).getByRole('listitem');
+    const item = within(screen.getByRole('region', { name: 'Sygnały ryzyka (1)' })).getByRole('listitem');
     expect(item).toHaveTextContent('S1.2');
-    expect(item).toHaveTextContent('Wykryto sygnał');
+  });
+
+  it('shows the risk and module as a tag line above the title, and the score, platform, time and status in the strip', () => {
+    render(<FindingDetailPanel {...base} detail={detail({ module: 'M1' })} />);
+    const tag = screen.getByText('M1 · Finfluencerzy');
+    expect(tag.parentElement).toHaveTextContent('Wysoki');
+    expect(tag.parentElement?.nextElementSibling).toHaveTextContent('Obietnica 18% zysku');
+    const strip = screen.getByLabelText('Dane zgłoszenia');
+    expect(within(strip).getByText('0,86')).toBeInTheDocument();
+    expect(within(strip).getByText('Strona WWW')).toBeInTheDocument();
+    expect(within(strip).getByText('21.11.2026 · 15:00 UTC')).toBeInTheDocument();
+    expect(within(strip).getByText('Nowe')).toBeInTheDocument();
+    expect(within(strip).getByRole('link', { name: /Otwórz źródło/ })).toHaveAttribute('href', 'https://alfa.example.com/konto');
+  });
+
+  it('labels the source and marks only a high-risk score for the red figure', () => {
+    const { rerender } = render(<FindingDetailPanel {...base} detail={detail()} />);
+    const strip = screen.getByLabelText('Dane zgłoszenia');
+    expect(within(strip).getByText('Źródło')).toBeInTheDocument();
+    expect(within(strip).getByText('0,86')).toHaveClass('score-high');
+    rerender(<FindingDetailPanel {...base} detail={detail({ riskLevel: 'medium' })} />);
+    expect(within(strip).getByText('0,86')).not.toHaveClass('score-high');
+  });
+
+  it('puts the firm and the advertiser in two labelled blocks', () => {
+    render(
+      <FindingDetailPanel
+        {...base}
+        detail={detail({ advertiser: { name: 'Jan', handle: '@jan', profileUrl: undefined, inRegistry: false, onWarningList: false } })}
+      />,
+    );
+    expect(within(screen.getByRole('group', { name: 'Firma inwestycyjna' })).getByText('Alfa DM S.A.')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Podmiot reklamujący' })).getByText('@jan')).toBeInTheDocument();
   });
 
   it('says so when no rule failed', () => {

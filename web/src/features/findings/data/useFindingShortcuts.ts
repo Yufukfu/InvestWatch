@@ -21,6 +21,8 @@ type Args = {
 // Fields that take text, and anything editable: a shortcut there would eat what the user types.
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
+  // A radio or checkbox takes no text, so a shortcut there eats nothing (the status radios keep 1-5 working).
+  if (target instanceof HTMLInputElement && ['radio', 'checkbox', 'button'].includes(target.type)) return false;
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return true;
   return target.closest('[contenteditable=""], [contenteditable="true"]') !== null;
 }

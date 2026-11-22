@@ -32,20 +32,6 @@ export function platformLabel(p: string): string {
   return (PLATFORM_LABEL as Record<string, string>)[p] ?? p;
 }
 
-const UTC = new Intl.DateTimeFormat('pl-PL', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'UTC',
-});
-
-export function formatUtc(iso: string): string {
-  const t = Date.parse(iso);
-  return Number.isNaN(t) ? iso : `${UTC.format(t)} UTC`;
-}
-
 // The table's detection time: UTC, day.month.year · hour:minute (the table header says what it is, the hover says UTC).
 // The parts are separate so a phone card can drop the year; undefined when the value is not a time.
 export function detectedParts(iso: string): { dayMonth: string; year: string; time: string } | undefined {

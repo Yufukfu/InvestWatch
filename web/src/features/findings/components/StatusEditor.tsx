@@ -38,21 +38,27 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
         onSave({ ...(statusChanged ? { status: nextStatus } : {}), ...(noteChanged ? { note: nextNote } : {}) });
       }}
     >
-      <div className="field">
-        <label htmlFor={`${id}-status`}>Status</label>
-        <select
-          id={`${id}-status`}
-          value={nextStatus}
-          disabled={isSaving}
-          onChange={(e) => setNextStatus(e.target.value as FindingStatus)}
-        >
+      <fieldset className="field field-status" role="radiogroup">
+        <legend>Status</legend>
+        <div className="chips">
           {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABEL[s]}
-            </option>
+            <label key={s} className="chip">
+              {/* aria-disabled, not disabled: a disabled radio drops keyboard focus out of the dialog while saving. */}
+              <input
+                type="radio"
+                name={`${id}-status`}
+                value={s}
+                checked={nextStatus === s}
+                aria-disabled={isSaving}
+                onChange={() => {
+                  if (!isSaving) setNextStatus(s);
+                }}
+              />
+              <span>{STATUS_LABEL[s]}</span>
+            </label>
           ))}
-        </select>
-      </div>
+        </div>
+      </fieldset>
       <div className="field">
         <label htmlFor={`${id}-note`}>Notatka</label>
         <textarea id={`${id}-note`} value={text} disabled={isSaving} maxLength={2000} onChange={(e) => setText(e.target.value)} />
@@ -61,7 +67,7 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
         {/* aria-disabled, not disabled: a disabled button drops keyboard focus to <body> (out of the
             dialog) the moment a save starts or completes; onSubmit ignores the click instead. */}
         <button type="submit" className="btn btn-primary" aria-disabled={isSaving || (!statusChanged && !noteChanged)}>
-          {isSaving ? 'Zapisywanie…' : 'Zapisz'}
+          {isSaving ? 'Zapisywanie…' : 'Zapisz decyzję'}
         </button>
         {/* Both live regions are always in the DOM, so a new message is announced. */}
         <div className="save-error" role="alert">
@@ -73,7 +79,7 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
           )}
         </div>
         <p role="status" className="saved">
-          {saved ? 'Zapisano.' : ''}
+          {saved ? `Zapisano. Status: ${STATUS_LABEL[status]}.` : ''}
         </p>
       </div>
     </form>

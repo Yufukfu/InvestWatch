@@ -98,9 +98,8 @@ describe('FindingsPage', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    const select = await within(dialog).findByLabelText('Status');
-    fireEvent.change(select, { target: { value: 'confirmed' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Potwierdzone' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz decyzję' }));
     await waitFor(() => expect(within(dialog).getByText('Potwierdzone', { selector: 'dd' })).toBeInTheDocument());
     expect(saved.status).toBe('confirmed');
     const row = screen.getByRole('button', { name: findings.items.find((i) => i.id === detail.id)!.title }).closest('tr')!;
@@ -112,8 +111,8 @@ describe('FindingsPage', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Zamknięte' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz decyzję' }));
     const alert = within(dialog).getByRole('alert');
     await waitFor(() => expect(alert).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.'));
     expect(within(dialog).getByText('transition not allowed')).toBeInTheDocument();
@@ -205,8 +204,8 @@ describe('FindingsPage', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
-    const save = within(dialog).getByRole('button', { name: 'Zapisz' });
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Zamknięte' }));
+    const save = within(dialog).getByRole('button', { name: 'Zapisz decyzję' });
     save.focus();
     fireEvent.click(save);
     await waitFor(() => expect(within(dialog).getByText('Zamknięte', { selector: 'dd' })).toBeInTheDocument());
@@ -239,7 +238,7 @@ describe('FindingsPage keyboard shortcuts', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    await within(dialog).findByLabelText('Status');
+    await within(dialog).findByRole('radiogroup', { name: 'Status' });
     return { patches, dialog };
   }
 
@@ -301,6 +300,14 @@ describe('FindingsPage keyboard shortcuts', () => {
     await waitFor(() => expect(patches).toEqual([{ id: detail.id, body: { status: to } }]));
   });
 
+  it('still works with focus on a status radio: choosing a status does not make the radio a typing field', async () => {
+    const { patches } = await openDetail();
+    const radio = within(screen.getByRole('dialog')).getByRole('radio', { name: 'Nowe' });
+    radio.focus();
+    fireEvent.keyDown(radio, { key: '3' });
+    await waitFor(() => expect(patches).toEqual([{ id: detail.id, body: { status: 'confirmed' } }]));
+  });
+
   it('sends nothing when the finding already has that status', async () => {
     const { patches } = await openDetail({ status: 'confirmed' });
     press('3');
@@ -322,7 +329,6 @@ describe('FindingsPage keyboard shortcuts', () => {
     const { patches } = await openDetail();
     fireEvent.keyDown(screen.getByLabelText('Szukaj'), { key: '3' });
     fireEvent.keyDown(within(screen.getByRole('dialog')).getByLabelText('Notatka'), { key: '3' });
-    fireEvent.keyDown(within(screen.getByRole('dialog')).getByLabelText('Status'), { key: '3' });
     press('3', { ctrlKey: true });
     press('3', { metaKey: true });
     press('3', { altKey: true });
