@@ -6,7 +6,7 @@
 #
 #   infra/tests/smoke.sh                 all groups except the LLM download
 #   infra/tests/smoke.sh parallel redis  selected groups
-#   SMOKE_LLM=1 infra/tests/smoke.sh llm also pulls gemma3:4b (several GB)
+#   SMOKE_LLM=1 infra/tests/smoke.sh llm also pulls gemma3:4b and bge-m3 (several GB)
 set -euo pipefail
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
@@ -360,6 +360,7 @@ llm_pull_completes() { # `up --wait` returns while the one-shot still runs: wait
 llm_serves_model() { # /v1/models on ollama:11434 lists the model, from a container on the data network
   local out; out=$(dcx "$1" "$PROBE_FILE" exec -T probe-data wget -q -T 10 -O - http://ollama:11434/v1/models)
   echo "$out" | head -c 300; echo; case $out in *'"gemma3:4b"'*) ;; *) return 1 ;; esac
+  case $out in *'"bge-m3'*) ;; *) return 1 ;; esac
 }
 llm_no_host_port() {
   local ports; ports=$(docker ps --filter "label=com.docker.compose.project=$1" --filter "label=com.docker.compose.service=ollama" --format '{{.Ports}}')
@@ -367,7 +368,7 @@ llm_no_host_port() {
 }
 pull_fail_isolated() { # a failed pull (an unknown model stands in for an unreachable registry) leaves the rest healthy
   local p=$1 code
-  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_MODEL=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
+  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_MODELS=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
   code=$?; echo "ollama-pull exit: $code"; [ "$code" -ne 0 ] || return 1
   dcx "$p" "$PROBE_FILE" ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" {print; bad=1} END {exit bad}'
 }
@@ -379,10 +380,10 @@ group_llm() {
   check "nothing LLM-related after a plain up" no_llm_without_profile "$p"
   check "ollama and ollama-pull exist only under --profile llm" llm_defined_in_profile "$p"
   check "serving ollama only on data, the pull only on egress" llm_networks "$p"
-  if [ "${SMOKE_LLM:-0}" != 1 ]; then log "SKIP  model download (set SMOKE_LLM=1; pulls gemma3:4b, several GB)"; return 0; fi
+  if [ "${SMOKE_LLM:-0}" != 1 ]; then log "SKIP  model download (set SMOKE_LLM=1; pulls gemma3:4b and bge-m3, several GB)"; return 0; fi
   check "--profile llm pulls and serves the model" dcx "$p" "$PROBE_FILE" --profile llm up -d --wait --wait-timeout 1500 ollama ollama-pull
   check "ollama-pull runs to completion and exits 0" llm_pull_completes "$p"
-  check "GET /v1/models lists gemma3:4b from the data network" llm_serves_model "$p"
+  check "GET /v1/models lists gemma3:4b and bge-m3 from the data network" llm_serves_model "$p"
   check "ollama publishes no host port" llm_no_host_port "$p"
   check "a failed pull leaves the other services healthy" pull_fail_isolated "$p"
 }
