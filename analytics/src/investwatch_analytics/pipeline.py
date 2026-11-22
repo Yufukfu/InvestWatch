@@ -6,7 +6,8 @@ offer is the publisher's own), or M3 (change analytics-m1-m3, design decisions 1
 Preprocessing extras (change analytics-embeddings, ADR 0313/0314), each injected and off by default:
 `gate` (investment topic gate; drops a third_party/unknown document with no investment signal), `embedder`
 (document vector; sets `model.embedder`; cached by the stored `content_hash`), `neardup` (MinHash index; groups near-identical documents and adds
-one summary sentence naming the original). Order: empty text, route, gate, embed, near-dup, modules.
+one summary sentence naming the original). Order: empty text, route, gate (dictionary, then the embedding
+rescue for a dictionary drop, analytics-embedding-gate), embed (reusing the gate's vector), near-dup, modules.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from typing import TYPE_CHECKING
 
 from .config import GateSettings
 from .gate import GateDecision, GateTerms, evaluate, load_terms
+from .gate_embedding import decide
 from .models import Finding, ScrapedDocument
 from .modules import m1, m2, m3
 from .modules.advertiser import build_advertiser
@@ -32,6 +34,7 @@ from .rules.engine import Catalogue, Context, run_rules
 
 if TYPE_CHECKING:
     from .embeddings import Embedder, EmbedOutcome
+    from .gate_embedding import GateEmbedding
     from .llm.judge import LlmJudge
     from .neardup import NearDupIndex, NearDupResult
 
@@ -54,10 +57,13 @@ class SignalCatalogues:
 class Gate:
     settings: GateSettings
     terms: GateTerms
+    #: The embedding rescue (analytics-embedding-gate); None = dictionary only (`dictionary_only_fallback`).
+    embedding: "GateEmbedding | None" = None
 
     @classmethod
-    def from_settings(cls, settings: GateSettings, terms: GateTerms | None = None) -> "Gate":
-        return cls(settings, terms or _default_terms())
+    def from_settings(cls, settings: GateSettings, terms: GateTerms | None = None, *,
+                      embedding: "GateEmbedding | None" = None) -> "Gate":
+        return cls(settings, terms or _default_terms(), embedding)
 
 
 @lru_cache(maxsize=1)
@@ -137,14 +143,19 @@ def analyze_document(
     m2_ctx = Context(doc=doc, pre=pre, firm_match=r.firm_match, registry=registry)  # M2 rules see the whole text
     findings: list[Finding] = []
     decision = None
+    embedding = None
     if gate is not None:
         decision = evaluate(scan_pre.normalized, source_kind=doc.source_kind, firm_matched=r.firm_match is not None,
                             terms=gate.terms, settings=gate.settings)
+        # Dictionary first; only a dictionary drop may be rescued by the embedding (same text and cache key as
+        # model.embedder below, so the outcome is reused and the document is embedded at most once).
+        decision, embedding = decide(decision, pre.normalized, doc.content_hash, gate.embedding, gate.settings)
         if not decision.passed:
             _skipped(doc, **decision.log_extra())
-            return Analysis(gate=decision)
+            return Analysis(gate=decision, embedding=embedding)
     # The cache key is the document's stored content_hash (ADR 0105); without one the vector is not cached.
-    embedding = embedder.embed(pre.normalized, doc.content_hash) if embedder is not None else None
+    if embedding is None and embedder is not None:
+        embedding = embedder.embed(pre.normalized, doc.content_hash)
     group = neardup.observe(doc.id, pre.normalized, doc.url) if neardup is not None else None
     if r.module is None:
         _skipped(doc, r.reason)

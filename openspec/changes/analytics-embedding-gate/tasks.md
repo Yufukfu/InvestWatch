@@ -10,9 +10,9 @@ Requested by Damian on 2026-11-22. Feature freeze 08:00, so if time runs short, 
 
 ## 2. Pipeline wiring (~40 min)
 
-- [ ] 2.1 Failing tests: the "Embedding rescue in the topic gate" scenarios end to end through `analyze_document` (rescued post routed and its findings carry `model.embedder`; the document embedded once; a dictionary hit never calls the embedder for the gate; a short text not embedded; `firm_own` unaffected; gold M1/M3 positives never dropped with an off-topic-voting embedder); log line has `gate_path`, `similarity`, `margin`, no text; degrade messages once per change of reason
-- [ ] 2.2 `pipeline.py`: the rescue after `evaluate`, `EmbedOutcome` reused; `Gate` carries the optional `GateEmbedding`
-- [ ] 2.3 Mutation check
+- [x] 2.1 Failing tests: the "Embedding rescue in the topic gate" scenarios end to end through `analyze_document` (rescued post routed and its findings carry `model.embedder`; the document embedded once; a dictionary hit never calls the embedder for the gate; a short text not embedded; `firm_own` unaffected; gold M1/M3 positives never dropped with an off-topic-voting embedder); log line has `gate_path`, `similarity`, `margin`, no text; degrade messages once per change of reason
+- [x] 2.2 `pipeline.py`: the rescue after `evaluate`, `EmbedOutcome` reused; `Gate` carries the optional `GateEmbedding`
+- [x] 2.3 Mutation check; `mutations: 5 tried, 5 caught` (after adding the stored-hash and failed-outcome assertions that the first draft lacked)
 
 ## 3. Worker, CLI, counter, compose (~40 min)
 
