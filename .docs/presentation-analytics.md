@@ -7,7 +7,7 @@ Numbers come from two runs of the gold-set evaluation, gold set SHA-256 `963f834
 - **rules only:** `python analytics/eval/run.py` on `main` at `dd30d668` (2026-11-22 03:45 UTC), no LLM, no database;
 - **with LLM:** `python analytics/eval/run.py --llm` on `main` at `0434553b` (same analytics code), hosted DeepSeek Flash (`deepseek-flash`).
 
-Per-rule and per-signal numbers are rules-only (`strict`). Thresholds are the hand-in defaults M1 0.75, M2 0.1, M3 0.4. To refresh them: rerun both commands and copy the `at_default_threshold` block (or the matching `points` entry) of each module and the `strict` block of each rule.
+The M2 figures were updated after PR #160 (R9, R10) from the quality table in `analytics/README.md`, measured on that change's branch; they were not re-run on `main` at `313c625b`. Per-rule and per-signal numbers are rules-only (`strict`). Thresholds are the hand-in defaults M1 0.75, M2 0.1, M3 0.4. To refresh them: rerun both commands and copy the `at_default_threshold` block (or the matching `points` entry) of each module and the `strict` block of each rule.
 
 **The gold set is synthetic.** 69 documents written by us from the challenge criteria (67 `synthetic`, 2 built around phrasings that ZASÓB quotes itself), with fictional firms and handles. It measures how well the rules follow our reading of the criteria, not real-world prevalence. UKNF provided no sample ads (`doc/` is everything); no real samples will arrive before the hand-in (#73, closed as not planned). Real samples could later go in as `origin: uknf-sample` lines with no code change.
 
@@ -54,16 +54,16 @@ Seven weighted signals, `score = σ(bias + Σ weight · signal)`:
 
 Each rule is a class plus a YAML catalogue entry (name, severity, legal basis, dictionaries). Visual rules read render metadata of page blocks (font size, region, viewport); on social posts without blocks they are `not_applicable`.
 
-- 12 of 18 rules implemented, P0 and P1: **R1** firm identification, **R2** ad label, **R3** risk next to return claims, **R4** risk font size, **R6** risk hidden in footer/footnotes, **R11** product comparisons, **R12** past performance (two sub-checks: R12a period and scope, R12b currency and costs), **R14** past-performance disclaimer, **R15** forecasts, **R16** tax information, **R17** implying KNF approval, **R18** supervision as a safety argument.
+- 14 of 18 rules implemented (`implemented: true` in `m2_rules.yaml`: 15 of 19 catalogue entries, because R12 is two): P0 and P1: **R1** firm identification, **R2** ad label, **R3** risk next to return claims, **R4** risk font size, **R6** risk hidden in footer/footnotes, **R11** product comparisons, **R12** past performance (two sub-checks: R12a period and scope, R12b currency and costs), **R14** past-performance disclaimer, **R15** forecasts, **R16** tax information, **R17** implying KNF approval, **R18** supervision as a safety argument; plus, from PR #160, **R9** comprehensibility (LLM-first: rules-only it only marks `uncertain`, which is listed but not scored) and **R10** language consistency (rules-only).
 - `score = Σ weight·fail / Σ weight·applicable`, high-severity rules weigh 3.
-- The other 6 (R5, R7, R8, R9, R10, R13) are already in the catalogue and the gold set (`not_implemented`), so their numbers appear the moment a rule lands.
+- The other 4 (R5, R7, R8, R13) are already in the catalogue and the gold set (`not_implemented`), so their numbers appear the moment a rule lands.
 
 **Gold set (synthetic, 35 docs, 14 hard cases), threshold 0.1:**
 
 | Run | Precision | Recall | F1 | TP / FP / FN / TN |
 |---|---|---|---|---|
-| with DeepSeek Flash | **1.00** | **0.74** | **0.85** | 17 / 0 / 6 / 12 |
-| rules only | 0.94 | 0.74 | 0.83 | 17 / 1 / 6 / 11 |
+| with DeepSeek Flash | **0.95** | **0.83** | **0.88** | 19 / 1 / 4 / 11 |
+| rules only | 0.95 | 0.78 | 0.86 | 18 / 1 / 5 / 11 |
 
 | Rule | Precision | Recall | F1 | Gold fails |
 |---|---|---|---|---|
@@ -81,7 +81,7 @@ Each rule is a class plus a YAML catalogue entry (name, severity, legal basis, d
 | R17 | 1.00 | 0.33 | 0.50 | 3 |
 | R18 | 1.00 | 1.00 | 1.00 | 2 |
 
-**Notes:** 6 of the 23 gold positives violate only rules not built yet (R5, R7-R10, R13), as many as the misses at 0.1; that is where recall comes from next. The LLM removes the one false positive but does not add recall, because the rules it backs are already built. Per-rule counts are small (1-7 fails each), so read them as "the rule behaves as specified", not as a statistic.
+**Notes:** Rules R9 and R10 (PR #160), strict precision / recall: R10 1.00 / 1.00; R9 1.00 / 0.00 rules-only and 1.00 / 1.00 with DeepSeek. The misses that remain include gold positives that violate only rules not built yet (R5, R7, R8, R13); that is where recall comes from next. The LLM removes the one false positive but does not add recall, because the rules it backs are already built. Per-rule counts are small (1-7 fails each), so read them as "the rule behaves as specified", not as a statistic.
 
 ---
 
@@ -111,11 +111,11 @@ Art. 76 advice = a recommendation to buy, sell or hold specific instruments, bas
 
 | M2 threshold | Precision (rules / DeepSeek) | Recall | F1 (rules / DeepSeek) | Alerts (TP+FP, rules / DeepSeek) |
 |---|---|---|---|---|
-| 0.10 (default) | 0.94 / 1.00 | 0.74 | 0.83 / 0.85 | 18 / 17 |
+| 0.10 (default) | 0.95 / 0.95 | 0.78 / 0.83 | 0.86 / 0.88 | 19 / 20 |
 | 0.25 | 1.00 | 0.61 | 0.76 | 14 |
 | 0.40 | 1.00 | 0.48 | 0.65 | 11 |
 
-**Notes:** Gold set: 69 synthetic documents, about a third hard cases by design, labels written from the criteria before running the rules (a disagreement becomes a rule follow-up, never a relabel). From 0.25 up, both runs give the same numbers. The numbers are honest about what is missing: 12 of 18 M2 rules, no real samples, and the LLM numbers are for one hosted model (DeepSeek Flash); local Gemma is not measured on the gold set.
+**Notes:** Gold set: 69 synthetic documents, about a third hard cases by design, labels written from the criteria before running the rules (a disagreement becomes a rule follow-up, never a relabel). From 0.25 up, both runs give the same numbers. The numbers are honest about what is missing: 14 of 18 M2 rules, no real samples, and the LLM numbers are for one hosted model (DeepSeek Flash); local Gemma is not measured on the gold set.
 
 ---
 
@@ -172,7 +172,7 @@ The LLM is any OpenAI-compatible endpoint, set in the root `.env`. Hosted model 
 
 Measured with DeepSeek Flash: on the gold set, 28 calls, all HTTP 200, no timeouts or malformed answers, latency p50 2.4 s / p95 6.4 s. On the stack with real pages, a second pass over the same 7 documents made 0 LLM calls and gave the same scores (cache). With a wrong API key, DeepSeek answered 401, the verdicts were dropped and the finding was rules-only, with the deferred checks left "do weryfikacji".
 
-Runbook (`analytics/README.md`, "LLM: hosted Gemma or local Ollama", PR #69), on the demo machine:
+Runbook (`analytics/README.md`, "LLM: hosted DeepSeek or local Ollama", PR #69), on the demo machine:
 
 1. In `.env`, comment out the hosted lines and set
    `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama`,

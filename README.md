@@ -8,35 +8,29 @@ Monitoring of online investment promotion for UKNF (HackNation 2026): a scraping
 |---|---|
 | [`scraper/`](scraper/) | data collection: collectors, job queue, scheduler |
 | [`analytics/`](analytics/) | preprocessing, modules M1–M3, LLM |
+| [`api/`](api/) | database schema (Alembic), REST API, Socket.IO gateway |
 | [`web/`](web/) | dashboard |
 | [`infra/`](infra/) | shared infrastructure: Postgres, Redis, object storage (MinIO), optional Ollama, HTTPS gateway |
-| [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI), mocks, validator – draft v1 |
+| [`contracts/`](contracts/) | data contracts (JSON Schema, OpenAPI 1.3.0), mocks, validator |
 | [`.docs/`](.docs/) | project documentation (English): plans, decisions, AI work log |
-| [`doc/`](doc/) | UKNF challenge materials (Polish), removed before hand-in |
+| [`doc/`](doc/) | UKNF challenge materials (Polish), committed in the repository |
 
-Who owns which folder: [`.github/CODEOWNERS`](.github/CODEOWNERS) (GitHub requests their review automatically; shared folders have no owner).
-
-## Documentation
-
-- [Integration plan](.docs/integration-plan.md) and [analytics plan](.docs/analytics-plan.md): drafts, contracts not yet confirmed
-- [AI-assisted development log](.docs/ai-workflow.md)
-- Scaling out `worker` and `analytics`, and what stays single-instance: [`infra/README.md`](infra/README.md#scale-out)
+Who owns which folder: [`.github/CODEOWNERS`](.github/CODEOWNERS). Plans, decisions and the AI-assisted development log: [`.docs/`](.docs/INDEX.md), [AI log](.docs/ai-workflow.md).
 
 ## Quick Start
 
 Requires Docker with Compose v2.20+.
 
 ```bash
-./scripts/init-env.sh          # creates .env with random secrets (never committed)
-docker compose up --build      # the whole stack; the first run also scans every scheduled source
-docker compose --profile llm up -d   # optional: local Gemma (gemma3:4b via Ollama, several GB download)
+./scripts/init-env.sh                # creates .env with random secrets (never committed)
+docker compose up --build            # the whole stack; the first run also scans the seeded sources
+# Local open model (Gemma via Ollama, several GB) instead of the hosted one:
+./scripts/init-env.sh --local-llm && docker compose --profile llm up --build
 ```
 
-The LLM is a hosted OpenAI-compatible model by default (a mentor-approved exception to the on-premise rule, [ADR 0304](.docs/decisions/0304-llm-serving.md)); the `llm` profile is the local open-model fallback. Infrastructure, networks and the joining contract for new modules: [`infra/README.md`](infra/README.md).
+Open https://localhost:8443 (local certificate: [`infra/README.md`](infra/README.md)). Scans, analysis and findings take a few minutes; check progress with the `bootstrap status` command in [`scraper/README.md`](scraper/README.md); `docker compose down -v` gives a clean start.
 
-On a clean clone the first `up` queues one scan per scheduled source (`bootstrap`, [`scraper/README.md`](scraper/README.md)); scans, analysis and findings take a few minutes. Check progress with `docker compose run --rm --no-deps -T bootstrap python -m iw_scraper.bootstrap status` (exit 0 = every module has findings). A later `up` on the same volumes scans nothing new, so use `docker compose down -v` for a clean demo. `BOOTSTRAP_SCAN=false` in `.env` turns the first scan off.
-
-Open https://localhost:8443 (local certificate: see [`infra/README.md`](infra/README.md)). For UI work without the backend, run the contract mock server and point `API_UPSTREAM` at it, or use `npm run dev` in `web/` against it ([`contracts/README.md`](contracts/README.md), "Mock server"; [`web/README.md`](web/README.md)).
+The LLM is optional: without one the system runs on rules only. The default is a hosted DeepSeek Flash through an OpenAI-compatible API ([ADR 0318](.docs/decisions/0318-hosted-llm-deepseek-flash.md); set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` in `.env`), a mentor-approved exception to the on-premise rule that swaps to local Ollama by environment only ([ADR 0304](.docs/decisions/0304-llm-serving.md)).
 
 ## Hardware requirements
 
@@ -53,31 +47,7 @@ Limits, image sizes and model sizes behind these numbers, and how they were obta
 
 ## Configuration
 
-All settings are environment variables in the root `.env` (template: [`.env.example`](.env.example), secrets from `./scripts/init-env.sh`). Each module's `compose.yaml` passes these to its containers; an empty or missing value takes the default shown in the reference.
-
-| Service (compose file) | Variables from the root `.env` | Reference |
-|---|---|---|
-| built images (`api`, `analytics`, `scraper`, `renderer`, `web`) | `COMPOSE_PROJECT_NAME`, `IW_VERSION` (image tag); `LOG_LEVEL` (default `INFO`) for `api`, `analytics`, `scraper` | [`.env.example`](.env.example) |
-| `postgres` ([`infra/`](infra/compose.yaml)) | `POSTGRES_DB`, `POSTGRES_ADMIN_USER`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD` | [`infra/README.md`](infra/README.md) |
-| `redis` | `REDIS_PASSWORD` | [`infra/README.md`](infra/README.md) |
-| `minio`, `minio-init` | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` | [`infra/README.md`](infra/README.md) |
-| `gateway` | `IW_HOSTNAME`, `IW_HTTPS_PORT`, `IW_HTTP_PORT`, `IW_HSTS`, `API_UPSTREAM`, `WEB_UPSTREAM` | [`infra/README.md`](infra/README.md) |
-| `ollama`, `ollama-pull` (profile `llm`) | `OLLAMA_PULL_MODELS`, `OLLAMA_CONTEXT_LENGTH`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_KEEP_ALIVE` | [`infra/README.md`](infra/README.md) |
-| dev ports overlay ([`infra/compose.dev-ports.yaml`](infra/compose.dev-ports.yaml)) | `IW_DEV_PG_PORT`, `IW_DEV_REDIS_PORT`, `IW_DEV_MINIO_PORT` | [`infra/README.md`](infra/README.md) |
-| `api-migrate`, `api` ([`api/`](api/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_SECURE`, `API_CORS_ORIGINS`; compose derives `DATABASE_URL`, `REDIS_URL` and `CORS_ORIGINS` from these, so never set them, and the image fixes `CONTRACTS_DIR` | [`api/README.md`](api/README.md) |
-| `analytics`, `analytics-eval` ([`analytics/`](analytics/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`; LLM: `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_S`, `LLM_DOC_BUDGET_S`, `LLM_CHUNK_CHARS`, `LLM_MAX_CHUNKS`, `LLM_CACHE_TTL_S`, `LLM_BREAKER_FAILURES`, `LLM_BREAKER_COOLDOWN_S`; embeddings: `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY`, `EMBED_DIM`, `EMBED_TIMEOUT_S`, `EMBED_MAX_CHARS`, `EMBED_CACHE_TTL_S`, `EMBED_BREAKER_FAILURES`, `EMBED_BREAKER_COOLDOWN_S`; gate and near-duplicates: `GATE_ENABLED`, `GATE_SIM_THRESHOLD`, `NEARDUP_NUM_PERM`, `NEARDUP_BANDS`, `NEARDUP_THRESHOLD`, `NEARDUP_MAX_CHARS`, `NEARDUP_TTL_S`; `CLAIM_MIN_IDLE_MS`, `REGISTRY_CSV` | [`analytics/README.md`](analytics/README.md), [`analytics/.env.example`](analytics/.env.example) |
-| `seed`, `bootstrap`, `worker`, `scheduler` ([`scraper/`](scraper/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`, `MINIO_*`, `SCRAPER_SEED_CRON`, `BOOTSTRAP_SCAN`, `SCRAPER_SHUTDOWN_DEADLINE`, `SCRAPER_HEALTH_PORT`, `PROXY_LIST`, `PROXY_ROTATION`, `PROXY_COOLDOWN_SECONDS`, `DOMAIN_MIN_INTERVAL_SECONDS`, `FETCH_TIMEOUT_SECONDS`, `FETCH_MAX_BYTES`, `ALLOWED_PORTS`, `COMPOSE_INTERNAL_HOSTS`, `FETCH_EXTRA_HOSTS`, `SCRAPER_RENDER_ENABLED`, `SCRAPER_RENDER_MAX_PER_HOUR`, `SCRAPER_ATTEMPT_TIMEOUT`, `RENDER_TIMEOUT_SECONDS` | [`scraper/README.md`](scraper/README.md), [`scraper/.env.example`](scraper/.env.example) |
-| `renderer` ([`scraper/compose.renderer.yaml`](scraper/compose.renderer.yaml)) | `RENDER_TIMEOUT_SECONDS`, `RENDER_MAX_PAGE_HEIGHT`, `RENDER_MAX_PNG_BYTES`, `RENDER_CONCURRENCY` | [`scraper/README.md`](scraper/README.md) |
-| `web` ([`web/`](web/compose.yaml)) | none at runtime. Build time, `npm run build`/`dev` only: `VITE_API_BASE_URL`, `VITE_EVENTS_URL`, `API_PROXY_TARGET` | [`web/README.md`](web/README.md), [`web/.env.example`](web/.env.example) |
-
-The code also reads variables that compose does not forward, so in the stack they keep their defaults; to change one, add it to the service's `environment:` in its `compose.yaml`:
-
-- analytics: `OFFICIAL_SOURCE_DOMAINS`, `WORKER_CONSUMER`, `STREAM_BLOCK_MS`, `MAX_DELIVERIES`, `MAX_DOCUMENT_BYTES`.
-- scraper: `SOCIAL_MAX_POSTS`, `SCRAPER_CONSUMER` and the queue and worker settings `SCRAPER_MAX_TRIES`, `SCRAPER_BACKOFF_BASE`, `SCRAPER_BACKOFF_CAP`, `SCRAPER_MAX_RETRY_AFTER`, `SCRAPER_DOMAIN_CONCURRENCY`, `SCRAPER_LEASE_TTL`, `SCRAPER_REQUEUE_DELAY`, `SCRAPER_FAILURE_THRESHOLD`, `SCRAPER_DOMAIN_COOLDOWN`, `SCRAPER_MAX_REQUEUES`, `SCRAPER_MAX_JOBS`, `SCRAPER_RECONNECT_BASE`, `SCRAPER_RECONNECT_CAP`, `SCRAPER_POLL_DELAY`, `SCRAPER_CLAIM_IDLE`, `SCRAPER_TICK_INTERVAL`, `SCRAPER_SWEEP_INTERVAL`, `SCRAPER_CONSUMER_BLOCK`, `SCRAPER_HEALTH_HOST` (meanings: [`scraper/.env.example`](scraper/.env.example)).
-- renderer: `RENDER_MAX_BLOCKS`.
-- api: `API_HOST`, `API_PORT`.
-
-Compose fixes `RENDERER_URL` (scraper) and `RENDERER_PORT` (renderer) to `http://renderer:8080` and `8080`. Variables for tests only (`TEST_DATABASE_URL`, `TEST_REDIS_URL`, `MOCK_*`) are described in each module's README.
+All settings are environment variables in the root `.env` (template: [`.env.example`](.env.example); secrets come from `./scripts/init-env.sh`). The per-service reference, with every variable and its default, is in [`infra/README.md`](infra/README.md#configuration-reference); module details are in the [`scraper`](scraper/README.md), [`analytics`](analytics/README.md), [`api`](api/README.md) and [`web`](web/README.md) READMEs.
 
 ## Licences of third-party services
 
