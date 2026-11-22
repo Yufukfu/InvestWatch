@@ -18,3 +18,9 @@ condition = "AND"
 paths = ['''^contracts/mocks/generate_mocks\.py$''']
 regexTarget = "line"
 regexes = ['''^\s*key="m\d-[a-z0-9-]+",''']
+
+[[rules.allowlists]]
+description = "Registry id of the fictional seed firm 'Alfa Inwestycje Dom Maklerski S.A.' (analytics/registry/seed.csv), asserted as `key:` in a web test (commit b14d0b5, PR #129); a public fixture UUID, not a credential. Only that exact value in that one file is skipped."
+condition = "AND"
+paths = ['''^web/src/features/advertisers/data/useAdvertisers\.test\.tsx$''']
+regexes = ['''^facc6bd1\-c728\-5348\-90a4\-011b0972fea9$''']
