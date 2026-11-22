@@ -22,6 +22,6 @@ Scope approved by Damian ("dokładamy brakujące reguły, start"). R10 first, th
 
 ## 4. Close
 
-- [ ] 4.1 Gold evaluation rules-only before / after (and `--llm` if available); per-rule P/R and M2 at 0.1 in the PR body; `test_eval_thresholds` result reported to the coordinator
-- [ ] 4.2 Docs (`.docs/analytics-plan.md` M2 rule list, `.docs/status/` analytics line if present), AI log, `docs-check`
-- [ ] 4.3 Archive the change (last commit)
+- [x] 4.1 Gold evaluation: rules-only M2 at 0.1 went from F1 0.829 (P 0.944, R 0.739) on `main` to 0.857 (P 0.947, R 0.783), and the recommended threshold stays 0.1 (`test_eval_thresholds` green). With DeepSeek Flash, M2 at 0.1 has F1 0.884 (P 0.95, R 0.826). R9 strict P/R: 1.0/0.0 rules-only, 1.0/1.0 with the LLM. R10: 1.0/1.0 on both runs. The numbers were reported to the coordinator
+- [x] 4.2 Docs (`.docs/analytics-plan.md` M2 rule list, `.docs/status/` analytics line if present), AI log, `docs-check`
+- [x] 4.3 Archive the change (last commit)
