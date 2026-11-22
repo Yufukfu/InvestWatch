@@ -885,7 +885,7 @@ class R11ProductComparisons(Rule):
         p = self._p
         texts = [s.text for s in ctx.pre.sentences]
         comparisons = [t for t in texts if R3RiskNextToReturns._hits(t, p["comparison"], p["exclude"])]
-        superlatives = [t for t in texts if any(s.search(t) for s in p["superlative"])]
+        superlatives = [t for t in texts if R3RiskNextToReturns._hits(t, p["superlative"], p["exclude"])]
         if not comparisons and not superlatives:
             return self.result("not_applicable", None, "Materiał nie zawiera porównań produktów ani usług.")
         text = ctx.doc.text

@@ -733,3 +733,18 @@ def test_every_evidence_is_a_quote_on_every_mock(with_judge, mock_documents, reg
         ctx = Context(doc=doc, pre=preprocess(doc.text), firm_match=registry.match(doc.text, doc.url), registry=registry)
         for r in run_rules(catalogue, ctx, judge=FakeJudge() if with_judge else None, module="M2"):
             assert r.evidence is None or r.evidence in doc.text, (raw["id"], r.rule_id, r.evidence)
+
+
+def test_r11_publisher_line_is_not_a_source(registry, catalogue):
+    # Group 6 review: "Materiał opublikowany przez …" names the publisher, not the source of the comparison.
+    text = "Prowizje niższe niż w innych biurach maklerskich. Materiał opublikowany przez DM X."
+    assert run(text, registry, catalogue)["R11"].result == "fail"
+
+
+@pytest.mark.parametrize(
+    "text", ["Załącznik nr 1 do Regulaminu.", "Polityka najlepszej realizacji zleceń.", "Our best execution policy."],
+    ids=["document-number", "best-execution-pl", "best-execution-en"],
+)
+def test_r11_boilerplate_is_not_a_superlative(text, registry, catalogue):
+    # Group 6 review: standard broker boilerplate is not an implicit market comparison.
+    assert run(text, registry, catalogue)["R11"].result == "not_applicable"

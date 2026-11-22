@@ -70,7 +70,8 @@ shared:
     - '\bsource\b'
     - '\bdata\s+from\b'
     # The method of a comparison names its source too (gold m2-r11-comparison-with-source).
-    - '\bopublikowan\w*\s+(?:\S+\s+){0,4}(?:na\s+stronach|przez|w\s+raport|w\s+sprawozdani)\w*'
+    # Not `opublikowany przez …`: that names the publisher, not the source (group 6 review).
+    - '\bopublikowan\w*\s+(?:\S+\s+){0,4}(?:na\s+stronach|w\s+raport|w\s+sprawozdani)\w*'
     - '\bporównani\w*\s+(?:\w+\s+){0,2}(?:tabel|cennik|taryf|ofert)\w*'
 
 rules:
@@ -244,6 +245,10 @@ rules:
         - '\bniż\s+(?:\w+\s+)?inflacj\w*'
         - '\bw\s+porównaniu\s+(?:z|ze|do)\s+(?:\w+\s+)?inflacj\w*'
         - '\bniż\s+(?:\d[\d.,]*|kilk\w*|pół\w*)'
+        # Also stripped before the superlatives: document numbers and best execution are boilerplate (group 6 review).
+        - '\b(?:załącznik\w*|zał\.|poz\.|ust\.|art\.|pkt\.?)\s*(?:nr|numer)\s*\d+'
+        - '\bnajlepsz\w*\s+(?:\w+\s+)?realizacj\w*'
+        - '\bbest\s+execution\b'
       superlative_patterns:
         - '\bnajlepsz\w*'
         - '\bnajtańsz\w*'
