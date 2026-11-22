@@ -38,6 +38,11 @@ export type FindingRow = {
   riskLevel?: RiskLevel;
   status: FindingStatus;
   detectedAt: string;
+  // Findings are unique per (document, module): rows of one post share documentId (issue #33).
+  documentId: string;
+  url: string;
+  // Hostname of an http(s) url, shown as text; undefined for anything else.
+  host?: string;
 };
 
 export type RuleOutcome = 'fail' | 'pass' | 'not_applicable' | 'uncertain';
@@ -75,6 +80,7 @@ export type AdvertiserView = {
 
 export type FindingDetail = {
   id: string;
+  documentId: string;
   module: FindingModule;
   title: string;
   summary?: string | null;

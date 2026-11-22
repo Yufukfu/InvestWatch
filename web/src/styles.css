@@ -97,6 +97,7 @@ button.link:hover { color: #1e40af; }
 .findings tbody tr.selected { background: #e8efff; box-shadow: inset 4px 0 0 var(--accent); }
 .findings tbody tr:last-child td { border-bottom: 0; }
 .col-title { min-width: 260px; }
+.row-host { display: block; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 .col-date { white-space: nowrap; color: var(--muted); }
 .sort { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; gap: 4px; }
 .sort-arrow { color: var(--accent); }
