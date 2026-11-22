@@ -77,3 +77,23 @@ def test_web_source_stays_collectable_on_any_host():
 def test_platform_the_collector_does_not_accept_is_not_collectable():
     assert source("https://t.me/s/SubeTradingPL", platform="facebook").collectable is False
     assert source("https://t.me/s/SubeTradingPL", platform="forum").collectable is False
+
+
+async def flow(ctx):  # a stand-in; the registry never calls it
+    raise AssertionError("not called")
+
+
+def test_flow_registration_is_returned_with_its_home_ip_mode():
+    reg = CollectorRegistry()
+    reg.register("x.com", flow=flow, platform="x", home_ip=True)
+
+    found = reg.for_url("https://x.com/uknf")
+    assert (found.parse, found.flow, found.home_ip) == (None, flow, True)
+
+
+@pytest.mark.parametrize("kwargs", [{}, {"parse": collector, "flow": flow}])
+def test_registration_names_a_parser_or_a_flow_not_both_and_not_neither(kwargs):
+    reg = CollectorRegistry()
+    parse = kwargs.get("parse")
+    with pytest.raises(ValueError, match="parser or a flow"):
+        reg.register("x.com", parse, flow=kwargs.get("flow"))

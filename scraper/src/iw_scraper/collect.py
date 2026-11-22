@@ -22,7 +22,7 @@ from iw_scraper.jobs import AttemptResult
 from iw_scraper.parsing import ParseFailure, parse_page
 from iw_scraper.rendering import PageRenderer, wants_render
 from iw_scraper.robots import check_robots
-from iw_scraper.social.model import build_author, build_page
+from iw_scraper.social.model import FlowContext, build_author, build_page
 from iw_scraper.social.registry import registry as social_registry
 from iw_scraper.sources import SourceStore, domain_of
 from iw_scraper.targets import AddressGuard, UrlGuard, target_guard
@@ -95,13 +95,20 @@ class Collector:
         source = await self._store.get(source_id)
         if source is None or not source.collectable:  # the queue checks too; this keeps a stray caller from fetching
             return _failed(source_id, Reason.INVALID_REQUEST, "source does not exist or is not collectable")
-        if source.platform != "web" and not social_registry.for_url(source.url).valid_url(source.url):
+        registration = None if source.platform == "web" else social_registry.for_url(source.url)
+        if registration is not None and not registration.valid_url(source.url):
             return _failed(source_id, Reason.INVALID_REQUEST, "source URL is not a valid channel URL for its host")
         urls = await self._urls_now()
         try:
             urls.check(source.url, enforce_host=False)
         except FetchFailure as failure:
             return _failed(source_id, failure.reason, failure.detail)
+        if registration is not None and registration.home_ip:
+            try:  # the flow connects on its own, so the address check of the fetch layer runs here once
+                await target_guard(urls, self._addresses, source.url)(source.url)
+            except FetchFailure as failure:
+                return _failed(source_id, failure.reason, failure.detail)
+            return await self._run_home_flow(source, registration.flow, started)
         proxy = self._rotator.start_run()
         if (deferral := proxy.deferral()) is not None:  # nothing is announced for a run that has to wait
             return AttemptResult(deferral=deferral)
@@ -110,7 +117,14 @@ class Collector:
         identity = stages.draw_identity()
         session = stages.open_session(identity)
         try:
-            return await self._collect(source, identity, session, urls, proxy)
+            return await self._attempt(source_id, self._collect(source, identity, session, urls, proxy, registration))
+        finally:
+            await stages.close_session(session)
+
+    async def _attempt(self, source_id: str, attempt: Awaitable[AttemptResult]) -> AttemptResult:
+        """Await one attempt and map the failures it raises to the `AttemptResult` the queue reads."""
+        try:
+            return await attempt
         except FetchDeferred as deferred:
             return AttemptResult(deferral=deferred.deferral)
         except FetchFailure as failure:
@@ -120,28 +134,53 @@ class Collector:
             )
         except ParseFailure as failure:
             return _failed(source_id, failure.reason, failure.detail)
-        finally:
-            await stages.close_session(session)
 
-    async def _collect(self, source: Source, identity, session, urls: UrlGuard, proxy) -> AttemptResult:
-        stages = self._stages
+    async def _run_home_flow(self, source: Source, flow, started: Callable[[], Awaitable[None]]) -> AttemptResult:
+        """A flow that runs from the home IP: no identity, session, proxy rotation or robots check (ADR 0109).
+
+        The URL guard has passed; the per-domain limiter is waited once here before the flow's first request.
+        """
+        await started()
         domain = domain_of(source)
-        guard = target_guard(urls, self._addresses, source.url)
-
         await self._limiter.wait_turn(domain)
-        verdict = await stages.check_robots(
+        context = FlowContext(
+            source=source, domain=domain, ingest=self._ingestor.ingest, clock=self._clock,
+            wait_turn=lambda: self._limiter.wait_turn(domain),
+        )
+        return await self._attempt(source.id, flow(context))
+
+    async def _check_robots(self, source: Source, identity, session, proxy, guard, domain: str) -> AttemptResult | None:
+        """One limiter turn, then `robots.txt`: None when the path is allowed, else the `blocked` result."""
+        await self._limiter.wait_turn(domain)
+        verdict = await self._stages.check_robots(
             source.url, identity, proxy, guard=guard, timeout=self._timeout, session=session
         )
         if not verdict.allowed:  # not a block signal: no identity is blamed
             return _failed(source.id, Reason.BLOCKED, verdict.detail)
+        return None
+
+    async def _fetch_page(self, url: str, identity, session, proxy, guard, domain: str):
+        await self._limiter.wait_turn(domain)
+        return await self._stages.fetch(
+            url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
+        )
+
+    async def _collect(
+        self, source: Source, identity, session, urls: UrlGuard, proxy, registration=None
+    ) -> AttemptResult:
+        stages = self._stages
+        domain = domain_of(source)
+        guard = target_guard(urls, self._addresses, source.url)
+
+        if registration is not None and registration.flow is not None:  # a flow on the fetch path asks for robots itself
+            return await registration.flow(self._flow_context(source, domain, identity, session, proxy, guard))
+        if (refusal := await self._check_robots(source, identity, session, proxy, guard, domain)) is not None:
+            return refusal
         if source.platform != "web":
             return await self._collect_social(source, identity, session, proxy, guard, domain)
 
-        await self._limiter.wait_turn(domain)
         began = time.monotonic()
-        result = await stages.fetch(
-            source.url, identity, proxy, guard=guard, timeout=self._timeout, max_bytes=self._max_bytes, session=session
-        )
+        result = await self._fetch_page(source.url, identity, session, proxy, guard, domain)
         duration_ms = int((time.monotonic() - began) * 1000)
 
         page = stages.parse(result.body, result.content_type, result.url)
@@ -156,6 +195,14 @@ class Collector:
         if stored.outcome == "failed":  # the ingestor has recorded it in `job_errors`
             return AttemptResult(error=stored.error, recorded=True)
         return AttemptResult(documents=1 if stored.outcome == "inserted" else 0)
+
+    def _flow_context(self, source: Source, domain: str, identity, session, proxy, guard) -> FlowContext:
+        return FlowContext(
+            source=source, domain=domain, ingest=self._ingestor.ingest, clock=self._clock,
+            wait_turn=lambda: self._limiter.wait_turn(domain), identity=identity, session=session, proxy=proxy,
+            check_robots=lambda: self._check_robots(source, identity, session, proxy, guard, domain),
+            fetch=lambda url: self._fetch_page(url, identity, session, proxy, guard, domain),
+        )
 
     async def _collect_social(self, source: Source, identity, session, proxy, guard, domain: str) -> AttemptResult:
         """Read a channel's pages, newest first, through the same fetch path as a web page.

@@ -4,8 +4,10 @@ A collector module (one per platform, registered by host in `registry`) turns on
 Nothing here knows a platform: the platform's name and profile URL travel in the `Channel`.
 """
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -86,3 +88,24 @@ def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
         "scrape_meta": {"message_id": post.message_id, "views": post.views, "network": channel.network},
         "html": post.html,
     }
+
+
+@dataclass(frozen=True)
+class FlowContext:
+    """What `run_source` hands a dedicated flow: the guarded source, the ingest and, on the fetch path only, the run's
+    identity, session and proxy with the shared robots check and fetch. A home-IP flow has `None` for the three."""
+
+    source: Any
+    domain: str
+    ingest: Callable[..., Awaitable[Any]]  # `Ingestor.ingest`
+    clock: Callable[[], datetime]
+    wait_turn: Callable[[], Awaitable[Any]]  # the per-domain limiter, for this source's domain
+    identity: Any = None
+    session: Any = None
+    proxy: Any = None
+    check_robots: Callable[[], Awaitable[Any]] | None = None  # None when allowed, else the `blocked` AttemptResult
+    fetch: Callable[[str], Awaitable[Any]] | None = None  # the shared fetch, after one `wait_turn`
+
+
+# a dedicated flow returns one attempt's `AttemptResult`; failures it cannot map itself it raises as `FetchFailure`
+Flow = Callable[[FlowContext], Awaitable[Any]]
