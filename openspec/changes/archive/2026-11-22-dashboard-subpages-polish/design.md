@@ -1,0 +1,3 @@
+# Design
+
+Hash state stays the routing mechanism (no router dependency, as in the redesign). `App` renders one page component per hash value; the header is outside the switch. Search params (filters, `finding`, `triage`) remain in the query string and survive page changes, so a shared link to `?finding=…#zgloszenia` reproduces the view. The one-shot triage flag lives in the URL and is consumed by `useFindings` when the findings page mounts, so setting the search first and the hash second is enough. Switching page scrolls to top and focuses `main` (`tabIndex={-1}`). Trend and calibration stay lazy chunks. No ADR: reversible, no new dependency.

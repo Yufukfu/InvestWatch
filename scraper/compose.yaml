@@ -56,6 +56,30 @@ services:
       resources:
         limits: { cpus: "0.5", memory: 128M }
 
+  # One-shot, first run only in effect: queues a scan request (the one the dashboard's rescan writes) for every active
+  # source that has a cron and never ran, so a clean `up` fills the database without a manual scan. A Redis key per
+  # source and `last_run_at` make a rerun, a second `up` or a scale-out queue nothing twice. BOOTSTRAP_SCAN=false turns
+  # it off. Status of the whole pipeline: docker compose run --rm --no-deps -T bootstrap python -m iw_scraper.bootstrap status
+  # (spec first-run-bootstrap). The app role and the Redis URL only: no MinIO, no route out.
+  bootstrap:
+    <<: [*scraper-image, *hardening]
+    command: ["python", "-m", "iw_scraper.bootstrap"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-iw_app}:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env (scripts/init-env.sh)}@postgres:5432/${POSTGRES_DB:-investwatch}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (scripts/init-env.sh)}@redis:6379/0
+      BOOTSTRAP_SCAN: ${BOOTSTRAP_SCAN:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      worker: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [data]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
   # Collectors: arq worker, scan-request consumer and GET /health on SCRAPER_HEALTH_PORT (inside data only, no host
   # port). Scale with `--scale worker=N`: the queue, run lock and domain limits are shared through Redis.
   worker:
@@ -126,6 +150,9 @@ services:
     depends_on:
       api-migrate: { condition: service_completed_successfully }
       seed: { condition: service_completed_successfully }
+      # Makes `up --wait` check the one-shot for completion: a finished one-shot nobody depends on fails the wait
+      # ("exited (0)"). required: false still starts the scheduler if bootstrap fails. Delays it by seconds.
+      bootstrap: { condition: service_completed_successfully, required: false }
       minio-init: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

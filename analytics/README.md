@@ -22,7 +22,7 @@ A document gives at most one finding per module ([`modules/router.py`](src/inves
 | a third party | firm named in the text or linked | M1 (a foreign firm without a Polish branch only if the ad targets Poland, else `not_targeting_poland`), plus M3 against the publisher when the advice offer is the publisher's own |
 | a third party | no firm | M3 if an offer signal (S3.3, S3.4, S3.5 or S3.8), else nothing (`no_signals`) |
 
-Before routing to a module, the topic gate drops a `third_party` or `unknown` document that has no investment signal: no term of [`gate_terms.yaml`](src/investwatch_analytics/gate_terms.yaml) and no registry firm. The drop is logged as `off_topic` with `dict_hits`, never with text, and counted in Redis `iw:stats:gate` (`passed`, `dropped`, `bypassed`). `firm_own` documents are never gated. A near-duplicate (MinHash Jaccard ≥ 0.8 over word 5-shingles) is analyzed as usual. Its summary names the original's URL, and it fires no second `finding.high_risk` for its group and module ([ADR 0314](../.docs/decisions/0314-topic-gate-and-near-duplicates.md)).
+Before routing to a module, the topic gate drops a `third_party` or `unknown` document that has no investment signal: no term of [`gate_terms.yaml`](src/investwatch_analytics/gate_terms.yaml) and no registry firm. With an embedder configured, a document the dictionary would drop, if it has at least `GATE_EMBED_MIN_CHARS` characters, gets a second look. It is embedded and passes when its cosine to the nearest on-topic centroid, minus its cosine to the `off_topic` centroid, is at least `GATE_EMBED_MIN_MARGIN`. The centroids come from the seed lines in `gate_terms.yaml`, and the default margin was measured with `bge-m3` on [`eval/gate_check.jsonl`](eval/gate_check.jsonl): run `python eval/gate_calibrate.py` with `EMBED_BASE_URL` set. Embeddings never re-judge a dictionary pass. Without an embedder, the gate is dictionary-only. The drop is logged as `off_topic` with `dict_hits`, `gate_path`, `similarity` and `margin`, never with text, and counted in Redis `iw:stats:gate` (`passed`, `dropped`, `bypassed`, plus `path_dictionary`, `path_embedding`, `path_dictionary_only_fallback` and `rescued`). `firm_own` documents are never gated. A near-duplicate (MinHash Jaccard ≥ 0.8 over word 5-shingles) is analyzed as usual. Its summary names the original's URL, and it fires no second `finding.high_risk` for its group and module ([ADR 0314](../.docs/decisions/0314-topic-gate-and-near-duplicates.md)).
 
 M1 score: σ(bias + Σ w·x), how certain this is a third-party ad of the firm. M3 score: the same form, capped at 0.4 unless S3.4 (a recommendation to buy, sell or hold financial instruments) is found; M3 means "may indicate" investment advice, and the summary says when personalisation (art. 76) is unconfirmed ([ADR 0308](../.docs/decisions/0308-m3-s34-gate.md)). Signals, weights and dictionaries: [`rules/m1_signals.yaml`](src/investwatch_analytics/rules/m1_signals.yaml), [`rules/m3_signals.yaml`](src/investwatch_analytics/rules/m3_signals.yaml). Evidence may quote the author handle, a link or the page URL as well as the text. Routing and the M1/M3 rules read at most the first 200 000 characters (`SCAN_MAX` in `pipeline.py`); firm names are compared after NFKC and removal of zero-width characters, with quotes cut from the original text. Specs: [`m1-third-party-signals`](../openspec/specs/m1-third-party-signals/spec.md), [`m3-unauthorized-advice-signals`](../openspec/specs/m3-unauthorized-advice-signals/spec.md).
 
@@ -37,16 +37,29 @@ docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XADD 
 
 Per message the worker loads the row, runs the pipeline, saves all findings in one transaction, publishes the events and only then acknowledges (XACK). A redelivery or a second message for the same document updates the finding (`(document_id, module)`) and publishes nothing. A malformed message, a missing row or an invalid document is logged and acknowledged; an unexpected error is retried up to `MAX_DELIVERIES`; a Postgres or Redis outage is retried with backoff and never acknowledged. `GET /health` on port 8001 (inside the stack only) answers 200 or 503 with `redis` / `db` flags. Specs: [`document-stream-worker`](../openspec/specs/document-stream-worker/spec.md), [`finding-storage`](../openspec/specs/finding-storage/spec.md), [`finding-events`](../openspec/specs/finding-events/spec.md); design and review follow-ups: [`openspec/changes/archive/2026-11-21-analytics-worker/`](../openspec/changes/archive/2026-11-21-analytics-worker/design.md).
 
-## LLM: hosted Gemma or local Ollama
+## LLM: hosted DeepSeek or local Ollama
 
-The model is chosen by env only, in the root `.env` (compose passes it to `analytics`; [ADR 0304](../.docs/decisions/0304-llm-serving.md), [ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)). Empty `LLM_BASE_URL` means rules-only. At start-up the worker logs `llm_mode` (`hosted`, `local` or `disabled`) and the model, never the key. If the endpoint fails (timeout, 429, 503, malformed answer), the circuit breaker opens after `LLM_BREAKER_FAILURES` failures and findings are rules-only until it closes; there is no automatic switch to another model.
+The model is chosen by env only, in the root `.env` (compose passes it to `analytics`; [ADR 0304](../.docs/decisions/0304-llm-serving.md), [ADR 0318](../.docs/decisions/0318-hosted-llm-deepseek-flash.md)). Empty `LLM_BASE_URL` means rules-only. At start-up the worker logs `llm_mode` (`hosted`, `local` or `disabled`) and the model, never the key. If the endpoint fails (timeout, 429, 503, malformed answer), the circuit breaker opens after `LLM_BREAKER_FAILURES` failures and findings are rules-only until it closes; there is no automatic switch to another model.
 
-**Hosted (default): Gemma 4 on the Gemini API.** Put these in the root `.env`:
+**Hosted (default): DeepSeek Flash.** Put these in the root `.env`:
+
+```bash
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-flash
+LLM_API_KEY=<DeepSeek API key>      # only in .env, never committed
+LLM_TIMEOUT_S=60
+LLM_DOC_BUDGET_S=90
+CLAIM_MIN_IDLE_MS=120000
+```
+
+Measured on 2026-11-22: 119 of 120 calls returned valid JSON (one malformed answer, dropped to rules), 3.1 s per call on the gold set and 6.7 s on real pages (p95 18.7 s), and the longest document took 53 s. No `<thought>` block, no fence.
+
+**Hosted alternative: Gemma 4 on the Gemini API** ([ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)). An open-weights model, but it often returned 503/429 and took 15-40 s per call:
 
 ```bash
 LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemma-4-31b-it            # gemma-4-26b-a4b-it if 31b keeps returning 503 "high demand"
-LLM_API_KEY=<Gemini API key>        # only in .env, never committed
+LLM_MODEL=gemma-4-26b-a4b-it        # or gemma-4-31b-it
+LLM_API_KEY=<Gemini API key>
 LLM_TIMEOUT_S=45
 LLM_DOC_BUDGET_S=50
 CLAIM_MIN_IDLE_MS=90000
@@ -60,28 +73,42 @@ CLAIM_MIN_IDLE_MS=90000
    LLM_BASE_URL=http://ollama:11434/v1   # internal host on the data network, plain http is allowed
    LLM_MODEL=gemma3:4b
    LLM_API_KEY=ollama                    # any non-empty value; Ollama does not check it
-   LLM_TIMEOUT_S=120                     # a small model on CPU is much slower than the hosted one
-   LLM_DOC_BUDGET_S=180
-   CLAIM_MIN_IDLE_MS=240000              # must stay above (LLM_DOC_BUDGET_S + 3) * 1000 or the worker exits
-   LLM_MAX_CHUNKS=2                      # fewer calls on long pages
+   LLM_TIMEOUT_S=240                     # measured: one 1500-character M1 call took 182 s on CPU
+   LLM_DOC_BUDGET_S=300
+   CLAIM_MIN_IDLE_MS=360000              # must stay above (LLM_DOC_BUDGET_S + 3 + EMBED_TIMEOUT_S) * 1000 or the worker exits
+   LLM_CHUNK_CHARS=1500                  # short chunks: the default 9000 characters take about 6 minutes per call on CPU
+   LLM_MAX_CHUNKS=1
+   EMBED_BASE_URL=http://ollama:11434/v1 # bge-m3 embeddings; without it bge-m3 is pulled but never used
    ```
 
-   `OLLAMA_MODELS="gemma3:4b bge-m3"`, `OLLAMA_CONTEXT_LENGTH=8192`, `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
+   `OLLAMA_PULL_MODELS="gemma3:4b bge-m3"`, `OLLAMA_CONTEXT_LENGTH=8192`, `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m` come from `.env.example`. A `.env` from before 2026-11-22 may have `OLLAMA_MODEL` or `OLLAMA_MODELS` instead; both are ignored and the defaults apply. Never set `OLLAMA_MODELS`: Ollama reads it as its model directory.
 
-2. Pull the models once (`gemma3:4b` about 3.3 GB, `bge-m3` for embeddings about 1.2 GB), then start the stack with the profile:
+   **Speed on CPU** (measured 2026-11-22 on the demo machine: Docker Desktop with 16 GB and 16 CPUs, no GPU, `ollama` capped at 4 CPUs): `gemma3:4b` reads the prompt at about 10 tokens/s and writes about 1.7 tokens/s. With the values above an M1 check finished in 182 s. An M2 check, which has a longer prompt, still timed out at 240 s and that finding stayed rules-only. While the LLM runs, `bge-m3` calls time out at the default `EMBED_TIMEOUT_S=15` (`model.embedder = null`). With the earlier `LLM_TIMEOUT_S=120` and the default chunk size every call timed out. Locally, expect a few model verdicts per page and the rest rules-only. Hosted, the same call took 4.6 s.
+
+2. Pull the models once (`gemma3:4b` about 3.3 GB, about 7 minutes at 8.5 MB/s; `bge-m3` about 1.2 GB, under 3 minutes), then start the stack with the profile:
 
    ```bash
-   docker compose --profile llm up ollama-pull
+   docker compose --profile llm up --exit-code-from ollama-pull ollama-pull   # without --exit-code-from a failed pull still exits 0
    docker compose --profile llm up -d
-   # stack already running: recreate only what changed
+   # stack already running: recreate only what changed (about 40 s)
    docker compose --profile llm up -d ollama analytics
    ```
 
-3. Check: `docker compose logs analytics | grep llm_mode` shows `local`, and findings decided with the model carry `model.llm = "gemma3:4b"`.
+   If the pull fails (`unexpected EOF`, `digest mismatch`), run the same command again: finished models are only checked and a broken part is downloaded again. Run one stack only: `ollama` takes up to 6 GB on top of the rest of the stack, and on 2026-11-22 Docker Desktop crashed during a pull with several stacks running at once.
 
-**Back to hosted:** restore the hosted lines and limits, then `docker compose up -d analytics`.
+3. Check:
+   - `docker compose logs analytics | grep llm_mode` shows `local` and `gemma3:4b`. With `EMBED_BASE_URL` set, `embed_mode` is `local`.
+   - `docker compose exec ollama ollama ps` lists `gemma3:4b` and `bge-m3` with `CONTEXT 8192` once each has served a request.
+   - Findings decided with the model carry `model.llm = "gemma3:4b"`, and their summary names the model.
+   - Re-scanning an unchanged page creates no new document. To send a stored document through analytics again:
 
-Notes: the LLM cache key includes the model, so after a switch pages are analysed again. The default thresholds were measured rules-only (ADR 0316, 0317); quality on `gemma3:4b` is not measured.
+     ```bash
+     docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XADD iw:documents "*" document_id <document uuid> schema v1'
+     ```
+
+**Back to hosted:** restore the hosted lines and limits. Also remove `LLM_CHUNK_CHARS` and `LLM_MAX_CHUNKS`, which are local-only. Either remove `EMBED_BASE_URL` or keep `ollama` running for it (embeddings are local only, ADR 0313). Then run `docker compose up -d analytics` (about 60 s). `ollama` keeps running, so `docker compose stop ollama` frees its memory when embeddings are off.
+
+Notes: the LLM cache key includes the model, so after a switch pages are analysed again. The default thresholds were measured rules-only (ADR 0316), except M1, measured with DeepSeek Flash (ADR 0318); quality on `gemma3:4b` is not measured, and its verdicts differ from the hosted model's (the same Telegram post scored 0.622 with `gemma3:4b` and 0.182 with `gemma-4-26b-a4b-it`).
 
 ## Gold-set evaluation (calibration panel)
 
@@ -95,17 +122,29 @@ docker compose run --rm analytics-eval        # the same in the stack
 
 The one-shot `analytics-eval` service runs `--db` on every `docker compose up`, after `api-migrate`. It stores a module's run only when the gold set, the pipeline version or the results changed, so restarts add nothing. `GET /api/calibration` adds analysts' `confirmed` / `false_positive` labels to that run's counts. The report gives precision, recall and F1 per module on the thresholds 0.05-0.95, counted the same way as the API. Per rule or signal it gives two readings: **`strict` (the headline: `uncertain` counts as not flagged)** and `review` (`uncertain` counts as flagged). Exit codes: 0 ok; 1 a labeled module produced no finding (`not_run`, no rows stored for it) or a gold document crashed the pipeline (nothing stored); 2 invalid gold set or configuration; 3 the database write failed.
 
-Latest rules-only numbers (M1 and M3: build `main` bb770a0; M2: re-run on `analytics-m2-p1-rules` de53bbe, defaults unchanged). Recommended threshold = higher end of the plateau of thresholds whose F1 is within 0.02 of the best; rules as `strict` precision / recall:
+Latest numbers (2026-11-22, `main` 0434553b, 69 gold documents): one rules-only run and one run with DeepSeek Flash (`run.py --llm`, recorded in [`eval/llm-run-deepseek-flash.json`](eval/llm-run-deepseek-flash.json)). The plateau is every threshold whose F1 is within 0.02 of the best. Each cell is precision / recall / F1 (tp / fp / fn / tn):
 
-| Module (gold cases) | Recommended (plateau) | At it | At the old ADR 0305 default | Rules |
-|---|---|---|---|---|
-| M1 (18: 10 / 8) | 0.65 (0.40-0.65) | precision 1.0, recall 0.8, F1 0.889 | 0.6: F1 0.889 | S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9 |
-| M2 (35: 23 / 12) | 0.1 (0.05-0.1) | precision 0.944, recall 0.739, F1 0.829 | 0.5: F1 0.516 | R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0, R4 1.0 / 0.5, R6 1.0 / 1.0, R11 1.0 / 1.0, R12a 1.0 / 1.0, R12b 1.0 / 1.0, R14 1.0 / 1.0, R15 1.0 / 1.0, R16 1.0 / 1.0, R17 1.0 / 0.33, R18 1.0 / 1.0 (R5, R7-R10, R13 not built) |
-| M3 (18: 10 / 8) | 0.25 (0.25 only); **default 0.4** (gate cap) | at 0.25: precision 0.875, recall 0.7, F1 0.778; at 0.4: precision 1.0, recall 0.4, F1 0.571 | 0.7: F1 0 | S3.1 1.0 / 0.67, S3.2 1.0 / 0.71, S3.8 1.0 / 1.0 |
+| Module (gold cases: pos / neg) | Default | Rules-only at the default | DeepSeek at the default | Rules-only plateau | DeepSeek plateau |
+|---|---|---|---|---|---|
+| M1 (18: 10 / 8) | **0.75** | 1.0 / 0.7 / 0.824 (7 / 0 / 3 / 8) | 1.0 / 1.0 / 1.0 (10 / 0 / 0 / 8) | 0.40-0.65, F1 0.889 | 0.75-0.80, F1 1.0 |
+| M1 at the old 0.65 | | 1.0 / 0.8 / 0.889 (8 / 0 / 2 / 8) | 0.909 / 1.0 / 0.952 (10 / 1 / 0 / 7) | | |
+| M2 (35: 23 / 12) | 0.1 | 0.944 / 0.739 / 0.829 (17 / 1 / 6 / 11) | 1.0 / 0.739 / 0.85 (17 / 0 / 6 / 12) | 0.05-0.10 | 0.10 only |
+| M3 (18: 10 / 8) | 0.4 (gate cap) | 1.0 / 0.4 / 0.571 (4 / 0 / 6 / 8) | 1.0 / 0.4 / 0.571 (4 / 0 / 6 / 8) | 0.25 only, F1 0.706 | 0.05-0.40, F1 0.588 |
 
-M3's default is raised to the S3.4 gate cap (0.4, ADR 0308) so capped findings never alert by default; it is re-evaluated once the LLM scores S3.4 (ADR 0316). S1.5, S3.3 and S3.4 need the LLM (`uncertain` rules-only, `strict` recall 0).
+M2 slider: at 0.25, 1.0 / 0.609 / 0.757; at 0.40, 1.0 / 0.478 / 0.647, the same on both runs. The DeepSeek run made 28 calls, all valid (3.1 s average, 6.4 s p95).
 
-**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md)): the recommended thresholds, M3 raised to its gate cap, are the defaults the API writes when `iw:settings:thresholds` is missing (M1 0.65, M2 0.1, M3 0.4; M2 re-measured from 0.25 with the P0 rules of `analytics-llm-p0`, [ADR 0317](../.docs/decisions/0317-hosted-llm-gemma-on-gemini-api.md)). [`eval/thresholds.json`](eval/thresholds.json) is the source. `python eval/run.py --write-thresholds` rewrites it, and the API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from it: `tests/test_eval_thresholds.py` fails until they match a fresh run. M2's value is low because only part of the 18 rules run today, and it moves when more rules or the LLM land.
+Rules as `strict` precision / recall, rules-only → DeepSeek where it differs:
+- **M1:** S1.1 1.0 / 0.94, S1.2 1.0 / 0.56, S1.3 1.0 / 0.71, S1.4 1.0 / 0.71 → 1.0 / 1.0, S1.5 1.0 / 0 → 1.0 / 1.0, S1.6 1.0 / 1.0, S1.7 1.0 / 0.9.
+- **M2:** R1 1.0 / 1.0, R2 1.0 / 0.67, R3 0.78 / 1.0 → 0.88 / 1.0, R4 1.0 / 0.5, R6, R11, R12a, R12b, R14, R15, R16 and R18 1.0 / 1.0, R17 1.0 / 0.33 → 1.0 / 0.67. R5, R7-R10 and R13 are not built.
+- **M3:** S3.1 1.0 / 0.53 → 1.0 / 0.47, S3.2 1.0 / 0.43 → 1.0 / 0.29, S3.3 1.0 / 0 → 1.0 / 0.25, S3.4 1.0 / 0 → 1.0 / 0.27, S3.5 1.0 / 0.38, S3.6 1.0 / 0.53 → 1.0 / 0.47, S3.8 1.0 / 1.0.
+
+Without the LLM, S1.5, S3.3 and S3.4 are `uncertain` (`strict` recall 0). M3's default is raised to the S3.4 gate cap (0.4, ADR 0308) so capped findings never alert by default. With DeepSeek, M3's best F1 is lower than rules-only, and 0.4 is on its plateau.
+
+**Default thresholds** ([ADR 0316](../.docs/decisions/0316-default-thresholds-from-evaluation.md), [ADR 0318](../.docs/decisions/0318-hosted-llm-deepseek-flash.md)): M1 0.75, M2 0.1, M3 0.4, written by the API when `iw:settings:thresholds` is missing. [`eval/thresholds.json`](eval/thresholds.json) is the source.
+- **M2 and M3** are the rules-only recommendations (M3 raised to its gate cap): `python eval/run.py --write-thresholds` rewrites them.
+- **M1** comes from the recorded DeepSeek run, because the hosted LLM is on by default: `LLM_MEASURED_DEFAULTS` in `evaluation/runner.py`, kept by `--write-thresholds`. It is refused if it is not on that run's F1 plateau.
+- **Copies.** The API's `DEFAULTS` and `events.DEFAULT_THRESHOLDS` must be copied from the file.
+- **Tests.** `tests/test_eval_thresholds.py` fails until the copies match. It also fails when the gold set or M1's rules-only default no longer match the recorded LLM run. Then re-run `python eval/run.py --llm` and replace the run file.
 
 ## Run locally (no infrastructure)
 
@@ -157,7 +196,7 @@ The Postgres tests apply [`tests/sql/schema.sql`](tests/sql/schema.sql), a hand-
 | `EMBED_BASE_URL` | empty (off) | OpenAI-compatible embeddings endpoint, local only: `http://ollama:11434/v1` with `docker compose --profile llm up` ([ADR 0313](../.docs/decisions/0313-embeddings-model-and-serving.md)). Off = `model.embedder = null` |
 | `EMBED_MODEL`, `EMBED_DIM` | `bge-m3`, `1024` | model and vector size; a vector of another size is rejected (`embed_malformed`). Pull it with `ollama-pull` (issue #65) or by hand: `docker compose exec ollama ollama pull bge-m3`. Measured on CPU (2026-11-22): a cold load takes about 37 s, so the first documents get `model.embedder = null` until the breaker's trial call finds the model loaded; warm calls take 4-12 s. Pre-warm before a demo (one request, or `OLLAMA_KEEP_ALIVE`, issue #65) |
 | `EMBED_TIMEOUT_S`, `EMBED_MAX_CHARS`, `EMBED_CACHE_TTL_S`, `EMBED_BREAKER_FAILURES`, `EMBED_BREAKER_COOLDOWN_S` | `15`, `4000`, `604800`, `3`, `60` | per call, input cut, vector cache `iw:emb:v1:*` TTL, circuit breaker. `LLM_DOC_BUDGET_S + 3 + EMBED_TIMEOUT_S` must stay below `CLAIM_MIN_IDLE_MS` |
-| `GATE_ENABLED`, `GATE_SIM_THRESHOLD` | `true`, `0.45` | topic gate on/off; the threshold is for the (not built) similarity rescue |
+| `GATE_ENABLED`, `GATE_EMBED_MIN_MARGIN`, `GATE_EMBED_MIN_CHARS` | `true`, `0.03`, `40` | topic gate on/off; the embedding rescue's margin (0-1, on-topic minus off-topic cosine) and the shortest text it embeds. The rescue needs `EMBED_BASE_URL`. `GATE_SIM_THRESHOLD` is no longer read |
 | `NEARDUP_NUM_PERM`, `NEARDUP_BANDS`, `NEARDUP_THRESHOLD`, `NEARDUP_MAX_CHARS`, `NEARDUP_TTL_S` | `128`, `32`, `0.8`, `50000`, `2592000` | MinHash near-dup index `iw:neardup:v1:*` in Redis (worker only; the CLI has none) |
 | `CONTRACTS_DIR`, `TEST_DATABASE_URL` (or CI's `TEST_DATABASE_ADMIN_URL`), `TEST_REDIS_URL` (or CI's `IW_TEST_REDIS_URL`) | unset | tests only |
 

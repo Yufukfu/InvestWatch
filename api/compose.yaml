@@ -5,14 +5,24 @@
 # api-migrate applies the shared schema once and exits; scraper, analytics and api start only after it:
 #   depends_on:
 #     api-migrate: { condition: service_completed_successfully }
+
+# Both services build the same Dockerfile, each under its own tag (issue #157), so each one rebuilds when it alone is
+# named: `up --build --no-deps api` rebuilds the API, and a stack that starts api-migrate without api (scraper/tests/
+# stack.sh, the analytics and scraper commands above) still builds the migration image. Two services building ONE tag
+# race on the containerd image store ("image ... already exists", reproduced with Compose v2.40), and building it in
+# one service only leaves the other to pull a tag no registry has. BuildKit solves the shared steps once, so a full
+# `up --build` still builds one image's worth of layers. Tag per compose project, rebuilt on every `up` (issue #63; see
+# web/compose.yaml).
+x-api-build: &api-build
+  build:
+    context: ..
+    dockerfile: api/Dockerfile
+  pull_policy: build
+
 services:
   api-migrate:
-    build:
-      context: ..
-      dockerfile: api/Dockerfile
-    # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
-    pull_policy: build
-    image: investwatch/api:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
+    <<: *api-build
+    image: investwatch/api-migrate:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     environment:
@@ -32,6 +42,7 @@ services:
 
   # REST under /api and Socket.IO under /socket.io on :8000; reached only through the gateway (no host port).
   api:
+    <<: *api-build
     image: investwatch/api:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["python", "-m", "investwatch_api"]
     restart: unless-stopped

@@ -24,10 +24,12 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0206](0206-dashboard-data-from-backend.md) | Dashboard data from the backend only; MSW only in tests (supersedes 0201's dev mocks) | accepted (takes effect when PR merges) |
 | [0207](0207-agent-push-and-pr.md) | Agents push their branch and open the PR; humans approve and merge | accepted (takes effect when the PR merges) |
 | [0208](0208-dashboard-realtime-socketio-client.md) | Dashboard real-time client: socket.io-client, one connection owned by the alerts feature | accepted (takes effect when the `realtime-alerts` PR merges) |
-| [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted (takes effect when the PR merges) |
+| [0209](0209-supply-chain-scanning.md) | Verifiable supply chain: `npm audit` + `pip-audit` + offline OSV-Scanner, Gitleaks for hard-coded secrets, no vendor SaaS (Snyk rejected) | accepted; "CI stays `workflow_dispatch`" superseded by [0213](0213-ci-on-every-pr.md) |
 | [0210](0210-unattended-pr-watcher.md) | An unattended PR watcher runs sandboxed agent sessions and publishes from the runner | accepted (takes effect when PR #48 merges; needs Adam's and Damian's approval) |
 | [0211](0211-codeowners-single-source.md) | `.github/CODEOWNERS` is the only place that names owners; shared areas have none (partly supersedes 0202 and 0205) | accepted (takes effect when the `codeowners-single-source` PR merges) |
 | [0212](0212-ai-log-one-file-per-entry.md) | AI log: one file per entry in `.docs/ai-log/`, table rendered on demand (replaces the `merge=union` table) | accepted (takes effect when the PR merges) |
+| [0213](0213-ci-on-every-pr.md) | `ci.yml` runs on every PR to `main` as an advisory check (not required: needs a paid plan or a public repo) | accepted (takes effect when the PR merges) |
+| [0214](0214-dashboard-fonts-fontsource.md) | Dashboard fonts: self-hosted static `@fontsource` packages (Space Grotesk, Inter, Geist Mono), Latin and Latin Extended only | accepted (takes effect when the PR merges) |
 | [0301](0301-contracts-v1.md) | Confirmation of data contracts v1 | accepted (takes effect when PR #3 merges) |
 | [0302](0302-api-service.md) | Placement and stack of the REST/WebSocket API | accepted (takes effect when PR #3 merges) |
 | [0303](0303-database-schema-ownership.md) | Ownership of the database schema and migrations (depends on [0302](0302-api-service.md)) | accepted (takes effect when PR #3 merges) |
@@ -43,8 +45,9 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0313](0313-embeddings-model-and-serving.md) | Embeddings: `bge-m3` on the local `ollama` service through OpenAI-compatible `/v1/embeddings`, env-only, no hosted default (depends on [0304](0304-llm-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
 | [0314](0314-topic-gate-and-near-duplicates.md) | Topic gate (dictionary or embedding, drop only when both say no) and near-dups (MinHash, analyzed and grouped, never dropped) (depends on [0313](0313-embeddings-model-and-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
 | [0315](0315-m2-art44-element-ownership.md) | M2: one owner rule per art. 44 element (count once); R15 reports every detected forecast, R11 flags only violations | accepted (takes effect when the `analytics-m2-p1-rules` PR merges) |
-| [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
-| [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted (takes effect when the `analytics-llm-p0` PR merges) |
+| [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted; M1's "rules-only" superseded by [0318](0318-hosted-llm-deepseek-flash.md) |
+| [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted; provider, model and limits superseded by [0318](0318-hosted-llm-deepseek-flash.md) |
+| [0318](0318-hosted-llm-deepseek-flash.md) | Hosted LLM default: DeepSeek Flash; M1 default threshold 0.75 from the recorded DeepSeek gold run (supersedes 0317's provider and limits, and 0316's rules-only rule for M1 only) | accepted (takes effect when the `analytics-deepseek-default` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 

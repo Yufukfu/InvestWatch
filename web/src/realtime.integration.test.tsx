@@ -72,6 +72,7 @@ describe('alerts and the findings workspace together', () => {
 
   it('while the detail dialog is open, a new high-risk alert is announced and reachable inside the dialog', async () => {
     // The whole app, so the slot the app provides (ToastSlotProvider in App) is what moves the toasts.
+    window.location.hash = 'zgloszenia';
     render(<App />, { wrapper: storeWrapper() });
     await screen.findByRole('button', { name: findings.items[0].title });
     act(() =>
@@ -88,6 +89,7 @@ describe('alerts and the findings workspace together', () => {
   });
 
   it('the app mounts the alerts in its header: a high-risk event shows a toast there', async () => {
+    window.location.hash = 'zgloszenia';
     render(<App />, { wrapper: storeWrapper() });
     await screen.findByRole('button', { name: findings.items[0].title });
     act(() =>

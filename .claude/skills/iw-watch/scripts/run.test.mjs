@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { main } from './watch.mjs';
+import { main, gitIdentityProblem } from './watch.mjs';
 import { fakeGh, fx, ME } from './testkit.mjs';
 import { MARKER } from './lib/rounds.mjs';
 
@@ -485,6 +485,33 @@ test('run: without the claude CLI it exits non-zero with install guidance and wr
   assert.equal(ghCalls, 0, 'fails before touching GitHub');
   assert.match(s.err.join(''), /claude.*(install|PATH)/i);
   assert.ok(!fs.existsSync(s.stateDir));
+});
+
+test('run: without a git identity it exits non-zero before any session and writes no state (#127)', async () => {
+  const s = setup();
+  s.deps.gitIdentityProblem = () => 'Author identity unknown';
+  let ghCalls = 0;
+  s.deps.gh = () => { ghCalls += 1; return null; };
+  assert.equal(await main(['run', '--mine'], s.deps), 2);
+  assert.equal(ghCalls, 0, 'fails before touching GitHub');
+  assert.equal(s.calls.length, 0, 'no agent session');
+  assert.match(s.err.join(''), /git identity/i);
+  assert.match(s.err.join(''), /user\.email/);
+  assert.ok(!fs.existsSync(s.stateDir));
+});
+
+test('gitIdentityProblem: names the gap when git cannot build an author or committer, null when it can (#127)', () => {
+  const bare = { PATH: process.env.PATH, HOME: os.devNull, GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.useConfigOnly', GIT_CONFIG_VALUE_0: 'true' };
+  assert.match(gitIdentityProblem(bare), /identity unknown|no email/i);
+  // a committer alone is not enough: the merge commit needs an author too
+  assert.match(gitIdentityProblem({ ...bare, GIT_COMMITTER_NAME: 'a', GIT_COMMITTER_EMAIL: 'a@example.invalid' }), /identity unknown|no email/i);
+  assert.equal(gitIdentityProblem({ ...bare, GIT_AUTHOR_NAME: 'a', GIT_AUTHOR_EMAIL: 'a@example.invalid', GIT_COMMITTER_NAME: 'a', GIT_COMMITTER_EMAIL: 'a@example.invalid' }), null);
+  // an identity set only in the main checkout's .git/config does not reach the fresh clones, so it does not count
+  const local = fs.mkdtempSync(path.join(os.tmpdir(), 'iw-ident-'));
+  git(local, 'init', '-q');
+  git(local, 'config', 'user.name', 'local'); git(local, 'config', 'user.email', 'local@example.invalid');
+  const was = process.cwd();
+  try { process.chdir(local); assert.match(gitIdentityProblem(bare), /identity unknown|no email/i); } finally { process.chdir(was); }
 });
 
 test('notify: IWATCH_NOTIFY_CMD gets kind, title and url as argv, no shell; a failing notifier does not fail the run', async () => {

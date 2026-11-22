@@ -28,7 +28,7 @@ from .embeddings import build_embedder
 from .gate import GateTermsError
 from .llm import build_judge
 from .models import ScrapedDocument
-from .pipeline import Gate, analyze, default_signal_catalogues
+from .pipeline import Gate, analyze, default_signal_catalogues, with_embedding
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
 
@@ -60,6 +60,9 @@ def main(argv: list[str] | None = None) -> int:
     judge = None if args.no_llm else build_judge(llm_settings)  # no Redis here: the CLI never caches
     # No Redis: no embedding cache and no near-dup index (both need shared state across runs).
     embedder = None if args.no_embed else build_embedder(embed_settings)
+    gate = with_embedding(gate, embedder, retry_s=embed_settings.breaker_cooldown_s)
+    if gate.embedding is not None:
+        gate.embedding.warm()  # once, before any document; if it fails the gate stays dictionary-only
     try:
         registry = Registry.from_csv(settings.registry_csv)
         catalogue = Catalogue.load()

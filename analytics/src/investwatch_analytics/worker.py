@@ -45,7 +45,7 @@ from .gate import GateTermsError, count_decision, load_terms
 from .neardup import build_index
 from .events import Publisher, RedisPublisher
 from .health import start_health_server
-from .pipeline import Gate, analyze_document, default_signal_catalogues
+from .pipeline import Gate, analyze_document, default_signal_catalogues, with_embedding
 from .registry import Registry, RegistryError
 from .rules.engine import Catalogue, CatalogueError
 from .storage import InvalidDocument, NotFound, StoreMisconfigured, StoreUnavailable
@@ -180,6 +180,7 @@ class Worker:
     def run_once(self) -> int:
         """Reclaim stale messages, else read one new message; process each. Returns how many were handled."""
         handled = 0
+        self._warm_gate()
         _, claimed, _ = self._redis.xautoclaim(
             self._config.stream, GROUP, self._config.consumer,
             min_idle_time=self._config.claim_min_idle_ms, start_id="0-0", count=CLAIM_COUNT,
@@ -203,6 +204,13 @@ class Worker:
                 self._process(message_id, fields or {})
                 handled += 1
         return handled
+
+    def _warm_gate(self) -> None:
+        """Build the gate centroids between messages, never inside one (design §2): `warm()` is rate-limited to one
+        attempt per breaker cooldown and does nothing once built, so a message costs at most its own embedding."""
+        embedding = self._gate.embedding if self._gate is not None else None
+        if embedding is not None:
+            embedding.warm()
 
     def _back_off(self, reason: str, exc: BaseException) -> None:
         delay = self._backoff + self._jitter()
@@ -391,9 +399,11 @@ def main(env: Mapping[str, str] | None = None) -> int:
         log.error("worker not started", extra={"reason": "config_error", "error": "REDIS_URL is malformed"})
         return 2
     aux = side_client(worker_settings.redis_url)
+    embedder = build_embedder(prep.embed, redis=aux)
+    gate = with_embedding(prep.gate, embedder, retry_s=prep.embed.breaker_cooldown_s)
     worker = Worker(client, store, RedisPublisher(client, alert_ttl_s=prep.neardup.ttl_s), registry=registry,
                     catalogue=catalogue, judge=build_judge(llm_settings, redis=client),
-                    gate=prep.gate, embedder=build_embedder(prep.embed, redis=aux),
+                    gate=gate, embedder=embedder,
                     neardup=build_index(prep.neardup, aux), side_client=aux,
                     config=WorkerConfig(consumer=worker_settings.consumer,
                                         block_ms=worker_settings.stream_block_ms,

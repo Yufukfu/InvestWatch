@@ -63,11 +63,12 @@ One page, top to bottom (`web/src/App.tsx`): header with live and health badges,
 - `Zapisz próg` stores it (`PUT /settings/thresholds`); the API derives every finding's risk level on read from that threshold (`high` if `score >= t`, `medium` if `score >= t - 0.2`), so the findings, the summary and future alerts change at once (`Zapisano. Poziomy ryzyka zostały przeliczone.`). `Wróć do obecnego` undoes the preview.
 - The curve comes from the gold-set evaluation that runs on every `docker compose up` (`analytics-eval`) plus the analysts' own labels (`Liczba oznaczonych próbek`).
 
-| M2 threshold (gold set, analytics slide 5) | Precision | Recall | Alerts (TP+FP) |
+| M2 threshold (gold set, `GET /api/calibration?module=M2` on `main` a0ad3d13, [demo-analytics.md](demo-analytics.md) §5) | Precision | Recall | Alerts (TP+FP) |
 |---|---|---|---|
-| 0.10 (default) | 0.93 | 0.61 | 15 |
-| 0.40 | 1.00 | 0.48 | 11 |
-| 0.50 | 1.00 | 0.26 | 6 |
+| 0.10 (default) | 0.944 | 0.739 | 18 |
+| 0.25 | 1.00 | 0.609 | 14 |
+| 0.40 | 1.00 | 0.478 | 11 |
+| 0.50 | 1.00 | 0.348 | 8 |
 
 **Notes:** This is jury criterion "wpływ zmian parametrów progowych na wyniki w panelu kalibracji" made concrete: the numbers in the table are the panel's own data source (synthetic gold set, rules only; see the analytics section). The panel needs labelled data; with none it says `Za mało oznaczonych danych, aby skalibrować ten moduł.` Raising a threshold is a precision-for-recall trade the analyst sees before saving, and saving is explicit and global, with a warning that it changes every finding of that module.
 
@@ -91,9 +92,9 @@ Not slides. The live order follows the jury's criteria in challenge §6: scrapin
 
 ## Before the demo (once, about 30 min ahead)
 
-1. Clean stack: `docker compose down -v` (drops the database, so earlier documents do not dedup the new run, #78 scraper notes), then `./scripts/init-env.sh` only if there is no `.env`, then `docker compose up --build -d`.
-2. LLM: the hosted Gemma answered 1 of 5 calls in #78. Either run local Gemma (`docker compose --profile llm up -d`, runbook in the analytics section, slide 7) or accept rules-only findings and say so.
-3. Scan every seeded source except one high-risk one you keep for the live toast (for example the mBank IKE promo page, M2, 0.50 in #78): list sources with `GET https://localhost:8443/api/sources`, then `POST https://localhost:8443/api/scans` with `{"source_id": "<id>"}` for each. Caveat: the `scheduler` scans each source on its own `schedule_cron` (UTC). The mBank promo row is `0 6 * * 1` (Mondays), so on Sunday it should not fire; for any other kept source check its cron and, if it is due, pause it (`PATCH /api/sources/{id}` with `{"active": false}`) and re-enable it just before the demo.
+1. **On the pre-warmed demo stack (`iw-demo`), do not run `down -v` or rebuild:** the LLM verdicts live in that stack's Redis cache and the hosted Gemma mostly returns 503s, so a fresh stack would show rules-only findings ([demo-analytics.md](demo-analytics.md) §0 and §4). `docker compose restart` is safe. Only on a new machine: `./scripts/init-env.sh` if there is no `.env`, then `docker compose up --build -d`.
+2. LLM: the demo findings come from the cache (demo-analytics.md §4 lists their ids). If the cache is gone, either run local Gemma (`docker compose --profile llm up -d`, runbook in the analytics section, slide 7) or accept rules-only findings and say so.
+3. Live-alert source: XTB forex (`https://www.xtb.com/pl/forex`, id in demo-analytics.md §4) has never been scanned on the demo stack, so scanning it live yields a new M2 finding. It is not cached: rules-only it is built in seconds, but with a slow Gemini it can take up to the 50 s document budget (ADR 0317). Its cron, and those of comparic and XTB IKE, are cleared on that stack, so no scheduled rescan stores an uncached version before 10:30.
 4. Open https://localhost:8443 in a browser that trusts the local certificate (`infra/README.md`), check `System działa` and `Na żywo` in the header.
 5. Do not open the Grant Thornton family-office finding: it is a negative control that scores high-risk M3 (0.78) only because the LLM was down (#78, gap 2). If the LLM is up for the demo, check its score again.
 6. Record the backup video now (script below), in case the live run fails.
@@ -104,14 +105,14 @@ Not slides. The live order follows the jury's criteria in challenge §6: scrapin
 |---|---|---|---|
 | 1 | Page loaded, point at the header | `InvestWatch`, `Na żywo`, `System działa`; cards `Wszystkie zgłoszenia`, `Wysokie ryzyko`, `Nowe` | "One `docker compose up`: scraper, analytics, API and this dashboard, on real pages scraped this morning." |
 | 2 | `Trend zgłoszeń`: click `Godzina`, then `Dzień` | the scan run as a spike | "Findings over time; table view for accessibility." |
-| 3 | Run the kept scan in a terminal (`POST /api/scans`) | after the scrape and analysis, a `Wysokie ryzyko` toast with module and score; the cards and list refresh | "Socket.IO push, no reload." (scan time on the demo machine not measured; if slow, go on and come back) |
+| 3 | Scan XTB forex in a terminal (`POST /api/scans` with its `source_id`) | after the scrape and analysis, a `Wysokie ryzyko` toast with module and score; the cards and list refresh | "Socket.IO push, no reload." Start the scan, then explain: the toast can take up to about 50 s if Gemini is slow; go on and come back to it. |
 | 4 | Click `Pokaż` on the toast | the detail: `Dlaczego to zgłoszenie`, failed rules with `Cytat z materiału` and `Podstawa prawna`, `Podmioty` | "Each verdict quotes the page and names the legal basis; the analyst does not have to trust a score." |
 | 5 | In `Decyzja analityka` set `W analizie`, type a note, click `Zapisz` | `Zapisano.`; the status changes in the list behind | "Status workflow; the change is broadcast to other open dashboards (`finding.updated`)." |
 | 6 | Close the detail; in the filters pick `Moduł` = `M1 · Finfluencerzy`, `Poziom ryzyka` = `Wysoki` | only high-risk M1 findings (in #78: the Take Profit guide, the Comparic ranking, the icobench list) | "Filters stay in the URL, so this view is a link." |
 | 7 | Click `Wyczyść filtry`, then `Moduł` = `M3 · Usługi bez zezwolenia` | M3 findings, e.g. the Moneteo review (high, 0.50 in #78) | "Shadow advisory: firms outside the KNF register offering advice." |
-| 8 | Scroll to `Kalibracja progów`, pick `M2`, move the slider from 0.10 to 0.40 | TP/FP/FN/TN, precision 0.93 → 1.00, recall 0.61 → 0.48 (gold set), the chart marker moves | "Threshold up: fewer false alarms, more misses. Preview only, nothing changed yet." |
-| 9 | Click `Zapisz próg` | `Zapisano. Poziomy ryzyka zostały przeliczone.`; the `Wysokie ryzyko` card changes | Expected from the #78 scores: the mBank eMakler page (M2 0.39) drops from high to medium, so the card goes down by one. Check this at the rehearsal; scores in #78 are rounded. |
-| 10 | `Wróć do obecnego` is only for the preview; to restore, move back to 0.10 and `Zapisz próg` again | the card goes back | "The threshold is the analyst's choice, measured, not hard-coded." |
+| 8 | Scroll to `Kalibracja progów`, pick `M2`, move the slider from 0.10 to 0.25 | TP/FP/FN/TN, precision 0.944 → 1.00, recall 0.739 → 0.609, alerts 18 → 14 (gold set), the chart marker moves | "Threshold up: fewer false alarms, more misses. Preview only, nothing changed yet." |
+| 9 | Optional: click `Zapisz próg` | `Zapisano. Poziomy ryzyka zostały przeliczone.`; M2 findings scoring 0.10-0.25 drop from high, so the `Wysokie ryzyko` card may go down | The XTB IKE finding (0.368) stays high at 0.25. Do not save 0.40: XTB IKE would drop. How far the card moves depends on the stack's other M2 scores; read it at the rehearsal. |
+| 10 | `Wróć do obecnego` is only for the preview; if you saved, move back to 0.10 and `Zapisz próg` again | the card goes back | "The threshold is the analyst's choice, measured, not hard-coded." |
 
 ## 3-minute video script
 

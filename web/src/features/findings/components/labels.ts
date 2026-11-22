@@ -46,6 +46,20 @@ export function formatUtc(iso: string): string {
   return Number.isNaN(t) ? iso : `${UTC.format(t)} UTC`;
 }
 
+// The table's detection time: UTC, day.month.year · hour:minute (the table header says what it is, the hover says UTC).
+// The parts are separate so a phone card can drop the year; undefined when the value is not a time.
+export function detectedParts(iso: string): { dayMonth: string; year: string; time: string } | undefined {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return undefined;
+  const d = new Date(t);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    dayMonth: `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}`,
+    year: String(d.getUTCFullYear()),
+    time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`,
+  };
+}
+
 // Polish plural: 1 zgłoszenie, 2-4 zgłoszenia (not 12-14), otherwise zgłoszeń.
 export function findingsCount(n: number): string {
   const lastTwo = n % 100;

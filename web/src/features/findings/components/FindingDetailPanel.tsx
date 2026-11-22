@@ -3,7 +3,7 @@ import { formatScore } from '../../../format/score';
 import { useAlertSlot } from '../../../alertSlot';
 import type { FindingDetail, RuleView, Severity } from '../model';
 import {
-  formatUtc,
+  detectedParts,
   METHOD_LABEL,
   MODULE_LABEL,
   platformLabel,
@@ -28,10 +28,18 @@ type Props = {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
+function detectedLabel(iso: string): string {
+  const p = detectedParts(iso);
+  return p ? `${p.dayMonth}.${p.year} · ${p.time} UTC` : iso;
+}
+
 const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
-function IssueItem({ rule, signal }: { rule: RuleView; signal: boolean }) {
-  const verdict = rule.result === 'uncertain' ? 'Niepewne' : signal ? 'Wykryto sygnał' : 'Niespełniona';
+// The result is a word, not only a colour: greyscale tells the three apart.
+const VERDICT: Partial<Record<RuleView['result'], string>> = { fail: 'Naruszenie', uncertain: 'Niepewne', pass: 'Zgodne' };
+
+function IssueItem({ rule }: { rule: RuleView }) {
+  const verdict = VERDICT[rule.result];
   return (
     <li className={`rule rule-${rule.result} sev-${rule.severity}`}>
       <div className="rule-head">
@@ -73,6 +81,7 @@ function RuleGroup({ title, rules }: { title: string; rules: RuleView[] }) {
         {rules.map((r) => (
           <li key={r.ruleId}>
             <span className="rule-id">{r.ruleId}</span> {r.name}
+            {r.result === 'pass' && <span className="rule-verdict verdict-pass">{VERDICT.pass}</span>}
             {r.explanation && (
               <span className="muted">
                 {' – '}
@@ -108,22 +117,10 @@ function Body({ d, statusEditor, moduleSwitcher }: { d: FindingDetail; statusEdi
   return (
     <>
       {moduleSwitcher}
-      <dl className="facts">
-        <div>
-          <dt>Ryzyko</dt>
-          <dd>
-            <RiskBadge level={d.riskLevel} />
-          </dd>
-        </div>
-        <div>
+      <dl className="facts" aria-label="Dane zgłoszenia">
+        <div className="fact-score">
           <dt>Wynik</dt>
-          <dd>{formatScore(d.score)}</dd>
-        </div>
-        <div>
-          <dt>Moduł</dt>
-          <dd>
-            {d.module} · {MODULE_LABEL[d.module]}
-          </dd>
+          <dd className={d.riskLevel === 'high' ? 'score-high' : undefined}>{formatScore(d.score)}</dd>
         </div>
         <div>
           <dt>Status</dt>
@@ -135,19 +132,58 @@ function Body({ d, statusEditor, moduleSwitcher }: { d: FindingDetail; statusEdi
         </div>
         <div>
           <dt>Wykryto</dt>
-          <dd>{formatUtc(d.detectedAt)}</dd>
+          <dd className="mono">{detectedLabel(d.detectedAt)}</dd>
+        </div>
+        <div>
+          <dt>Źródło</dt>
+          <dd className="source">
+            {href ? (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                Otwórz źródło ↗
+              </a>
+            ) : (
+              <span className="muted">{d.url}</span>
+            )}
+          </dd>
         </div>
       </dl>
-      <p className="source">
-        {href ? (
-          <a href={href} target="_blank" rel="noopener noreferrer">
-            Otwórz źródło ↗
-          </a>
-        ) : (
-          <span className="muted">{d.url}</span>
-        )}
-      </p>
       <RescanNotice rescan={d.rescan} />
+
+      {(d.firm || d.advertiser) && (
+        <div className="parties">
+          {d.firm && (
+            <div className="party" role="group" aria-labelledby="d-firm">
+              <p className="party-label" id="d-firm">Firma inwestycyjna</p>
+              <p className="party-name" dir="auto">{d.firm.name}</p>
+              {d.firm.authorized !== undefined && (
+                <p className={d.firm.authorized ? 'flag flag-ok' : 'flag flag-bad'}>
+                  {d.firm.authorized ? 'Firma w rejestrze KNF' : 'Firma spoza rejestru KNF'}
+                </p>
+              )}
+              {d.firm.registryType && <p className="muted">Typ: {REGISTRY_LABEL[d.firm.registryType] ?? d.firm.registryType}</p>}
+              {d.firm.matchConfidence !== undefined && (
+                <p className="muted">Pewność dopasowania: {Math.round(d.firm.matchConfidence * 100)}%</p>
+              )}
+            </div>
+          )}
+          {d.advertiser && (
+            <div className="party" role="group" aria-labelledby="d-advertiser">
+              <p className="party-label" id="d-advertiser">Podmiot reklamujący</p>
+              <p className="party-name" dir="auto">{d.advertiser.name ?? 'Nadawca bez nazwy'}</p>
+              {d.advertiser.handle &&
+                (profile ? (
+                  <a href={profile} target="_blank" rel="noopener noreferrer" dir="auto">
+                    {d.advertiser.handle}
+                  </a>
+                ) : (
+                  <p dir="auto">{d.advertiser.handle}</p>
+                ))}
+              {d.advertiser.inRegistry === false && <p className="flag flag-bad">Nadawca spoza rejestru KNF</p>}
+              {d.advertiser.onWarningList && <p className="flag flag-bad">Na liście ostrzeżeń KNF</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       {d.summary && (
         <section className="detail-section" aria-labelledby="d-summary">
@@ -165,7 +201,7 @@ function Body({ d, statusEditor, moduleSwitcher }: { d: FindingDetail; statusEdi
         ) : (
           <ul className="rules">
             {issues.map((r) => (
-              <IssueItem key={r.ruleId} rule={r} signal={signal} />
+              <IssueItem key={r.ruleId} rule={r} />
             ))}
           </ul>
         )}
@@ -182,43 +218,6 @@ function Body({ d, statusEditor, moduleSwitcher }: { d: FindingDetail; statusEdi
         <section className="detail-section" aria-labelledby="d-status">
           <h3 id="d-status">Decyzja analityka</h3>
           {statusEditor}
-        </section>
-      )}
-
-      {(d.firm || d.advertiser) && (
-        <section className="detail-section" aria-labelledby="d-parties">
-          <h3 id="d-parties">Podmioty</h3>
-          {d.firm && (
-            <div className="party">
-              <p className="party-name">{d.firm.name}</p>
-              {d.firm.authorized !== undefined && (
-                <p className={d.firm.authorized ? 'flag flag-ok' : 'flag flag-bad'}>
-                  {d.firm.authorized ? 'Firma w rejestrze KNF' : 'Firma spoza rejestru KNF'}
-                </p>
-              )}
-              {d.firm.registryType && <p className="muted">Typ: {REGISTRY_LABEL[d.firm.registryType] ?? d.firm.registryType}</p>}
-              {d.firm.matchConfidence !== undefined && (
-                <p className="muted">Pewność dopasowania: {Math.round(d.firm.matchConfidence * 100)}%</p>
-              )}
-            </div>
-          )}
-          {d.advertiser && (
-            <div className="party">
-              <p className="party-name" dir="auto">
-                {d.advertiser.name ?? 'Nadawca bez nazwy'}
-              </p>
-              {d.advertiser.handle &&
-                (profile ? (
-                  <a href={profile} target="_blank" rel="noopener noreferrer" dir="auto">
-                    {d.advertiser.handle}
-                  </a>
-                ) : (
-                  <p dir="auto">{d.advertiser.handle}</p>
-                ))}
-              {d.advertiser.inRegistry === false && <p className="flag flag-bad">Nadawca spoza rejestru KNF</p>}
-              {d.advertiser.onWarningList && <p className="flag flag-bad">Na liście ostrzeżeń KNF</p>}
-            </div>
-          )}
         </section>
       )}
 
@@ -348,9 +347,17 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
       }}
     >
       <div className="detail-header">
-        <h2 id="detail-title" dir="auto">
-          {detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}
-        </h2>
+        <div className="detail-heading">
+          {detail && !notFound && (
+            <p className="detail-tag">
+              <RiskBadge level={detail.riskLevel} />
+              <span className="mono">
+                {detail.module} · {MODULE_LABEL[detail.module]}
+              </span>
+            </p>
+          )}
+          <h2 id="detail-title" dir="auto">{detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}</h2>
+        </div>
         <div className="detail-actions">
           {detail?.exportUrl && !notFound && (
             <a className="btn" href={detail.exportUrl} target="_blank" rel="noopener noreferrer">
