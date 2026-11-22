@@ -68,7 +68,11 @@ export function StatusEditor({ status, note, onSave, isSaving, saved, error }: P
           {error && <p>Nie udało się zapisać zmiany: {error.message}</p>}
           {error?.detail && (
             <p className="muted">
-              Odpowiedź serwera: <span lang="en">{error.detail}</span>
+              {/* The server's own text: alone in a dir="auto" span, so a bidi control cannot reorder the label. */}
+              Odpowiedź serwera:{' '}
+              <span lang="en" dir="auto">
+                {error.detail}
+              </span>
             </p>
           )}
         </div>
