@@ -46,13 +46,7 @@ x86-64 or arm64 host with Docker. No GPU: compose declares no GPU device, so Oll
 | CPU cores, minimum / recommended | 4 / 8 | 6 / 12 |
 | Free disk, minimum | 10 GB | 22 GB |
 
-How the numbers were obtained (origin/main `ba32bd27`, 2026-11-22):
-
-- **RAM.** The sum of `deploy.resources.limits.memory` in `docker compose --profile llm config`: the 10 long-running services of the default stack are capped at 4.4 GiB together (`renderer` 1 GiB, `worker` 768 MiB, `postgres`, `minio`, `analytics` 512 MiB each, `api` 384 MiB, `redis`, `scheduler` 256 MiB each, `gateway`, `web` 128 MiB each). The one-shot jobs (`minio-init`, `api-migrate`, `seed`, `analytics-eval`) add up to 768 MiB while they start the stack. `ollama` is capped at 6 GiB, `ollama-pull` (one-shot) at 2 GiB. Minimum = limits plus ~1.5 GB for the OS; recommended leaves headroom on top. Measured idle (`docker stats`, part of the stack started, no scraping): `renderer` 230 MiB, `postgres` 27-28 MiB, `redis` 26 MiB, `minio` 26 MiB, `gateway` 16-23 MiB, `web` 8 MiB, far below the caps.
-- **CPU.** The sum of the CPU limits: 8.5 for the default stack, `ollama` adds 4.0. The services rarely peak at the same time, hence the lower minimum.
-- **Disk, default stack.** `docker image ls` after `docker compose build` on arm64: `renderer` 954 MB (Chromium), `api` 267 MB, `scraper` 250 MB, `analytics` 250 MB, `web` 55 MB, `postgres` 291 MB, `minio` 160 MB, `redis` 119 MB, `caddy` 63 MB: 2.4 GB. The build stages pull `node:22-alpine` (164 MB) and `python:3.13-slim` (144 MB) and leave build cache. Data volumes start empty and grow with scraped pages and screenshots.
-- **Disk, `llm` profile.** Ollama image: 2.9 GB compressed on arm64, 3.4 GB on amd64 (sum of layer sizes in the registry manifest of the pinned digest; unpacked it is larger). Models, from the published manifests on `registry.ollama.ai`: `gemma3:4b` 3.35 GB, `bge-m3` 1.16 GB ([#65](https://github.com/Yufukfu/InvestWatch/issues/65)). Both stay loaded at once (`OLLAMA_MAX_LOADED_MODELS=2`), so their 4.5 GB of weights plus the context cache sit inside the 6 GiB `ollama` limit.
-- **Speed on CPU** ([`analytics/.env.example`](analytics/.env.example)): warm `bge-m3` took 4-12 s per document on a loaded 16-core CPU, a cold load 37 s.
+Limits, image sizes and model sizes behind these numbers, and how they were obtained: [`infra/README.md`](infra/README.md), "Resource sizing" (origin/main `ba32bd27`, 2026-11-22). Minimum = compose memory limits plus about 1.5 GB for the OS.
 
 ## Configuration
 
@@ -60,7 +54,7 @@ All settings are environment variables in the root `.env` (template: [`.env.exam
 
 | Service (compose file) | Variables from the root `.env` | Reference |
 |---|---|---|
-| built images (`api`, `analytics`, `scraper`, `renderer`, `web`) | `COMPOSE_PROJECT_NAME`, `IW_VERSION` (image tag); `LOG_LEVEL` (default `INFO`) for `api`, `analytics`, `scraper` | [`web/compose.yaml`](web/compose.yaml) |
+| built images (`api`, `analytics`, `scraper`, `renderer`, `web`) | `COMPOSE_PROJECT_NAME`, `IW_VERSION` (image tag); `LOG_LEVEL` (default `INFO`) for `api`, `analytics`, `scraper` | [`.env.example`](.env.example) |
 | `postgres` ([`infra/`](infra/compose.yaml)) | `POSTGRES_DB`, `POSTGRES_ADMIN_USER`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD` | [`infra/README.md`](infra/README.md) |
 | `redis` | `REDIS_PASSWORD` | [`infra/README.md`](infra/README.md) |
 | `minio`, `minio-init` | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` | [`infra/README.md`](infra/README.md) |
