@@ -100,3 +100,10 @@ export type FindingDetail = {
   pipelineVersion?: string;
   llm?: string | null;
 };
+
+// One finding of the open material, as the detail's module switcher offers it (issue #33).
+export type ModuleOption = {
+  id: string;
+  module: FindingModule;
+  riskLevel?: RiskLevel;
+};
