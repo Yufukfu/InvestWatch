@@ -9,4 +9,4 @@
 ## 2. Closing
 
 - [x] 2.1 Apply `iw-docs-update` (docs, `.docs/status/dashboard.md`, ADRs) and add the `iw-ai-log` entry.
-- [ ] 2.2 Run `iw-pr-review` and fix real findings.
+- [x] 2.2 Run `iw-pr-review` and fix real findings. Group and whole-branch review (one commit of logic, so one range): no blocking findings. Could not check: a real screen reader reading the isolated labels.
