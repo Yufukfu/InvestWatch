@@ -40,6 +40,8 @@ describe('parseRescan', () => {
     });
     expect(parseRescan({ rescan: { state: 'changed', latest_document_id: `${ID}x`, checked_at: 42 } })).toEqual({ state: 'changed' });
     expect(parseRescan({ rescan: { state: 'changed', latest_document_id: `x${ID}` } })).toEqual({ state: 'changed' });
+    expect(parseRescan({ rescan: { state: 'removed', checked_at: 'Nov 22' } })).toEqual({ state: 'removed' });
+    expect(parseRescan({ rescan: { state: 'removed', checked_at: '1' } })).toEqual({ state: 'removed' });
     expect(parseRescan({ rescan: { state: 'changed', latest_document_id: 123 } })).toEqual({ state: 'changed' });
     expect(parseRescan({ rescan: { state: 'changed', latest_document_id: [ID] } })).toEqual({ state: 'changed' });
   });
