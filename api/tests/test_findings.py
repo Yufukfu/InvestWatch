@@ -14,9 +14,9 @@ from sqlalchemy import create_engine, insert, select
 
 from apiutil import DEAD_REDIS, FakeObjectStore, make_services
 from conftest import assert_contract_valid
-from dbutil import document_row, finding_row
+from dbutil import document_row, finding_row, source_row
 from investwatch_api.app import create_app
-from investwatch_api.db.tables import documents, findings
+from investwatch_api.db.tables import documents, findings, job_errors, sources
 from investwatch_api.thresholds import DEFAULTS, risk_level
 from openapi_check import assert_response_matches, response_errors
 
@@ -348,3 +348,98 @@ def test_empty_status_list(client, raw):
 def test_longest_note_is_accepted(client, migrated_db):
     f = _one(migrated_db)
     assert client.patch(f"/api/findings/{f['id']}", json={"note": "x" * 10_000}).status_code == 200
+
+
+# --- re-scan state (issue #71): document.scrape_meta.rescan --------------------------------------
+
+def _rescan(client, finding):
+    body = client.get(f"/api/findings/{finding['id']}").json()
+    _detail_parts_valid(body)
+    return body["document"]["scrape_meta"]["rescan"]
+
+
+def _job_error(url, **over):
+    row = dict(id=uuid.uuid4(), source_id=None, url="https://alfa.example/oferta", reason="http_error",
+               detail="HTTP 404", occurred_at=datetime.now(timezone.utc))
+    row.update(over)
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(insert(job_errors).values(row))
+    engine.dispose()
+
+
+def _rescanned(migrated_db, **newer_over):
+    """An old document with a finding and a later fetch of the same page."""
+    src = source_row()
+    t = datetime.now(timezone.utc) - timedelta(hours=2)
+    old = document_row(source_id=src["id"], fetched_at=t, payload={"scrape_meta": {"scraper": "httpx"}})
+    new = document_row(source_id=src["id"], fetched_at=t + timedelta(hours=1), **newer_over)
+    f_old, f_new = finding_row(old["id"]), finding_row(new["id"])
+    engine = create_engine(migrated_db.app_url)
+    with engine.begin() as conn:
+        conn.execute(insert(sources).values(src))
+    engine.dispose()
+    _insert(migrated_db.app_url, [old, new], [f_old, f_new])
+    return src, old, new, f_old, f_new
+
+
+def test_rescan_state_current_without_a_later_fetch(client, migrated_db):
+    doc = document_row()
+    f = finding_row(doc["id"])
+    _insert(migrated_db.app_url, [doc], [f])
+    state = _rescan(client, f)
+    assert state["state"] == "current" and state["latest_document_id"] is None
+    assert datetime.fromisoformat(state["checked_at"]) == doc["fetched_at"]
+
+
+def test_rescan_with_new_text_marks_the_old_finding_changed(client, migrated_db):
+    _, old, new, f_old, f_new = _rescanned(migrated_db)
+    state = _rescan(client, f_old)
+    assert state["state"] == "changed" and state["latest_document_id"] == str(new["id"])
+    assert _rescan(client, f_new)["state"] == "current"
+    meta = client.get(f"/api/findings/{f_old['id']}").json()["document"]["scrape_meta"]
+    assert meta["scraper"] == "httpx"  # the scraper's own keys are kept
+
+
+def test_rescan_with_gone_status_marks_removed(client, migrated_db):
+    for status in (404, 410):
+        _, _, new, f_old, _ = _rescanned(migrated_db, http_status=status)
+        state = _rescan(client, f_old)
+        assert state["state"] == "removed" and state["latest_document_id"] == str(new["id"])
+
+
+def test_rescan_same_url_other_source_or_other_page_is_not_a_change(client, migrated_db):
+    _, old, _, f_old, _ = _rescanned(migrated_db, url="https://alfa.example/inna")
+    assert _rescan(client, f_old)["state"] == "current"
+    other = source_row()
+    engine = create_engine(migrated_db.app_url)
+    with engine.begin() as conn:
+        conn.execute(insert(sources).values(other))
+    engine.dispose()
+    later = document_row(source_id=other["id"], fetched_at=old["fetched_at"] + timedelta(minutes=5))
+    _insert(migrated_db.app_url, [later])
+    assert _rescan(client, f_old)["state"] == "current"
+
+
+def test_rescan_matches_the_canonical_url(client, migrated_db):
+    _, _, new, f_old, _ = _rescanned(migrated_db, url="https://alfa.example/oferta?utm_source=x",
+                                     canonical_url="https://alfa.example/oferta")
+    assert _rescan(client, f_old)["latest_document_id"] == str(new["id"])
+
+
+def test_rescan_gone_job_error_after_the_last_fetch_marks_removed(client, migrated_db):
+    src, old, new, f_old, f_new = _rescanned(migrated_db)
+    _job_error(migrated_db.app_url, source_id=src["id"], occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    for f in (f_old, f_new):
+        state = _rescan(client, f)
+        assert state["state"] == "removed" and state["latest_document_id"] is None
+
+
+def test_rescan_job_error_before_the_last_fetch_or_not_gone_is_ignored(client, migrated_db):
+    src, old, new, f_old, f_new = _rescanned(migrated_db)
+    _job_error(migrated_db.app_url, source_id=src["id"], occurred_at=old["fetched_at"] + timedelta(minutes=1))
+    _job_error(migrated_db.app_url, source_id=src["id"], detail="HTTP 500",
+               occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    _job_error(migrated_db.app_url, source_id=None, occurred_at=new["fetched_at"] + timedelta(minutes=1))
+    assert _rescan(client, f_old)["state"] == "changed"
+    assert _rescan(client, f_new)["state"] == "current"

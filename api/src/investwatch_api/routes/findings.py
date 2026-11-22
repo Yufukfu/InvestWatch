@@ -17,6 +17,7 @@ from ..db.tables import documents, findings
 from ..errors import validation_error
 from ..models import STATUSES, FindingPatch, Module, RiskLevel
 from ..queries import like_pattern, risk_level_expr
+from ..rescan import rescan_state
 
 router = APIRouter()
 log = logging.getLogger("investwatch_api.findings")
@@ -122,8 +123,12 @@ async def get_finding(finding_id: UUID, request: Request):
     async with svc.engine.connect() as conn:
         row = await _finding_row(conn, finding_id, thresholds)
         doc = (await conn.execute(select(documents).where(documents.c.id == row["document_id"]))).mappings().first()
+        rescan = await rescan_state(conn, doc) if doc else None
     view = _view(row)
     document = document_to_contract(doc) if doc else None
+    if document is not None:
+        # The contract's only open slot for it (finding.schema.json is closed): scrape_meta.rescan, issue #71.
+        document["scrape_meta"] = {**(document.get("scrape_meta") or {}), "rescan": rescan}
     view["document"] = document
     shots = (document or {}).get("screenshots") or {}
     view["screenshot_urls"] = {vp: f"/api/documents/{row['document_id']}/screenshot/{vp}"
