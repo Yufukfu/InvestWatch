@@ -26,13 +26,13 @@ Order R5, then R7, R8 and R13 (feature freeze Sun 08:00). If time runs short, sh
 
 ## 4. R13 dominance and the year-range detector
 
-- [ ] 4.1 Write the failing tests for every R13 scenario and the "Past year range" scenario.
-- [ ] 4.2 Add the closed year range to `_PastPerformance`, implement R13. Tests green.
-- [ ] 4.3 Mutation check; record `mutations: N tried, N caught`.
+- [x] 4.1 Write the failing tests for every R13 scenario and the "Past year range" scenario.
+- [x] 4.2 Add the closed year range to `_PastPerformance`, implement R13. Tests green.
+- [x] 4.3 Mutation check; record `mutations: N tried, N caught`. `mutations: 15 tried, 15 caught` (the year-range end bound and the range itself; sentence and figure links; the visibility filter; largest-font tie; the first-block size bound and the first-block check; position vs list order; worst viewport; the quote; the three not-applicable cases). First run one survivor (sentence containment, redundant for `%` figures); an amount-only test was added.
 
 ## 5. Closing
 
-- [ ] 5.1 Run `eval/run.py --module M2` again; record per-rule P/R and M2 at 0.1 next to the baseline in `follow-ups.md`; leave `test_eval_thresholds` as it is if the best threshold moved, and report.
+- [x] 5.1 Run `eval/run.py --module M2` again; record per-rule P/R and M2 at 0.1 next to the baseline in `follow-ups.md`; leave `test_eval_thresholds` as it is if the best threshold moved, and report.
 - [ ] 5.2 Docs: `.docs/analytics-plan.md` §5, `.docs/status/` for analytics, the AI log entry, `docs-check` clean.
 - [ ] 5.3 `iw-reviewer` pass on the whole diff; fix verified findings.
 - [ ] 5.4 Archive the change as the last commit; push and open the PR to `main`.

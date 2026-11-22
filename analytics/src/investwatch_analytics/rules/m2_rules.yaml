@@ -418,8 +418,24 @@ rules:
         - '\bryzyk\w*\s+(?:\w+\s+)?walutow\w*'
         - '\bcurrency\s+(?:fluctuations?|risk)\b'
         - '\bexchange\s+rates?\b'
-  # R13: visual, needs `blocks` (font size, position in the viewport; #29).
-  - {id: R13, name: Dominacja wyników historycznych, severity: low, legal_basis: art. 44 ust. 4 lit. a rozp. del. 2017/565, implemented: false}
+  # ZASÓB R13 "czy wyniki historyczne nie stanowią najbardziej wyeksponowanego elementu informacji": per viewport a
+  # past-performance block (a detector sentence, or a headline restating one's return figure) with the largest font,
+  # or first and above the dominant size, fails. Visual (rules/m2_visual.py); the shared `pp_*` detector (ADR 0315).
+  - id: R13
+    name: Dominacja wyników historycznych
+    severity: low
+    legal_basis: art. 44 ust. 4 lit. a rozp. del. 2017/565
+    implemented: true
+    params:
+      figure_patterns: *pp_figure
+      amount_patterns: *pp_amount
+      amount_return_patterns: *pp_amount_return
+      figure_exclude_patterns: *return_figure_exclude
+      figure_extra_exclude_patterns: *pp_figure_exclude
+      past_patterns: *pp_past
+      future_patterns: *pp_future
+      forecast_patterns: *forecast_markers
+      forecast_verb_patterns: *forecast_verbs
   # ZASÓB R14: "obecność wyraźnego zastrzeżenia" – a clear disclaimer present anywhere, no proximity requirement.
   # A footnote-only disclaimer passes here; its placement is R6 ("ryzyko ukryte w przypisach").
   - id: R14

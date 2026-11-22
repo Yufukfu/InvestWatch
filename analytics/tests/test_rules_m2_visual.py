@@ -74,7 +74,7 @@ def page(risk_desktop: dict | None = None, risk_mobile: dict | None = None) -> l
 
 def test_catalogue_implements_the_visual_rules(catalogue):
     implemented = {s.id for s in catalogue.implemented}
-    assert {"R5", "R7", "R8"} <= implemented
+    assert {"R5", "R7", "R8", "R13"} <= implemented
 
 
 # ---- R5 exposure and contrast ------------------------------------------------------------------
@@ -290,3 +290,112 @@ def test_r8_bad_min_font_px_fails_at_load(tmp_path, bad):
 
 def test_r8_zero_px_warning_is_uncertain(registry, catalogue):
     assert run(TEXT, registry, catalogue, blocks=page(risk_mobile={"size": 0}))["R8"].result == "uncertain"
+
+
+# ---- R13 dominance of past performance and the year-range detector ------------------------------
+
+PAST = "Portfel 2021-2025: łączna stopa zwrotu 120%."
+PP_DISCLAIMER = "Wyniki historyczne nie stanowią wiarygodnego wskaźnika przyszłych wyników."
+PP_TEXT = f"Nagłówek kampanii. +120% w 5 lat! Bank Kwarcowy S.A. Reklama. {PAST} {PP_DISCLAIMER} {RISK}"
+
+
+def pp_page(headline_size=56, mobile=True, headline="+120% w 5 lat!"):
+    """A 32 px campaign heading on top, the headline under it, a 16 px past-performance paragraph, the warnings."""
+    blocks = [block("Nagłówek kampanii", size=32, bbox=(0, 0, 800, 50)),
+              block(headline, size=headline_size, bbox=(0, 70, 800, 60)),
+              block(f"Bank Kwarcowy S.A. Reklama. {PAST}", size=16, bbox=(0, 140, 800, 40)),
+              block(f"{PP_DISCLAIMER} {RISK}", size=14, bbox=(0, 200, 800, 40))]
+    if mobile:
+        blocks += [dict(b, viewport="mobile") for b in blocks]
+    return blocks
+
+
+def test_year_range_is_a_past_marker(registry, catalogue):
+    r = run(f"{PAST} {PP_DISCLAIMER}", registry, catalogue)
+    assert r["R14"].result == "pass"
+    assert run("Prognoza na lata 2026-2030: 8% rocznie.", registry, catalogue)["R14"].result == "not_applicable"
+    assert run("Portfel 2021-2027: łączna stopa zwrotu 120%.", registry, catalogue)["R14"].result == "not_applicable"
+
+
+def test_r13_gold_headline_restating_a_past_return_fails(registry, catalogue):
+    r = run_gold("m2-r13-past-performance-dominates", registry, catalogue)["R13"]
+    assert r.result == "fail"
+    assert r.evidence == "+120% w 5 lat!"
+    assert r.evidence_locator.viewport == "desktop"
+    assert "56 px" in r.explanation
+
+
+def test_r13_gold_past_performance_in_body_text_passes(registry, catalogue):
+    r = run_gold("m2-r12-past-performance-compliant", registry, catalogue)["R13"]
+    assert r.result == "pass"
+    assert r.evidence is not None and r.evidence.startswith("Stopa zwrotu w latach")
+
+
+def test_r13_largest_past_performance_block_fails(registry, catalogue):
+    text = f"Bank Kwarcowy S.A. Reklama. {PAST} {PP_DISCLAIMER} {RISK}"
+    blocks = [block(f"Bank Kwarcowy S.A. Reklama. {PAST}", size=40, bbox=(0, 300, 800, 40)),
+              block(f"{PP_DISCLAIMER} {RISK}", size=40, bbox=(0, 0, 800, 40))]
+    r = run(text, registry, catalogue, blocks=blocks)["R13"]
+    assert r.result == "fail"  # tied for the largest font
+    assert r.evidence == PAST
+
+
+def test_r13_first_block_above_dominant_size_fails(registry, catalogue):
+    blocks = [block("+120% w 5 lat!", size=20, bbox=(0, 0, 800, 30)),
+              block("Nagłówek kampanii", size=40, bbox=(0, 50, 800, 60)),
+              block(f"Bank Kwarcowy S.A. Reklama. {PAST} {PP_DISCLAIMER} {RISK}", size=16, bbox=(0, 120, 800, 200))]
+    text = f"+120% w 5 lat! Nagłówek kampanii. Bank Kwarcowy S.A. Reklama. {PAST} {PP_DISCLAIMER} {RISK}"
+    assert run(text, registry, catalogue, blocks=blocks)["R13"].result == "fail"
+    blocks[0]["font_size_px"] = 16  # first, but at the dominant size: not the most prominent element
+    assert run(text, registry, catalogue, blocks=blocks)["R13"].result == "pass"
+
+
+def test_r13_first_block_uses_position_not_list_order(registry, catalogue):
+    blocks = [block("Nagłówek kampanii", size=40, bbox=(0, 0, 800, 60)),
+              block("+120% w 5 lat!", size=20, bbox=(0, 600, 800, 30)),
+              block(f"Bank Kwarcowy S.A. Reklama. {PAST} {PP_DISCLAIMER} {RISK}", size=16, bbox=(0, 120, 800, 200))]
+    text = f"Nagłówek kampanii. +120% w 5 lat! Bank Kwarcowy S.A. Reklama. {PAST} {PP_DISCLAIMER} {RISK}"
+    assert run(text, registry, catalogue, blocks=blocks)["R13"].result == "pass"
+    blocks[1]["bbox"] = [0, -10, 800, 30]
+    assert run(text, registry, catalogue, blocks=blocks)["R13"].result == "fail"
+
+
+def test_r13_mobile_only_dominance_reports_mobile(registry, catalogue):
+    blocks = pp_page(headline_size=12, mobile=False) + [dict(b, viewport="mobile") for b in pp_page(mobile=False)]
+    r = run(PP_TEXT, registry, catalogue, blocks=blocks)["R13"]
+    assert r.result == "fail"
+    assert r.evidence_locator.viewport == "mobile"
+    assert run(PP_TEXT, registry, catalogue, blocks=pp_page(headline_size=12))["R13"].result == "pass"
+
+
+def test_r13_invisible_block_does_not_dominate(registry, catalogue):
+    blocks = pp_page(mobile=False)
+    assert run(PP_TEXT, registry, catalogue, blocks=blocks)["R13"].result == "fail"
+    blocks[1]["visible"] = False
+    assert run(PP_TEXT, registry, catalogue, blocks=blocks)["R13"].result == "pass"
+
+
+def test_r13_a_figure_not_from_past_performance_is_not_linked(registry, catalogue):
+    blocks = pp_page(mobile=False, headline="Prowizja 0% na start!")
+    text = PP_TEXT.replace("+120% w 5 lat!", "Prowizja 0% na start!")
+    assert run(text, registry, catalogue, blocks=blocks)["R13"].result == "pass"
+
+
+def test_r13_without_past_performance_or_blocks_is_not_applicable(registry, catalogue):
+    r = run(TEXT, registry, catalogue, blocks=page())["R13"]
+    assert r.result == "not_applicable" and "wyników historycznych" in r.explanation
+    r = run(PP_TEXT, registry, catalogue)["R13"]
+    assert r.result == "not_applicable" and "renderowaniu" in r.explanation
+    other = [block(HEAD, size=32), block(RISK)]
+    r = run(PP_TEXT, registry, catalogue, blocks=other)["R13"]
+    assert r.result == "not_applicable"
+
+
+def test_r13_amount_only_past_performance_block_is_detected(registry, catalogue):
+    claim = "Nasi klienci zarobili 5 000 zł w 2024 roku."
+    text = f"{claim} Bank Kwarcowy S.A. Reklama. {PP_DISCLAIMER}"
+    blocks = [block(claim, size=48, bbox=(0, 0, 800, 60)),
+              block(f"Bank Kwarcowy S.A. Reklama. {PP_DISCLAIMER}", size=16, bbox=(0, 80, 800, 40))]
+    r = run(text, registry, catalogue, blocks=blocks)["R13"]
+    assert r.result == "fail"
+    assert r.evidence == claim

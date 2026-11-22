@@ -11,7 +11,17 @@ import re
 
 from ..models import Block, EvidenceLocator, RuleResult
 from .engine import Context, register
-from .m2 import NO_BLOCKS, NO_RENDER_METADATA, VIEWPORTS, _RiskWarnings, locator_for
+from .m2 import (
+    NO_BLOCKS,
+    NO_PAST_PERFORMANCE,
+    NO_RENDER_METADATA,
+    VIEWPORTS,
+    _PastPerformance,
+    _RiskWarnings,
+    locate,
+    locator_for,
+    weighted_median,
+)
 
 _SEVERITY = {"fail": 3, "uncertain": 2, "pass": 1}
 _HEX = re.compile(r"#[0-9a-fA-F]{6}")  # the contract's colour format; anything else is an unknown colour
@@ -195,3 +205,78 @@ class R8Responsiveness(_RiskWarnings):
                 f"Strona wyrenderowana tylko w jednym widoku ({rendered[0]}) – nie można ocenić responsywności."
             )
         return self.result(result, self.warning_quote(ctx, b), why, locator)
+
+
+# ---- R13 dominance of past performance ---------------------------------------------------------
+
+NO_PAST_PERFORMANCE_BLOCK = "Wyniki historyczne nie występują w danych renderowania – reguła nie dotyczy."
+
+
+def _figure_key(figure: str) -> str:
+    return "".join(figure.split()).replace(",", ".")
+
+
+@register
+class R13PastPerformanceDominance(_PastPerformance):
+    """ZASÓB R13: "czy wyniki historyczne nie stanowią najbardziej wyeksponowanego elementu informacji".
+
+    A block presents past performance when it holds a sentence of the shared detector (R12a, R12b, R14), or
+    restates a return figure of one (a `+120%` headline over "łączna stopa zwrotu 120%"). It dominates its
+    viewport with the largest font (ties included), or as the first block above the dominant (length-weighted
+    median) size."""
+
+    rule_id = "R13"
+
+    def _figures(self, text: str) -> set[str]:
+        return {_figure_key(m.group(0)) for p in self._pp["figure"] for m in p.finditer(text)}
+
+    def _quote(self, ctx: Context, b: Block, sentences: list) -> str | None:
+        inside = next((s.text for s in sentences if locate(b.text, s.text) is not None), None)
+        return inside if inside is not None else locate(ctx.doc.text, b.text)
+
+    def _viewport(self, blocks: list[Block], sentences: list, figures: set[str]) -> tuple[str, Block, str] | None:
+        visible = [b for b in blocks if b.visible and b.font_size_px > 0]
+        past = [b for b in visible
+                if any(locate(b.text, s.text) is not None for s in sentences) or self._figures(b.text) & figures]
+        if not past:
+            return None
+        largest = max(b.font_size_px for b in visible)
+        dominant = weighted_median([(b.font_size_px, len(b.text)) for b in visible])
+        if all(b.bbox is not None and len(b.bbox) == 4 for b in visible):
+            first = min(visible, key=lambda b: (b.bbox[1], b.bbox[0]))
+        else:
+            first = visible[0]
+        vp = past[0].viewport
+        for b in past:
+            if b.font_size_px >= largest:
+                return "fail", b, (
+                    f"Wyniki historyczne są najbardziej wyeksponowanym elementem: największa czcionka w widoku "
+                    f"({_px(b.font_size_px)} px, {vp})."
+                )
+        if first in past and first.font_size_px > dominant:
+            return "fail", first, (
+                f"Wyniki historyczne są pierwszym elementem strony, czcionką {_px(first.font_size_px)} px powyżej "
+                f"przeważającej {_px(dominant)} px ({vp})."
+            )
+        b = past[0]
+        return "pass", b, (
+            f"Wyniki historyczne nie są najbardziej wyeksponowanym elementem: {_px(b.font_size_px)} px przy "
+            f"największej czcionce {_px(largest)} px ({vp})."
+        )
+
+    def evaluate(self, ctx: Context) -> RuleResult:
+        if not ctx.doc.blocks:
+            return self.result("not_applicable", None, NO_BLOCKS)
+        sentences = self.past_performance(ctx)
+        if not sentences:
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE)
+        figures = set().union(*(self._figures(s.text) for s in sentences))
+        verdicts = []
+        for vp in VIEWPORTS:
+            v = self._viewport([b for b in ctx.doc.blocks if b.viewport == vp], sentences, figures)
+            if v is not None:
+                verdicts.append(v)
+        if not verdicts:
+            return self.result("not_applicable", None, NO_PAST_PERFORMANCE_BLOCK)
+        result, b, why = worst(verdicts)
+        return self.result(result, self._quote(ctx, b, sentences), why, locator_for(b))
