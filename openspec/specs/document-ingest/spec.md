@@ -174,7 +174,7 @@ When a re-scan of a `web` source finds a duplicate, the scraper SHALL log one `r
 - **THEN** no row is inserted and the log line outcome is `reverted`
 
 #### Scenario: Page comes back after a removal
-- **WHEN** a `gone` job error is newer than the most recent document and a re-scan finds that document's text
+- **WHEN** a removal job error is newer than the most recent document and a re-scan finds that document's text
 - **THEN** no row is inserted and the log line outcome is `reappeared`
 
 #### Scenario: Duplicate after losing the insert race

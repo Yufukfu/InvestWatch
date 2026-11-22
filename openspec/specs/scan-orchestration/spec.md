@@ -33,7 +33,7 @@ The queue SHALL retry transient failures (`timeout`, HTTP 5xx) up to a cap with 
 - **THEN** one job error with the failing reason (`timeout` or `http_error`) is recorded
 
 #### Scenario: Non-transient failure is not retried
-- **WHEN** a job fails with `blocked`, `blocked_target` or HTTP 404 (`http_error`, or `gone` for a source with a stored document)
+- **WHEN** a job fails with `blocked`, `blocked_target` or HTTP 404 (`http_error`; a confirmed removal of a source with a stored document is not a failure, see below)
 - **THEN** it is not retried and one job error is recorded
 
 #### Scenario: Retry-After defers the whole domain
@@ -106,7 +106,7 @@ For every job that runs, scheduled or requested, the scraper SHALL publish `scan
 - **THEN** it publishes nothing, and the running job's own events cover the source
 
 ### Requirement: Derive run status and record it on the source
-`data.status` SHALL be `ok` with no job error (a `gone` observation is not one), `failed` with no document and at least one job error, otherwise `partial`. When a job starts running the scraper SHALL set `sources.last_run_status` to `running`; at its final outcome it SHALL write `last_run_at` (UTC) and `last_run_status`. The number of new documents of the job is the `documents` field of `scan.finished`; there is no `documents_count` column (the API counts `documents` rows on read).
+`data.status` SHALL be `ok` with no job error (a removal is not one), `failed` with no document and at least one job error, otherwise `partial`. When a job starts running the scraper SHALL set `sources.last_run_status` to `running`; at its final outcome it SHALL write `last_run_at` (UTC) and `last_run_status`. The number of new documents of the job is the `documents` field of `scan.finished`; there is no `documents_count` column (the API counts `documents` rows on read).
 
 #### Scenario: Run ends with job errors
 - **WHEN** a job ends with one document and one job error
@@ -121,7 +121,7 @@ For every job that runs, scheduled or requested, the scraper SHALL publish `scan
 - **THEN** `scan.finished` has `documents = 0` and `status = ok`
 
 #### Scenario: Removed page ends ok and is not requeued
-- **WHEN** a job ends with a `gone` job error and no document
+- **WHEN** a job ends with a confirmed removal (`http_error` `HTTP 404`/`HTTP 410` row with the source URL) and no document
 - **THEN** `scan.finished` has `status = ok`, `documents = 0`, `sources.last_run_status = ok`, and the job is not requeued
 
 ### Requirement: Schedule collection and the republish sweep

@@ -36,3 +36,10 @@
 - [x] 6.1 Apply iw-docs-update: an ADR with the derivation rule and its two limits (next free number across all branches, 0109 is taken), `scraper/README.md` (how to read `rescan_outcome`, what `gone` means, soft 404s not detected), `.docs/status/scraper.md`, and add the iw-ai-log row; `docs-check` prints `docs-check: ok`
 - [x] 6.2 Post the derivation queries and the decision 5 migration proposal as a comment on issue 71 (owners Damian and Kacper); link it from the PR body
 - [x] 6.3 Run iw-pr-review and fix real findings
+
+## 7. Review fix (PR 108): write what the api reads
+
+- [x] 7.1 Test first (`test_types.py`, `test_errors.py`, `test_ingest_db.py`, `test_ingest_rescan.py`, `test_e2e.py`): `gone` is not a reason; `record_gone` writes `http_error` `HTTP 404`/`HTTP 410` with the URL; the removal lookup matches only that detail with a URL; the end-to-end test runs the predicate copied from `api/src/investwatch_api/rescan.py`
+- [x] 7.2 Drop `Reason.GONE`; `record_gone` and `removal_state` use `http_error` plus the detail; specs, design, ADR 0110 and README say so
+- [x] 7.3 Mutation check - mutations: 4 tried, 4 caught
+- [x] 7.4 Redirect URL mismatch (review comment 2) needs an api change: row in `follow-ups.md` for Damian
