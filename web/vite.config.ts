@@ -26,6 +26,10 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      // Generous limits: the same suite runs on a busy laptop or a loaded CI runner, where a jsdom render
+      // that takes 100 ms when idle can take seconds (issue #60). A real hang still fails, just later.
+      testTimeout: 20_000,
+      hookTimeout: 20_000,
       setupFiles: ['./src/test/setup.ts'],
       env: { VITE_API_BASE_URL: 'http://localhost/api' },
     },

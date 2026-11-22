@@ -1,0 +1,62 @@
+# Follow-ups
+
+## Differences from the mock findings (task 10.0)
+
+`contracts/mocks/` stay untouched (Damian's rule); checked on 2026-11-22 with `python -m investwatch_analytics.cli ../contracts/mocks/documents.json --no-llm`, with and without `GATE_ENABLED=false`, on both `registry/seed.csv` and the default KNF registry.
+
+| # | Mock | Mock value | From this change | Disposition |
+|---|---|---|---|---|
+| M1 | all findings | `model.embedder: bge-m3` | `null` unless `EMBED_BASE_URL` is set and the vector was used | `keep-mock` (the mock is illustrative) |
+| M2 | all documents | – | the gate drops none of the mock documents: findings identical with and without the gate; all valid against `finding.schema.json` | – |
+| M3 | `8721cb75` (edu, M1) | an M1 finding | none, with or without the gate | not from this change (routing/rules on main); left as is |
+
+## Review findings
+
+| # | Source | Item | Disposition |
+|---|---|---|---|
+| R1 | review group 1 | https-with-key rule had no accepting test | `fix-here` (eecc55b) |
+| R2 | review group 1 | bad port, `:abc` and whitespace in `EMBED_BASE_URL` passed startup | `fix-here` (eecc55b). `_check_base_url` (LLM, analytics-llm-p0) has the same gap: told the coordinator |
+| R3 | review group 1 | key-leak test half tautological | `fix-here` (eecc55b) |
+| R4 | review group 1, PLAUSIBLE | `ollama` host name counts as local, so a key may go over plain http to it | `wont-fix`: same accepted rule as the LLM (`_LOCAL_HOSTS`), compose service name |
+| R5 | review group 1, can't verify | callers must pass the real `llm_doc_budget_s` to `EmbedSettings.from_env` (default 0 skips the combined check) | `fix-here` (group 9): `preprocessing_from_env` passes the LLM budget plus its 3 s connect margin when the LLM is on |
+| R6 | review group 2 | huge integer values (OverflowError) and deep JSON nesting (RecursionError) escaped untyped | `fix-here` (both are `EmbedMalformed`). `llm/client.py:_content` has the same RecursionError hole: told the coordinator |
+| R7 | review group 2 | a lone surrogate in scraped text raised UnicodeEncodeError before the request | `fix-here`: ASCII-escaped JSON body |
+| R8 | review group 2 | timing tests counted SSL context setup | `fix-here`: client built before the clock starts |
+| R9 | review group 2 | worst-case wall time is about connect (3 s) + 2 x `EMBED_TIMEOUT_S` (header wait plus one chunk wait), not timeout + 1 s; the claim-idle check sums only one timeout | `docs`: same behaviour as the LLM client; with the defaults (5 s) the worst case is 13 s, well inside the 60 s claim idle time. Revisit together with the LLM budget in analytics-llm-p0 group 10 |
+| R10 | review group 2, PLAUSIBLE | gzip response could inflate past the size cap inside one chunk | `fix-here`: `Accept-Encoding: identity` |
+| R11 | review group 2 | the guard fires on send, not on build | `fix-here`: spec wording matches the guard (any request to a non-stub host fails the test); the shared conftest guard is analytics-llm-p0's |
+| R12 | review group 2, uncovered | no test pins `CONNECT_TIMEOUT_S` or `trust_env=False` | `wont-fix` for now: mirrors the LLM client, which has the same gap |
+| R13 | group 3 | `analytics-llm-p0` has no breaker yet (its group 10), so `embeddings/breaker.py` is a minimal one of our own | `new-item` after llm-p0 group 10: merge into one generic breaker if its class is shareable |
+| R14 | review group 3 | a non-UTF-8 cached value raised UnicodeDecodeError out of `embed` through a `decode_responses=True` client | `fix-here` |
+| R15 | review group 3, PLAUSIBLE | an oversized planted cache value was decoded into floats before the length check | `fix-here`: length check restored before decoding |
+| R16 | review group 3, PLAUSIBLE | an unexpected exception in a half-open trial left the breaker shut for good and escaped `embed` | `fix-here`: catch-all counts as unavailable |
+| R17 | review group 3 | failed trial not tested above threshold 1 | `fix-here` |
+| R18 | review group 3, can't verify | callers must pass a per-document, non-empty `content_hash`; Redis latency until the 1 s socket-timeout client (group 9) | `fix-here` in groups 7 and 9 |
+| R19 | review group 4 | common posts dropped: inflected `forexie`/`Nasdaqu`, compounds `CFDs`/`S&P500`/`BTCUSD`/`#forexsignals`, `tradować`, `finansowa`, `dochód`, WIG/GPW, ETH/USDT, `return`/`income` | `fix-here`: stems and terms added; `forexpo`/`cfdx` now pass too (recall first) |
+| R20 | review group 4 | regex scan took seconds to tens of seconds on hostile 2 MB text | `fix-here`: only the first 200k characters are scanned, plus a first-letter lookahead (worst measured about 1.6 s under load) |
+| R21 | review group 4, PLAUSIBLE | prefixes not normalized, unknown YAML keys ignored, bare `*` word accepted | `fix-here` |
+| R22 | review group 4 | tests that could not fail (embedder always None, redundant repr check), no test for uppercase or diacritic terms or the `wy` prefix | `fix-here` |
+| R23 | review group 4 | if group 5 (stretch) is cut, no test covers vocabulary-free investment posts: they are dropped by design | `docs`: noted in design §4 as the known cost of the dictionary-only gate |
+| R24 | review group 6 | a spam flood made each `observe` read every id of 32 growing buckets (O(N) per copy, O(N²) total) and the buckets never expired | `fix-here`: `SRANDMEMBER` sample of 64, no `SADD` to a bucket of 256 or more |
+| R25 | review group 6, PLAUSIBLE | memory estimate in design was about 8x too low | `docs`: design corrected; url capped at 2048 characters |
+| R26 | review group 6, PLAUSIBLE | the group outlived its original's keys, so `original_url` became null | `fix-here`: a new member refreshes `meta:{gid}` and `doc:{gid}`; the summary sentence (group 8b) also skips a null `original_url` |
+| R27 | review group 6 | a redelivered original reported a similarity to a document of another group | `fix-here` |
+| R28 | review group 6 | determinism only checked in one process; estimate-dependent tests had no preconditions; long-text test timing only | `fix-here`: golden signature and bucket key, precondition asserts, shingle-count bound |
+| R29 | review group 6 | two workers observing near-identical documents at the same instant can both become originals | `wont-fix`: one missed grouping and possibly one extra alert, no corruption (MULTI/EXEC pipeline) |
+| R30 | review group 8a | all claims of a save were taken before any PUBLISH, so a failed publish could silence whole groups for the TTL | `fix-here`: the claim is taken right before its own `finding.high_risk` |
+| R31 | review group 8a | the claim TTL is a constant, not `NEARDUP_TTL_S` | `fix-here` (group 9): the worker passes `alert_ttl_s=NEARDUP_TTL_S` |
+| R32 | review group 8a | no-groups tests did not prove Redis is untouched | `fix-here` |
+| R33 | review group 8a, PLAUSIBLE | one scam template naming different impersonated firms forms one group, so only the first firm alerts | `docs`: design §5 names it; per-firm claims would need the firm in the key, a product call for Damian |
+| R34 | coordinator | scipy is heavy for the image: does datasketch need it at runtime? | `fix-here`: yes (package `__init__` imports `lsh.py` -> `scipy.integrate`), so datasketch is replaced by our own numpy MinHash; about -115 MB |
+| R35 | review MinHash refactor, PLAUSIBLE | signatures changed but the key prefix stayed `iw:neardup:v1`, so a Redis with keys from the datasketch build would miss matches | `wont-fix`: no Redis has run this branch outside fakeredis tests, so v1 is the first real layout. A later change of the hash must bump the prefix |
+| R36 | review MinHash refactor | the "datasketch legacy value for value" claim had no test after removal | `fix-here`: golden vector of datasketch 2.0.0 `scheme="legacy"` on a 3000-item, multi-chunk set |
+| R37 | review MinHash refactor | a tautological self-equality assert | `fix-here`: removed |
+| R38 | review MinHash refactor | `.docs/analytics-plan.md` §2 still names `datasketch` | `docs`: closing task 10.1 (iw-docs-update) |
+| R39 | group 9 testing | the gate dropped real M3 advisory offers that carry no market word ("grupa VIP, codziennie mówię co kupić, płatna subskrypcja") | `fix-here`: advisory cues in `gate_terms.yaml` (co kupić, rekomend*, porad*, konsultacj*, subskrypcj*, vip, premium, mentoring*) and a test that the gate keeps those posts' M3 findings. The gold set should get gate negatives and advisory positives to measure this |
+| R40 | group 9 | the gold-set evaluation (`evaluation/runner.py`) calls `analyze` without the gate, so calibration does not see gate drops | `new-item`: run the evaluation once with the gate and report how many gold positives it drops (target 0) |
+| R41 | review group 7 | the similarity rescue (stretch) is not wired: the gate runs before the embedding | `docs`: group 5 stays stretch; if built, the embedding moves before the gate (design §4) |
+| R42 | review group 9 | compose passed `EMBED_MODEL=""` when unset, so setting only `EMBED_BASE_URL` made the worker exit 2 in a restart loop | `fix-here`: `${EMBED_MODEL:-bge-m3}` plus a test that every compose key's empty value means its default |
+| R43 | review group 9, can't verify | a slow (not down) Redis can add about 3-4 s of side-client calls per document, outside the claim-idle check | `wont-fix` for now: 48 s worst case against 60 s at the defaults; revisit with a per-message deadline |
+| R44 | review group 9 | the gate counter increments before `save_findings`, so a redelivery after a store failure counts twice | `wont-fix`: statistics only |
+| R45 | closing | group 5 (similarity rescue with class centroids, stretch) cut for time: the gate is dictionary-only; `GATE_SIM_THRESHOLD` and the centroid seeds are kept, unused | `new-item`: build it in a later change, moving the embedding before the gate, and calibrate the threshold on the gold set |
+| R46 | whole-branch review | `judge.begin_document()` starts the LLM budget before the embedding call, so a slow embedder (worst case about 13 s) eats into `LLM_DOC_BUDGET_S` and the LLM may degrade to rules-only on that document until the embeddings breaker opens | `docs`: comment in `worker.preprocessing_from_env`; total wall time stays inside the claim-idle check. Fix later by starting the budget after the embedding |

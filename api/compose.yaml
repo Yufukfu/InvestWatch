@@ -10,7 +10,9 @@ services:
     build:
       context: ..
       dockerfile: api/Dockerfile
-    image: investwatch/api:${IW_VERSION:-dev}
+    # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
+    pull_policy: build
+    image: investwatch/api:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     environment:
@@ -30,7 +32,7 @@ services:
 
   # REST under /api and Socket.IO under /socket.io on :8000; reached only through the gateway (no host port).
   api:
-    image: investwatch/api:${IW_VERSION:-dev}
+    image: investwatch/api:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     command: ["python", "-m", "investwatch_api"]
     restart: unless-stopped
     environment:

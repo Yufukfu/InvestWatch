@@ -9,8 +9,8 @@ import { server } from '../../../test/setup';
 import { storeWrapper } from '../../../test/store';
 import { useRealtime } from './useRealtime';
 
-// The debounced refresh (1 s) is waited for with this timeout.
-const SLOW = { timeout: 3000 };
+// The debounced refresh (1 s) is waited for with this timeout (above the 5 s default in test/setup.ts).
+const SLOW = { timeout: 8000 };
 
 type Handler = (payload?: unknown) => void;
 
