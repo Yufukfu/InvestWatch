@@ -13,7 +13,7 @@ The deterministic part is `scripts/watch.mjs` (no model, plain `gh`): it polls, 
 
 | Flag | Work items |
 |---|---|
-| `--mine` | `address-review` (new review activity by teammates on my open PRs), `ci-failed` (a failed check on the head), `approved` (GitHub says approved, every check finished with none failed, no conflict: I can merge; a running check holds it until a later scan) |
+| `--mine` | `address-review` (new review activity by teammates on my open PRs), `ci-failed` (a failed check on the head), `approved` (GitHub says approved, every check finished with none failed, no conflict, not a draft, base is the default branch: I can merge; a running check holds it until a later scan) |
 | `--review-requested` | `review` (a ready PR waiting for my review at its current head; also a new head after I asked for changes) |
 | `--author <login>` | `review` of that login's PRs, or narrows the other flags |
 | `--domain <dir>` / `--domain mine` | `review` of PRs that touch a directory owned in `.github/CODEOWNERS` on the default branch (`mine`: every directory I own) |
@@ -42,7 +42,7 @@ Run `/loop 2m /iw-watch --mine` (or any flags above). On each tick:
 
 ## Headless
 
-`watch.mjs run <flags> [--publish] [--limit 3] [--budget-usd 2] [--model <name>]` starts one `claude -p` session per item. Without `--publish` it is a dry run, which is the default. Each session runs:
+`watch.mjs run <flags> [--publish] [--limit 3] [--budget-usd 2] [--model <name>]` starts one `claude -p` session per item; `--limit` caps the sessions, and an `approved` notice (no session) never takes a slot. Without `--publish` it is a dry run, which is the default. Each session runs:
 
 - **in a disposable clone** `../InvestWatch-worktrees/watch-pr-<n>`. For my own PR that is its branch, refused when the branch is from a fork, is the base or default branch, does not match the scanned sha, or changes `.claude/`, `CLAUDE.md`, `.github/` or `.mcp.json`. For a review it is the base branch, with the PR head as `refs/iw/pr-<n>`, so the PR's own `.claude/` never loads. The runner runs `npm ci --ignore-scripts` before the session.
 - **in the Claude Code sandbox** (`--settings`):
