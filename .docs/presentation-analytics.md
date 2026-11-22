@@ -4,7 +4,7 @@ Slide content for the hand-in PDF (issues #77 and #74). Kacper pastes it into th
 
 Numbers come from one run of `python analytics/eval/run.py` on `main` at `c810a140` (2026-11-22 00:02 UTC): rules only, no LLM, gold set SHA-256 `963f834e…`. To refresh them: rerun the command and copy the `at_default_threshold` block of each module and the `strict` block of each rule.
 
-**The gold set is synthetic.** 69 documents written by us from the challenge criteria (67 `synthetic`, 2 built around phrasings that ZASÓB quotes itself), with fictional firms and handles. It measures how well the rules follow our reading of the criteria, not real-world prevalence. UKNF provided no sample ads (`doc/` is everything); real samples go in as `origin: uknf-sample` lines with no code change (#73, slot on slide 5).
+**The gold set is synthetic.** 69 documents written by us from the challenge criteria (67 `synthetic`, 2 built around phrasings that ZASÓB quotes itself), with fictional firms and handles. It measures how well the rules follow our reading of the criteria, not real-world prevalence. UKNF provided no sample ads (`doc/` is everything); no real samples will arrive before the hand-in (#73, closed as not planned). Real samples could later go in as `origin: uknf-sample` lines with no code change.
 
 ---
 
@@ -95,8 +95,6 @@ Art. 76 advice = a recommendation to buy, sell or hold specific instruments, bas
 | 0.25 | 0.93 | 0.57 | 14 |
 | 0.40 | 1.00 | 0.48 | 11 |
 | 0.50 | 1.00 | 0.26 | 6 |
-
-**Real UKNF samples (#73):** _slot — not received at the time of writing. If they arrive: add them as `origin: uknf-sample`, rerun `python analytics/eval/run.py`, and put the per-module precision/recall for that origin here._
 
 **Notes:** Gold set: 69 synthetic documents, about a third hard cases by design, labels written from the criteria before running the rules (a disagreement becomes a rule follow-up, never a relabel). The numbers are honest about what is missing: rules-only, 8 of 18 M2 rules, no real samples.
 
