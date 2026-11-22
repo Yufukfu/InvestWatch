@@ -187,6 +187,7 @@ Base URL `/api`, JSON, pagination `?page=1&page_size=50`.
 |---|---|---|
 | GET | `/findings` | list; filters: `module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q`. `document_id` (contract 1.1.0) returns every finding of one document, at most one per module, so the detail panel can list M1 and M3 of one post across pages |
 | GET | `/findings/{id}` | details + `document` (text, links, screenshot URLs) |
+| GET | `/findings/{id}/export` | evidence pack (case file) for UKNF follow-up, contract 1.2.0, read-only: finding with scores, model and rules, document (URL, `content_hash`, `fetched_at`, text), raw HTML from `iw-raw` with its SHA-256, screenshot URLs, failed rules with legal basis and quotes. JSON by default; `?format=html` is a printable page (the dashboard's "Eksportuj" button links to it) |
 | PATCH | `/findings/{id}` | `{ "status": "...", "note": "..." }` – status change (alerting requirement) |
 | GET | `/stats/trend` | `?module&bucket=hour|day&risk_level&date_from&date_to` → `{ "bucket": "hour", "points": [{ "t": "...", "M1": 3, "M2": 7, "M3": 1 }] }` (shape in `contracts/openapi.yaml`); day buckets start at 00:00 UTC (to confirm with Damian) |
 | GET | `/stats/summary` | counts per module / status / platform |
