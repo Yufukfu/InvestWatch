@@ -327,13 +327,28 @@ test('--mine: no approved item without GitHub\'s approval, with a failed check, 
     { ...ok, reviewDecision: 'REVIEW_REQUIRED' },
     { ...ok, reviewDecision: '' },
     { ...ok, statusCheckRollup: fx('checks-failed.json') },
+    { ...ok, statusCheckRollup: [{ __typename: 'CheckRun', name: 'ci', status: 'IN_PROGRESS', conclusion: '' }] },
+    { ...ok, statusCheckRollup: [{ __typename: 'CheckRun', name: 'ci', status: 'QUEUED', conclusion: null }] },
+    { ...ok, statusCheckRollup: [{ __typename: 'StatusContext', context: 'ext', state: 'PENDING' }] },
     { ...ok, mergeable: 'CONFLICTING' },
   ]) assert.deepEqual(run(fakeGh(routes(pr)).gh, empty()).items.filter((i) => i.kind === 'approved'), []);
 });
 
 test('--mine: an approved item is told even past the round cap', () => {
   const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
-  const mine = [1, 2, 3].map((i) => comment(100 + i, ME, `round ${i}\n${MARKER}`, `2026-11-21T2${i}:00:00Z`));
-  const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [], 'issues/11/comments': mine });
-  assert.ok(run(gh, empty()).items.some((i) => i.kind === 'approved'));
+  const mine = [1, 2, 3].map((i) => comment(100 + i, ME, `round ${i}\n${MARKER}`, `2026-11-21T1${i}:00:00Z`));
+  // The fixture reviews are new work, so the cap branch runs: cap-reached replaces the work, approved stays.
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'issues/11/comments': mine });
+  const kinds = run(gh, empty(), { mine: true }, { maxRounds: 3 }).items.map((i) => i.kind).sort();
+  assert.deepEqual(kinds, ['approved', 'cap-reached']);
+});
+
+test('--mine: completed checks that passed or were skipped do not hold the approved item back', () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [
+    { __typename: 'CheckRun', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    { __typename: 'CheckRun', name: 'docs', status: 'COMPLETED', conclusion: 'SKIPPED' },
+    { __typename: 'StatusContext', context: 'ext', state: 'SUCCESS' },
+  ] };
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  assert.equal(run(gh, empty()).items.filter((i) => i.kind === 'approved').length, 1);
 });

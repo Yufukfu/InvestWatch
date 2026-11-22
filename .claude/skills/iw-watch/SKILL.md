@@ -13,7 +13,7 @@ The deterministic part is `scripts/watch.mjs` (no model, plain `gh`): it polls, 
 
 | Flag | Work items |
 |---|---|
-| `--mine` | `address-review` (new review activity by teammates on my open PRs), `ci-failed` (a failed check on the head), `approved` (GitHub says approved, no failed check, no conflict: I can merge) |
+| `--mine` | `address-review` (new review activity by teammates on my open PRs), `ci-failed` (a failed check on the head), `approved` (GitHub says approved, every check finished with none failed, no conflict: I can merge; a running check holds it until a later scan) |
 | `--review-requested` | `review` (a ready PR waiting for my review at its current head; also a new head after I asked for changes) |
 | `--author <login>` | `review` of that login's PRs, or narrows the other flags |
 | `--domain <dir>` / `--domain mine` | `review` of PRs that touch a directory owned in `.github/CODEOWNERS` on the default branch (`mine`: every directory I own) |
