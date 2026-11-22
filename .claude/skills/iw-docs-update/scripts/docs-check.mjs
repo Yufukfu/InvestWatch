@@ -22,9 +22,9 @@ const IGNORED_NAMES = new Set(['follow-ups.md', 'tasks.md', 'proposal.md', 'desi
 const PEOPLE = ['Adam', 'Kacper', 'Damian'];
 // Directories plus the names of the status domains (`dashboard` is web/, `platform` is analytics/, api/, contracts/).
 const MODULE_WORDS = ['scraper', 'analytics', 'api', 'web', 'contracts', 'infra', 'dashboard', 'platform'];
-// History keeps the names it had (ADR files, the AI log); in-flight changes are archived (and skipped) later.
-// The decisions index (.docs/decisions/README.md) is a live doc, so only numbered ADR files are skipped.
-const OWNERSHIP_SKIP = [/^\.docs\/decisions\/\d{4}-[^/]+\.md$/, /^\.docs\/ai-workflow\.md$/, /^openspec\/changes\//];
+// History keeps the names it had (ADR files, AI log entries, the old AI log table); in-flight changes are archived
+// (and skipped) later. The indexes (.docs/decisions/README.md, .docs/ai-log/README.md) are live docs, so only dated files are skipped.
+const OWNERSHIP_SKIP = [/^\.docs\/decisions\/\d{4}-[^/]+\.md$/, /^\.docs\/ai-log\/\d{4}-[^/]+\.md$/, /^\.docs\/ai-workflow\.md$/, /^openspec\/changes\//];
 // Spec scenario steps are hypothetical examples ("GIVEN analytics/ is owned by Damian"); only in openspec/specs/.
 const SCENARIO_STEP = /^\s*-\s*\*\*(?:GIVEN|WHEN|THEN|AND)\*\*/;
 const NAME = `(?:${PEOPLE.join('|')})\\b`;

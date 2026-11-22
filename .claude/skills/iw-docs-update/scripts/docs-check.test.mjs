@@ -201,6 +201,14 @@ test('a CODEOWNERS handle is an ownership claim only next to a module name, and 
   assert.deepEqual(checkDocs(root).map((p) => `${p.file}:${p.line}`), ['.docs/b.md:1']);
 });
 
+test('AI log entries are history; the AI log index is a live doc', () => {
+  const root = repo({
+    '.docs/ai-log/2026-11-22T0215-kacper-x.md': 'Five docs said Kacper owns `infra/`.\n',
+    '.docs/ai-log/README.md': 'ok\nKacper owns `infra/`.\n',
+  });
+  assert.deepEqual(checkDocs(root).map((p) => `${p.file}:${p.line}`), ['.docs/ai-log/README.md:2']);
+});
+
 test('the scenario-step exemption applies to specs only', () => {
   const root = repo({ 'CLAUDE.md': '- **AND** Owner: Damian\n', 'openspec/specs/x/spec.md': '- **AND** Owner: Damian\n' });
   assert.deepEqual(checkDocs(root).map((p) => p.file), ['CLAUDE.md']);
