@@ -20,11 +20,12 @@ from uuid import UUID
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from jsonschema import FormatChecker
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .evidence import HTML_HEADERS, ExportFormat, NoObjects, evidence_pack, render_html
 from .png import placeholder_png
 from .settings import Settings
 from .store import MODULES, Store, load_mock_data
@@ -151,7 +152,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     settings = settings or Settings()
     store = store or Store(load_mock_data(settings.contracts_dir))
 
-    api = FastAPI(title="InvestWatch mock API", version="1.1.0")
+    api = FastAPI(title="InvestWatch mock API", version="1.2.0")
     api.state.store = store
     api.state.settings = settings
     api.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
@@ -237,8 +238,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return {"items": [store.finding_view(f) for f in result[start:start + page_size]],
                 "total": len(result), "page": page, "page_size": page_size}
 
-    @api.get("/api/findings/{finding_id}")
-    async def get_finding(finding_id: UUID):
+    def finding_detail(finding_id: UUID) -> dict:
         finding = get_finding_or_404(finding_id)
         view = store.finding_view(finding)
         document = store.documents.get(finding["document_id"])
@@ -247,6 +247,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         view["screenshot_urls"] = {vp: f"/api/documents/{finding['document_id']}/screenshot/{vp}"
                                    for vp, key in shots.items() if key}
         return view
+
+    @api.get("/api/findings/{finding_id}")
+    async def get_finding(finding_id: UUID):
+        return finding_detail(finding_id)
+
+    @api.get("/api/findings/{finding_id}/export")
+    async def export_finding(finding_id: UUID, format: ExportFormat = "json"):
+        pack = await evidence_pack(finding_detail(finding_id), NoObjects())
+        if format == "html":
+            return HTMLResponse(render_html(pack), headers=HTML_HEADERS)
+        return JSONResponse(pack, headers={"Content-Disposition": f'inline; filename="investwatch-finding-{finding_id}.json"'})
 
     @api.patch("/api/findings/{finding_id}")
     async def patch_finding(finding_id: UUID, patch: Annotated[FindingPatch, Body()]):

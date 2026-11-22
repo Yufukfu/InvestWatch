@@ -4,7 +4,7 @@
 // notifier never fails the run.
 import { spawnSync } from 'node:child_process';
 
-export const KINDS = ['done', 'draft-ready', 'needs-human'];
+export const KINDS = ['done', 'draft-ready', 'needs-human', 'approved'];
 // titles are other people's text; a notifier may print them to a terminal
 const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '?');
 

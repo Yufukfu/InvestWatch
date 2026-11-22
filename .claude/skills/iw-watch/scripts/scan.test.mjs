@@ -304,3 +304,51 @@ test('CLI: human output names the PR, the kind and the round, with control chara
   assert.ok(!text.includes('\u001b'));
   assert.equal(clean('a\u0007b\u009bc'), 'a?b?c');
 });
+
+test('--mine: an approved, green, mergeable PR is one approved item per head sha, with its approvers', () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const reviews = fx('reviews-11.json');
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': reviews, 'pulls/11/comments': [] });
+  const state = empty();
+  const items = run(gh, state).items.filter((i) => i.kind === 'approved');
+  assert.equal(items.length, 1);
+  assert.deepEqual(items[0].approvers, ['hen68']);
+  assert.equal(items[0].id, `11.approved.${pr.headRefOid}`);
+  ack(state, items[0].id);
+  assert.deepEqual(run(gh, state).items.filter((i) => i.kind === 'approved'), [], 'told once per head');
+  const moved = { ...pr, headRefOid: 'b'.repeat(40) };
+  assert.equal(run(fakeGh({ 'pr list mine': [moved], 'pulls/11/reviews': reviews, 'pulls/11/comments': [] }).gh, state).items.filter((i) => i.kind === 'approved').length, 1, 'a new head after the ack is told again');
+});
+
+test('--mine: no approved item without GitHub\'s approval, with a failed check, or with a conflict', () => {
+  const ok = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const routes = (pr) => ({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  for (const pr of [
+    { ...ok, reviewDecision: 'REVIEW_REQUIRED' },
+    { ...ok, reviewDecision: '' },
+    { ...ok, statusCheckRollup: fx('checks-failed.json') },
+    { ...ok, statusCheckRollup: [{ __typename: 'CheckRun', name: 'ci', status: 'IN_PROGRESS', conclusion: '' }] },
+    { ...ok, statusCheckRollup: [{ __typename: 'CheckRun', name: 'ci', status: 'QUEUED', conclusion: null }] },
+    { ...ok, statusCheckRollup: [{ __typename: 'StatusContext', context: 'ext', state: 'PENDING' }] },
+    { ...ok, mergeable: 'CONFLICTING' },
+  ]) assert.deepEqual(run(fakeGh(routes(pr)).gh, empty()).items.filter((i) => i.kind === 'approved'), []);
+});
+
+test('--mine: an approved item is told even past the round cap', () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [] };
+  const mine = [1, 2, 3].map((i) => comment(100 + i, ME, `round ${i}\n${MARKER}`, `2026-11-21T1${i}:00:00Z`));
+  // The fixture reviews are new work, so the cap branch runs: cap-reached replaces the work, approved stays.
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'issues/11/comments': mine });
+  const kinds = run(gh, empty(), { mine: true }, { maxRounds: 3 }).items.map((i) => i.kind).sort();
+  assert.deepEqual(kinds, ['approved', 'cap-reached']);
+});
+
+test('--mine: completed checks that passed or were skipped do not hold the approved item back', () => {
+  const pr = { ...fx('pr-11.json'), reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', statusCheckRollup: [
+    { __typename: 'CheckRun', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    { __typename: 'CheckRun', name: 'docs', status: 'COMPLETED', conclusion: 'SKIPPED' },
+    { __typename: 'StatusContext', context: 'ext', state: 'SUCCESS' },
+  ] };
+  const { gh } = fakeGh({ 'pr list mine': [pr], 'pulls/11/reviews': [], 'pulls/11/comments': [] });
+  assert.equal(run(gh, empty()).items.filter((i) => i.kind === 'approved').length, 1);
+});

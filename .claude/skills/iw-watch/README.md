@@ -14,13 +14,13 @@
 
    ```sh
    export IWATCH_DISCORD_WEBHOOK="https://discord.com/api/webhooks/<id>/<token>"
-   export IWATCH_DISCORD_USER_ID="<your Discord user id>"   # optional: "hey, I need you @you" when it needs you
+   export IWATCH_DISCORD_USER_ID="<your Discord user id>"   # optional: pings you when it needs you, and when your PR is approved
    export IWATCH_NOTIFY_CMD="node $HOME/Projects/InvestWatch/.claude/skills/iw-watch/scripts/notify-discord.mjs"
    ```
 
    Then run `chmod 600 ~/.zshenv`. Never put the URL in the repository, in a `.env` that gets copied around, or in a skill file.
    Your user id: Discord → User Settings → Advanced → Developer Mode on, then right-click your name → Copy User ID. Only that id is ever pinged, and only on a "needs you" message.
-3. Test it: `node .claude/skills/iw-watch/scripts/notify-discord.mjs needs-human "#0 test" https://github.com` (with the user id set, it pings you).
+3. Test it: `node .claude/skills/iw-watch/scripts/notify-discord.mjs needs-human "#0 test" https://github.com` (with the user id set, it pings you). `approved` instead of `needs-human` shows the "🎉 your PR is approved! You can merge it now." message.
 
 The agent never sees these variables: the session it starts gets an allow-list of the environment (PATH, HOME, locale, the Claude login), nothing else.
 
