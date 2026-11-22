@@ -9,7 +9,9 @@ services:
       context: ..
       dockerfile: scraper/Dockerfile
       target: renderer
-    image: investwatch/renderer:${IW_VERSION:-dev}
+    # Tag per compose project, rebuilt on every `up` (issue #63; see web/compose.yaml).
+    pull_policy: build
+    image: investwatch/renderer:${IW_VERSION:-${COMPOSE_PROJECT_NAME:-dev}}
     restart: unless-stopped
     init: true  # Chromium spawns many children; PID 1 must reap them
     environment:
