@@ -252,6 +252,22 @@ async def test_a_failure_carries_neither_the_proxy_nor_the_library_text_nor_a_ca
     assert failure.__cause__ is None and failure.__suppress_context__
 
 
+async def test_a_stalled_library_call_ends_as_a_timeout_instead_of_hanging_the_run():
+    release = threading.Event()
+
+    class Stalled(FakeApi):
+        def fetch(self, video_id, languages=("en",)):
+            release.wait(5)  # the library sets no timeout of its own; the adapter must bound the wait
+            return [Snippet("late")]
+
+    try:
+        with pytest.raises(FetchFailure) as caught:
+            await transcript.fetch_transcript("JLShF0trXZI", "pl", PROXY, api_factory=Stalled(None).factory, timeout=0.05)
+    finally:
+        release.set()
+    assert caught.value.reason is Reason.TIMEOUT and caught.value.__cause__ is None
+
+
 @pytest.mark.parametrize("video_id", ["short", "has space!!", "../../etc/passwd", "a" * 12, ""])
 async def test_a_malformed_video_id_is_refused_before_the_library_is_called(video_id):
     api = FakeApi([Snippet("x")])

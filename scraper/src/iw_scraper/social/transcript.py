@@ -13,6 +13,7 @@ from iw_scraper.fetch import FetchFailure
 from iw_scraper.types import Reason
 
 _VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+TRANSCRIPT_TIMEOUT = 15.0  # seconds; the library sets none, and a stalled proxy would hold the run to the queue's deadline
 _TIMEOUT_NAMES = ("Timeout", "ReadTimeout", "ConnectTimeout")
 
 
@@ -48,12 +49,14 @@ def _fetch_sync(video_id: str, language: str, proxy_url: str, api_factory) -> st
     return " ".join(" ".join(snippet.text for snippet in snippets).split()) or None
 
 
-async def fetch_transcript(video_id: str, language: str, proxy_url: str, *, api_factory=None) -> str | None:
+async def fetch_transcript(
+    video_id: str, language: str, proxy_url: str, *, api_factory=None, timeout: float = TRANSCRIPT_TIMEOUT
+) -> str | None:
     """The transcript text of one video in `language`, or None when it has none; one request through `proxy_url`."""
     if not _VIDEO_ID.fullmatch(video_id):
         raise FetchFailure(Reason.INVALID_REQUEST, "not a YouTube video id")
     try:
-        return await asyncio.to_thread(_fetch_sync, video_id, language, proxy_url, api_factory)
+        return await asyncio.wait_for(asyncio.to_thread(_fetch_sync, video_id, language, proxy_url, api_factory), timeout)
     except Exception as error:  # every library failure, whatever its type; the original stays out of the chain
         failure = map_library_error(error)
         if failure is None:
