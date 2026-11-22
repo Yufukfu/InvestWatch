@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { SectionBoundary } from './SectionBoundary';
 import { AlertsPage } from './features/alerts/AlertsPage';
 import { HealthPage } from './features/health/HealthPage';
@@ -32,6 +32,9 @@ function useActiveSection(): string {
 
 export function App() {
   const active = useActiveSection();
+  const navId = useId();
+  // Only meaningful below 600px, where the CSS hides the section links until the menu button opens them.
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <ToastSlotProvider>
       <header className="app-header">
@@ -40,9 +43,9 @@ export function App() {
             <h1>InvestWatch</h1>
             <span className="brand-tagline">NARZĘDZIE NADZORCZE</span>
           </div>
-          <nav className="app-nav" aria-label="Sekcje">
+          <nav id={navId} className={menuOpen ? 'app-nav app-nav-open' : 'app-nav'} aria-label="Sekcje">
             {SECTION_LINKS.map((l) => (
-              <a key={l.id} href={`#${l.id}`} aria-current={l.id === active ? 'location' : undefined}>
+              <a key={l.id} href={`#${l.id}`} onClick={() => setMenuOpen(false)} aria-current={l.id === active ? 'location' : undefined}>
                 {l.label}
               </a>
             ))}
@@ -51,6 +54,16 @@ export function App() {
             <AlertsPage />
             <HealthPage />
           </div>
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label="Menu"
+            aria-expanded={menuOpen}
+            aria-controls={navId}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
         </div>
       </header>
       <div className="app">

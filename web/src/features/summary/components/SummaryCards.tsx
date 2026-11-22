@@ -21,7 +21,9 @@ export function SummaryCards({ summary, asOf, onStartTriage }: Props) {
       <p className="hero-eyebrow">PRZEGLĄD · {asOf}</p>
       <div className="hero-row">
         <p className="hero-figures">
-          <span className="hero-value">{summary.total}</span> <span className="hero-label">zgłoszeń, z czego</span>{' '}
+          <span className="hero-value">{summary.total}</span> <span className="hero-label">
+            zgłoszeń<span className="hero-sep">, z czego</span>
+          </span>{' '}
           <span className="hero-value hero-value-risk">{summary.highRisk}</span>{' '}
           <span className="hero-label">wysokiego ryzyka</span>
         </p>

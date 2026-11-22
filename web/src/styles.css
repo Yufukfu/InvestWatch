@@ -29,6 +29,7 @@
   --risk-high: #d7261e;
   --risk-high-bg: #fde2e2;
   --risk-high-fg: #8a1111;
+  --risk-high-border: #f3b9b5;
   --risk-medium-bg: #fdf0d0;
   --risk-medium-fg: #7a4a00;
   --risk-low-bg: #e3f2ea;
@@ -86,6 +87,18 @@ h1, h2, h3 { line-height: 1.2; font-family: var(--font-display); }
 .app-nav a { display: inline-flex; align-items: center; min-height: var(--tap); min-width: var(--tap); justify-content: center; color: var(--muted); font-size: 14px; font-weight: 500; text-decoration: none; box-shadow: inset 0 -2px 0 transparent; }
 .app-nav a:hover { color: var(--text); }
 .app-nav a[aria-current='location'] { color: var(--text); font-weight: 700; box-shadow: inset 0 -2px 0 var(--accent); }
+.nav-toggle { display: none; }
+@media (max-width: 599px) {
+  .app-header-inner { padding-block: 14px; gap: var(--space-3); }
+  .brand { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .brand h1 { font-size: 20px; }
+  .header-status { margin-left: auto; }
+  .nav-toggle { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: var(--tap); height: var(--tap); padding: 0; border: 1px solid var(--control-border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: 20px; cursor: pointer; }
+  /* The section links drop below the header row and stack, 44px each; they are only shown while the menu is open. */
+  .app-nav { display: none; order: 10; flex: 1 0 100%; flex-direction: column; margin-right: 0; padding-left: 0; border-left: 0; }
+  .app-nav.app-nav-open { display: flex; }
+  .app-nav a { justify-content: flex-start; }
+}
 .app { max-width: 1440px; margin: 0 auto; padding: 0 var(--gutter); }
 main { display: grid; gap: 0; }
 /* Grid items default to min-width: auto; without this a wide table widens the page instead of scrolling. */
@@ -122,6 +135,19 @@ main > [id] { scroll-margin-top: var(--space-4); }
 .kpi-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; line-height: 1.1; }
 .kpi-label { color: var(--muted); font-size: 13px; }
 @media (min-width: 600px) { .kpis { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-4) var(--space-8); } .hero-value { font-size: 80px; } .hero-label { font-size: 26px; } }
+.hero-sep { display: inline; }
+@media (max-width: 599px) {
+  .hero-row { display: grid; }
+  .hero-figures { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 var(--space-3); }
+  .hero-label { font-size: 20px; }
+  .hero-sep { display: none; }
+  .hero-triage { width: 100%; min-height: 52px; font-size: 15px; }
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .hero-row { display: grid; }
+  .hero-triage { justify-self: start; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4) var(--space-6); }
+}
 @media (min-width: 1024px) { .hero { padding: 56px 0 var(--space-8); } .hero-value { font-size: 96px; } .hero-label { font-size: 28px; } .kpis { gap: var(--space-4) 72px; } }
 
 /* Buttons and inputs */
@@ -139,10 +165,10 @@ button.link { font: inherit; display: inline-flex; align-items: center; min-heig
 button.link:hover { color: var(--link); }
 
 /* Filters */
-.filters { display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); align-items: end; margin-bottom: var(--space-6); }
+.filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; margin-bottom: var(--space-6); }
+.filters > * { min-width: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label, .field legend { font-size: 13px; font-weight: 600; color: var(--muted); }
-.field-search { grid-column: span 2; }
 .field input, .field select { border-color: var(--control-border); font-size: 14px; }
 .field-status { grid-column: 1 / -1; border: 0; margin: 0; padding: 0; }
 .field-status legend { padding: 0; margin-bottom: 4px; }
@@ -153,12 +179,21 @@ button.link:hover { color: var(--link); }
 .chip:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 .filters-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
-/* Phone: the fields sit behind the "Filtry" button; from 600px they are always shown and the button is not. */
-.filters.filters-open { display: grid; }
-.filters-toggle { width: 100%; justify-content: space-between; margin-bottom: var(--space-3); }
-.filters-toggle-count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--accent); color: var(--accent-text); font-size: 14px; font-weight: 600; }
-@media (min-width: 600px) { .filters { display: grid; } .filters-toggle { display: none; } }
-@media (max-width: 520px) { .field-search { grid-column: 1 / -1; } }
+/* Below 1024px the search field sits beside the "Filtry" button, the active filters are removable chips under it, and the
+   other fields stay behind the button; from 1024px everything is one grid and the button and chips are not drawn. */
+.filters-more { display: none; grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); align-items: end; }
+.filters-more.filters-open { display: grid; }
+.filters-toggle { height: 48px; border-color: var(--accent); font-size: 14px; font-weight: 600; padding: 0 var(--space-4); }
+.filters-toggle-count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 600; }
+.filter-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.filter-chip { font: inherit; font-size: 13px; font-weight: 600; min-height: var(--tap); padding: 0 14px; border: 1px solid var(--control-border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text); cursor: pointer; }
+.filter-chip-status { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+@media (min-width: 1024px) {
+  .filters { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); }
+  .field-search { grid-column: span 2; }
+  .filters-toggle, .filter-chips { display: none; }
+  .filters-more, .filters-more.filters-open { display: contents; }
+}
 
 /* Keyboard shortcut legend */
 .shortcuts summary { cursor: pointer; padding: var(--space-3) 0; font-weight: 600; }
@@ -195,8 +230,8 @@ kbd { font-family: var(--font-mono); font-size: 14px; font-weight: 600; min-widt
 .findings tbody tr.selected { background: var(--tint-selected); }
 
 /* Below 1024px the same table markup is laid out as rows of flexible parts (table roles are explicit in the markup).
-   Tablet: risk, title, module and score on the first line, platform, status and time under the title.
-   Phone: a card, with risk, module and score on top, the title on its own line and the details below. */
+   Tablet: a four-column list (risk, title, module, score) with platform, status and time as a muted line under the title.
+   Phone: a bordered card, with risk, module and score on top, the title on its own line and the details below. */
 @media (max-width: 1023px) {
   .findings, .findings tbody { display: block; }
   .findings thead { display: block; }
@@ -204,27 +239,51 @@ kbd { font-family: var(--font-mono); font-size: 14px; font-weight: 600; min-widt
   /* The sort buttons stay; the other headers are kept for assistive technology but not drawn. */
   .findings thead th { padding: 0; border: 0; }
   .findings thead th:not(.col-score):not(.col-date) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .findings tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); padding: var(--space-3); border-bottom: 1px solid var(--border); }
-  .findings tbody tr:last-child { border-bottom: 0; }
+  .findings tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); padding: var(--space-3); }
   .findings tbody td { padding: 0; border: 0; min-width: 0; }
   .findings tbody tr::after { content: ''; order: 5; flex-basis: 100%; height: 0; }
   .col-risk { order: 1; flex: 0 0 84px; }
   .col-title { order: 2; flex: 1 1 0; min-width: 0; }
-  .col-module { order: 3; }
-  .col-score { order: 4; }
+  .col-module { order: 3; flex: 0 0 48px; }
+  .col-score { order: 4; flex: 0 0 64px; text-align: right; }
+  .score-bar, .date-year, .findings .status::before { display: none; }
+  .score { justify-content: flex-end; font-weight: 600; }
+  .findings tbody .col-platform, .findings tbody .col-status { color: var(--muted); font-size: 12px; }
   .col-platform { order: 6; margin-left: 96px; }
+  .col-platform::after { content: '\00b7'; margin-left: var(--space-2); }
   .col-status { order: 7; }
+  .col-status::after { content: '\00b7'; margin-left: var(--space-2); }
   .findings tbody .col-date { order: 8; }
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .findings tbody tr { border-bottom: 1px solid var(--border); }
+  .findings tbody tr:last-child { border-bottom: 0; }
+  /* The header row repeats the list columns; the time sort sits right after the title label. */
+  .findings thead tr { justify-content: flex-start; gap: var(--space-1) var(--space-3); }
+  .findings thead th.col-risk, .findings thead th.col-title, .findings thead th.col-module { position: static; width: auto; height: auto; overflow: visible; clip-path: none; display: flex; align-items: center; }
+  .findings thead .col-title { order: 2; flex: 0 0 auto; }
+  .findings thead .col-date { order: 3; flex: 1 1 0; text-align: left; }
+  .findings thead .col-module { order: 4; }
+  .findings thead .col-score { order: 5; }
+  .findings thead .col-score .sort { margin-left: auto; }
 }
 @media (max-width: 599px) {
   .findings tbody tr::after { display: none; }
+  .findings tbody { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
+  .findings tbody tr { gap: 10px var(--space-2); padding: var(--space-4); border: 1px solid var(--border); border-radius: 12px; }
+  .findings tbody tr.row-high { border-color: var(--risk-high-border); }
   .col-risk { flex: 0 0 auto; }
-  .col-module { order: 2; }
-  .col-score { order: 3; margin-left: auto; }
+  .col-module { order: 2; flex: 0 0 auto; }
+  .findings tbody .col-module { font-size: 13px; }
+  .col-score { order: 3; flex: 0 0 auto; margin-left: auto; }
   .col-title { order: 4; flex: 1 1 100%; }
+  .findings tbody .col-title { font-size: 15px; }
+  .findings tbody tr:not(.row-high) .col-title { font-weight: 500; }
+  .findings tbody .col-platform, .findings tbody .col-status { font-size: 13px; }
   .col-platform { order: 5; margin-left: 0; }
   .col-status { order: 6; }
-  .findings tbody .col-date { order: 7; }
+  .col-status::after { content: none; }
+  .findings tbody .col-date { order: 7; margin-left: auto; }
 }
 
 /* Risk and status: text plus colour, never colour alone; same size as body text. */
@@ -246,6 +305,14 @@ kbd { font-family: var(--font-mono); font-size: 14px; font-weight: 600; min-widt
 .state-empty p { margin: 0 0 12px; }
 .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .pager-pos { font-size: 13px; color: var(--muted); }
+.pager-short { display: none; }
+@media (max-width: 599px) {
+  .pager { justify-content: space-between; }
+  .pager .btn { min-height: 48px; padding: 0 18px; font-size: 14px; }
+  .pager-long { display: none; }
+  .pager-short { display: inline; font-weight: 600; color: var(--text); }
+  .pager-size { flex-basis: 100%; margin-left: 0; justify-content: flex-end; }
+}
 .pager-size { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
 [role='alert'] { color: var(--risk-high-fg); }
 

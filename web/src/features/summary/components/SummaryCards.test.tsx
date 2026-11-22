@@ -23,6 +23,13 @@ describe('SummaryCards (hero)', () => {
     );
   });
 
+  it('puts ", z czego" in its own element, so the phone layout can stack the two figures without it', () => {
+    render(<SummaryCards summary={SUMMARY} asOf="22.11.2026" onStartTriage={vi.fn()} />);
+    const sep = screen.getByText(', z czego');
+    expect(sep).toHaveClass('hero-sep');
+    expect(sep.parentElement).toHaveTextContent('zgłoszeń, z czego');
+  });
+
   it('lists the new findings and every module with its name, the count first', () => {
     render(<SummaryCards summary={SUMMARY} asOf="22.11.2026" onStartTriage={vi.fn()} />);
     const list = screen.getByRole('list', { name: 'Wskaźniki' });

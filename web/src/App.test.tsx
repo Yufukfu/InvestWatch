@@ -37,6 +37,25 @@ describe('App (against contract mocks)', () => {
     expect(region).toHaveTextContent(`${summary.total} zgłoszeń, z czego`);
   });
 
+  it('opens the section menu from a hamburger button and closes it after a link is chosen', () => {
+    renderApp();
+    const toggle = screen.getByRole('button', { name: 'Menu' });
+    const nav = screen.getByRole('navigation', { name: 'Sekcje' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', nav.id);
+    expect(nav.id).not.toBe('');
+    expect(nav).not.toHaveClass('app-nav-open');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(nav).toHaveClass('app-nav-open');
+    fireEvent.click(within(nav).getByRole('link', { name: 'Zgłoszenia' }));
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(nav).not.toHaveClass('app-nav-open');
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    expect(nav).not.toHaveClass('app-nav-open');
+  });
+
   it('labels the tool and links the header to the three sections', async () => {
     renderApp();
     expect(screen.getByText('NARZĘDZIE NADZORCZE')).toBeInTheDocument();

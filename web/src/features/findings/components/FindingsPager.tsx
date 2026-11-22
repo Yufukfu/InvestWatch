@@ -18,7 +18,13 @@ export function FindingsPager({ page, pageSize, total, onPage, onPageSize }: Pro
         ← Poprzednia
       </button>
       <span className="pager-pos" aria-live="polite">
-        Strona {page} z {pages}
+        <span className="pager-long">
+          Strona {page} z {pages}
+        </span>
+        {/* The phone shows only this short form; the long one is dropped there, so it is never read twice. */}
+        <span className="pager-short" aria-hidden="true">
+          {page} / {pages}
+        </span>
       </span>
       <button type="button" className="btn" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Następna strona">
         Następna →

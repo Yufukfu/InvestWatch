@@ -1,6 +1,6 @@
 import { formatScore } from '../../../format/score';
 import type { FindingRow, FindingSort } from '../model';
-import { findingsCount, formatDetected, MODULE_LABEL, platformLabel, STATUS_LABEL } from './labels';
+import { findingsCount, detectedParts, MODULE_LABEL, platformLabel, STATUS_LABEL } from './labels';
 import { RiskBadge } from './RiskBadge';
 
 type Props = {
@@ -16,6 +16,18 @@ type Props = {
   isFetching: boolean;
   isError: boolean;
 };
+
+// dd.mm.yyyy · hh:mm; the year is its own element so the phone card can show dd.mm · hh:mm.
+function DetectedAt({ iso }: { iso: string }) {
+  const p = detectedParts(iso);
+  if (!p) return <>{iso}</>;
+  return (
+    <>
+      {p.dayMonth}
+      <span className="date-year">.{p.year}</span> · {p.time}
+    </>
+  );
+}
 
 type SortKey = 'detected_at' | 'score';
 
@@ -111,7 +123,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                 </td>
                 <td role="cell" className="col-date mono">
                   <time dateTime={f.detectedAt} title="Czas UTC">
-                    {formatDetected(f.detectedAt)}
+                    <DetectedAt iso={f.detectedAt} />
                   </time>
                 </td>
               </tr>
