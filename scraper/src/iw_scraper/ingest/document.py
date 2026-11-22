@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from iw_scraper.types import Source
 
 # the parsed page carries the raw HTML for the object store; it is not part of the ScrapedDocument. The object
-# key is set by the pipeline after a real upload, never taken from a page.
-_PAGE_ONLY_KEYS = frozenset({"html", "html_object_key"})
+# key is set by the pipeline after a real upload, never taken from a page. `render` is the collector's render step
+# (an async callable); the pipeline runs it and sets `screenshots` and `scrape_meta.render` from its output.
+_PAGE_ONLY_KEYS = frozenset({"html", "html_object_key", "render"})
 # `author` is dropped too: page markup (meta, rel=author, embedded JSON) is writer-controlled, and analytics routes a
 # post to M2 on `author.handle` / `author.profile_url` (issue 36). A platform collector that has account data adds its own path.
 _UNTRUSTED_PAGE_KEYS = frozenset({"author"})

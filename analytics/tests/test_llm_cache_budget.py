@@ -9,6 +9,7 @@ import fakeredis
 import pytest
 import redis
 
+from conftest import stored_hash
 from llm_stub import Reply, closed_port_url
 from investwatch_analytics.config import LlmSettings
 from investwatch_analytics.llm.judge import SemanticCheck
@@ -35,9 +36,14 @@ def make(url, *, cache=None, clock=None, **env):
     return HttpJudge(settings, redis=cache, clock=clock or Clock())
 
 
-def ask(judge, text=TEXT, checks=(R17,), module="M2", context=""):
+_STORED = object()
+
+
+def ask(judge, text=TEXT, checks=(R17,), module="M2", context="", content_hash=_STORED):
+    """`content_hash` is the document's stored value (issue #31); by default the one the scraper would store."""
     pre = preprocess(text)
-    return judge.judge(module=module, module_context=context, text=text, content_hash=pre.content_hash,
+    stored = stored_hash(text) if content_hash is _STORED else content_hash
+    return judge.judge(module=module, module_context=context, text=text, content_hash=stored,
                        sentences=pre.sentences, checks=list(checks))
 
 
@@ -141,6 +147,25 @@ def test_redis_down_is_a_miss_and_never_raises(stub_llm, caplog):
     out = ask(make(stub_llm.base_url, cache=BrokenRedis()))
     assert out.verdicts["R17"].result == "fail" and len(stub_llm.requests) == 1
     assert any(getattr(rec, "reason", None) == "llm_cache_unavailable" for rec in caplog.records)
+
+
+def test_no_stored_hash_bypasses_the_cache(stub_llm):
+    """Issue #31: analytics never computes a hash, and a missing one must not become a key shared by documents."""
+    r = fakeredis.FakeRedis(decode_responses=True)
+    stub_llm.default = Reply.results(FAIL)
+    first = ask(make(stub_llm.base_url, cache=r), content_hash=None)
+    second = ask(make(stub_llm.base_url, cache=r), content_hash=None)
+    assert len(stub_llm.requests) == 2 and first.verdicts == second.verdicts
+    assert r.keys("iw:llm:*") == []
+
+
+def test_cache_key_is_the_stored_hash(stub_llm):
+    """Two stored hashes, same text: two keys. The key follows the document's stored value, not its text."""
+    r = fakeredis.FakeRedis(decode_responses=True)
+    stub_llm.default = Reply.results(FAIL)
+    ask(make(stub_llm.base_url, cache=r), content_hash="a" * 64)
+    ask(make(stub_llm.base_url, cache=r), content_hash="b" * 64)
+    assert len(stub_llm.requests) == 2 and len(r.keys("iw:llm:*")) == 2
 
 
 def test_no_cache_without_redis(stub_llm):

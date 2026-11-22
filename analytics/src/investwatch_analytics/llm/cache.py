@@ -1,7 +1,8 @@
 """Redis response cache (ADR 0309, design §7). A Redis error is a miss or a skipped write: never raised.
 
 The key is derived from `(content_hash, prompt_version, model)` plus module, chunk index and count, the chunk's
-character span and the sorted requested rule ids. The value is the validated response content; quote
+character span and the sorted requested rule ids. `content_hash` is the document's stored value (NFC, ADR 0105);
+the judge skips the cache for a document without one (issue #31). The value is the validated response content; quote
 verification is re-run on every read, so an entry edited in Redis cannot inject evidence.
 """
 

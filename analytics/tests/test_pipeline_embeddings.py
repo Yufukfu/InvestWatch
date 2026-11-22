@@ -149,12 +149,18 @@ def test_embedder_failure_gives_null(registry, catalogue, status):
     assert a.gate.passed
 
 
-def test_embedder_gets_normalized_text_and_own_hash(registry, catalogue):
+def test_embedder_gets_normalized_text_and_the_stored_hash(registry, catalogue):
+    """The cache key is the document's stored `content_hash` (ADR 0105); analytics never computes one."""
     emb = FakeEmbedder()
-    d = doc(FINFLUENCER + "   \n\n  ")
+    d = doc(FINFLUENCER + "   \n\n  ", content_hash="ab" * 32)
     run(d, registry, catalogue, embedder=emb)
-    pre = preprocess(d.text)
-    assert emb.calls == [(pre.normalized, pre.content_hash)]
+    assert emb.calls == [(preprocess(d.text).normalized, "ab" * 32)]
+
+
+def test_document_without_a_stored_hash_is_embedded_with_none(registry, catalogue):
+    emb = FakeEmbedder()
+    run(doc(), registry, catalogue, embedder=emb)
+    assert emb.calls and emb.calls[0][1] is None
 
 
 def test_firm_page_is_embedded(registry, catalogue):

@@ -222,6 +222,19 @@ def test_cache_down_still_embeds(stub_llm):
     assert out.status == "ok" and out.vector is not None and broken.calls == 2
 
 
+def test_no_stored_hash_embeds_without_the_cache(stub_llm, r):
+    stub_llm.default = Reply(body=body(vec()))
+    e = HttpEmbedder(settings(stub_llm.base_url), redis=r)
+    assert e.embed("x", None).status == "ok" and e.embed("x", None).status == "ok"
+    assert len(stub_llm.requests) == 2 and r.keys("iw:emb:*") == []
+
+
+def test_empty_stored_hash_is_treated_as_none(stub_llm, r):
+    stub_llm.default = Reply(body=body(vec()))
+    HttpEmbedder(settings(stub_llm.base_url), redis=r).embed("x", "")
+    assert r.keys("iw:emb:*") == []
+
+
 def test_no_redis_no_cache(stub_llm):
     stub_llm.default = Reply(body=body(vec()))
     e = HttpEmbedder(settings(stub_llm.base_url))

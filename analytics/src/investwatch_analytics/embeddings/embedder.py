@@ -42,7 +42,7 @@ class EmbedOutcome:
 class Embedder(Protocol):
     model: str
 
-    def embed(self, text: str, content_hash: str) -> EmbedOutcome: ...
+    def embed(self, text: str, content_hash: str | None) -> EmbedOutcome: ...
 
 
 class HttpEmbedder:
@@ -60,11 +60,13 @@ class HttpEmbedder:
     def close(self) -> None:
         self._client.close()
 
-    def embed(self, text: str, content_hash: str) -> EmbedOutcome:
+    def embed(self, text: str, content_hash: str | None) -> EmbedOutcome:
+        """`content_hash` is the document's stored value (ADR 0105); None or empty: embed without the cache."""
         if not text.strip():
             return EmbedOutcome(None, None, "empty_text")
-        if self._cache is not None:
-            cached = self._cache.get(content_hash)
+        cache = self._cache if content_hash else None
+        if cache is not None:
+            cached = cache.get(content_hash)
             if cached is not None:
                 return EmbedOutcome(cached, self._s.model, "cached")
         if not self._breaker.allow():
@@ -84,6 +86,6 @@ class HttpEmbedder:
                                                     "embed_model": self._s.model})
             return EmbedOutcome(None, None, "embed_unavailable")
         self._breaker.success()
-        if self._cache is not None:
-            self._cache.put(content_hash, vector)
+        if cache is not None:
+            cache.put(content_hash, vector)
         return EmbedOutcome(vector, self._s.model, "ok")

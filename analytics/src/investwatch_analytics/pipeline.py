@@ -5,7 +5,7 @@ offer is the publisher's own), or M3 (change analytics-m1-m3, design decisions 1
 
 Preprocessing extras (change analytics-embeddings, ADR 0313/0314), each injected and off by default:
 `gate` (investment topic gate; drops a third_party/unknown document with no investment signal), `embedder`
-(document vector; sets `model.embedder`), `neardup` (MinHash index; groups near-identical documents and adds
+(document vector; sets `model.embedder`; cached by the stored `content_hash`), `neardup` (MinHash index; groups near-identical documents and adds
 one summary sentence naming the original). Order: empty text, route, gate, embed, near-dup, modules.
 """
 
@@ -143,7 +143,8 @@ def analyze_document(
         if not decision.passed:
             _skipped(doc, **decision.log_extra())
             return Analysis(gate=decision)
-    embedding = embedder.embed(pre.normalized, pre.content_hash) if embedder is not None else None
+    # The cache key is the document's stored content_hash (ADR 0105); without one the vector is not cached.
+    embedding = embedder.embed(pre.normalized, doc.content_hash) if embedder is not None else None
     group = neardup.observe(doc.id, pre.normalized, doc.url) if neardup is not None else None
     if r.module is None:
         _skipped(doc, r.reason)
