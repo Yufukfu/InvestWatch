@@ -27,7 +27,7 @@
 ## 5. Closing
 
 - [x] 5.1 Apply the iw-docs-update skill (docs, `.docs/status/scraper.md`, no ADR needed) and add the iw-ai-log entry; `docs-check` prints `docs-check: ok`.
-- [ ] 5.2 Run the iw-pr-review skill and fix real findings.
+- [x] 5.2 Run the iw-pr-review skill and fix real findings. Whole-branch review: no blocking findings; its "could not check" items are in the PR body.
 
 ## Workflow follow-up
 
