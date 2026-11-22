@@ -21,7 +21,26 @@ describe('useSummary', () => {
         { module: 'M2', count: 3 },
         { module: 'M3', count: 4 },
       ],
+      m2Coverage: { total: 3, registryMatched: 3 },
     });
+  });
+
+  it('leaves m2Coverage undefined for a server without the field', async () => {
+    server.use(http.get('http://localhost/api/stats/summary', () => HttpResponse.json({ ...summary, m2_coverage: undefined })));
+    const { result } = renderHook(() => useSummary(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current).toBeDefined());
+    expect(result.current?.m2Coverage).toBeUndefined();
+  });
+
+  it('maps a partial coverage as the server sends it', async () => {
+    server.use(
+      http.get('http://localhost/api/stats/summary', () =>
+        HttpResponse.json({ ...summary, m2_coverage: { total: 4, registry_matched: 1 } }),
+      ),
+    );
+    const { result } = renderHook(() => useSummary(), { wrapper: storeWrapper() });
+    await waitFor(() => expect(result.current).toBeDefined());
+    expect(result.current?.m2Coverage).toEqual({ total: 4, registryMatched: 1 });
   });
 
   it('orders the module counts by module name and tolerates a missing by_module', async () => {

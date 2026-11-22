@@ -114,3 +114,10 @@ export type ModuleOption = {
   module: FindingModule;
   riskLevel?: RiskLevel;
 };
+
+// Bulk status change (POST /findings/bulk-status, contracts 1.3.0, issue #115): one entry per sent id, in
+// request order. `title` is the updated finding's title, or the row's title when the finding is gone.
+export type BulkItem = { id: string; title: string; result: 'updated' | 'not_found' };
+export type BulkOutcome = { status: FindingStatus; updated: number; notFound: number; items: BulkItem[] };
+// A row as the bulk action sends it: its id, and its title to name it if the API no longer has it.
+export type BulkTarget = { id: string; title: string };

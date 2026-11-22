@@ -48,6 +48,7 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted; M1's "rules-only" superseded by [0318](0318-hosted-llm-deepseek-flash.md) |
 | [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted; provider, model and limits superseded by [0318](0318-hosted-llm-deepseek-flash.md) |
 | [0318](0318-hosted-llm-deepseek-flash.md) | Hosted LLM default: DeepSeek Flash; M1 default threshold 0.75 from the recorded DeepSeek gold run (supersedes 0317's provider and limits, and 0316's rules-only rule for M1 only) | accepted (takes effect when the `analytics-deepseek-default` PR merges) |
+| [0319](0319-m2-default-threshold-005.md) | M2 default threshold 0.05, re-measured after all 18 rules are built (supersedes only the M2 value 0.1 of 0316 and 0318) | accepted (takes effect when PR #159 merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 

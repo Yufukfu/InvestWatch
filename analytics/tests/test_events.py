@@ -241,7 +241,7 @@ def test_names_match_the_contract():
 
 def test_defaults_match_adr_0316_and_0318():
     # literal on purpose; tests/test_eval_thresholds.py checks it against analytics/eval/thresholds.json
-    assert DEFAULT_THRESHOLDS == {"M1": 0.75, "M2": 0.1, "M3": 0.4}
+    assert DEFAULT_THRESHOLDS == {"M1": 0.75, "M2": 0.05, "M3": 0.4}
 
 
 # ---- failures -----------------------------------------------------------------------------------
@@ -281,7 +281,7 @@ class SecondPublishFails(fakeredis.FakeRedis):
 
 @pytest.mark.parametrize(
     "first_score,unsent",
-    [(0.05, ["55555555-5555-4555-8555-555555555555"]),  # first finding fully sent, the second not at all
+    [(0.01, ["55555555-5555-4555-8555-555555555555"]),  # below M2's default: first fully sent, the second not at all
      (0.9, ["44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"])],  # high_risk lost
     ids=["second-finding-lost", "high-risk-lost"],
 )
@@ -290,7 +290,7 @@ def test_partial_publish_reports_what_was_sent(caplog, first_score, unsent):
     first, other = "44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"
     with caplog.at_level(logging.WARNING):
         sent = RedisPublisher(client, clock=clock).publish_findings(
-            [created(score=first_score), created(score=0.05, fid=other)]
+            [created(score=first_score), created(score=0.01, fid=other)]
         )
     assert [(e["type"], e["data"]["id"]) for e in sent] == [("finding.created", first)]
     [rec] = [rec for rec in caplog.records if getattr(rec, "reason", None) == "publish_failed"]

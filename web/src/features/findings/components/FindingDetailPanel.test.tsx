@@ -363,3 +363,23 @@ describe('FindingDetailPanel', () => {
     });
   });
 });
+
+describe('FindingDetailPanel rule grid', () => {
+  it('shows the M2 rule grid built from the finding\'s rules', () => {
+    render(<FindingDetailPanel detail={detail()} isLoading={false} isError={false} notFound={false} onClose={vi.fn()} />);
+    const grid = screen.getByRole('region', { name: 'POKRYCIE REGUŁ M2 · 5 WYMOGÓW' });
+    expect(within(grid).getAllByRole('button').map((b) => b.textContent)).toEqual(['R3', 'R12a', 'R1', 'R10', 'R9']);
+  });
+
+  it('shows no grid for M1 or M3, or an M2 finding without rules', () => {
+    const { rerender } = render(
+      <FindingDetailPanel detail={detail({ module: 'M1' })} isLoading={false} isError={false} notFound={false} onClose={vi.fn()} />,
+    );
+    expect(screen.queryByRole('region', { name: /POKRYCIE REGUŁ/ })).toBeNull();
+    rerender(<FindingDetailPanel detail={detail({ module: 'M3' })} isLoading={false} isError={false} notFound={false} onClose={vi.fn()} />);
+    expect(screen.queryByRole('region', { name: /POKRYCIE REGUŁ/ })).toBeNull();
+    rerender(<FindingDetailPanel detail={detail({ rules: [] })} isLoading={false} isError={false} notFound={false} onClose={vi.fn()} />);
+    expect(screen.queryByRole('region', { name: /POKRYCIE REGUŁ/ })).toBeNull();
+  });
+});
+

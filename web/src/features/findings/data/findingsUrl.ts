@@ -1,4 +1,5 @@
 import type { GetFindingsApiArg } from '../../../api/generated';
+import { config } from '../../../config';
 import { isUuid } from '../../../url/uuid';
 import {
   MODULES,
@@ -110,4 +111,32 @@ export function toQueryArg(f: FindingFilters): GetFindingsApiArg {
   if (f.dateTo) arg.dateTo = `${f.dateTo}T23:59:59Z`;
   if (f.q) arg.q = f.q;
   return arg;
+}
+
+// Query names of GET /findings and GET /findings/export for each argument of the generated client.
+const EXPORT_PARAMS: ReadonlyArray<[keyof GetFindingsApiArg, string]> = [
+  ['module', 'module'],
+  ['status', 'status'],
+  ['riskLevel', 'risk_level'],
+  ['platform', 'platform'],
+  ['scoreMin', 'score_min'],
+  ['dateFrom', 'date_from'],
+  ['dateTo', 'date_to'],
+  ['q', 'q'],
+  ['sort', 'sort'],
+];
+
+// The rows cap of GET /findings/export (contracts 1.3.0).
+export const EXPORT_ROW_CAP = 10_000;
+
+// CSV of the current list (issue #115): the same arguments as the list request (toQueryArg), so the
+// file holds what the table shows, without page and page_size. A plain link: the browser downloads it.
+export function exportUrl(f: FindingFilters): string {
+  const arg = toQueryArg(f);
+  const p = new URLSearchParams();
+  for (const [key, name] of EXPORT_PARAMS) {
+    const v = arg[key];
+    if (v !== undefined) p.set(name, String(v));
+  }
+  return `${config.apiBaseUrl}/findings/export?${p.toString().replaceAll('%2C', ',')}`;
 }

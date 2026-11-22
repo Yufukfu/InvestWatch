@@ -1,6 +1,8 @@
+import { config } from '../../../config';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FILTERS,
+  exportUrl,
   hasTriageFlag,
   parseFilters,
   parseSelected,
@@ -162,4 +164,40 @@ describe('triage URL', () => {
     expect(serializeUrl(f, undefined)).toBe('?status=new&risk_level=high');
   });
 });
+});
+
+describe('exportUrl', () => {
+  const params = (url: string) => {
+    const [path, query] = url.split('?');
+    return { path, p: new URLSearchParams(query) };
+  };
+
+  it('carries the list filters and sort, never page or page_size', () => {
+    const f = parseFilters(
+      '?module=M2&status=new,in_review&risk_level=high&platform=web&score_min=0.5&date_from=2026-11-01&date_to=2026-11-21&q=forex&sort=-score&page=3&page_size=50',
+    );
+    const { path, p } = params(exportUrl(f));
+    expect(path).toBe(`${config.apiBaseUrl}/findings/export`);
+    expect(Object.fromEntries(p)).toEqual({
+      module: 'M2',
+      status: 'new,in_review',
+      risk_level: 'high',
+      platform: 'web',
+      score_min: '0.5',
+      date_from: '2026-11-01T00:00:00Z',
+      date_to: '2026-11-21T23:59:59Z',
+      q: 'forex',
+      sort: '-score',
+    });
+  });
+
+  it('writes the default sort for an unfiltered list', () => {
+    expect(exportUrl(DEFAULT_FILTERS)).toBe(`${config.apiBaseUrl}/findings/export?sort=-detected_at`);
+  });
+
+  it('encodes the search text', () => {
+    const { p } = params(exportUrl({ ...DEFAULT_FILTERS, q: 'a&b=c #1' }));
+    expect(p.get('q')).toBe('a&b=c #1');
+    expect([...p.keys()]).toEqual(['q', 'sort']);
+  });
 });
