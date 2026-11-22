@@ -191,12 +191,15 @@ describe('interaction styling', () => {
     expect(px(declared('select', 'padding-right') ?? '0px')).toBeGreaterThanOrEqual(36);
   });
 
-  it('uses the soft border at rest and the 3:1 border on focus', () => {
+  it('uses the soft border on labelled controls and the 3:1 border on text fields at rest', () => {
     expect(tokens.get('--field-border')).toBeDefined();
     expect(contrast('--field-border', '--surface')).toBeLessThan(contrast('--control-border', '--surface'));
-    for (const sel of ['.btn', 'input', 'select', 'textarea', '.chip', '.filter-chip', '.trend-buckets', '.trend-table summary', '.segmented button', '.nav-toggle', '.status-editor textarea']) {
-      const border = declared(sel, 'border') ?? declared(sel, 'border-color') ?? '';
-      expect(border, sel).toContain('var(--field-border)');
+    const rest = (sel: string) => declared(sel, 'border') ?? declared(sel, 'border-color') ?? '';
+    for (const sel of ['.btn', '.chip', '.filter-chip', '.trend-buckets', '.trend-table summary', '.segmented button', '.nav-toggle']) {
+      expect(rest(sel), sel).toContain('var(--field-border)');
+    }
+    for (const sel of ['input', 'select', 'textarea', '.field input', '.field select', '.status-editor textarea']) {
+      expect(rest(sel), sel).toContain('var(--control-border)');
     }
     expect(declared('input:focus-visible', 'border-color')).toBe('var(--control-border)');
   });

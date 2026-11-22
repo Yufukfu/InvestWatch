@@ -198,7 +198,7 @@ main > [id] { scroll-margin-top: var(--space-4); }
 input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: var(--text-2); }
 input:focus-visible, select:focus-visible, textarea:focus-visible, .field input:focus-visible, .field select:focus-visible, .status-editor textarea:focus-visible { border-color: var(--control-border); }
 input:disabled, select:disabled, textarea:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
-input, select, textarea { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--field-border); border-radius: var(--radius-sm); padding: 0 var(--space-3); min-height: var(--tap); }
+input, select, textarea { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--control-border); border-radius: var(--radius-sm); padding: 0 var(--space-3); min-height: var(--tap); }
 textarea { min-height: 72px; resize: vertical; width: 100%; }
 button.link { font: inherit; display: inline-flex; align-items: center; min-height: var(--tap); color: var(--text); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
 button.link:hover { color: var(--link); }
@@ -208,7 +208,7 @@ button.link:hover { color: var(--link); }
 .filters > * { min-width: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label, .field legend { font-size: 13px; font-weight: 600; color: var(--muted); }
-.field input, .field select { border-color: var(--field-border); font-size: 14px; }
+.field input, .field select { border-color: var(--control-border); font-size: 14px; }
 select { appearance: none; padding-right: 36px; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; }
 .field-status { grid-column: 1 / -1; border: 0; margin: 0; padding: 0; }
 .field-status legend { padding: 0; margin-bottom: 4px; }
@@ -493,7 +493,7 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 .detail-section:has(.status-editor) { margin-top: 28px; padding: 20px; border-radius: 12px; background: var(--tint-hover); }
 .status-editor { display: grid; gap: 14px; }
 .status-editor .field-status legend { font-size: 13px; }
-.status-editor textarea { min-height: 56px; border-color: var(--field-border); font-size: 14px; padding: 10px 12px; }
+.status-editor textarea { min-height: 56px; border-color: var(--control-border); font-size: 14px; padding: 10px 12px; }
 .status-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .status-actions p { margin: 0; }
 .status-editor .btn-primary, .calibration-save .btn-primary { background: var(--link); border-color: var(--link); font-weight: 700; font-size: 13px; }
