@@ -24,6 +24,8 @@ RULES = [
      "explanation": "Brak ostrzeżenia.", "method": "rule"},
     {"rule_id": "R2", "name": "Wyniki historyczne", "result": "pass", "severity": "medium"},
     {"rule_id": "R3", "name": "Prognozy", "result": "fail", "severity": "low", "evidence": None},
+    {"rule_id": "R4", "name": "Czcionka ostrzeżenia", "result": "uncertain", "severity": "medium"},
+    {"rule_id": "R5", "name": "Dane podmiotu", "result": "not_applicable", "severity": "low"},
 ]
 MODEL = {"pipeline_version": "0.3.0", "llm": "gemma-3-27b-it", "embedder": "bge-m3"}
 
