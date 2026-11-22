@@ -206,8 +206,22 @@ rules:
       risk_exclude_patterns: *risk_exclude_patterns
       disclaimer_patterns: *past_performance_disclaimers
       footnote_markers: *footnote_markers
-  # R5 (P1, not built here): not_applicable with "brak informacji o ryzyku" when the material has none (ZASÓB).
-  - {id: R5, name: Ekspozycja i kontrast ryzyka, severity: medium, legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565, implemented: false}
+  # ZASÓB R5 "kontrastu, przesłonięcia przez inne elementy oraz czytelności": per viewport a risk block that is
+  # visible and has WCAG contrast >= min_contrast passes; `visible: false` or lower contrast fails; unknown colours
+  # are uncertain. Visual (rules/m2_visual.py): not_applicable without `blocks`; not_applicable with "brak
+  # informacji o ryzyku" when the material has none (ZASÓB). Occlusion: not reported by the renderer yet.
+  - id: R5
+    name: Ekspozycja i kontrast ryzyka
+    severity: medium
+    legal_basis: art. 44 ust. 2 lit. c i e rozp. del. 2017/565
+    implemented: true
+    params:
+      min_contrast: 4.5
+      risk_patterns: *risk_patterns
+      risk_override_patterns: *risk_override_patterns
+      risk_exclude_patterns: *risk_exclude_patterns
+      disclaimer_patterns: *past_performance_disclaimers
+      footnote_markers: *footnote_markers
   # ZASÓB R6 "ryzyko ukryte w przypisach": a risk block only in the footer / legal region or a footnote and
   # not in the viewport on load. Visual: not_applicable without `blocks`, never pass. Viewports desktop,
   # mobile, tablet; the worst one is reported. `visible` is R5's, `requires_interaction` is R7's.

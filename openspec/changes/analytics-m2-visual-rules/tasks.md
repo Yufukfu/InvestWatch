@@ -8,9 +8,9 @@ Order R5, then R7, R8 and R13 (feature freeze Sun 08:00). If time runs short, sh
 
 ## 1. R5 exposure and contrast
 
-- [ ] 1.1 Write the failing tests (`tests/test_rules_m2_visual.py`): every R5 scenario, the catalogue parameter checks for `min_contrast`, and the implemented-rule list.
-- [ ] 1.2 Add `rules/m2_visual.py` with the shared viewport helpers and R5, register it in `Catalogue.load`, add `min_contrast` to the catalogue. Tests green.
-- [ ] 1.3 Mutation check; record `mutations: N tried, N caught`. Push the branch as a backup.
+- [x] 1.1 Write the failing tests (`tests/test_rules_m2_visual.py`): every R5 scenario, the catalogue parameter checks for `min_contrast`, and the implemented-rule list.
+- [x] 1.2 Add `rules/m2_visual.py` with the shared viewport helpers and R5, register it in `Catalogue.load`, add `min_contrast` to the catalogue. Tests green.
+- [x] 1.3 Mutation check; record `mutations: N tried, N caught`. Push the branch as a backup. `mutations: 13 tried, 13 caught` (visibility, the colour guard, the contrast boundary, best-of-viewport, worst viewport, the no-blocks guard, gamma, the ratio order, the quote; `min_contrast` bounds and the bool guard). The first run had one survivor (quote = raw block text); a mixed-block test was added.
 
 ## 2. R7 one-click availability
 

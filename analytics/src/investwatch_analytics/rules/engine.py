@@ -59,6 +59,8 @@ KNOWN_PARAMS = {
     "performance_patterns", "forecast_disclaimer_patterns",
     "tax_patterns", "tax_exclude_patterns", "tax_individual_patterns", "tax_change_patterns", "tax_context_patterns",
     "tax_subject_patterns",
+    # analytics-m2-visual-rules (R5, R8)
+    "min_contrast", "min_font_px",
 }
 # M1/M3 signal parameters (rules/m1.py, rules/m3.py). `*_patterns` compile like the M2 ones;
 # the plain string lists below must hold non-empty strings.
@@ -219,7 +221,7 @@ class Catalogue:
 
     @classmethod
     def load(cls, path: Path | None = None, *, module: str = "M2") -> "Catalogue":
-        from . import m1, m2, m3  # noqa: F401  (registers the rule classes)
+        from . import m1, m2, m2_visual, m3  # noqa: F401  (registers the rule classes)
 
         path = path or DEFAULT_CATALOGUE
         if module not in _ID_PREFIX:
@@ -313,6 +315,12 @@ def _check_params(path: Path, rule_id: str, params: Any) -> dict[str, Any]:
             isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1
         ):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a number in (0, 1]")
+        if key == "min_contrast" and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not 1 <= value <= 21
+        ):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a WCAG contrast ratio in [1, 21]")
+        if key == "min_font_px" and (isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0):
+            raise CatalogueError(f"{path}: {rule_id} {key} must be a positive number")
         if key == "hiding_regions" and (not isinstance(value, list) or not all(isinstance(v, str) and v for v in value)):
             raise CatalogueError(f"{path}: {rule_id} {key} must be a list of non-empty strings")
         if key.endswith("_patterns") or key == "labels":
