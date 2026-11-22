@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from dataclasses import replace
 from datetime import datetime
 
 import asyncpg
@@ -8,7 +9,14 @@ from iw_scraper.ingest.document import build_document
 from iw_scraper.ingest.errors import record_error, redact
 from iw_scraper.ingest.publisher import STREAM, mark_published, publish
 from iw_scraper.ingest.storage import Storage
-from iw_scraper.ingest.store import IngestResult, insert_document, is_duplicate
+from iw_scraper.ingest.store import (
+    IngestResult,
+    RemovalState,
+    insert_document,
+    is_duplicate,
+    previous_document,
+    removal_state,
+)
 from iw_scraper.ingest.validate import check_document
 from iw_scraper.types import JobError, Reason, Source
 
@@ -59,6 +67,7 @@ class Ingestor:
         source_id = doc["source_id"]
         try:
             if await is_duplicate(self.pool, source_id, doc["content_hash"]):
+                await self._log_duplicate(doc)
                 return IngestResult("duplicate")
         except Exception as exc:  # nothing is uploaded yet; any failure here is a recorded storage error
             return await self._fail(JobError(Reason.STORAGE_ERROR, f"dedup check failed: {exc}", source_id))
@@ -85,10 +94,56 @@ class Ingestor:
 
         if result.outcome == "duplicate":
             await self._remove_object(key)  # lost the race: another worker inserted the same page
+            await self._log_duplicate(doc)
             return result
 
         await self._announce(result.document_id, source_id)
-        return result
+        return await self._with_previous(result, doc)
+
+    async def rescan_state(self, source_id: str) -> RemovalState | None:
+        """The newest stored document of the source and whether a `gone` is newer; None when the lookup fails."""
+        try:
+            return await removal_state(self.pool, source_id)
+        except Exception as exc:  # informational: a failing lookup is logged and never fails a run
+            self._log_lookup_failure(source_id, exc)
+            return None
+
+    async def _with_previous(self, result: IngestResult, doc: dict) -> IngestResult:
+        """A web page that already had a version reports it; the first collection says nothing."""
+        if doc["platform"] != "web":
+            return result
+        try:
+            previous = await previous_document(self.pool, doc["source_id"], result.document_id)
+        except Exception as exc:
+            self._log_lookup_failure(doc["source_id"], exc)
+            return result
+        if previous is None:
+            return result
+        self._log_outcome("changed", doc["source_id"], result.document_id)
+        return replace(result, previous_document_id=previous)
+
+    async def _log_duplicate(self, doc: dict) -> None:
+        """Unchanged, reverted or reappeared: a duplicate leaves no trace in the tables, so the log is the evidence."""
+        if doc["platform"] != "web":
+            return
+        state = await self.rescan_state(doc["source_id"])
+        if state is None:
+            return
+        if state.gone_is_newer:
+            outcome = "reappeared"
+        elif state.content_hash == doc["content_hash"]:
+            outcome = "unchanged"
+        else:
+            outcome = "reverted"
+        self._log_outcome(outcome, doc["source_id"], state.document_id)
+
+    @staticmethod
+    def _log_outcome(outcome: str, source_id: str, document_id: str | None) -> None:
+        log.info(json.dumps({"event": "rescan_outcome", "outcome": outcome, "source_id": source_id, "document_id": document_id}))
+
+    @staticmethod
+    def _log_lookup_failure(source_id: str, exc: BaseException) -> None:
+        log.warning(json.dumps({"event": "rescan_lookup_failed", "source_id": source_id, "error": redact(f"{type(exc).__name__}: {exc}")}))
 
     async def _announce(self, document_id: str, source_id: str) -> None:
         try:

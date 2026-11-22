@@ -8,10 +8,10 @@
 
 ## 2. Changed, unchanged, reverted, reappeared
 
-- [ ] 2.1 Test first (`scraper/tests/test_ingest_store.py`, test PostgreSQL): `removal_state` of a source with no document, one document, two documents, and a `gone` row older and newer than the newest document; `previous_document` returns the newest other row created before the new one, ties by id; equal timestamps do not read as "newer"
-- [ ] 2.2 Test first (`scraper/tests/test_ingest_rescan.py`): the spec scenarios of "Report a changed page" and "Report an unchanged or reverted re-scan" (first collection, edited page with `outcome` still `inserted` and `previous_document_id` set, earlier rows keep every column value, a duplicate found after losing the insert race, lookup failure after the insert, unchanged, reverted, reappeared, a non-web document logs nothing), reading the `rescan_outcome` log line
-- [ ] 2.3 `ingest/store.py` lookups; `ingest/pipeline.py` `previous_document_id`, `Ingestor.rescan_state`, the `rescan_outcome` log line; failures of the lookups are logged and never fail the ingest
-- [ ] 2.4 Mutation check — mutations: N tried, N caught
+- [x] 2.1 Test first (`scraper/tests/test_ingest_store.py`, test PostgreSQL): `removal_state` of a source with no document, one document, two documents, and a `gone` row older and newer than the newest document; `previous_document` returns the newest other row created before the new one, ties by id; equal timestamps do not read as "newer"
+- [x] 2.2 Test first (`scraper/tests/test_ingest_rescan.py`): the spec scenarios of "Report a changed page" and "Report an unchanged or reverted re-scan" (first collection, edited page with `outcome` still `inserted` and `previous_document_id` set, earlier rows keep every column value, a duplicate found after losing the insert race, lookup failure after the insert, unchanged, reverted, reappeared, a non-web document logs nothing), reading the `rescan_outcome` log line
+- [x] 2.3 `ingest/store.py` lookups; `ingest/pipeline.py` `previous_document_id`, `Ingestor.rescan_state`, the `rescan_outcome` log line; failures of the lookups are logged and never fail the ingest
+- [x] 2.4 Mutation check — mutations: 15 tried, 15 caught
 
 ## 3. Removed page in the web flow
 
