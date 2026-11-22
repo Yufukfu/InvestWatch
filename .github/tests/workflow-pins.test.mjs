@@ -42,16 +42,22 @@ export function pinViolations(text) {
     const n = i + 1;
     const uses = line.match(/^\s*-?\s*uses:\s*(\S+)/);
     if (uses && !/@[0-9a-f]{40}$/.test(uses[1])) out.push(`line ${n}: action not pinned by commit SHA: ${uses[1]}`);
-    const imageVar = line.match(/^\s*(IMAGE_[A-Z0-9_]*):\s*(\S+)/);
-    if (imageVar && !DIGEST_RE.test(imageVar[2])) out.push(`line ${n}: image not pinned by digest: ${imageVar[2]}`);
+    const unpinned = (image) => out.push(`line ${n}: image not pinned by digest: ${image}`);
+    // Image values: an IMAGE_* env, a job `container:` or a service `image:` (a `container:` mapping has no value here,
+    // its nested `image:` is checked on its own line), and IMAGE_* set in shell, including through $GITHUB_ENV.
+    const key = line.match(/^\s*-?\s*(IMAGE_[A-Z0-9_]*|image|container):\s*["']?([^\s"']+)/);
+    if (key && !DIGEST_RE.test(key[2])) unpinned(key[2]);
+    for (const [, value] of line.matchAll(/\bIMAGE_[A-Z0-9_]*=["']?([^\s"']+)/g)) if (!DIGEST_RE.test(value)) unpinned(value);
     if (/\bdocker\s+run\b/.test(line)) {
       // A command continued with a trailing backslash is read up to its last line.
       for (let j = i + 1; /\\\s*$/.test(line) && j < lines.length; j++) line = line.replace(/\\\s*$/, ' ') + lines[j].replace(/\s+#.*$/, '');
-      const run = dockerRunImage(words(line.split(/\bdocker\s+run\b/)[1]));
-      if (run.error) out.push(`line ${n}: ${run.error}`);
-      // A variable image is allowed only as an IMAGE_* env, which the check above pins.
-      else if (!/^\$\{?IMAGE_[A-Z0-9_]*\}?$/.test(run.image) && !DIGEST_RE.test(run.image))
-        out.push(`line ${n}: image not pinned by digest: ${run.image}`);
+      // Every `docker run` on the line, also chained ones (`a && docker run ...`).
+      for (const segment of line.split(/\bdocker\s+run\b/).slice(1)) {
+        const run = dockerRunImage(words(segment));
+        if (run.error) out.push(`line ${n}: ${run.error}`);
+        // A variable image is allowed only as an IMAGE_* variable, whose value the checks above pin.
+        else if (!/^\$\{?IMAGE_[A-Z0-9_]*\}?$/.test(run.image) && !DIGEST_RE.test(run.image)) unpinned(run.image);
+      }
     }
     const pip = line.match(/\bpip\s+install\b(.*)$/);
     if (pip) {
@@ -128,6 +134,31 @@ test('an unknown docker run option fails closed instead of guessing the image', 
 test('the image of a docker run continued over several lines is checked', () => {
   const v = pinViolations(`${PINNED}\n          docker run --rm \\\n            -v "$PWD:/src:ro" \\\n            node:22 npm audit`);
   assert.deepEqual(v, ['line 7: image not pinned by digest: node:22']);
+});
+
+test('every docker run on a chained line is checked', () => {
+  for (const sep of ['&&', ';', '|', '||']) {
+    const v = pinViolations(`${PINNED}\n          docker run --rm "$IMAGE_OSV" scan ${sep} docker run alpine:3.20 echo`);
+    assert.deepEqual(v, ['line 7: image not pinned by digest: alpine:3.20'], sep);
+  }
+});
+
+test('job container and service images are checked', () => {
+  for (const [yaml, line] of [['    container: alpine:3.20', 7], ['    container:\n      image: "node:22"', 8], ['      postgres:\n        image: postgres:17-alpine', 8]]) {
+    const v = pinViolations(`${PINNED}\n${yaml}`);
+    assert.equal(v.length, 1, yaml);
+    assert.match(v[0], new RegExp(`^line ${line}: image not pinned by digest: `), yaml);
+  }
+  assert.deepEqual(pinViolations(`${PINNED}\n    container:\n      image: alpine:3.20@sha256:${DIGEST}`), []);
+});
+
+test('an IMAGE_* set in shell or through GITHUB_ENV is checked', () => {
+  for (const bad of ['          IMAGE_X=alpine:3.20 docker run "$IMAGE_X"', '          echo "IMAGE_X=node:22" >> "$GITHUB_ENV"']) {
+    const v = pinViolations(`${PINNED}\n${bad}`);
+    assert.equal(v.length, 1, bad);
+    assert.match(v[0], /^line 7: image not pinned by digest: (alpine:3\.20|node:22)$/, bad);
+  }
+  assert.deepEqual(pinViolations(`${PINNED}\n          IMAGE_X=alpine:3.20@sha256:${DIGEST} docker run "$IMAGE_X"`), []);
 });
 
 test('an unpinned or range-pinned scanner package fails', () => {

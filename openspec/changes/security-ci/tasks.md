@@ -21,6 +21,7 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
 - [x] 2.3 The pin test from group 1 is green against the real workflow. Run `node --test` for the hook, script and `.github/tests` suites. Result: 88 tests, 88 pass.
 - [x] 2.4 Mutation check: tag one `uses:`, drop one image digest, unpin `pip-audit` (each must turn the pin test red); `mutations: 3 tried, 3 caught`
 - [x] 2.5 Review fix (`iw-reviewer`, group 2): the image rule needed a `/`, so `docker run alpine:3.20` and `IMAGE_OSV2: …:v2.2.4` passed unpinned. `docker run` arguments are now parsed: the first word that is not an option is the image, unknown options fail closed, a variable image must be an `IMAGE_*` env, and continued lines are joined. `mutations: 10 tried, 10 caught`
+- [x] 2.6 Review fix, round 2: only the first `docker run` on a line was read, so `… && docker run alpine:3.20` passed. Every `docker run` on a line is now checked, and job `container:`, service `image:` and `IMAGE_*=` shell or `$GITHUB_ENV` assignments are checked too (the reviewer's out-of-scope items, cheap and in the spec's "every container image"). `mutations: 4 tried, 4 caught` (a cut at `&&`/`;`/`|` survived because it changed nothing, so it was removed). Round 2 of 2: no further review round on this group.
 
 ## 3. First runs in GitHub Actions (~30 min, after the push)
 
