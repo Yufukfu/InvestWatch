@@ -123,7 +123,7 @@ The scraper SHALL capture a full-page PNG for each of `desktop` (1440x900), `tab
 - **THEN** `screenshots.tablet` is `null`, the other two keys are set and a job error is recorded
 
 #### Scenario: Failure after the first viewport
-- **WHEN** a viewport other than a block or a refused target fails after an earlier one succeeded
+- **WHEN** a renderer call other than a block or a refused target fails after an earlier one succeeded (a spent render deadline or a pause between calls is not a call and still discards the render)
 - **THEN** the viewports already taken and their blocks are stored, the failed and the not attempted viewports are `null`, and one job error is recorded
 
 #### Scenario: Block or refusal after the first viewport

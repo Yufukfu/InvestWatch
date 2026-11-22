@@ -68,7 +68,7 @@ class RequestPolicy:
         """Remember a request that is the target of a redirect: Chromium follows those without asking `route`."""
         try:
             navigation = request.is_navigation_request() and request.frame.parent_frame is None
-        except PlaywrightError:  # cannot tell, so judge it as the stricter kind
+        except Exception:  # cannot tell (an event handler's error would be swallowed), so judge it as the stricter kind
             navigation = True
         self._hops.append((request.url, request.resource_type, navigation))
 
