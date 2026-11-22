@@ -171,7 +171,7 @@ export const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f
 
 function scanState(deps, ctx, o, state) {
   const mode = { mine: o.mine, reviewRequested: o.reviewRequested, author: o.author, domainFilter: ctx.domainFilter };
-  const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode, state, maxRounds: o.maxRounds, warn: (m) => deps.stderr(`${m}\n`) });
+  const r = scan({ gh: deps.gh, repo: ctx.repo, me: ctx.me, mode, state, maxRounds: o.maxRounds, defaultBranch: ctx.defaultBranch, warn: (m) => deps.stderr(`${m}\n`) });
   if (r.open) dropClosed(state, r.open);
   return r;
 }
@@ -369,7 +369,10 @@ function runCmd(deps, ctx, o) {
   const res = withState(deps, ctx.repo, (state, sdir, lock) => {
     const { items } = scanState(deps, ctx, o, state);
     saveState(sdir, state);
-    for (const it of items.slice(0, o.limit)) {
+    // --limit bounds the sessions; an approved notice starts none, so it never takes a slot from real work
+    const work = items.filter((it) => it.kind !== 'approved');
+    const told = items.filter((it) => it.kind === 'approved');
+    for (const it of [...work.slice(0, o.limit), ...told]) {
       refreshLock(lock, { now: deps.now });
       let r;
       try {
@@ -391,7 +394,7 @@ function runCmd(deps, ctx, o) {
       saveState(sdir, state);
       notify(notice);
     }
-    if (items.length > o.limit) deps.stderr(`iw-watch: ${items.length - o.limit} more item(s) wait for the next run (--limit ${o.limit})\n`);
+    if (work.length > o.limit) deps.stderr(`iw-watch: ${work.length - o.limit} more item(s) wait for the next run (--limit ${o.limit})\n`);
     return { count: items.length };
   });
   if (!res.skipped && res.count === 0) deps.stderr('iw-watch: nothing new\n');
