@@ -131,10 +131,11 @@ a:hover { color: var(--link-strong); }
   .app-nav { display: none; order: 10; flex: 1 0 100%; flex-direction: column; margin-right: 0; padding-left: 0; border-left: 0; }
   .app-nav.app-nav-open { display: flex; }
   .app-nav a { justify-content: flex-start; }
-  /* The export joins the menu: below the section links, left-aligned, only while the menu is open. */
-  .header-export { display: none; order: 11; flex: 1 0 100%; align-items: flex-start; }
-  .header-export.header-export-open { display: flex; }
-  .header-export .export-report-note { text-align: left; }
+  /* The export joins the menu: below the section links, left-aligned, only while the menu is open. Scoped to the header so
+     these rules outrank the base .export-report rule further down (same media-free specificity would lose to it). */
+  .app-header .header-export { display: none; order: 11; flex: 1 0 100%; align-items: flex-start; }
+  .app-header .header-export.header-export-open { display: flex; }
+  .app-header .header-export .export-report-note { text-align: left; }
 }
 .app { max-width: 1440px; margin: 0 auto; padding: 0 var(--gutter); }
 main { display: grid; gap: 0; }
