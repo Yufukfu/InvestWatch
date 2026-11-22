@@ -24,7 +24,7 @@ InvestWatch to działający prototyp systemu, który zbiera z internetu i medió
 
 **Wyniki**
 - Na prawdziwych danych (próba generalna, #78): 17 źródeł (13 stron WWW, 4 kanały Telegram), 223 dokumenty, 0 błędów analityki, 72 zgłoszenia (M1 54, M2 5, M3 13), 10 alertów wysokiego ryzyka.
-- Na zbiorze wzorcowym (69 dokumentów syntetycznych napisanych z kryteriów UKNF, reguły bez LLM, domyślne progi): M1 precyzja 1,00 / czułość 0,80; M2 0,93 / 0,61; M3 1,00 / 0,40. Progi domyślne są zmierzone na tym zbiorze, a nie wybrane ręcznie. Zbiór jest syntetyczny, bo nie otrzymaliśmy próbek od UKNF; prawdziwe próbki dodaje się bez zmiany kodu.
+- Na zbiorze wzorcowym (69 dokumentów syntetycznych napisanych z kryteriów UKNF, reguły bez LLM, domyślne progi): M1 precyzja 1,00 / czułość 0,80; M2 0,93 / 0,61; M3 1,00 / 0,40. Progi M1 i M2 są zmierzone na tym zbiorze; próg M3 (0,4) wynika z bramki S3.4. Zbiór jest syntetyczny, bo nie otrzymaliśmy próbek od UKNF; prawdziwe próbki dodaje się bez zmiany kodu.
 
 **Architektura**
 Lekkie, osobne serwisy (scraper, analytics, api, web, infra), każdy z własnym `compose.yaml`, połączone kontraktami JSON Schema i OpenAPI (zamrożone jako v1) oraz strumieniami Redis. Skalowanie przez kolejne workery scrapera i analityki. Nowe źródło to kilka linii TOML, nowa platforma to jeden moduł parsera, nowa reguła M2 to wpis YAML i jedna klasa. Stos open source i on-premise (PostgreSQL, Redis, MinIO, Caddy, Ollama); jedyny wyjątek, hostowany LLM, zatwierdził mentor i zamienia się na lokalny model samą konfiguracją.
