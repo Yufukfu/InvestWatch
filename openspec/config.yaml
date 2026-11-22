@@ -11,7 +11,7 @@ context: |
   (contracts ScrapedDocument and Finding, v1) before proposing anything. Contracts are frozen after
   Sat 14:30; a change that alters one must say so and bump the version.
   Project skills that attach to this workflow: iw-commit-cycle (commits and review), iw-docs-update
-  (docs, ADRs, STATUS), iw-ai-log (AI log row), iw-pr-review (final review). The reviewer agent is
+  (docs, ADRs, STATUS), iw-ai-log (AI log entry), iw-pr-review (final review). The reviewer agent is
   iw-reviewer (.claude/agents).
 
 rules:
@@ -28,7 +28,7 @@ rules:
   tasks:
     - Each task group is one commit-sized unit whose first task is its failing test. Keep tasks under about 2 hours.
     - 'Each task group ends with a mutation-check task (iw-commit-cycle step 3); when done, its tasks.md line reads `mutations: N tried, N caught` (or `mutations: n/a, <reason>`).'
-    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, the .docs/status/ file for the directories you changed, ADRs) and add the iw-ai-log row; (2) run the iw-pr-review skill and fix real findings.
+    - Every tasks.md ends with these closing tasks, in this order - (1) apply the iw-docs-update skill (docs, the .docs/status/ file for the directories you changed, ADRs) and add the iw-ai-log entry; (2) run the iw-pr-review skill and fix real findings.
 
 operations:
   apply:

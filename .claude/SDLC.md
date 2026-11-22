@@ -13,7 +13,7 @@ How the three of us ship with Claude Code. Adapted from the Neopadel pilot, cut 
 | Review criteria ("ready") | `.claude/CODE_REVIEW.md` |
 | Review commands, PR body | `.claude/skills/iw-pr-review/SKILL.md` |
 | Which doc to update, ADRs, closing a change | `.claude/skills/iw-docs-update/SKILL.md` |
-| AI log row | `.claude/skills/iw-ai-log/SKILL.md` |
+| AI log entry | `.claude/skills/iw-ai-log/SKILL.md` |
 | Agent hand-offs: watching GitHub for reviews, review requests, owner-routed issues | `.claude/skills/iw-watch/SKILL.md` |
 | Hook behaviour and escapes | header of `.claude/hooks/git-guard.js` |
 | Closing tasks and apply/archive guidance | `openspec/config.yaml` |
@@ -47,7 +47,7 @@ Anything real but out of scope goes into the change's `follow-ups.md` with one d
 
 ## Parallel work
 
-Three people, a worktree per change, ownership by directory in [`.github/CODEOWNERS`](../.github/CODEOWNERS) (the only place that names owners; shared areas have none, [ADR 0211](../.docs/decisions/0211-codeowners-single-source.md)). To limit merge conflicts: edit only the `.docs/status/` file for the directories you changed (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by person (Adam 01xx, Kacper 02xx, Damian 03xx); the AI log table merges by keeping both sides' rows. Touching a directory someone else owns in `CODEOWNERS`, or a frozen contract, is announced in the team chat first.
+Three people, a worktree per change, ownership by directory in [`.github/CODEOWNERS`](../.github/CODEOWNERS) (the only place that names owners; shared areas have none, [ADR 0211](../.docs/decisions/0211-codeowners-single-source.md)). To limit merge conflicts: edit only the `.docs/status/` file for the directories you changed (`.docs/STATUS.md` is team-wide only, [ADR 0205](../.docs/decisions/0205-status-per-domain.md)); ADR numbers by person (Adam 01xx, Kacper 02xx, Damian 03xx); the AI log is one file per entry in `.docs/ai-log/` ([ADR 0212](../.docs/decisions/0212-ai-log-one-file-per-entry.md)). Touching a directory someone else owns in `CODEOWNERS`, or a frozen contract, is announced in the team chat first.
 
 ## Not adopted from Neopadel (on purpose)
 

@@ -37,7 +37,7 @@
 | See what the system does now, or what is in flight | [../openspec/specs/](../openspec/specs/), [../openspec/changes/](../openspec/changes/) |
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
 | Update docs after a change | [../.claude/skills/iw-docs-update/SKILL.md](../.claude/skills/iw-docs-update/SKILL.md) |
-| Log AI usage for the jury | [ai-workflow.md](ai-workflow.md) |
+| Log AI usage for the jury, or read the log | [ai-workflow.md](ai-workflow.md) (process), [ai-log/](ai-log/README.md) (one file per entry, `iw-ai-log` skill) |
 | Let my agent watch GitHub for reviews, review requests and hand-offs from teammates' agents | [../.claude/skills/iw-watch/SKILL.md](../.claude/skills/iw-watch/SKILL.md) |
 
 ## Rules
