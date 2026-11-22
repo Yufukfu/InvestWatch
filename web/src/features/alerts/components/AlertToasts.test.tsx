@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { iso } from '../../../test/iso';
 import type { AlertItem } from '../model';
 import { AlertToasts } from './AlertToasts';
 
@@ -14,18 +15,18 @@ describe('AlertToasts', () => {
     expect(within(region).queryAllByRole('group')).toHaveLength(0);
     const live = container.querySelector('[aria-live="polite"]')!;
     expect(live).toHaveTextContent(/^$/);
-    rerender(<AlertToasts alerts={[alert({ title: 'Nowy' })]} announcement="Wysokie ryzyko: Nowy" {...handlers()} />);
+    rerender(<AlertToasts alerts={[alert({ title: 'Nowy' })]} announcement={`Wysokie ryzyko: ${iso('Nowy')}`} {...handlers()} />);
     expect(container.querySelector('[aria-live="polite"]')).toBe(live);
-    expect(live).toHaveTextContent(/^Wysokie ryzyko: Nowy$/);
+    expect(live.textContent).toBe(`Wysokie ryzyko: ${iso('Nowy')}`);
     expect(region.querySelectorAll('[aria-live]')).toHaveLength(1);
   });
 
   it('keeps the announcement when a toast is dismissed or opened', () => {
     const { container, rerender } = render(
-      <AlertToasts alerts={[alert({ title: 'Nowy' }), alert({ id: 'b', title: 'Stary' })]} announcement="Wysokie ryzyko: Nowy" {...handlers()} />,
+      <AlertToasts alerts={[alert({ title: 'Nowy' }), alert({ id: 'b', title: 'Stary' })]} announcement={`Wysokie ryzyko: ${iso('Nowy')}`} {...handlers()} />,
     );
-    rerender(<AlertToasts alerts={[alert({ id: 'b', title: 'Stary' })]} announcement="Wysokie ryzyko: Nowy" {...handlers()} />);
-    expect(container.querySelector('[aria-live="polite"]')).toHaveTextContent(/^Wysokie ryzyko: Nowy$/);
+    rerender(<AlertToasts alerts={[alert({ id: 'b', title: 'Stary' })]} announcement={`Wysokie ryzyko: ${iso('Nowy')}`} {...handlers()} />);
+    expect(container.querySelector('[aria-live="polite"]')?.textContent).toBe(`Wysokie ryzyko: ${iso('Nowy')}`);
   });
 
   it('holds a toast on hover or focus and releases it only when neither is left', () => {
@@ -37,7 +38,7 @@ describe('AlertToasts', () => {
     fireEvent.mouseLeave(toast);
     expect(h.onRelease).toHaveBeenLastCalledWith('x');
     const show = screen.getByRole('button', { name: 'Pokaż' });
-    const close = screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' });
+    const close = screen.getByRole('button', { name: `Zamknij: ${iso('Płatne sygnały')}` });
     fireEvent.focus(show);
     expect(h.onHold).toHaveBeenCalledTimes(2);
     fireEvent.blur(show, { relatedTarget: close });
@@ -72,7 +73,7 @@ describe('AlertToasts', () => {
     const h = handlers();
     const { rerender } = render(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
     fireEvent.mouseEnter(screen.getByRole('group'));
-    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' }));
+    fireEvent.click(screen.getByRole('button', { name: `Zamknij: ${iso('Płatne sygnały')}` }));
     expect(h.onDismiss).toHaveBeenCalledWith('x');
     rerender(<AlertToasts alerts={[]} announcement="" {...h} />);
     rerender(<AlertToasts alerts={[alert({ id: 'x' })]} announcement="" {...h} />);
@@ -105,20 +106,20 @@ describe('AlertToasts', () => {
     const [first, second] = screen.getAllByRole('group');
     fireEvent.click(within(second).getByRole('button', { name: 'Pokaż' }));
     expect(h.onOpen).toHaveBeenLastCalledWith('b');
-    fireEvent.click(within(first).getByRole('button', { name: 'Zamknij: Pierwszy' }));
+    fireEvent.click(within(first).getByRole('button', { name: `Zamknij: ${iso('Pierwszy')}` }));
     expect(h.onDismiss).toHaveBeenLastCalledWith('a');
   });
 
   it('gives each close button its own accessible name', () => {
     render(<AlertToasts alerts={[alert({ id: 'a', title: 'Pierwszy' }), alert({ id: 'b', title: 'Drugi' })]} announcement="" {...handlers()} />);
-    expect(screen.getByRole('button', { name: 'Zamknij: Pierwszy' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Zamknij: Drugi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Zamknij: ${iso('Pierwszy')}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Zamknij: ${iso('Drugi')}` })).toBeInTheDocument();
   });
 
   it('moves focus to the next toast when one is dismissed, not to the body', () => {
     render(<AlertToasts alerts={[alert({ id: 'a', title: 'Pierwszy' }), alert({ id: 'b', title: 'Drugi' })]} announcement="" {...handlers()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Pierwszy' }));
-    const rest = screen.getByRole('group', { name: 'Wysokie ryzyko: Drugi' });
+    fireEvent.click(screen.getByRole('button', { name: `Zamknij: ${iso('Pierwszy')}` }));
+    const rest = screen.getByRole('group', { name: `Wysokie ryzyko: ${iso('Drugi')}` });
     expect(rest.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(within(rest).getByRole('button', { name: 'Pokaż' }));
   });
@@ -126,12 +127,12 @@ describe('AlertToasts', () => {
   it('moves focus to the next toast when one is opened, so the detail has a place to return to', () => {
     render(<AlertToasts alerts={[alert({ id: 'a', title: 'Pierwszy' }), alert({ id: 'b', title: 'Drugi' })]} announcement="" {...handlers()} />);
     fireEvent.click(screen.getAllByRole('button', { name: 'Pokaż' })[0]);
-    expect(screen.getByRole('group', { name: 'Wysokie ryzyko: Drugi' }).contains(document.activeElement)).toBe(true);
+    expect(screen.getByRole('group', { name: `Wysokie ryzyko: ${iso('Drugi')}` }).contains(document.activeElement)).toBe(true);
   });
 
   it('moves focus to the toast region when the last toast goes', () => {
     render(<AlertToasts alerts={[alert({ id: 'a' })]} announcement="" {...handlers()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Zamknij: Płatne sygnały' }));
+    fireEvent.click(screen.getByRole('button', { name: `Zamknij: ${iso('Płatne sygnały')}` }));
     expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Alerty' }));
   });
 
@@ -144,7 +145,7 @@ describe('AlertToasts', () => {
   });
 
   it('keeps a right-to-left override and markup in the title inside its own dir="auto" element', () => {
-    const title = 'Zysk <img src=x onerror=alert(1)> [link](javascript:alert(1)) ‮gpj.exe';
+    const title = 'Zysk <img src=x onerror=alert(1)> [link](javascript:alert(1)) \u202Egpj.exe';
     const { container } = render(<AlertToasts alerts={[alert({ title })]} announcement="" {...handlers()} />);
     const toast = container.querySelector('.toast') as HTMLElement;
     expect(toast.querySelector('img')).toBeNull();
@@ -154,5 +155,21 @@ describe('AlertToasts', () => {
     expect(el.textContent).toBe(title);
     expect(el).not.toContainElement(within(toast).getByText('Wysokie ryzyko'));
     expect(within(toast).getAllByRole('button').every((b) => !el.contains(b))).toBe(true);
+  });
+
+  it('isolates a right-to-left override in the title inside the toast and close button names', () => {
+    const title = 'Zysk \u202Egpj.exe';
+    render(<AlertToasts alerts={[alert({ title })]} announcement="" {...handlers()} />);
+    const toast = screen.getByRole('group');
+    expect(toast).toHaveAttribute('aria-label', `Wysokie ryzyko: \u2068${title}\u2069`);
+    expect(within(toast).getByRole('button', { name: /^Zamknij/ })).toHaveAttribute('aria-label', `Zamknij: \u2068${title}\u2069`);
+  });
+
+  it('keeps a title that tries to close the isolate inside it in both names', () => {
+    const title = 'a\u2069\u202Eb\u2067c';
+    render(<AlertToasts alerts={[alert({ title })]} announcement="" {...handlers()} />);
+    const toast = screen.getByRole('group');
+    expect(toast).toHaveAttribute('aria-label', 'Wysokie ryzyko: \u2068a\u202Eb\u2067c\u2069\u2069');
+    expect(within(toast).getByRole('button', { name: /^Zamknij/ })).toHaveAttribute('aria-label', 'Zamknij: \u2068a\u202Eb\u2067c\u2069\u2069');
   });
 });
