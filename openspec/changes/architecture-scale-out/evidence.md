@@ -8,6 +8,7 @@ Machine: Docker Desktop, 12 CPUs, 8 GB for the VM, fresh volumes, project `iw-ar
 | one `POST /api/scans` for each of the 17 seeded sources | 17 × 202; all three `worker` replicas executed jobs; 223 documents (same as the #78 run) |
 | analytics after that run | replica 1 handled 111 distinct documents, replica 2 handled 112, overlap 0; 70 findings, 0 duplicate `(document_id, module)` rows, 0 ERROR lines |
 | 223 ids re-announced four times, one analytics replica killed one second later | 2 entries pending at the kill (one per consumer); after the 60 s claim idle time `XPENDING` = 0 and group lag 0; findings still 70, duplicates 0 |
+| 4 same-domain (`t.me`) sources scanned with 3 workers | fetches ran on all three workers, 4.9 / 15.0 / 5.0 s apart at log time. The log is written after the response, so this is consistent with the 5 s per-domain rule and does not prove request-start spacing; the rule itself is read from the code |
 | `--scale scheduler=2` | both run; one `_job_id` per source and slot (`scheduler.py:68`), so a slot is enqueued once. Not run across a cron slot (6 h cron), so by code reading plus arq's job-id rule |
 | `--scale gateway=2` | the second replica fails: `Bind for 127.0.0.1:18080 failed: port is already allocated` |
 | `--scale api=2` through the gateway, 30 requests | all 30 reached one replica: Docker DNS returns both addresses but Caddy dials the name and Go takes the first, so nothing is balanced and no Socket.IO session is split. A second `api` replica would sit idle |

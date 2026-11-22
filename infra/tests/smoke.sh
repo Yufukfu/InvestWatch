@@ -18,6 +18,7 @@ TMP=$(mktemp -d)
 if command -v cygpath >/dev/null 2>&1; then TMP=$(cygpath -m "$TMP"); ROOT=$(cygpath -m "$ROOT"); INFRA="$ROOT/infra/compose.yaml"; fi
 RUN_ID="s$$"
 PROJECTS=()
+SCALE_PROJECTS=()
 FAILS=0
 PASSES=0
 
@@ -37,7 +38,14 @@ check() { # check "<name>" cmd...  (passes when cmd exits 0)
 }
 
 cleanup() {
-  local p
+  local p svc
+  # The scale group runs the root stack, which declares networks (render) that no file below knows, and builds
+  # images that carry explicit tags (so `down --rmi local` keeps them): remove both here, before $TMP goes.
+  for p in "${SCALE_PROJECTS[@]:-}"; do
+    [ -n "$p" ] || continue
+    docker compose -p "$p" --env-file "$TMP/$p.env" -f "$ROOT/compose.yaml" --profile llm down -v --remove-orphans >/dev/null 2>&1 || true
+    for svc in web api analytics scraper renderer; do docker rmi "investwatch/$svc:$p" >/dev/null 2>&1 || true; done
+  done
   for p in "${PROJECTS[@]:-}"; do
     [ -n "$p" ] || continue
     # Every file any group adds, so networks declared only there (devhost) are removed too.
@@ -445,7 +453,7 @@ scale_analytics_consumers() { # every replica is its own consumer of the group (
 
 group_scale() {
   local p="iw-smoke-s-$RUN_ID"
-  PROJECTS+=("$p"); new_env "$p" 18452 18089 >/dev/null
+  SCALE_PROJECTS+=("$p"); new_env "$p" 18452 18089 >/dev/null  # torn down by cleanup(), which knows the root file
   check "worker and analytics have no container_name and no host port" scale_no_fixed_names "$p"
   check "two worker and two analytics replicas run and are healthy" scale_replicas_run "$p"
   check "each analytics replica is its own consumer of iw:documents" scale_analytics_consumers "$p"
