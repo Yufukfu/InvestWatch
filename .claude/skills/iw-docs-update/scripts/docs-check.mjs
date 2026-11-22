@@ -20,14 +20,16 @@ const IGNORED_NAMES = new Set(['follow-ups.md', 'tasks.md', 'proposal.md', 'desi
 const PEOPLE = ['Adam', 'Kacper', 'Damian'];
 // Directories plus the names of the status domains (`dashboard` is web/, `platform` is analytics/, api/, contracts/).
 const MODULE_WORDS = ['scraper', 'analytics', 'api', 'web', 'contracts', 'infra', 'dashboard', 'platform'];
-// History keeps the names it had (ADRs, the AI log); in-flight changes are archived (and skipped) later.
-const OWNERSHIP_SKIP = ['.docs/decisions/', '.docs/ai-workflow.md', 'openspec/changes/'];
+// History keeps the names it had (ADR files, the AI log); in-flight changes are archived (and skipped) later.
+// The decisions index (.docs/decisions/README.md) is a live doc, so only numbered ADR files are skipped.
+const OWNERSHIP_SKIP = [/^\.docs\/decisions\/\d{4}-[^/]+\.md$/, /^\.docs\/ai-workflow\.md$/, /^openspec\/changes\//];
 // Spec scenario steps are hypothetical examples ("GIVEN analytics/ is owned by Damian").
 const SCENARIO_STEP = /^\s*-\s*\*\*(?:GIVEN|WHEN|THEN|AND)\*\*/;
 const NAME = `(?:${PEOPLE.join('|')})\\b`;
 const MODULE = `(?<![\\w/-])\`?(?:${MODULE_WORDS.join('|')})/?\`?`;
 const OWNERSHIP_PATTERNS = [
-  new RegExp(`\\b(?:owners?|owned by)\\b[\\s:*(]*${NAME}`, 'i'), // owner Damian, **Owner:** Damian, owned by Kacper
+  new RegExp(`\\b(?:owners?|owned by|maintained by)\\b[\\s:*(]*${NAME}`, 'i'), // owner Damian, **Owner:** Damian, owned by Kacper, maintained by Adam
+  new RegExp(`\\b${NAME}\\s+owns\\s+${MODULE}`), // Damian owns `analytics/`
   new RegExp(`\\b${NAME}'s module`), // Adam's module
   new RegExp(`${MODULE}\\s*\\(${NAME}`), // scraper (Adam), web/ dashboard (Kacper)
   new RegExp(`\`(?:${MODULE_WORDS.join('|')})/\` ${NAME}`), // `scraper/` Adam
@@ -98,7 +100,7 @@ export function checkDocs(root) {
 
   const extra = ['openspec/config.yaml', ...composeFiles(root)];
   for (const file of [...files, ...extra.filter((f) => fs.existsSync(path.join(root, f)))]) {
-    if (OWNERSHIP_SKIP.some((p) => file.startsWith(p))) continue;
+    if (OWNERSHIP_SKIP.some((re) => re.test(file))) continue;
     fs.readFileSync(path.join(root, file), 'utf8').split('\n').forEach((text, i) => {
       if (SCENARIO_STEP.test(text) || !OWNERSHIP_PATTERNS.some((re) => re.test(text))) return;
       problems.push({ file, line: i + 1, problem: 'per-person ownership statement: link .github/CODEOWNERS instead' });

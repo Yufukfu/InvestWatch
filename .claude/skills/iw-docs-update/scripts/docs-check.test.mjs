@@ -137,6 +137,9 @@ const OWNERSHIP = [
   'Modules: web/ dashboard (Kacper).',
   'analytics/ (Damian; an api/ folder later).',
   '| Folder | Purpose | Owner |',
+  'The renderer is maintained by Adam.',
+  'Damian owns `analytics/` and `api/`.',
+  'Kacper owns web.',
 ];
 
 test('flags each per-person ownership statement in a live doc, with its line', () => {
@@ -160,6 +163,24 @@ test('history, in-flight changes, prose about work and spec scenario steps may n
     'README.md': 'Owners: [`.github/CODEOWNERS`](.github/CODEOWNERS)',
     '.github/CODEOWNERS': '/api/ @Yufukfu\n',
     'api/CLAUDE.md': '#',
+  });
+  assert.deepEqual(checkDocs(root), []);
+});
+
+test('only ADR files are history: the decisions index is a live doc', () => {
+  const root = repo({
+    '.docs/decisions/0101-x.md': '- **Owner:** Damian\n',
+    '.docs/decisions/README.md': '0101-x.md\n- **Owner:** Damian\n',
+    '.github/CODEOWNERS': '/api/ @Yufukfu\n',
+  });
+  assert.deepEqual(checkDocs(root).map((p) => `${p.file}:${p.line}`), ['.docs/decisions/README.md:2']);
+});
+
+test('prose naming a person next to "owns" or "maintained" without a module is not an ownership claim', () => {
+  const root = repo({
+    'api/README.md': 'Adam owns the follow-up. The cache is maintained by the worker. Kacper owns up to the bug.\n',
+    'api/CLAUDE.md': '#',
+    '.github/CODEOWNERS': '/api/ @Yufukfu\n',
   });
   assert.deepEqual(checkDocs(root), []);
 });

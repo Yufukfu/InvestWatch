@@ -44,4 +44,4 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
-- **First social platform** (team decision: one platform first). Owner Adam.
+- **First social platform** (team decision: one platform first). Lead: Adam.

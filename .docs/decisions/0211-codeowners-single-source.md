@@ -29,4 +29,4 @@ Option 3.
 
 - Changing an owner is a one-line PR to `CODEOWNERS`, and GitHub and `iw-watch` follow it without doc edits.
 - Nobody is asked automatically to review a change to a shared area. The author asks in the team chat when it matters.
-- The ownership check is a pattern match. New wording (for example "maintained by Adam") gets past it until a test and a pattern are added.
+- The ownership check is a pattern match. New wording (for example "Adam is responsible for `scraper/`") gets past it until a test and a pattern are added.
