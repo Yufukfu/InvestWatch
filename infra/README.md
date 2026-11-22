@@ -1,6 +1,6 @@
 # infra
 
-Shared infrastructure, with no single owner ([`.github/CODEOWNERS`](../.github/CODEOWNERS)): any teammate may change it. Each module has its own `compose.yaml`; the root `compose.yaml` only includes them, so a module is deployed, scaled or replaced without touching the others. Reasoning: [ADR 0202](../.docs/decisions/0202-deployment-topology.md) (topology), [ADR 0306](../.docs/decisions/0306-object-storage-image.md) (object storage and Redis images), [ADR 0304](../.docs/decisions/0304-llm-serving.md) (LLM fallback).
+Infrastructure shared by every module (owners: [`.github/CODEOWNERS`](../.github/CODEOWNERS)). Each module has its own `compose.yaml`; the root `compose.yaml` only includes them, so a module is deployed, scaled or replaced without touching the others. Reasoning: [ADR 0202](../.docs/decisions/0202-deployment-topology.md) (topology), [ADR 0306](../.docs/decisions/0306-object-storage-image.md) (object storage and Redis images), [ADR 0304](../.docs/decisions/0304-llm-serving.md) (LLM fallback).
 
 | Service | Purpose | Reachable from |
 |---|---|---|

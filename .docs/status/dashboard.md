@@ -1,6 +1,6 @@
 # Status: dashboard
 
-Covers `web/` and `infra/`; whoever changes them updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS); `infra/` is shared). Last updated: 2026-11-22 (Sun).
+Covers `web/` and `infra/`; whoever changes them updates this file (owners: [`.github/CODEOWNERS`](../../.github/CODEOWNERS)). Last updated: 2026-11-22 (Sun).
 
 ## State
 

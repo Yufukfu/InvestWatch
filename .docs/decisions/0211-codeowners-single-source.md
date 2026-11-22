@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-22
-- Deciders: agent-written from Kacper's decision (change `codeowners-single-source`). It takes effect when the team approves and merges the PR. Partly supersedes [ADR 0202](0202-deployment-topology.md): its consequence that Kacper owns the root include list and `infra/`. Partly supersedes [ADR 0205](0205-status-per-domain.md): status domains mapped to people, and "edit only your own domain file".
+- Deciders: agent-written from Kacper's decision (change `codeowners-single-source`). It takes effect when the team approves and merges the PR. Partly supersedes [ADR 0202](0202-deployment-topology.md): its consequence that Kacper owns the root include list and `infra/` (`infra/` goes to Damian; the root include list is a shared root file). Partly supersedes [ADR 0205](0205-status-per-domain.md): status domains mapped to people, and "edit only your own domain file".
 
 ## Context
 
@@ -18,11 +18,11 @@ PR #48 added `.github/CODEOWNERS`. GitHub requests the code owners' review from 
 
 Option 3.
 
-- `.github/CODEOWNERS` maps the modules to people: `scraper/`, `web/`, `analytics/`, `api/`, `contracts/`.
-- Shared areas have no owner: `infra/`, `.docs/`, `.claude/`, `openspec/`, `.github/` and root files. Any teammate may change them. A new top-level directory needs the whole team's OK, no longer Kacper's alone.
+- `.github/CODEOWNERS` maps the modules and `infra/` to people: `scraper/`, `web/`, `analytics/`, `api/`, `contracts/`, `infra/`. `infra/` (database roles, the gateway, Redis, MinIO) goes to Damian (`@Yufukfu`). Damian's PR #95 review asked whether `infra/` should have an owner, and Kacper decided it should be Damian: Redis, MinIO and the Ollama profile came from his PR #18, and the `api` migrations depend on the database roles in `infra/postgres/init/`. Damian confirms it by approving the PR.
+- Shared areas have no owner: `.docs/`, `.claude/`, `openspec/`, `.github/` and root files. Any teammate may change them. A new top-level directory needs the whole team's OK, no longer Kacper's alone.
 - Other docs link to `CODEOWNERS` and never name an owner.
 - Status files map to directories, and whoever changes a directory updates the file that covers it.
-- `docs-check` enforces this. Every service directory needs a `/<dir>/` line with an `@handle`. A per-person ownership statement in a live doc fails the check (`owner <Name>`, `owned by <Name>`, `<Name>'s module`, `<dir> (<Name>)`, an `Owner` table column). ADRs, the AI log and OpenSpec changes are skipped because they are history or still in flight.
+- `docs-check` enforces this. Every service directory and `infra/` needs an owner: the last `/<dir>`, `/<dir>/` or `/<dir>/**` line names an `@handle` (the last matching line wins, as on GitHub). A per-person ownership statement in a live doc fails the check (`owner <Name>`, `owned by <Name>`, `<Name>'s module`, `<dir> (<Name>)`, an `Owner` table column, a `CODEOWNERS` handle on the same line as a module name unless it credits a PR). ADRs, the AI log and OpenSpec changes are skipped because they are history or still in flight.
 - The per-person ADR number ranges stay. They prevent number collisions and say nothing about ownership.
 
 ## Consequences

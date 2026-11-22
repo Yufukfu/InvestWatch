@@ -17,7 +17,7 @@ A doc claim that matters is checked against the code before you rely on it. Afte
 
 ## Services
 
-Who owns which directory is in [`.github/CODEOWNERS`](.github/CODEOWNERS) only; docs link there instead of naming people. Shared areas (`infra/`, `.docs/`, `.claude/`, `openspec/`, `.github/`, root files) have no owner, and a new top-level directory needs the whole team's OK ([ADR 0211](.docs/decisions/0211-codeowners-single-source.md)). The root [`README.md`](README.md) has the human-facing overview and Quick Start. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
+Who owns which directory is in [`.github/CODEOWNERS`](.github/CODEOWNERS) only; docs link there instead of naming people. Shared areas (`.docs/`, `.claude/`, `openspec/`, `.github/`, root files) have no owner, and a new top-level directory needs the whole team's OK ([ADR 0211](.docs/decisions/0211-codeowners-single-source.md)). The root [`README.md`](README.md) has the human-facing overview and Quick Start. Each service has a `README.md` (people, jury) and a `CLAUDE.md` (agents).
 
 | Directory | Role | Rules |
 |---|---|---|
