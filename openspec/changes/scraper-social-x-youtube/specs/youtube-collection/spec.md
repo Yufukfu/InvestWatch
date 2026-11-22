@@ -16,7 +16,7 @@ A YouTube source SHALL have a URL of the form `https://www.youtube.com/@<handle>
 - **THEN** no request is made and a job error with reason `invalid_request` is recorded
 
 ### Requirement: Newest videos, bounded
-A run SHALL read the channel's video list once through the shared fetch layer, take the channel id and the newest `YOUTUBE_MAX_VIDEOS` video ids (default 10) from it, skip videos whose permalink already has a stored document, and request one watch page per remaining video, one at a time, each after the per-domain wait.
+A run SHALL read the channel's video list once through the shared fetch layer, sending the fixed consent cookie `SOCS=CAI` with every YouTube page request (without it the channel page ends on the consent page), take the channel id and the newest `YOUTUBE_MAX_VIDEOS` video ids (default 10) from it, skip videos whose permalink already has a stored document, and request one watch page per remaining video, one at a time, each after the per-domain wait.
 
 #### Scenario: Default cap
 - **WHEN** a channel has 200 videos and `YOUTUBE_MAX_VIDEOS` is unset
@@ -26,8 +26,12 @@ A run SHALL read the channel's video list once through the shared fetch layer, t
 - **WHEN** every listed video already has a stored document
 - **THEN** no watch page is requested
 
+#### Scenario: Consent cookie sent
+- **WHEN** a run requests the channel page or a watch page
+- **THEN** the request carries the cookie `SOCS=CAI` and no other cookie
+
 #### Scenario: List behind a consent page
-- **WHEN** the channel page redirects to `consent.youtube.com`, a host the URL guard does not allow
+- **WHEN** the channel page still redirects to `consent.youtube.com`, a host the URL guard does not allow
 - **THEN** the run ends with the fetch layer's job error reason `blocked_target`, no document is emitted and no watch page is requested
 
 #### Scenario: List without video ids
