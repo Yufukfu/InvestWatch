@@ -35,6 +35,40 @@ const injectedRtkApi = api
         }),
         providesTags: ["findings"],
       }),
+      getFindingsExport: build.query<
+        GetFindingsExportApiResponse,
+        GetFindingsExportApiArg
+      >({
+        query: (queryArg) => ({
+          url: `/findings/export`,
+          params: {
+            module: queryArg["module"],
+            status: queryArg.status,
+            platform: queryArg.platform,
+            source_id: queryArg.sourceId,
+            document_id: queryArg.documentId,
+            risk_level: queryArg.riskLevel,
+            score_min: queryArg.scoreMin,
+            date_from: queryArg.dateFrom,
+            date_to: queryArg.dateTo,
+            q: queryArg.q,
+            sort: queryArg.sort,
+            format: queryArg.format,
+          },
+        }),
+        providesTags: ["findings"],
+      }),
+      postFindingsBulkStatus: build.mutation<
+        PostFindingsBulkStatusApiResponse,
+        PostFindingsBulkStatusApiArg
+      >({
+        query: (queryArg) => ({
+          url: `/findings/bulk-status`,
+          method: "POST",
+          body: queryArg.body,
+        }),
+        invalidatesTags: ["findings"],
+      }),
       getFindingsById: build.query<
         GetFindingsByIdApiResponse,
         GetFindingsByIdApiArg
@@ -52,6 +86,18 @@ const injectedRtkApi = api
           body: queryArg.body,
         }),
         invalidatesTags: ["findings"],
+      }),
+      getFindingsByIdExport: build.query<
+        GetFindingsByIdExportApiResponse,
+        GetFindingsByIdExportApiArg
+      >({
+        query: (queryArg) => ({
+          url: `/findings/${queryArg.id}/export`,
+          params: {
+            format: queryArg.format,
+          },
+        }),
+        providesTags: ["findings"],
       }),
       getStatsTrend: build.query<GetStatsTrendApiResponse, GetStatsTrendApiArg>(
         {
@@ -177,6 +223,40 @@ export type GetFindingsApiArg = {
   sort?: "detected_at" | "-detected_at" | "score" | "-score";
   page?: number;
   pageSize?: number;
+};
+export type GetFindingsExportApiResponse =
+  /** status 200 CSV attachment */ string;
+export type GetFindingsExportApiArg = {
+  module?: "M1" | "M2" | "M3";
+  /** Comma-separated list */
+  status?: string;
+  platform?: string;
+  sourceId?: string;
+  documentId?: string;
+  riskLevel?: "high" | "medium" | "low";
+  scoreMin?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  q?: string;
+  sort?: "detected_at" | "-detected_at" | "score" | "-score";
+  format?: "csv";
+};
+export type PostFindingsBulkStatusApiResponse =
+  /** status 200 Per-item results */ {
+    updated: number;
+    not_found: number;
+    results: {
+      id: string;
+      result: "updated" | "not_found";
+      /** The updated finding with `risk_level`; null when not found */
+      finding: Finding | null;
+    }[];
+  };
+export type PostFindingsBulkStatusApiArg = {
+  body: {
+    ids: string[];
+    status: "new" | "in_review" | "confirmed" | "false_positive" | "closed";
+  };
 };
 export type GetFindingsByIdApiResponse =
   /** status 200 Mock `mocks/finding-detail.json` */ Finding & {
@@ -326,6 +406,37 @@ export type PatchFindingsByIdApiArg = {
     note?: string | null;
   };
 };
+export type GetFindingsByIdExportApiResponse =
+  /** status 200 The evidence pack (JSON), or a printable HTML page when `format=html` */ {
+    export_version: "1";
+    generated_at: string;
+    finding: Finding;
+    /** The stored document; null when the row is gone */
+    document: ScrapedDocument | null;
+    /** Raw HTML from object storage. `available` is false when there is no key, no object or the store is down */
+    raw: {
+      object_key: string | null;
+      available: boolean;
+      unavailable_reason?:
+        | ("no_key" | "not_found" | "store_down" | null)
+        | ("no_key" | "not_found" | "store_down" | null);
+      sha256?: string | null;
+      size_bytes?: number | null;
+      /** true when `html` holds only the first 2 MB */
+      truncated?: boolean;
+      html?: string | null;
+    };
+    /** API URLs for the screenshots, keyed by viewport (as on the finding detail) */
+    screenshot_urls: {
+      [key: string]: string;
+    };
+    /** The finding's rules with `result` fail, in stored order */
+    failed_rules: RuleResult[];
+  };
+export type GetFindingsByIdExportApiArg = {
+  id: string;
+  format?: "json" | "html";
+};
 export type GetStatsTrendApiResponse =
   /** status 200 Mock `mocks/trend.json` */ {
     bucket: "hour" | "day";
@@ -359,6 +470,13 @@ export type GetStatsSummaryApiResponse =
       [key: string]: number;
     };
     last_scan_at?: string | null;
+    /** M2 findings (`total`) and those matched to a KNF register entry, i.e. with `firm.registry_id`
+    set (`registry_matched`), for the dashboard's coverage strip. Added in 1.3.0.
+     */
+    m2_coverage?: {
+      total: number;
+      registry_matched: number;
+    };
   };
 export type GetStatsSummaryApiArg = void;
 export type GetCalibrationApiResponse =
@@ -543,6 +661,10 @@ export type Finding = {
     embedder?: string | null;
   } | null;
 };
+export type Error = {
+  error: string;
+  details?: any;
+};
 export type Uuid2 = string;
 export type Platform =
   | "web"
@@ -575,9 +697,66 @@ export type Block = {
   /** Text is cut off at this viewport. */
   overflow_clipped?: boolean | null;
 };
-export type Error = {
-  error: string;
-  details?: any;
+export type ScrapedDocument = {
+  id: Uuid2;
+  /** Row in the `sources` table; null for ad-hoc URLs. */
+  source_id?: Uuid2 | null;
+  platform: Platform;
+  /** firm_own = published by the investment firm itself (M2); third_party = published by someone else (M1/M3). */
+  source_kind: "firm_own" | "third_party" | "unknown";
+  url: string;
+  canonical_url?: string | null;
+  fetched_at: string;
+  published_at?: string | null;
+  http_status?: number | null;
+  /** ISO 639-1 code if known; analytics detects it anyway. */
+  lang?: string | null;
+  title?: string | null;
+  /** Clean text of the whole material (no HTML). */
+  text: string;
+  /** sha256 of the normalized text, for deduplication. */
+  content_hash?: string | null;
+  author?: {
+    name?: string | null;
+    handle?: string | null;
+    profile_url?: string | null;
+    followers?: number | null;
+  } | null;
+  links?: {
+    href: string;
+    text?: string | null;
+    /** Raw rel attribute, e.g. 'nofollow sponsored'. */
+    rel?: string | null;
+  }[];
+  media?: {
+    type: "image" | "video";
+    /** Key in the MinIO bucket `iw-raw`, e.g. media/{document_id}/0.jpg */
+    object_key: string;
+    alt?: string | null;
+    /** Filled by analytics if OCR is run. */
+    ocr_text?: string | null;
+  }[];
+  /** html/{document_id}.html in MinIO. */
+  html_object_key?: string | null;
+  screenshots?: {
+    desktop?: string | null;
+    tablet?: string | null;
+    mobile?: string | null;
+  } | null;
+  /** Rendered text blocks from Playwright. Needed only for the visual M2 rules (R4-R8, R13); empty for social media posts. */
+  blocks?: Block[];
+  scrape_meta?:
+    | {
+        scraper?: "playwright" | "httpx" | "api" | "manual";
+        user_agent?: string | null;
+        /** Proxy identifier, never credentials. */
+        proxy?: string | null;
+        duration_ms?: number | null;
+        [key: string]: any;
+      }
+    | {
+        [key: string]: any;
+      };
 };
 export type Thresholds = {
   M1: number;
@@ -629,9 +808,14 @@ export type SourceInput = {
 export const {
   useGetFindingsQuery,
   useLazyGetFindingsQuery,
+  useGetFindingsExportQuery,
+  useLazyGetFindingsExportQuery,
+  usePostFindingsBulkStatusMutation,
   useGetFindingsByIdQuery,
   useLazyGetFindingsByIdQuery,
   usePatchFindingsByIdMutation,
+  useGetFindingsByIdExportQuery,
+  useLazyGetFindingsByIdExportQuery,
   useGetStatsTrendQuery,
   useLazyGetStatsTrendQuery,
   useGetStatsSummaryQuery,

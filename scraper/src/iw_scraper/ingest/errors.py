@@ -96,6 +96,20 @@ def _stored_url(url: str | None) -> str | None:
     return None if url is None else redact(_drop_userinfo(url)[:_MAX_DETAIL])
 
 
+_MIN_KNOWN_SECRET = 4  # a shorter value would mask ordinary words; real cookies and proxy parts are longer
+
+
+def redact_known(text: str, secrets) -> str:
+    """Mask every occurrence of the given secret values (cookies, a proxy URL, its host, user and password).
+
+    `redact` finds secrets by their shape; a bare token or a proxy host has none, so the adapters that hold them
+    pass them here. The longest value goes first, so a secret that contains another is masked whole.
+    """
+    for secret in sorted({s for s in secrets if s and len(s) >= _MIN_KNOWN_SECRET}, key=len, reverse=True):
+        text = text.replace(secret, "***")
+    return text
+
+
 def _short_source_id(source_id: str) -> str:
     # redact first, cap after: capping first could cut the "@" that marks a userinfo and leave its password
     return redact(source_id)[:_MAX_SOURCE_ID_IN_DETAIL]

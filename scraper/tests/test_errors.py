@@ -245,3 +245,40 @@ def test_the_plain_header_form_still_masks_to_the_end_of_the_line():
 
 def test_names_that_only_contain_a_secret_word_by_accident_are_left_alone():
     assert redact("AuthenticationError: bypass the cache") == "AuthenticationError: bypass the cache"
+
+
+COOKIE = "9f2c41d0aa7b3e5c1d8f66b0c2e47a19d3b5f801"
+PROXY = "http://resi_user:Sup3rS3cret@pl-sticky.proxy.example:8080"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"Cannot reach x.com with {COOKIE}",  # a bare token that no name marks
+        f"HTTPSConnectionPool(host='pl-sticky.proxy.example', port=8080): proxy refused",  # only the host
+        f"auth failed for resi_user",  # only the user
+        f"407 for Sup3rS3cret",  # only the password
+        f"ProxyError({PROXY!r})",
+    ],
+)
+def test_known_secrets_are_masked_wherever_they_appear(text):
+    from iw_scraper.ingest.errors import redact_known
+
+    masked = redact_known(text, [COOKIE, PROXY, "pl-sticky.proxy.example", "resi_user", "Sup3rS3cret"])
+
+    for secret in (COOKIE, "pl-sticky.proxy.example", "resi_user", "Sup3rS3cret", PROXY):
+        assert secret not in masked
+
+
+def test_known_secrets_keep_the_rest_of_the_message_and_ignore_empty_values():
+    from iw_scraper.ingest.errors import redact_known
+
+    masked = redact_known(f"timeout after 30 s talking to {COOKIE}", [COOKIE, "", None])
+
+    assert masked == "timeout after 30 s talking to ***"
+
+
+def test_a_secret_that_contains_another_is_masked_whole():
+    from iw_scraper.ingest.errors import redact_known
+
+    assert redact_known("v=abc12345-long-extension", ["abc12345", "abc12345-long-extension"]) == "v=***"

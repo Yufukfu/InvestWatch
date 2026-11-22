@@ -35,6 +35,7 @@ const rule = (over: Partial<RuleView> = {}): RuleView => ({
 
 const detail = (over: Partial<FindingDetail> = {}): FindingDetail => ({
   id: 'f1',
+  documentId: 'doc-1',
   module: 'M2',
   title,
   summary,
@@ -43,6 +44,7 @@ const detail = (over: Partial<FindingDetail> = {}): FindingDetail => ({
   status: 'new',
   note: null,
   url: 'https://alfa.example.com/konto',
+  exportUrl: 'http://localhost/api/findings/f1/export?format=html',
   platform: 'web',
   detectedAt: '2026-11-21T15:00:00Z',
   advertiser: { name, handle, profileUrl: 'https://instagram.com/uchwyt', inRegistry: false },
@@ -81,7 +83,7 @@ describe('untrusted finding text', () => {
     const hrefs = within(panel)
       .getAllByRole('link')
       .map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['https://alfa.example.com/konto', 'https://instagram.com/uchwyt']);
+    expect(hrefs).toEqual(['http://localhost/api/findings/f1/export?format=html', 'https://alfa.example.com/konto', 'https://instagram.com/uchwyt']);
     expect(hrefs.join(' ')).not.toMatch(/javascript:|evil\.example/);
   });
 
@@ -127,6 +129,8 @@ describe('untrusted finding text', () => {
       riskLevel: 'high',
       status: 'new',
       detectedAt: '2026-11-21T15:00:00Z',
+      documentId: 'doc-1',
+      url: 'https://example.com/post/1',
     };
     const { container } = render(
       <FindingsTable
