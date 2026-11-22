@@ -2,9 +2,9 @@
 
 ## 1. Include path
 
-- [ ] 1.1 Failing test first: a `config` scenario in `scraper/tests/stack.sh` that merges the documented `-f` chain and checks `renderer`; watch it fail on the bare include
-- [ ] 1.2 `scraper/compose.yaml` includes `../scraper/compose.renderer.yaml`; every chain in the issue passes `docker compose config -q`
-- [ ] 1.3 Mutation check: revert the include to the bare name, the scenario goes red (`mutations: N tried, N caught`)
+- [x] 1.1 Failing test first: a `root`-group scenario in `scraper/tests/stack.sh` that merges the documented `-f` chain and checks `renderer`; watch it fail on the bare include
+- [x] 1.2 `scraper/compose.yaml` includes `../scraper/compose.renderer.yaml`; every chain in the issue passes `docker compose config -q`
+- [x] 1.3 Mutation check: revert the include to the bare name, the scenario goes red (`mutations: 1 tried, 1 caught`)
 
 ## 2. Closing
 
