@@ -16,7 +16,7 @@
 ## 3. Closing
 
 - [x] 3.1 Apply `iw-docs-update` (`.docs/status/dashboard.md`) and add the `iw-ai-log` row. Verify: `node .claude/skills/iw-docs-update/scripts/docs-check.mjs` exits 0.
-- [ ] 3.2 Run `iw-pr-review` and fix real findings. Verify: no blocking finding.
+- [x] 3.2 Run `iw-pr-review` and fix real findings. Verify: no blocking finding.
 
 ## Workflow follow-up
 
