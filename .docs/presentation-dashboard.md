@@ -81,7 +81,7 @@ One page, top to bottom (`web/src/App.tsx`): header with live and health badges,
 - **Errors stay local:** each chart section loads lazily and has its own error boundary (`Nie udało się pobrać danych trendu.`), so one failing request does not blank the page.
 - **Hardened container:** the `web` service runs read-only with all capabilities dropped (`web/compose.yaml`).
 
-**Notes:** The seven are the `dependencies` of `web/package.json`; react-is is there for Recharts. CI jobs for Gitleaks and OSV-Scanner are an open PR (#100), so today these scans are run by hand and recorded in each PR body. The `web` image build runs lint and the production build; the Vitest suite runs locally and in CI (issue #60), after #78 saw test timeouts under load in the image build.
+**Notes:** The seven are the `dependencies` of `web/package.json`; react-is is there for Recharts. Since #100, `.github/workflows/security.yml` runs Gitleaks, OSV-Scanner, `pip-audit` and `npm audit` on every PR to `main` (advisory, not a required check). The `web` image build runs lint and the production build; the Vitest suite runs locally and in CI (issue #60), after #78 saw test timeouts under load in the image build.
 
 ---
 
