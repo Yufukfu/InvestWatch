@@ -43,5 +43,11 @@ export function kpis(rows: readonly AdvertiserRow[]): AdvertiserKpis {
       firms.add(f.key);
       matchedFindings += f.count;
     }
-  return { advertisers: rows.length, firms: firms.size, repeat: rows.filter((r) => r.repeat).length, matchedFindings };
+  // "N reklamodawców promuje M firm": an advertiser with no matched firm promotes no licensed firm.
+  return { advertisers: rows.filter(hasMatchedFirm).length, firms: firms.size, repeat: rows.filter((r) => r.repeat).length, matchedFindings };
+}
+
+// True when the advertiser has at least one finding with a matched registry firm (an edge in the graph).
+export function hasMatchedFirm(r: AdvertiserRow): boolean {
+  return r.firms.some((f) => f.key !== NO_FIRM);
 }

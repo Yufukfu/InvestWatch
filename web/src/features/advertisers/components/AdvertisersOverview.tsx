@@ -1,5 +1,5 @@
 import { FINDINGS_CAP, type AdvertiserRow, type RelationNav } from '../model';
-import type { AdvertiserFilters, AdvertiserKpis } from '../filters';
+import { hasMatchedFirm, type AdvertiserFilters, type AdvertiserKpis } from '../filters';
 import { GRAPH_MAX_ADVERTISERS, type Graph } from '../graph';
 import { AdvertiserFiltersBar, type AdvertiserView } from './AdvertiserFiltersBar';
 import { AdvertiserGraph } from './AdvertiserGraph';
@@ -58,7 +58,7 @@ export function AdvertisersOverview(props: Props) {
         <div className="adv-layout">
           <AdvertiserGraph graph={graph} selected={selected} onOpenRelation={onOpenRelation} />
           <TopAdvertisers
-            rows={rows.slice(0, GRAPH_MAX_ADVERTISERS)}
+            rows={rows.filter(hasMatchedFirm).slice(0, GRAPH_MAX_ADVERTISERS)}
             matchedFindings={kpis.matchedFindings}
             selected={selected}
             onSelect={onSelect}

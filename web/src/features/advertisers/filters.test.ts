@@ -54,9 +54,10 @@ describe('filterRows', () => {
 });
 
 describe('kpis', () => {
-  it('counts advertisers, distinct matched firms, repeat advertisers and matched findings', () => {
+  it('counts advertisers that promote a matched firm, distinct matched firms, repeat advertisers and matched findings', () => {
+    // @c has no matched firm: it promotes no licensed firm, so the sentence does not count it.
     const rows = aggregateAdvertisers([f('@a', 'X'), f('@a', 'Y'), f('@b', 'X'), f('@b', null), f('@c', null)]);
-    expect(kpis(rows)).toEqual({ advertisers: 3, firms: 2, repeat: 1, matchedFindings: 3 });
+    expect(kpis(rows)).toEqual({ advertisers: 2, firms: 2, repeat: 1, matchedFindings: 3 });
   });
 
   it('is all zeros for no rows', () => {

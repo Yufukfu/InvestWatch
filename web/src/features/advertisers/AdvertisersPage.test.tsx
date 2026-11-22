@@ -18,7 +18,7 @@ describe('AdvertisersPage (contract mock)', () => {
   it('states the KPI sentence and draws the M1 advertisers, none from M3', async () => {
     renderPage();
     await screen.findByRole('img', { name: /Graf powiązań/ });
-    expect(figures()).toHaveTextContent('4 reklamodawcy promują 2 licencjonowane firmy, w tym 0 powtarzających się');
+    expect(figures()).toHaveTextContent('3 reklamodawcy promują 2 licencjonowane firmy, w tym 0 powtarzających się');
     const left = screen.getByRole('list', { name: 'Reklamodawcy' });
     expect(within(left).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['@finanse_z_kasia1', '@inwestor_jan1', '@marek_trader1']);
     expect(screen.queryByText('Sygnały VIP')).toBeNull();
@@ -31,18 +31,27 @@ describe('AdvertisersPage (contract mock)', () => {
   it('highlights the top advertiser of the side table until another row is picked', async () => {
     renderPage();
     await screen.findByRole('img', { name: /Graf powiązań/ });
-    expect(screen.getByRole('button', { name: '@ekonomia_na_luzie' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('link', { name: 'Zobacz zgłoszenia @ekonomia_na_luzie' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '@finanse_z_kasia' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('link', { name: 'Zobacz zgłoszenia @finanse_z_kasia' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '@marek_trader' }));
     expect(screen.getByRole('button', { name: '@marek_trader' })).toHaveAttribute('aria-pressed', 'true');
     expect(document.querySelector('[data-edge^="h:@marek_trader|"]')).toHaveClass('adv-edge-selected');
+  });
+
+  it('lists in the side table only advertisers with a matched firm, like the graph', async () => {
+    renderPage();
+    await screen.findByRole('img', { name: /Graf powiązań/ });
+    // @ekonomia_na_luzie has only findings with no matched firm: it stays in the Tabela view, not in the side table.
+    expect(screen.queryByRole('button', { name: '@ekonomia_na_luzie' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Tabela' }));
+    expect(within(screen.getByRole('table')).getByText('Ekonomia na luzie')).toBeInTheDocument();
   });
 
   it('applies the filters to the loaded findings', async () => {
     renderPage();
     await screen.findByRole('img', { name: /Graf powiązań/ });
     fireEvent.change(screen.getByLabelText('Ryzyko'), { target: { value: 'low' } });
-    expect(figures()).toHaveTextContent('1 reklamodawca promuje 0 licencjonowanych firm, w tym 0 powtarzających się');
+    expect(figures()).toHaveTextContent('0 reklamodawców promuje 0 licencjonowanych firm, w tym 0 powtarzających się');
     fireEvent.change(screen.getByLabelText('Ryzyko'), { target: { value: 'all' } });
     fireEvent.click(screen.getByLabelText('Tylko powtarzający się'));
     expect(screen.getByRole('status')).toHaveTextContent('Brak reklamodawców dla wybranych filtrów');

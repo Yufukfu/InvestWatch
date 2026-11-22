@@ -7,7 +7,7 @@ The Powiązania page of the dashboard (`web/`, owners in `.github/CODEOWNERS`): 
 ## Requirements
 
 ### Requirement: Powiązania page
-The dashboard SHALL have a page `Powiązania` at hash `#powiazania`, linked in the header navigation between `Zgłoszenia` and `Kalibracja` and marked `aria-current` while open, loaded on first visit. It SHALL open with the eyebrow `POWIĄZANIA · M1 · FINFLUENCERZY I FIRMY Z REJESTRU` and the sentence `<N> reklamodawców promuje <M> licencjonowanych firm, w tym <R> powtarzających się` (Polish plurals) over the filtered advertisers.
+The dashboard SHALL have a page `Powiązania` at hash `#powiazania`, linked in the header navigation between `Zgłoszenia` and `Kalibracja` and marked `aria-current` while open, loaded on first visit. It SHALL open with the eyebrow `POWIĄZANIA · M1 · FINFLUENCERZY I FIRMY Z REJESTRU` and the sentence `<N> reklamodawców promuje <M> licencjonowanych firm, w tym <R> powtarzających się` (Polish plurals) over the filtered advertisers, where `<N>` counts only advertisers with at least one matched firm.
 
 #### Scenario: Page from its hash
 - **WHEN** the dashboard opens with `#powiazania`
@@ -15,7 +15,7 @@ The dashboard SHALL have a page `Powiązania` at hash `#powiazania`, linked in t
 
 #### Scenario: KPI counts
 - **WHEN** advertiser `@a` has findings for firms X and Y, `@b` for X, and `@c` only without a firm
-- **THEN** the sentence states 3 advertisers, 2 firms and 1 repeat advertiser
+- **THEN** the sentence states 2 advertisers (not `@c`, which promotes no licensed firm), 2 firms and 1 repeat advertiser
 
 ### Requirement: Advertiser-to-firm table
 The page SHALL offer a `Tabela` view listing the advertisers of M1 findings (`Finding.advertiser`, integration plan §4) with, per advertiser, the licensed firms (`Finding.firm`) it promotes and a finding count per firm, plus the advertiser's total, sorted by total descending. It SHALL be built from `GET /findings` with `module=M1`, without a new endpoint. Advertiser names, handles and firm names SHALL be plain text, each in a `dir="auto"` element.
@@ -56,14 +56,14 @@ The page SHALL filter the loaded findings in the browser by period (`Ostatnie 7 
 
 #### Scenario: Risk filter
 - **WHEN** the risk filter is set to `Niskie` on the contract mock
-- **THEN** the sentence states 1 advertiser and 0 firms
+- **THEN** the sentence states 0 advertisers and 0 firms, because the only advertiser left has no matched firm
 
 #### Scenario: Repeat only
 - **WHEN** `Tylko powtarzający się` is checked and no advertiser repeats
 - **THEN** the page shows the empty-state text
 
 ### Requirement: Advertiser graph
-The `Graf` view SHALL draw advertisers with a matched firm (at most 12) on the left and registry firms on the right, each with its finding count, joined by one curved edge per pair whose thickness grows with the pair's finding count, with a legend. It SHALL be inline SVG with an accessible name, labels as HTML text in `dir="auto"` elements, and a side table `Najczęstsi reklamodawcy` whose rows highlight the advertiser's edges.
+The `Graf` view SHALL draw advertisers with a matched firm (at most 12) on the left and registry firms on the right, each with its finding count, joined by one curved edge per pair whose thickness grows with the pair's finding count, with a legend. It SHALL be inline SVG with an accessible name, labels as HTML text in `dir="auto"` elements, and a side table `Najczęstsi reklamodawcy` of the same advertisers whose rows highlight the advertiser's edges.
 
 #### Scenario: Edge per pair
 - **WHEN** `@a` has 3 findings for firm X and 1 for firm Y

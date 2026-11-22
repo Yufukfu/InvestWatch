@@ -40,7 +40,7 @@ describe('AdvertisersOverview', () => {
   it('states the KPI sentence with the repeat count in its own element', () => {
     const { container } = render(<AdvertisersOverview {...props()} />);
     expect(screen.getByRole('heading', { name: 'POWIĄZANIA · M1 · FINFLUENCERZY I FIRMY Z REJESTRU' })).toBeInTheDocument();
-    expect(container.querySelector('.adv-figures')).toHaveTextContent('3 reklamodawcy promują 2 licencjonowane firmy, w tym 1 powtarzający się');
+    expect(container.querySelector('.adv-figures')).toHaveTextContent('2 reklamodawcy promują 2 licencjonowane firmy, w tym 1 powtarzający się');
     expect(container.querySelector('[data-kpi="repeat"]')).toHaveClass('hero-value-risk');
   });
 

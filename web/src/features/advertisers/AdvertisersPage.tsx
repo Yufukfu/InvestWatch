@@ -5,7 +5,7 @@ import type { AdvertiserView } from './components/AdvertiserFiltersBar';
 import { RelationView } from './components/RelationView';
 import { useAdvertisers } from './data/useAdvertisers';
 import { useRelationNav } from './data/useRelationNav';
-import { DEFAULT_ADVERTISER_FILTERS, filterFindings, filterRows, kpis as countKpis, type AdvertiserFilters } from './filters';
+import { DEFAULT_ADVERTISER_FILTERS, filterFindings, filterRows, hasMatchedFirm, kpis as countKpis, type AdvertiserFilters } from './filters';
 import { buildGraph } from './graph';
 
 // Powiązania (M1, issue #72): who promotes which licensed firm, as a graph or a table, and the findings of one
@@ -24,8 +24,10 @@ export function AdvertisersPage() {
   const rows = useMemo(() => (grouped ? filterRows(grouped, filters) : undefined), [grouped, filters]);
   const graph = useMemo(() => (rows ? buildGraph(rows) : undefined), [rows]);
   const kpis = useMemo(() => countKpis(rows ?? []), [rows]);
-  // The side table's pick, else its first row (the mockup opens with the top advertiser highlighted).
-  const selected = rows?.some((r) => r.key === picked) ? picked : rows?.[0]?.key;
+  // The side table lists the graph's advertisers (with a matched firm); its pick, else its first row (the mockup
+  // opens with the top advertiser highlighted).
+  const topRows = useMemo(() => rows?.filter(hasMatchedFirm), [rows]);
+  const selected = topRows?.some((r) => r.key === picked) ? picked : topRows?.[0]?.key;
 
   // Opening or leaving a relation starts at the top of the page.
   const relationKey = nav.relation ? `${nav.relation.advertiser}|${nav.relation.firm ?? ''}` : '';
