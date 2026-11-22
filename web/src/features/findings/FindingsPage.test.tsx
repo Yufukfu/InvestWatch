@@ -1,4 +1,3 @@
-import { config } from '../../config';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
@@ -510,45 +509,10 @@ describe('FindingsPage keyboard shortcuts', () => {
     expect(patches).toEqual([]);
   });
 
-  describe('Eksportuj raport', () => {
-    it('links to the CSV export with the current filters and states the 10 000-row cap', async () => {
-      window.history.replaceState(null, '', '/?module=M2&risk_level=high&sort=-score&page=2');
-      render(<FindingsPage />, { wrapper: storeWrapper() });
-      const link = await screen.findByRole('link', { name: /^Eksportuj raport/ });
-      expect(link).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?module=M2&risk_level=high&sort=-score`);
-      expect(link).toHaveAttribute('download');
-      expect(screen.getByText(/CSV, maks\. 10\s000 wierszy/)).toBeInTheDocument();
-      expect(screen.queryByText(/tylko pierwsze 10 000/)).toBeNull();
-    });
-
-    it('follows a filter change', async () => {
-      render(<FindingsPage />, { wrapper: storeWrapper() });
-      await screen.findByText(findings.items[0].title);
-      fireEvent.change(screen.getByLabelText('Moduł'), { target: { value: 'M3' } });
-      await waitFor(() =>
-        expect(screen.getByRole('link', { name: /^Eksportuj raport/ })).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?module=M3&sort=-detected_at`),
-      );
-    });
-
-    it('says the export is cut when the list total is above the cap', async () => {
-      server.use(http.get('http://localhost/api/findings', () => HttpResponse.json({ ...findings, total: 12000 })));
-      render(<FindingsPage />, { wrapper: storeWrapper() });
-      expect(await screen.findByText(/tylko pierwsze 10\s000 z 12\s000/)).toBeInTheDocument();
-    });
-
-    it('says nothing about truncation at exactly 10 000', async () => {
-      server.use(http.get('http://localhost/api/findings', () => HttpResponse.json({ ...findings, total: 10000 })));
-      render(<FindingsPage />, { wrapper: storeWrapper() });
-      await screen.findByText(findings.items[0].title);
-      expect(screen.queryByText(/tylko pierwsze/)).toBeNull();
-    });
-
-    it('stays available when the list fails', async () => {
-      server.use(http.get('http://localhost/api/findings', () => HttpResponse.error()));
-      render(<FindingsPage />, { wrapper: storeWrapper() });
-      await screen.findByRole('alert');
-      expect(screen.getByRole('link', { name: /^Eksportuj raport/ })).toHaveAttribute('href', `${config.apiBaseUrl}/findings/export?sort=-detected_at`);
-    });
+  it('has no export link of its own: the header carries it', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    expect(screen.queryByRole('link', { name: /Eksportuj raport/ })).toBeNull();
   });
 });
 

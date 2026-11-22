@@ -131,6 +131,10 @@ a:hover { color: var(--link-strong); }
   .app-nav { display: none; order: 10; flex: 1 0 100%; flex-direction: column; margin-right: 0; padding-left: 0; border-left: 0; }
   .app-nav.app-nav-open { display: flex; }
   .app-nav a { justify-content: flex-start; }
+  /* The export joins the menu: below the section links, left-aligned, only while the menu is open. */
+  .header-export { display: none; order: 11; flex: 1 0 100%; align-items: flex-start; }
+  .header-export.header-export-open { display: flex; }
+  .header-export .export-report-note { text-align: left; }
 }
 .app { max-width: 1440px; margin: 0 auto; padding: 0 var(--gutter); }
 main { display: grid; gap: 0; }
@@ -279,11 +283,10 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 .bulk-item-not_found { color: var(--muted); }
 .col-select { width: 44px; }
 .row-check { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
-/* Report export: the mockup's outlined "Eksportuj raport" with the row cap beside it. */
-.export-report { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-left: auto; }
-.export-report-note { color: var(--muted); font-size: 13px; }
-/* On a phone the export block wraps under the heading: start it at the left edge, not pushed right by margin-left: auto. */
-@media (max-width: 599px) { .export-report { margin-left: 0; } }
+/* Report export in the header (the mockup's outlined "Eksportuj raport", right of the status badges), with the row cap as a
+   small note under the button. */
+.export-report { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.export-report-note { max-width: 22rem; color: var(--muted); font-size: 12px; text-align: right; }
 .findings-count { margin: 0 0 8px; color: var(--muted); font-weight: 600; }
 .table-scroll { overflow-x: auto; }
 .findings { width: 100%; border-collapse: collapse; background: var(--surface); }

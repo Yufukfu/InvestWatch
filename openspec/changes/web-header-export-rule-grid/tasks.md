@@ -2,9 +2,9 @@
 
 ## 1. Export link in the header
 
-- [ ] 1.1 Write failing tests: the header has one `Eksportuj raport`; on the findings page its `href` follows the URL filters (also after a filter change) and the truncation note uses the list total; on the overview it exports with default filters and says so; the findings page has no second copy; the `☰` button controls the export region.
-- [ ] 1.2 Implement `useReportExport`, `ReportExport`, the header placement, remove the findings-page copy, styles.
-- [ ] 1.3 Mutation check.
+- [x] 1.1 Write failing tests: the header has one `Eksportuj raport`; on the findings page its `href` follows the URL filters (also after a filter change) and the truncation note uses the list total; on the overview it exports with default filters and says so; the findings page has no second copy; the `☰` button controls the export region.
+- [x] 1.2 Implement `useReportExport`, `ReportExport`, the header placement, remove the findings-page copy, styles.
+- [x] 1.3 Mutation check, against `App.test.tsx`: the page check on the filters dropped (URL filters on every page); the URL read once instead of subscribed (`useUrlSearch` replaced by `window.location.search`); the list query never skipped (a fetch on the overview); the total kept after an error (survived at first; test for a later failed request added, then caught); the "bez filtrów" note dropped; the cap boundary moved to `>=`; the header always told it is on the findings page; `aria-controls` without the export; the menu class never set on the export. Not counted: reading `search` from `window.location` while still calling `useUrlSearch` (the hook's subscription alone re-renders, equivalent), and `onFindingsPage &&` in the total (a skipped query has no data, equivalent). mutations: 9 tried, 9 caught
 
 ## 2. M2 rule grid
 
