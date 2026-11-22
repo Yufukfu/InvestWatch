@@ -58,7 +58,7 @@ export function AdvertiserGraph({ graph, selected: picked, onOpenRelation }: Pro
                 </li>
               ))}
             </ul>
-            <svg className="adv-graph-edges" role="img" aria-label={summary} width={W} height={graph.height} viewBox={`0 0 ${W} ${graph.height}`}>
+            <svg className="adv-graph-edges" role="img" aria-label={summary} height={graph.height} viewBox={`0 0 ${W} ${graph.height}`} preserveAspectRatio="none">
               {edges.map((e) => (
                 <g
                   key={`${e.advertiser}|${e.firm}`}

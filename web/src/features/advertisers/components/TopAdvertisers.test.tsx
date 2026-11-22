@@ -36,11 +36,13 @@ describe('TopAdvertisers', () => {
     expect(screen.getByText('9 zgłoszeń z dopasowaną firmą · kliknij wiersz, by podświetlić relacje')).toBeInTheDocument();
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
     const cells = within(rows[0]).getAllByRole('cell');
-    expect(cells[0]).toHaveTextContent('@apowtarzający sięOKX · Nordic');
+    expect(cells[0]).toHaveTextContent('@a (powtarzający się)OKX · Nordic');
+    // Like the mockup, the side table shows the repeat by its red firm count; the text is for assistive tech.
+    expect(within(cells[0]).getByText('(powtarzający się)')).toHaveClass('visually-hidden');
     expect(cells[1]).toHaveTextContent('2');
     expect(cells[1]).toHaveClass('adv-firms-repeat');
     expect(cells[2]).toHaveTextContent('9');
-    expect(within(rows[1]).queryByText('powtarzający się')).toBeNull();
+    expect(within(rows[1]).queryByText('(powtarzający się)')).toBeNull();
     expect(within(rows[1]).getAllByRole('cell')[1]).not.toHaveClass('adv-firms-repeat');
   });
 

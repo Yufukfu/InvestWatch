@@ -41,7 +41,7 @@ The page SHALL offer a `Tabela` view listing the advertisers of M1 findings (`Fi
 - **THEN** the page shows an empty-state text
 
 ### Requirement: Repeat advertisers highlighted
-An advertiser that promotes two or more distinct matched firms, or has five or more M1 findings, SHALL be a repeat advertiser: marked with the text `Powtarzający się` (or `powtarzający się`) in the table and side table, its count and edges drawn red, never by colour alone. Any other advertiser SHALL NOT be marked.
+An advertiser that promotes two or more distinct matched firms, or has five or more M1 findings, SHALL be a repeat advertiser: marked with the text `Powtarzający się` in the table, its count and edges drawn red; in the side table, as in the mockup, by its red firm count with the legend and a visually hidden `(powtarzający się)`. Any other advertiser SHALL NOT be marked.
 
 #### Scenario: Two firms
 - **WHEN** advertiser `@a` has one finding for firm X and one for firm Y, and `@b` has two findings for firm X
@@ -52,7 +52,7 @@ An advertiser that promotes two or more distinct matched firms, or has five or m
 - **THEN** `@a` is marked as repeat and `@b` is not
 
 ### Requirement: Client-side filters
-The page SHALL filter the loaded findings in the browser by period (`Ostatnie 7 / 30 / 90 dni`, `Wszystko`, on `detected_at`), risk level as returned by the API (`Wszystkie`, `Wysokie`, `Średnie`, `Niskie`), minimum findings per advertiser, and `Tylko powtarzający się`, and SHALL switch between `Graf` and `Tabela` with buttons that expose their pressed state. The KPI sentence, graph and tables SHALL follow the filters.
+The page SHALL filter the loaded findings in the browser by period (`Ostatnie 7 / 30 / 90 dni`, `Wszystko`, on `detected_at`, default `Ostatnie 30 dni`), risk level as returned by the API (`Wszystkie`, `Wysokie`, `Średnie`, `Niskie`), minimum findings per advertiser, and `Tylko powtarzający się`, and SHALL switch between `Graf` and `Tabela` with buttons that expose their pressed state. The KPI sentence, graph and tables SHALL follow the filters.
 
 #### Scenario: Risk filter
 - **WHEN** the risk filter is set to `Niskie` on the contract mock

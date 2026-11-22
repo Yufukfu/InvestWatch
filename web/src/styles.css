@@ -86,6 +86,8 @@
   --font-text: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The Powiązania graph labels use a serif face, as in the advertiser-graph mockup (#72). */
+  --font-graph: Georgia, 'Times New Roman', Times, serif;
   font-family: var(--font-text);
   font-size: 16px;
   line-height: 1.45;
@@ -602,27 +604,29 @@ kbd { display: inline-block; font-family: var(--font-mono); font-size: 12px; lin
 /* Graph: HTML labels in two columns, the SVG between them draws only the edges. */
 .adv-graph { margin: 0; }
 .adv-graph-scroll { overflow-x: auto; }
-.adv-graph-inner { min-width: 760px; padding: 0 0 var(--space-6); }
-.adv-graph-heads, .adv-graph-body { display: grid; grid-template-columns: minmax(220px, 1fr) 300px minmax(240px, 1fr); }
+.adv-graph-inner { min-width: 630px; padding: 0 0 var(--space-6); }
+.adv-graph-heads, .adv-graph-body { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(170px, 300px) minmax(220px, 1fr); }
 .adv-graph-hint { display: none; margin: 0 0 var(--space-3); color: var(--muted); font-size: 13px; }
-@media (max-width: 899px) { .adv-graph-hint { display: block; } }
+@media (max-width: 699px) { .adv-graph-hint { display: block; } }
 @media (max-width: 599px) { .adv-filters-sep { display: none; } .adv-view { margin-left: 0; } }
-.adv-graph-heads { margin-bottom: var(--space-4); color: var(--muted); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+.adv-graph-heads { margin-bottom: var(--space-4); color: var(--muted); font-family: var(--font-graph); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 .adv-graph-heads > :first-child { text-align: right; padding-right: 72px; }
 .adv-graph-heads > :last-child { padding-left: 28px; }
 .adv-graph-body { position: relative; }
 .adv-graph-col { position: relative; list-style: none; margin: 0; padding: 0; }
-.adv-graph-col > li { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: var(--space-3); transform: translateY(-50%); font-family: var(--font-display); font-size: 16px; line-height: 20px; }
+.adv-graph-col > li { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: var(--space-3); transform: translateY(-50%); font-family: var(--font-graph); font-size: 16px; line-height: 20px; }
 .adv-graph-left > li { justify-content: flex-end; }
 .adv-graph-name { font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .adv-graph-right .adv-graph-name { white-space: normal; }
-.adv-graph-count { font-family: var(--font-mono); font-size: 15px; color: var(--muted); min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
+.adv-graph-count { font-family: var(--font-graph); font-size: 15px; color: var(--muted); min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
 .adv-graph-left .repeat .adv-graph-count { color: var(--risk-high); font-weight: 600; }
 .adv-graph-dot { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
 .adv-graph-left .adv-graph-dot { margin-right: -7px; }
 .adv-graph-right .adv-graph-dot { margin-left: -7px; }
 .adv-graph-left .repeat .adv-graph-dot { background: var(--risk-high); }
-.adv-graph-edges { overflow: visible; display: block; }
+/* The edge area stretches with its column (tablet); strokes keep their width so thickness still means the count. */
+.adv-graph-edges { overflow: visible; display: block; width: 100%; }
+.adv-graph-edges path { vector-effect: non-scaling-stroke; }
 .adv-edge { cursor: pointer; }
 .adv-edge-line { fill: none; stroke-linecap: round; transition: opacity var(--dur) var(--ease); }
 .adv-edge-hit { fill: none; stroke: transparent; pointer-events: stroke; }

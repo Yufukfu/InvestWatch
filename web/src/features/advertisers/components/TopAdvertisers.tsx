@@ -44,7 +44,8 @@ export function TopAdvertisers({ rows, matchedFindings, selected, onSelect, rela
                     <button type="button" className="adv-top-handle" aria-pressed={r.key === selected} onClick={(e) => { e.stopPropagation(); onSelect(r.key); }}>
                       <span dir="auto">{advertiserLabel(r)}</span>
                     </button>
-                    {r.repeat && <span className="adv-repeat-tag">powtarzający się</span>}
+                    {/* The mockup marks a repeat advertiser by its red firm count and the legend; the text is for assistive tech. */}
+                    {r.repeat && <span className="visually-hidden"> (powtarzający się)</span>}
                     {firms.length > 0 && (
                       <span className="adv-top-firms">
                         {firms.map((f, i) => (

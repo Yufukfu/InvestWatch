@@ -19,9 +19,11 @@ function f(handle: string, firm: string | null, extra: Partial<AdvertiserFinding
 }
 
 describe('filterFindings', () => {
-  it('keeps everything with the default filters', () => {
-    const all = [f('@a', 'X', { detectedAt: '2020-01-01T00:00:00Z' }), f('@b', null, { riskLevel: undefined })];
-    expect(filterFindings(all, DEFAULT_ADVERTISER_FILTERS, NOW)).toEqual(all);
+  it('keeps the last 30 days with the default filters, as in the mockup', () => {
+    const recent = f('@b', null, { riskLevel: undefined });
+    const old = f('@a', 'X', { detectedAt: '2020-01-01T00:00:00Z' });
+    expect(DEFAULT_ADVERTISER_FILTERS.period).toBe('30');
+    expect(filterFindings([old, recent], DEFAULT_ADVERTISER_FILTERS, NOW)).toEqual([recent]);
   });
 
   it('keeps findings detected within the period, boundary included', () => {

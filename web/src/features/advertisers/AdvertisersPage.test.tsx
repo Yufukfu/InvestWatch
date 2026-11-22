@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { storeWrapper } from '../../test/store';
 import { AdvertisersPage } from './AdvertisersPage';
 
@@ -15,6 +15,14 @@ function renderPage(search = '') {
 const figures = () => document.querySelector('.adv-figures');
 
 describe('AdvertisersPage (contract mock)', () => {
+  // The default period is the last 30 days: pin the clock next to the contract mock's dates.
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-22T06:00:00Z'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('states the KPI sentence and draws the M1 advertisers, none from M3', async () => {
     renderPage();
     await screen.findByRole('img', { name: /Graf powiązań/ });

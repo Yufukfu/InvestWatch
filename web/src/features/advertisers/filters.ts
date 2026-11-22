@@ -12,7 +12,7 @@ export type AdvertiserFilters = {
 
 export const PERIODS: readonly AdvertiserPeriod[] = ['7', '30', '90', 'all'];
 export const MIN_FINDINGS_OPTIONS: readonly number[] = [1, 2, 3, 5, 10];
-export const DEFAULT_ADVERTISER_FILTERS: AdvertiserFilters = { period: 'all', risk: 'all', minFindings: 1, repeatOnly: false };
+export const DEFAULT_ADVERTISER_FILTERS: AdvertiserFilters = { period: '30', risk: 'all', minFindings: 1, repeatOnly: false };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
