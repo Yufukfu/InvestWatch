@@ -104,7 +104,8 @@ GATE = Gate.from_settings(GateSettings())
 def test_counter_fields(r, text, kind, field):
     d = evaluate(text, source_kind=kind, firm_matched=False, terms=load_terms(), settings=GateSettings())
     count_decision(r, d)
-    assert r.hgetall(STATS_KEY) == {field: "1"}
+    path = {} if kind == "firm_own" else {"path_dictionary": "1"}  # analytics-embedding-gate: decision path
+    assert r.hgetall(STATS_KEY) == {field: "1", **path}
 
 
 def test_counter_disabled_gate_counts_as_passed(r):
@@ -133,7 +134,8 @@ def test_worker_drops_off_topic_and_counts(r, store, registry, catalogue, caplog
     w = make_worker(r, store, registry, catalogue, pub, gate=GATE)
     with caplog.at_level(logging.INFO):
         handle(w, r, RECIPE_ID, ORIG)
-    assert r.hgetall(STATS_KEY) == {"dropped": "1", "passed": "1"}
+    assert r.hgetall(STATS_KEY) == {"dropped": "1", "passed": "1", "path_dictionary": "1",
+                                    "path_dictionary_only_fallback": "1"}
     assert store.findings_for_document(RECIPE_ID) == [] and store.findings_for_document(ORIG)
     assert any(getattr(x, "reason", None) == "off_topic" for x in caplog.records)
 

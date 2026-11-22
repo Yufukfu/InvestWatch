@@ -66,6 +66,20 @@ class Gate:
         return cls(settings, terms or _default_terms(), embedding)
 
 
+def with_embedding(gate: Gate, embedder: "Embedder | None", *, retry_s: float) -> Gate:
+    """The gate with its embedding rescue when an embedder, seed classes and an enabled gate exist; otherwise the
+    dictionary-only gate, logged once here (start-up), never per document. Centroids are built later by `warm()`."""
+    reason = ("gate_disabled" if not gate.settings.enabled else "embedder_disabled" if embedder is None
+              else "no_seed_classes" if not gate.terms.centroids else None)
+    if reason is not None:
+        log.info("embedding gate off", extra={"reason": reason, "gate_path": "dictionary_only_fallback"})
+        return gate
+    from .gate_embedding import GateEmbedding
+
+    return Gate(gate.settings, gate.terms, GateEmbedding(embedder, gate.terms.centroids, gate.settings,
+                                                         retry_s=retry_s))
+
+
 @lru_cache(maxsize=1)
 def _default_terms() -> GateTerms:
     return load_terms()

@@ -129,9 +129,18 @@ def evaluate(normalized_text: str, *, source_kind: str, firm_matched: bool, term
 
 
 def count_decision(client: Any, decision: GateDecision) -> None:
-    """HINCRBY `iw:stats:gate` passed | dropped | bypassed; a Redis error is logged, never raised."""
+    """HINCRBY `iw:stats:gate` passed | dropped | bypassed, plus `path_<path>` for a judged document and `rescued`
+    for an embedding pass (analytics-embedding-gate), in one round trip; a Redis error is logged, never raised."""
+    fields = [_COUNTER_FIELD.get(decision.reason, "passed")]
+    if decision.path:
+        fields.append(f"path_{decision.path}")
+    if decision.passed and decision.reason == "embedding":
+        fields.append("rescued")
     try:
-        client.hincrby(STATS_KEY, _COUNTER_FIELD.get(decision.reason, "passed"), 1)
+        pipe = client.pipeline(transaction=False)
+        for name in fields:
+            pipe.hincrby(STATS_KEY, name, 1)
+        pipe.execute()
     except Exception as exc:  # noqa: BLE001 - a counter must never fail a document
         log.warning("gate counter not updated", extra={"reason": "gate_counter_unavailable",
                                                        "error": type(exc).__name__})

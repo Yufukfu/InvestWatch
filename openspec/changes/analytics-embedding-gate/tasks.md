@@ -16,9 +16,9 @@ Requested by Damian on 2026-11-22. Feature freeze 08:00, so if time runs short, 
 
 ## 3. Worker, CLI, counter, compose (~40 min)
 
-- [ ] 3.1 Failing tests: worker warms the centroids at start and between messages (rate-limited, never inside `_process`); counter path fields and `rescued`; Redis error on the counter is not raised; CLI builds and warms with `EMBED_BASE_URL`, none with `--no-embed`; compose passes `GATE_EMBED_*` with empty meaning the default
-- [ ] 3.2 `worker.py`, `cli.py`, `gate.count_decision`, `analytics/compose.yaml`
-- [ ] 3.3 Mutation check
+- [x] 3.1 Failing tests: worker warms the centroids at start and between messages (rate-limited, never inside `_process`); counter path fields and `rescued`; Redis error on the counter is not raised; CLI builds and warms with `EMBED_BASE_URL`, none with `--no-embed`; compose passes `GATE_EMBED_*` with empty meaning the default
+- [x] 3.2 `worker.py`, `cli.py`, `gate.count_decision`, `analytics/compose.yaml`
+- [x] 3.3 Mutation check; `mutations: 11 tried, 10 caught`; the survivor (warm inside `_process`) showed the test never reached the analysis, fixed: `mutations: 1 tried, 1 caught`. Not covered by a test: the two wiring lines in `worker.main` (checked in the manual run, task 4.3)
 
 ## 4. Calibration and the real run (~45 min)
 
