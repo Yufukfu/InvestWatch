@@ -4,14 +4,14 @@ No test calls a real LLM (`stub_llm` only). Task 2.1 makes live calls; it is a m
 
 ## 1. Bare results array (~30 min)
 
-- [ ] 1.1 Failing tests:
+- [x] 1.1 Failing tests:
   - a bare array is accepted as `{"results": [...]}`, also after a `<thought>` block and inside a code fence;
   - an empty array is valid with no verdicts;
   - through the judge, an array answer with a quote in the document gives `fail` with that evidence, and a quote not in the document gives `uncertain`;
   - an invalid item in an array is dropped;
   - the string, number, boolean and null cases stay `LlmMalformed`, and so does an object without `results` (the old "array → malformed" case moves to the accepted cases).
-- [ ] 1.2 `ChatClient._content` turns a parsed list into `{"results": list}`; tests green
-- [ ] 1.3 Mutation check
+- [x] 1.2 `ChatClient._content` turns a parsed list into `{"results": list}`; tests green
+- [x] 1.3 Mutation check; `mutations: 5 tried, 5 caught`. On the first run, two survivors (wrapping any non-object, dropping the object guard) were closed by pinning the exception type and message for scalars. Two older tests that pinned 'array → malformed' (`test_llm_client.py::test_malformed`, `test_llm_judge.py::test_failures_degrade`) now use a JSON string instead, as the spec delta says
 
 ## 2. Evaluation (~30 min, mostly waiting)
 
