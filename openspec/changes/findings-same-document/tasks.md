@@ -8,7 +8,7 @@
 
 ## 2. Module switcher in the detail (starts after the `document_id` contract change is merged)
 
-- [ ] 2.1 Merge `main` with Damian's contract change and regenerate the snapshot and client (`web/README.md` steps). Verify: the generated `GetFindingsApiArg` has `documentId`, and `npm run typecheck` is clean.
+- [x] 2.1 Merge `main` with Damian's contract change and regenerate the snapshot and client (`web/README.md` steps). Verify: the generated `GetFindingsApiArg` has `documentId`, and `npm run typecheck` is clean.
 - [ ] 2.2 Failing tests first: `useDocumentFindings` sends `document_id` and no list filters, filters the response by `document_id`, and returns empty on error; `FindingsPage.test.tsx` covers switch M1 to M3 (URL, rules, focus), single module (no switcher), sibling error (detail still usable), back button, and the list filtered to M1 (switcher still offers M3). Verify: new cases fail.
 - [ ] 2.3 Implement the `useDocumentFindings` hook, the presentational `ModuleSwitcher` (Polish labels, risk as text), and the wiring in `DetailContainer`. Verify: the tests pass, lint and typecheck are clean, and a manual check against the mock server at 375 px and 1280 px with a local M1+M3 fixture.
 - [ ] 2.4 Mutation check on the filter by `document_id`, the "more than one" condition and the error path. Record: `mutations: N tried, N caught`.
