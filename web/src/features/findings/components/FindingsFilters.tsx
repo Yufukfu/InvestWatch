@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { isolate } from '../../../format/bidi';
 import { MODULES, PLATFORMS, RISK_LEVELS, STATUSES, type FindingFilters } from '../model';
 import { MODULE_LABEL, PLATFORM_LABEL, RISK_LABEL, STATUS_LABEL } from './labels';
 
@@ -111,10 +112,10 @@ export function FindingsFilters({ filters, onChange, onReset }: Props) {
               key={c.key}
               type="button"
               className={c.status ? 'filter-chip filter-chip-status' : 'filter-chip'}
-              aria-label={`Usuń filtr: ${c.label}`}
+              aria-label={`Usuń filtr: ${c.key === 'q' ? isolate(c.label) : c.label}`}
               onClick={() => onChange(c.clears)}
             >
-              {c.label} <span aria-hidden="true">✕</span>
+              <span dir="auto">{c.label}</span> <span aria-hidden="true">✕</span>
             </button>
           ))}
         </div>

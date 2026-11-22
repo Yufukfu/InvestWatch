@@ -117,7 +117,7 @@ describe('FindingsFilters', () => {
       'Usuń filtr: ≥ 0.7',
       'Usuń filtr: od 2026-11-20',
       'Usuń filtr: do 2026-11-21',
-      'Usuń filtr: „jan”',
+      'Usuń filtr: \u2068„jan”\u2069',
     ]);
     expect(chips[0]).toHaveTextContent('Nowe');
     const expected: Array<Partial<FindingFilters>> = [
