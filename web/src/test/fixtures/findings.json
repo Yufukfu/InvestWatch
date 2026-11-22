@@ -340,6 +340,172 @@
       }
     },
     {
+      "id": "3ac853fc-0792-5a97-84d6-24aa2fbf2937",
+      "document_id": "22adccca-7226-5d29-8029-48ce11cdf441",
+      "module": "M3",
+      "score": 0.84,
+      "risk_level": "high",
+      "status": "new",
+      "title": "Płatne sygnały kup/sprzedaj od @marek_trader, podmiotu spoza rejestru",
+      "summary": "Ten sam post oferuje odpłatne rekomendacje kupna akcji i sprzedaży CFD. Autor nie występuje w rejestrze firm inwestycyjnych KNF.",
+      "firm": null,
+      "advertiser": {
+        "name": "Marek Trader",
+        "handle": "@marek_trader",
+        "profile_url": "https://www.instagram.com/marek_trader/",
+        "in_registry": false,
+        "on_warning_list": null
+      },
+      "rules": [
+        {
+          "rule_id": "S3.1",
+          "name": "Podmiot spoza rejestru",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "@marek_trader",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.4",
+          "name": "Rekomendacja konkretnych instrumentów",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "kupuję akcje spółki Przykład S.A., a CFD na złoto sprzedaję",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "llm"
+        },
+        {
+          "rule_id": "S3.5",
+          "name": "Model odpłatny",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "grupie premium za 149 zł/mies.",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S3.6",
+          "name": "Kierowanie do Polski",
+          "result": "fail",
+          "severity": "low",
+          "evidence": "149 zł",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "Załóż rachunek w Alfa Inwestycje DM z moim kodem MAREK100 i odbierz 100 zł na start 💸 Moi subskrybenci wiedzą więcej: w tym tygodniu kupuję akcje spółki Przykład S.A., a CFD na złoto sprzedaję. Pełna ",
+      "url": "https://www.instagram.com/p/MOCK0005/",
+      "platform": "instagram",
+      "note": null,
+      "detected_at": "2026-11-21T12:01:00Z",
+      "updated_at": "2026-11-21T12:01:00Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
+      "id": "ef85ced1-2f04-5f3d-bc93-63a276c206fd",
+      "document_id": "22adccca-7226-5d29-8029-48ce11cdf441",
+      "module": "M1",
+      "score": 0.88,
+      "risk_level": "high",
+      "status": "new",
+      "title": "Finfluencer @marek_trader reklamuje Alfa Inwestycje DM z kodem polecającym",
+      "summary": "Post promuje rachunek w Alfa Inwestycje DM z kodem MAREK100 i bonusem 100 zł. Brak oznaczenia współpracy i informacji o ryzyku.",
+      "firm": {
+        "name": "Alfa Inwestycje Dom Maklerski S.A.",
+        "registry_id": "facc6bd1-c728-5348-90a4-011b0972fea9",
+        "registry_type": "brokerage_house",
+        "authorized": true,
+        "match_confidence": 0.95
+      },
+      "advertiser": {
+        "name": "Marek Trader",
+        "handle": "@marek_trader",
+        "profile_url": "https://www.instagram.com/marek_trader/",
+        "in_registry": false
+      },
+      "rules": [
+        {
+          "rule_id": "S1.1",
+          "name": "Wzmianka o firmie z rejestru",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "Alfa Inwestycje DM",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.2",
+          "name": "Link afiliacyjny / kod polecający",
+          "result": "fail",
+          "severity": "high",
+          "evidence": "kodem MAREK100",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.3",
+          "name": "Oznaczenie współpracy",
+          "result": "pass",
+          "severity": "medium",
+          "evidence": null,
+          "evidence_locator": null,
+          "explanation": "Brak #reklama / #współpraca.",
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.4",
+          "name": "Wezwanie do działania",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "link w bio!",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        },
+        {
+          "rule_id": "S1.6",
+          "name": "Autor inny niż firma",
+          "result": "fail",
+          "severity": "medium",
+          "evidence": "@marek_trader",
+          "evidence_locator": null,
+          "explanation": null,
+          "legal_basis": null,
+          "method": "rule"
+        }
+      ],
+      "content_excerpt": "Załóż rachunek w Alfa Inwestycje DM z moim kodem MAREK100 i odbierz 100 zł na start 💸 Moi subskrybenci wiedzą więcej: w tym tygodniu kupuję akcje spółki Przykład S.A., a CFD na złoto sprzedaję. Pełna ",
+      "url": "https://www.instagram.com/p/MOCK0005/",
+      "platform": "instagram",
+      "note": null,
+      "detected_at": "2026-11-21T12:00:40Z",
+      "updated_at": "2026-11-21T12:00:40Z",
+      "model": {
+        "pipeline_version": "0.1.0-mock",
+        "llm": "gemma3:4b",
+        "embedder": "bge-m3"
+      }
+    },
+    {
       "id": "0a58df37-a2f1-5464-9691-f5f74cea21c5",
       "document_id": "c99e2a35-eee1-5ee9-b057-b0d707a52cfb",
       "module": "M2",
@@ -792,7 +958,7 @@
       }
     }
   ],
-  "total": 9,
+  "total": 11,
   "page": 1,
   "page_size": 50
 }

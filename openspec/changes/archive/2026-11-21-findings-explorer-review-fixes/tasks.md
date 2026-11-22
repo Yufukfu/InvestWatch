@@ -18,3 +18,11 @@
 - [x] 3.2 Browser run against the mock at 375/768/1280 px: keyboard sort and paging keep focus, save keeps focus in the panel, Escape behaviour, console clean in the production build.
 - [x] 3.3 Add a note to the archived `findings-explorer/tasks.md` mutation lines; apply `iw-docs-update` (`.docs/status/dashboard.md`) and add the `iw-ai-log` row.
 - [x] 3.4 Run `iw-pr-review`, fix real findings, then reply on PR #39 to each review point (reviewer: focus restore on close ran before `inert` was lifted; merged into one effect, checked in Chrome).
+
+## 4. Review round 2 (@hen68, PR #39)
+
+Added after this change was archived (commit f8b3e48); merged here from a duplicate active folder (issue #55).
+
+- [x] 4.1 Focus escapes the dialog when the refetch after a save fails: the detail renders a stable tree (alert slot and body slot), and a test saves with the refetch failing and asserts focus stays inside the dialog.
+- [x] 4.2 Order-dependent test in `useFindings.test.tsx` ("a settled search replaces the history entry"): wait for the request to settle before the test ends.
+- [x] 4.3 Inert-lift-before-focus test cannot fail: spy on the opener's `focus` and assert the page has no `inert` attribute at call time.
