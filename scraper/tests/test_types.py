@@ -9,6 +9,7 @@ EXPECTED_REASONS = {
     "blocked_target",
     "timeout",
     "http_error",
+    "gone",
     "parse_error",
     "empty_text",
     "schema_invalid",
@@ -28,6 +29,7 @@ def test_job_error_carries_reason_detail_and_optional_source():
     assert err.reason is Reason.BLOCKED
     assert err.detail == "HTTP 403"
     assert err.source_id is None
+    assert err.url is None
 
 
 def test_job_error_rejects_a_plain_string_reason():

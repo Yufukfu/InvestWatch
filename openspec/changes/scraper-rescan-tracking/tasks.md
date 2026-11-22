@@ -2,9 +2,9 @@
 
 ## 1. Reason `gone` and the URL on job errors
 
-- [ ] 1.1 Test first (`scraper/tests/test_types.py`, `test_errors.py`): add `gone` to `EXPECTED_REASONS` (the set-equality test), `oops` is still rejected; a URL with userinfo or a token query is stored redacted and cut to a maximum length; `JobError(url=...)` is written to `job_errors.url` and `redact` still applies to the detail; every existing error without a URL still stores NULL
-- [ ] 1.2 Add `Reason.GONE` and `JobError.url`; `record_error` writes the column through `redact` and a length cap (test PostgreSQL, `scraper/tests/schema.sql` already has `url`)
-- [ ] 1.3 Mutation check — mutations: N tried, N caught
+- [x] 1.1 Test first (`scraper/tests/test_types.py`, `test_errors.py`): add `gone` to `EXPECTED_REASONS` (the set-equality test), `oops` is still rejected; a URL with userinfo or a token query is stored redacted and cut to a maximum length; `JobError(url=...)` is written to `job_errors.url` and `redact` still applies to the detail; every existing error without a URL still stores NULL
+- [x] 1.2 Add `Reason.GONE` and `JobError.url`; `record_error` writes the column through `redact` and a length cap (test PostgreSQL, `scraper/tests/schema.sql` already has `url`)
+- [x] 1.3 Mutation check — mutations: 6 tried, 6 caught
 
 ## 2. Changed, unchanged, reverted, reappeared
 
