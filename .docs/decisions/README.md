@@ -44,8 +44,9 @@ Every ADR file must be listed in the table below (checked by `docs-check.mjs`).
 | [0313](0313-embeddings-model-and-serving.md) | Embeddings: `bge-m3` on the local `ollama` service through OpenAI-compatible `/v1/embeddings`, env-only, no hosted default (depends on [0304](0304-llm-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
 | [0314](0314-topic-gate-and-near-duplicates.md) | Topic gate (dictionary or embedding, drop only when both say no) and near-dups (MinHash, analyzed and grouped, never dropped) (depends on [0313](0313-embeddings-model-and-serving.md)) | accepted (takes effect when the `analytics-embeddings` PR merges) |
 | [0315](0315-m2-art44-element-ownership.md) | M2: one owner rule per art. 44 element (count once); R15 reports every detected forecast, R11 flags only violations | accepted (takes effect when the `analytics-m2-p1-rules` PR merges) |
-| [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted (takes effect when the `analytics-eval-calibration` PR merges) |
-| [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted (takes effect when the `analytics-llm-p0` PR merges) |
+| [0316](0316-default-thresholds-from-evaluation.md) | Default thresholds from the gold-set evaluation (best F1 per module, rules-only; supersedes 0305's default values only) | accepted; M1's "rules-only" superseded by [0318](0318-hosted-llm-deepseek-flash.md) |
+| [0317](0317-hosted-llm-gemma-on-gemini-api.md) | Hosted LLM default: Gemma 4 on the Gemini API (OpenAI-compatible endpoint); supersedes only ADR 0304's provider choice | accepted; provider, model and limits superseded by [0318](0318-hosted-llm-deepseek-flash.md) |
+| [0318](0318-hosted-llm-deepseek-flash.md) | Hosted LLM default: DeepSeek Flash; M1 default threshold 0.75 from the recorded DeepSeek gold run (supersedes 0317's provider and limits, and 0316's rules-only rule for M1 only) | accepted (takes effect when the `analytics-deepseek-default` PR merges) |
 
 ## Candidate topics (evidence only, rationale to be decided by a human)
 
