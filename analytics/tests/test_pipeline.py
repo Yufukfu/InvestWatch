@@ -335,7 +335,9 @@ def test_summary_when_no_rule_applies():
 def test_six_m1_m3_mocks(mock_documents, registry, catalogue, finding_validator):
     """Routing, contract validity and evidence of the six M1/M3 mock documents (read-only test double)."""
     docs = {d["id"]: d for d in mock_documents}
-    expected = {"jan": ["M1"], "kasia": ["M1"], "edu": [], "gold": ["M3"], "vip": ["M3"], "blog": ["M3"]}
+    expected = {"jan": ["M1"], "kasia": ["M1"], "edu": [], "gold": ["M3"], "vip": ["M3"],
+                # analytics-post-integration-fixes: the family-office explainer has vocabulary, no offer
+                "blog": []}
     for key, modules in expected.items():
         findings = run(docs[MOCK[key]], registry, catalogue)
         assert modules_of(findings) == modules, key

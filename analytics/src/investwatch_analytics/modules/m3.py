@@ -31,13 +31,17 @@ from ..rules.scoring import capped, sigmoid_score
 from .excerpt import excerpt
 
 GATE_CAP = 0.4
-#: Signals that indicate an offer at all; without one, an M3-only document gets no finding.
-ADVISORY = ("S3.2", "S3.3", "S3.4", "S3.5", "S3.8")
+#: Signals that indicate an offer at all: what is recommended (S3.4, S3.8), to whom (S3.3), for money (S3.5). Without
+#: one, an M3-only document gets no finding. Service vocabulary (S3.2), an unregistered name (S3.1) and targeting
+#: Poland (S3.6) only weigh in the score of an offer: EY's family-office page scored 0.269 on them alone
+#: (change analytics-post-integration-fixes, design 2).
+OFFER = ("S3.3", "S3.4", "S3.5", "S3.8")
+ADVISORY = OFFER  # the earlier name
 PRESENT = ("fail", "uncertain")
 
 
 def has_advisory(rules: list[RuleResult]) -> bool:
-    return any(r.rule_id in ADVISORY and r.result in PRESENT for r in rules)
+    return any(r.rule_id in OFFER and r.result in PRESENT for r in rules)
 
 
 def score(rules: list[RuleResult], catalogue: Catalogue) -> tuple[float, bool]:
