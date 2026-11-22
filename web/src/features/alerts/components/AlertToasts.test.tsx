@@ -142,4 +142,17 @@ describe('AlertToasts', () => {
     expect(container.querySelector('img')).toBeNull();
     expect(document.activeElement).toBe(before);
   });
+
+  it('keeps a right-to-left override and markup in the title inside its own dir="auto" element', () => {
+    const title = 'Zysk <img src=x onerror=alert(1)> [link](javascript:alert(1)) ‮gpj.exe';
+    const { container } = render(<AlertToasts alerts={[alert({ title })]} announcement="" {...handlers()} />);
+    const toast = container.querySelector('.toast') as HTMLElement;
+    expect(toast.querySelector('img')).toBeNull();
+    expect(within(toast).queryByRole('link')).toBeNull();
+    const el = within(toast).getByText(title);
+    expect(el).toHaveAttribute('dir', 'auto');
+    expect(el.textContent).toBe(title);
+    expect(el).not.toContainElement(within(toast).getByText('Wysokie ryzyko'));
+    expect(within(toast).getAllByRole('button').every((b) => !el.contains(b))).toBe(true);
+  });
 });

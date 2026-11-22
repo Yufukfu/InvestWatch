@@ -9,7 +9,12 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 # Contract snapshot (src/api/openapi.json, generated.ts) is committed, so the image builds without ../contracts.
 # `build` runs tsc -b itself, so no separate typecheck step.
-RUN npm run lint && npx vitest run src && npm run build
+# The Vitest suite is not part of the default image build: on a loaded machine its timing made
+# `docker compose up --build` fail and compose then silently started an older image (issue #60).
+# It runs in CI (`npm test` in .github/workflows/ci.yml) and before each commit; opt in here with
+# `docker compose build --build-arg WEB_RUN_TESTS=1 web`.
+ARG WEB_RUN_TESTS=0
+RUN npm run lint && if [ "$WEB_RUN_TESTS" = "1" ]; then npx vitest run src; fi && npm run build
 
 FROM public.ecr.aws/nginx/nginx-unprivileged:1.29-alpine AS runtime
 COPY nginx.conf /etc/nginx/conf.d/default.conf

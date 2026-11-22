@@ -85,7 +85,9 @@ export function AlertToasts({ alerts, announcement, onOpen, onDismiss, onHold, o
               <span className="risk risk-high">Wysokie ryzyko</span>
               {meta && <span className="toast-meta">{meta}</span>}
             </p>
-            <p className="toast-title">{a.title}</p>
+            <p className="toast-title" dir="auto">
+              {a.title}
+            </p>
             <div className="toast-actions">
               <button
                 type="button"
