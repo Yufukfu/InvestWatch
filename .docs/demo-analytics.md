@@ -4,7 +4,7 @@ The analytics part of the hand-in demo (Sun 2026-11-22, 10:30), to be read next 
 
 ## 0. Stack
 
-- **Where:** a dedicated worktree, detached at `origin/main` `a0ad3d13` (`C:/Users/Damian/HackNation/InvestWatch-worktrees/demo`), so the demo does not depend on whatever branch the main checkout is on.
+- **Where:** a dedicated worktree (`C:/Users/Damian/HackNation/InvestWatch-worktrees/demo`); the running images were built from `origin/main` `a0ad3d13`, so the demo does not depend on whatever branch the main checkout is on. The worktree now holds this docs branch (merged with a newer `main`), so a rebuild there would build newer code: another reason not to rebuild.
 - **Env:** the root `.env`, copied in by a script that never prints values, plus `COMPOSE_PROJECT_NAME=iw-demo`. The LLM lines are those of ADR 0317 with the tested alternative model: `LLM_MODEL=gemma-4-26b-a4b-it`, `LLM_TIMEOUT_S=45`, `LLM_DOC_BUDGET_S=50`, `CLAIM_MIN_IDLE_MS=90000`.
 - **Start:** one command, `docker compose up -d --build`. It passed on the first try, with no override file (all 10 services healthy, `/api/health` `ok`).
 - **URLs:** dashboard `https://localhost:8443/`, API `https://localhost:8443/api/...`. The gateway uses a self-signed certificate: open the dashboard once before the demo and accept the certificate in the browser you will present from.
