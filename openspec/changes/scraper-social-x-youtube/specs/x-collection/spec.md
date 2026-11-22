@@ -23,15 +23,11 @@ The collector SHALL read `X_AUTH_TOKEN` and `X_CT0` from the environment. A miss
 - **THEN** no request is made and one job error with reason `invalid_request` and that detail is recorded
 
 ### Requirement: One document per original post
-The collector SHALL emit one document per original post or quote that has text, with `url` the permalink `https://x.com/<handle>/status/<id>`, `text` the full text as the platform returns it, `published_at` in UTC ISO-8601 from the creation time, `platform` `x`, `source_kind` from the source row, `title` null, `canonical_url` equal to `url`, and `lang` the platform's code when it is two lowercase letters and null otherwise. `scrape_meta.post_id` SHALL hold the post id and `scrape_meta.scraper` SHALL be `api`. `html` SHALL hold the post as JSON restricted to id, text, creation time, language, handle and media count, with no cookie, token or viewer field. A repost of another account's post SHALL be skipped and counted.
+The collector SHALL emit one document per original post or quote that has text, with `url` the permalink `https://x.com/<handle>/status/<id>`, `text` the full text as the platform returns it, `published_at` in UTC ISO-8601 from the creation time, `platform` `x` and `source_kind` from the source row. A repost of another account's post SHALL be skipped and counted.
 
 #### Scenario: Text post
 - **WHEN** the account has a post with id 2123819354898731226, text `Z upoważnienia Komisji…` and creation time `Fri Nov 20 16:42:47 +0000 2026`
 - **THEN** one document is emitted with url `https://x.com/uknf/status/2123819354898731226`, that text and `published_at` `2026-11-20T16:42:47+00:00`
-
-#### Scenario: Language code outside the contract
-- **WHEN** the platform returns the language `und` or `qme`
-- **THEN** the document's `lang` is null and the document is stored
 
 #### Scenario: Repost of another account
 - **WHEN** the timeline contains a repost of another account's post
@@ -41,13 +37,20 @@ The collector SHALL emit one document per original post or quote that has text, 
 - **WHEN** a post has only media and no text
 - **THEN** no document is emitted and it is not a job error
 
-#### Scenario: Stored html holds no viewer data
-- **WHEN** a post is stored
-- **THEN** its `html` parses as JSON with only the listed keys
-
 #### Scenario: Same post collected again
 - **WHEN** the same post is collected in two runs with unchanged text
 - **THEN** one document exists for it
+
+### Requirement: Post fields and stored html
+`title` SHALL be null, `canonical_url` equal to `url`, and `lang` the platform's code when it is two lowercase letters and null otherwise. `scrape_meta.post_id` SHALL hold the post id and `scrape_meta.scraper` SHALL be `api`. `html` SHALL hold the post as JSON restricted to id, text, creation time, language, handle and media count, with no cookie, token or viewer field.
+
+#### Scenario: Language code outside the contract
+- **WHEN** the platform returns the language `und` or `qme`
+- **THEN** the document's `lang` is null and the document is stored
+
+#### Scenario: Stored html holds no viewer data
+- **WHEN** a post is stored
+- **THEN** its `html` parses as JSON with only the listed keys
 
 ### Requirement: Author comes from the source URL
 Every document SHALL carry `author` with `handle` the source URL's handle with a leading `@`, `profile_url` `https://x.com/<handle>`, `name` the display name the platform returns and `followers` its follower count as an integer or null. `handle` and `profile_url` SHALL come from the source URL and never from a post.
@@ -76,7 +79,7 @@ A run SHALL read at most `SOCIAL_MAX_POSTS` posts (default 40, shared with Teleg
 - **THEN** no follower lookup is made
 
 ### Requirement: Stop at the first restriction
-The adapter SHALL report an authentication failure, a challenge, a suspension marker or a rate limit as a restriction (the library gives no separate signal for an empty not-found answer, so an empty timeline is logged and is not an error), and the run SHALL end at once with the job error reason `blocked`, keep documents already stored and make no further call. Nothing deactivates the source automatically: the queue's block handling applies and the owner removes the schedule if the account is lost.
+The adapter SHALL report an authentication failure, a challenge, a suspension marker or a rate limit as a restriction, and the run SHALL end at once with the job error reason `blocked`, keep documents already stored and make no further call.
 
 #### Scenario: Account restricted
 - **WHEN** the adapter reports a restriction on the timeline call or on the follower lookup
@@ -85,6 +88,20 @@ The adapter SHALL report an authentication failure, a challenge, a suspension ma
 #### Scenario: Unknown library error
 - **WHEN** the library fails in a way the adapter cannot classify
 - **THEN** one job error with reason `http_error` (a network failure), `timeout` or `parse_error` (an unreadable answer) is recorded, according to the mapping, and no document is emitted for that call
+
+### Requirement: An empty timeline is not an error
+The library gives no separate signal for an empty not-found answer, so an empty timeline SHALL be logged and SHALL NOT be a job error.
+
+#### Scenario: Empty timeline
+- **WHEN** the timeline call returns no post
+- **THEN** the run stores nothing, logs it and records no job error
+
+### Requirement: A lost account is not deactivated automatically
+Nothing SHALL deactivate the source automatically: the queue's block handling applies and the owner removes the schedule if the account is lost.
+
+#### Scenario: Blocked run leaves the source as it was
+- **WHEN** a run ends with reason `blocked`
+- **THEN** the source stays active and its schedule is not changed
 
 ### Requirement: Malformed posts are skipped, not stored empty
 A post without an id or a creation time SHALL be skipped and counted in the log. If every post of a run is skipped for being malformed, the run SHALL record one job error with reason `parse_error`. A document with empty `text` SHALL never be emitted.

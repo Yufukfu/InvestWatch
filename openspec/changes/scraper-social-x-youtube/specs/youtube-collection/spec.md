@@ -39,7 +39,7 @@ A run SHALL read the channel's video list once through the shared fetch layer, s
 - **THEN** no document is emitted and one job error with reason `parse_error` and the detail "no readable video list" is recorded
 
 ### Requirement: One document per video
-The collector SHALL emit one document per playable video, with `url` `https://www.youtube.com/watch?v=<id>`, `platform` `youtube`, `source_kind` from the source row, `title` the video title, `published_at` the publish date in UTC ISO-8601, `lang` null, `canonical_url` equal to `url`, and `text` the title, the description and the transcript (when there is one) joined by blank lines. `scrape_meta.video_id` SHALL hold the video id and `scrape_meta.transcript` SHALL be `caption`, `none` or `failed`. `html` SHALL hold the video's player data (details, microformat and caption track list) as JSON, without `visitorData` or any token.
+The collector SHALL emit one document per playable video, with `url` `https://www.youtube.com/watch?v=<id>`, `platform` `youtube`, `source_kind` from the source row, `title` the video title, `published_at` the publish date in UTC ISO-8601, `lang` null, `canonical_url` equal to `url`, and `text` the title, the description and the transcript (when there is one) joined by blank lines.
 
 #### Scenario: Video with transcript
 - **WHEN** a video has the title `Film jubileuszowy…`, a description and a transcript
@@ -53,13 +53,16 @@ The collector SHALL emit one document per playable video, with `url` `https://ww
 - **WHEN** a watch page reports the video as unavailable, private or age-restricted
 - **THEN** no document is emitted for it, the count is logged and it is not a job error
 
-#### Scenario: Stored html holds no tokens
-- **WHEN** a video is stored
-- **THEN** its `html` parses as JSON and contains no `visitorData` key
-
 #### Scenario: Same video collected again
 - **WHEN** the same video is collected in two runs
 - **THEN** one document exists for it, and its transcript is not requested again
+
+### Requirement: Video metadata and stored html
+`scrape_meta.video_id` SHALL hold the video id and `scrape_meta.transcript` SHALL be `caption`, `none` or `failed`. `html` SHALL hold the video's player data (details, microformat and caption track list) as JSON, without `visitorData` or any token.
+
+#### Scenario: Stored html holds no tokens
+- **WHEN** a video is stored
+- **THEN** its `html` parses as JSON and contains no `visitorData` key
 
 ### Requirement: Author comes from the source URL
 Every document SHALL carry `author` with `handle` the source URL's handle with a leading `@`, `profile_url` `https://www.youtube.com/@<handle>`, `name` the channel name from the watch page's player data and `followers` null. `handle` and `profile_url` SHALL come from the source URL. A video whose channel id differs from the channel id read from the list page SHALL be skipped and counted.

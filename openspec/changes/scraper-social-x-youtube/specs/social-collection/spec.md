@@ -36,12 +36,15 @@ Social collectors SHALL be registered by host in a registry beside the page-pars
 
 ## ADDED Requirements
 
-### Requirement: Dedicated flows outside the shared fetch path
-The X flow SHALL read through an account-based library with the cookies of a dedicated account and SHALL NOT read `robots.txt`, draw a run identity, open a fetch-layer session or use the proxy rotation: it runs from the home IP (ADR 0109). It SHALL still pass the URL guard, and the per-domain rate limit SHALL apply once before its first request. The YouTube transcript request SHALL use only its own proxy `YT_TRANSCRIPT_PROXY` and no robots check. Every other request of the system keeps the robots rule.
+### Requirement: The X flow runs from the home IP
+The X flow SHALL read through an account-based library with the cookies of a dedicated account and SHALL NOT read `robots.txt`, draw a run identity, open a fetch-layer session or use the proxy rotation: it runs from the home IP (ADR 0109). It SHALL still pass the URL guard, and the per-domain rate limit SHALL apply once before its first request.
 
 #### Scenario: X run passes the guards and skips robots
 - **WHEN** a run starts for an X source
 - **THEN** the URL guard runs, the per-domain limiter is waited once, no `robots.txt` request is made and no proxy of the rotation is used
+
+### Requirement: The transcript request uses its own proxy
+The YouTube transcript request SHALL use only its own proxy `YT_TRANSCRIPT_PROXY` and no robots check. Every other request of the system keeps the robots rule.
 
 #### Scenario: Transcript uses only its own proxy
 - **WHEN** a transcript is requested while `PROXY_LIST` is also set
