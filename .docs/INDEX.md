@@ -16,6 +16,7 @@
 | Store, dedup and announce a document (DB, MinIO, `iw:documents`, republish sweep) | [../scraper/CLAUDE.md](../scraper/CLAUDE.md) (Ingest), [decisions/0104-ingest-order-and-republish-sweep.md](decisions/0104-ingest-order-and-republish-sweep.md) |
 | Produce or consume a finding | [integration-plan.md](integration-plan.md) §4, then [../analytics/CLAUDE.md](../analytics/CLAUDE.md) |
 | Run or operate the analytics worker (env, feeding a document, poison messages, `/health`, registry) | [../analytics/README.md](../analytics/README.md) "Run the worker" and "Configuration", then [../openspec/specs/document-stream-worker/spec.md](../openspec/specs/document-stream-worker/spec.md) |
+| Switch the LLM between hosted Gemma (Gemini API) and local Gemma (Ollama, `--profile llm`) | [../analytics/README.md](../analytics/README.md) "LLM: hosted Gemma or local Ollama", then [decisions/0317-hosted-llm-gemma-on-gemini-api.md](decisions/0317-hosted-llm-gemma-on-gemini-api.md) |
 | Refresh or check the KNF firm registry (`registry/knf.csv`, curated domains, ids) | [../analytics/registry/README.md](../analytics/registry/README.md), then [decisions/0311-knf-registry-source-and-ids.md](decisions/0311-knf-registry-source-and-ids.md) |
 | Build or call the REST API | [integration-plan.md](integration-plan.md) §5 |
 | Know what the API does beyond the contract (risk level, filters, calibration, Socket.IO relay, limits) | [../api/README.md](../api/README.md) "REST and Socket.IO", then [../openspec/specs/rest-api/spec.md](../openspec/specs/rest-api/spec.md) and [../openspec/specs/event-relay/spec.md](../openspec/specs/event-relay/spec.md) |
@@ -35,6 +36,7 @@
 | Start a task, or know the process and review bar | [../.claude/SDLC.md](../.claude/SDLC.md), [../.claude/CODE_REVIEW.md](../.claude/CODE_REVIEW.md) |
 | Update docs after a change | [../.claude/skills/iw-docs-update/SKILL.md](../.claude/skills/iw-docs-update/SKILL.md) |
 | Log AI usage for the jury | [ai-workflow.md](ai-workflow.md) |
+| Let my agent watch GitHub for reviews, review requests and hand-offs from teammates' agents | [../.claude/skills/iw-watch/SKILL.md](../.claude/skills/iw-watch/SKILL.md) |
 
 ## Rules
 
