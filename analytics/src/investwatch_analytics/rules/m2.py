@@ -96,7 +96,7 @@ def _any_exclusion(exclude: list[re.Pattern]) -> re.Pattern | None:
         return entry[1]
     combined = None
     flags = {x.flags for x in exclude}
-    if exclude and len(flags) == 1 and not any(re.search(r"\\[1-9]|\(\?P=|\(\?[aiLmsux-]+\)", x.pattern) for x in exclude):
+    if exclude and len(flags) == 1 and not any(re.search(r"\\[1-9]|\(\?P=|\(\?\(|\(\?[aiLmsux-]+\)", x.pattern) for x in exclude):
         try:
             combined = re.compile("|".join(f"(?:{x.pattern})" for x in exclude), flags.pop())
         except re.error:

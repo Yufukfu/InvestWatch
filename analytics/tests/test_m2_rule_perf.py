@@ -181,3 +181,10 @@ def test_r16_strips_disclaimer_words_only_in_disclaimer_sentences():
     [f] = analyze(doc, registry=registry, catalogue=catalogue, now=NOW)
     r16 = next(r for r in f.rules if r.rule_id == "R16")
     assert r16.result != "not_applicable"
+
+
+def test_conditional_group_reference_falls_back():
+    exclude = [re.compile(r"(a)?(?(1)b|c)"), re.compile("z")]
+    assert m2._any_exclusion(exclude) is None
+    for t in ["ab", "c", "zz", "xyz"]:
+        assert m2.blank_exclusions(t, exclude) == sequential(t, exclude)
