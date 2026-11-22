@@ -32,7 +32,7 @@ async def test_error_without_url_stores_null(pool):
 
 
 async def test_url_is_stored_on_the_row(pool):
-    await record_error(pool, JobError(Reason.GONE, "HTTP 410", None, url="https://example.com/ad/1"))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", None, url="https://example.com/ad/1"))
     assert await stored_urls(pool) == ["https://example.com/ad/1"]
 
 
@@ -45,19 +45,19 @@ async def test_url_is_stored_on_the_row(pool):
     ],
 )
 async def test_url_credentials_are_not_recorded(pool, url, secret):
-    await record_error(pool, JobError(Reason.GONE, "HTTP 404", None, url=url))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", None, url=url))
     stored = await stored_urls(pool)
     assert secret not in stored[0]
     assert stored[0].startswith("https://")
 
 
 async def test_long_url_is_capped(pool):
-    await record_error(pool, JobError(Reason.GONE, "HTTP 404", None, url="https://example.com/" + "a" * 5000))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", None, url="https://example.com/" + "a" * 5000))
     assert len((await stored_urls(pool))[0]) == 300
 
 
 async def test_detail_is_still_redacted_when_a_url_is_given(pool):
-    await record_error(pool, JobError(Reason.GONE, "password=hunter2", None, url="https://example.com/ad"))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "password=hunter2", None, url="https://example.com/ad"))
     assert "hunter2" not in (await rows(pool))[0]["detail"]
 
 

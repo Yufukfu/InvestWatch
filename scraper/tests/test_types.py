@@ -9,7 +9,6 @@ EXPECTED_REASONS = {
     "blocked_target",
     "timeout",
     "http_error",
-    "gone",
     "parse_error",
     "empty_text",
     "schema_invalid",

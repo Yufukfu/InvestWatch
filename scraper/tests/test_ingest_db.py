@@ -6,6 +6,8 @@ import uuid
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from iw_scraper.ingest.document import build_document
 from iw_scraper.ingest.errors import record_error
 from iw_scraper.ingest.store import insert_document, is_duplicate, previous_document, removal_state
@@ -154,9 +156,9 @@ async def stored(pool, source, text, at: datetime, doc_id: str | None = None) ->
 
 
 async def gone_at(pool, source, at: datetime) -> None:
-    await record_error(pool, JobError(Reason.GONE, "HTTP 410", source.id, url=source.url))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", source.id, url=source.url))
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE job_errors SET occurred_at = $1 WHERE reason = 'gone'", at)
+        await conn.execute("UPDATE job_errors SET occurred_at = $1 WHERE reason = 'http_error'", at)
 
 
 async def test_removal_state_of_a_source_with_no_document(pool, seeded_source):
@@ -194,13 +196,20 @@ async def test_gone_at_the_same_instant_as_the_newest_document_is_not_newer(pool
 
 async def test_gone_of_another_source_does_not_count(pool, seeded_source):
     await stored(pool, seeded_source, "A", minutes(0))
-    await record_error(pool, JobError(Reason.GONE, "HTTP 410", str(uuid.uuid4())))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", str(uuid.uuid4())))
     assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
 
 
-async def test_only_gone_errors_count_as_removal(pool, seeded_source):
+@pytest.mark.parametrize("detail", ["HTTP 503", "HTTP 4040", "transport error: HTTP 404"])
+async def test_only_a_404_or_410_http_error_counts_as_removal(pool, seeded_source, detail):
     await stored(pool, seeded_source, "A", minutes(0))
-    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 503", seeded_source.id))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, detail, seeded_source.id, url=seeded_source.url))
+    assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
+
+
+async def test_a_404_without_a_url_is_a_failed_run_not_a_removal(pool, seeded_source):
+    await stored(pool, seeded_source, "A", minutes(0))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", seeded_source.id))  # the url is only set by `record_gone`
     assert (await removal_state(pool, seeded_source.id)).gone_is_newer is False
 
 

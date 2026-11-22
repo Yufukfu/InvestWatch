@@ -113,7 +113,7 @@ class Ingestor:
         return await self._with_previous(result, doc)
 
     async def rescan_state(self, source_id: str) -> RemovalState | None:
-        """The newest stored document of the source and whether a `gone` is newer; None when the lookup fails."""
+        """The newest stored document of the source and whether a removal row is newer; None when the lookup fails."""
         try:
             return await removal_state(self.pool, source_id)
         except Exception as exc:  # informational: a failing lookup is logged and never fails a run
@@ -121,13 +121,13 @@ class Ingestor:
             return None
 
     async def record_gone(self, source: Source, status: int, *, already_recorded: bool = False) -> None:
-        """A web page answered 404 or 410 twice: store one `gone` job error with the source URL, and log it.
+        """A web page answered 404 or 410 twice: store one `http_error` job error (`HTTP 404`/`HTTP 410`, the shape the api reads) with the source URL, and log it.
 
-        `already_recorded` is a re-scan that found the page still missing after a `gone` that is newer than its
+        `already_recorded` is a re-scan that found the page still missing after a removal row that is newer than its
         newest document: only the log line is written. Never raises; it observes, it does not fail the run.
         """
         if not already_recorded:
-            await self._record(JobError(Reason.GONE, f"HTTP {status}", source.id, url=source.url))
+            await self._record(JobError(Reason.HTTP_ERROR, f"HTTP {status}", source.id, url=source.url))
         self._log_outcome("gone", source.id, None)
 
     async def _with_previous(self, result: IngestResult, doc: dict) -> IngestResult:

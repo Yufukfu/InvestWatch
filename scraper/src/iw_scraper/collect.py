@@ -159,7 +159,7 @@ class Collector:
     async def _fetch_web(
         self, source: Source, identity, session, proxy, guard, domain: str
     ) -> tuple[FetchResult, int] | AttemptResult:
-        """Fetch the page; a 404 or 410 on a source that stored a document is confirmed once and recorded as `gone`.
+        """Fetch the page; a 404 or 410 on a source that stored a document is confirmed once and recorded as a removal.
 
         `fetch()` follows redirects itself, so a redirect that ends in 404 looks like a 404 on the source URL.
         The confirmation is the same run's second observation, not a retry: any other answer to it keeps its own

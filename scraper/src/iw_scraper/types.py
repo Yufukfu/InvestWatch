@@ -16,7 +16,6 @@ class Reason(StrEnum):
     BLOCKED_TARGET = "blocked_target"
     TIMEOUT = "timeout"
     HTTP_ERROR = "http_error"
-    GONE = "gone"
     PARSE_ERROR = "parse_error"
     EMPTY_TEXT = "empty_text"
     SCHEMA_INVALID = "schema_invalid"

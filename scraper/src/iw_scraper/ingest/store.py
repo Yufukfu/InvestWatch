@@ -20,7 +20,7 @@ class IngestResult:
 
 @dataclass(frozen=True)
 class RemovalState:
-    """The newest document of a source and whether a `gone` job error is newer than it."""
+    """The newest document of a source and whether a removal job error is newer than it."""
 
     document_id: str | None
     content_hash: str | None
@@ -90,12 +90,13 @@ async def insert_document(pool: asyncpg.Pool, doc: dict) -> IngestResult:
 
 
 async def removal_state(pool: asyncpg.Pool, source_id: str) -> RemovalState:
-    """Newest document of the source ("newest" is `created_at DESC, id DESC`) and the newest `gone` error."""
+    """Newest document of the source ("newest" is `created_at DESC, id DESC`) and the newest removal row: an `http_error` `HTTP 404`/`HTTP 410` with a url (what `record_gone` writes, what the api reads)."""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
             SELECT d.id, d.content_hash, d.created_at,
-                   (SELECT max(occurred_at) FROM job_errors WHERE source_id = $1 AND reason = 'gone') AS gone_at
+                   (SELECT max(occurred_at) FROM job_errors WHERE source_id = $1 AND reason = 'http_error'
+                      AND detail ~ '^HTTP (404|410)$' AND url IS NOT NULL) AS gone_at
             FROM (SELECT 1) AS one
             LEFT JOIN LATERAL (
               SELECT id, content_hash, created_at FROM documents WHERE source_id = $1

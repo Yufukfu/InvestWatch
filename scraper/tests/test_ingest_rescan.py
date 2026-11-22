@@ -102,7 +102,7 @@ async def test_page_returning_to_an_earlier_text_is_reverted(pool, ingestor, see
 
 async def test_page_back_after_a_removal_is_reappeared(pool, ingestor, seeded_source, caplog):
     await scan(ingestor, seeded_source, "A")
-    await record_error(pool, JobError(Reason.GONE, "HTTP 410", seeded_source.id, url=seeded_source.url))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 410", seeded_source.id, url=seeded_source.url))
     caplog.clear()
     result = await scan(ingestor, seeded_source, "A")
     assert result.outcome == "duplicate"
@@ -165,7 +165,7 @@ async def test_rescan_state_reports_the_stored_document_and_removal(pool, ingest
     first = await scan(ingestor, seeded_source, "A")
     state = await ingestor.rescan_state(seeded_source.id)
     assert (state.document_id, state.gone_is_newer) == (first.document_id, False)
-    await record_error(pool, JobError(Reason.GONE, "HTTP 404", seeded_source.id, url=seeded_source.url))
+    await record_error(pool, JobError(Reason.HTTP_ERROR, "HTTP 404", seeded_source.id, url=seeded_source.url))
     assert (await ingestor.rescan_state(seeded_source.id)).gone_is_newer is True
 
 
@@ -196,7 +196,7 @@ async def test_record_gone_stores_one_row_with_the_source_url_and_logs_gone(pool
     await ingestor.record_gone(seeded_source, 410)
     [row] = await job_errors(pool)
     assert (str(row["source_id"]), row["url"], row["reason"], row["detail"]) == (
-        seeded_source.id, seeded_source.url, "gone", "HTTP 410",
+        seeded_source.id, seeded_source.url, "http_error", "HTTP 410",
     )
     assert [l["outcome"] for l in outcomes(caplog)] == ["gone"]
 

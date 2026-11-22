@@ -101,8 +101,11 @@ async def _settled(events, source_id) -> bool:
     return len(await finished(events, source_id)) >= 1
 
 
-# The two queries the api runs to label a web source (design decisions 1 and 2 of `scraper-rescan-tracking`, issue 71).
-# "Changed" is asked of one document, "removed" of one source; "newer" is strictly greater everywhere.
+# "Changed" is the scraper's proposal (design decision 1 of `scraper-rescan-tracking`, issue 71); the api's own
+# query differs. "Removed" copies the predicate of `api/src/investwatch_api/rescan.py` (`rescan_state`, on main):
+# `job_errors` of the source, `url` in {canonical_url or url, url}, `reason = 'http_error'`, `detail` matching
+# GONE_DETAIL, `occurred_at` after the newest fetch of the page. If the scraper writes another reason or detail,
+# this fails; the SQL below must be kept equal to that file.
 CHANGED_SQL = """
 SELECT EXISTS (
   SELECT 1 FROM documents newer
@@ -110,22 +113,29 @@ SELECT EXISTS (
 ) FROM documents d WHERE d.id = $1
 """
 REMOVED_SQL = """
-SELECT COALESCE(
-  (SELECT max(occurred_at) FROM job_errors WHERE source_id = $1 AND reason = 'gone')
-  > (SELECT max(created_at) FROM documents WHERE source_id = $1),
-  false)
+WITH page AS (
+  SELECT coalesce(canonical_url, url) AS key, url, max(fetched_at) OVER () AS last_seen
+  FROM documents WHERE source_id = $1 ORDER BY fetched_at DESC, created_at DESC LIMIT 1
+)
+SELECT EXISTS (
+  SELECT 1 FROM job_errors e, page
+  WHERE e.source_id = $1
+    AND e.url IN (page.key, page.url)
+    AND e.reason = 'http_error'
+    AND e.detail ~ '^HTTP (404|410)$'  -- GONE_DETAIL of rescan.py
+    AND e.occurred_at > page.last_seen)
 """
 
 
 async def derived(pool, source_id: str, first_document: str) -> tuple[bool, bool]:
-    """(first document is changed, source is removed) as the api derives them."""
+    """(first document is changed by the proposed rule, source is removed by the api's removal predicate)."""
     return (
         await pool.fetchval(CHANGED_SQL, uuid.UUID(first_document)),
         await pool.fetchval(REMOVED_SQL, uuid.UUID(source_id)),
     )
 
 
-async def test_a_page_is_edited_reverted_removed_and_comes_back_and_the_api_derivation_follows(
+async def test_a_page_is_edited_reverted_removed_and_comes_back_and_the_derivations_follow(
     pool, storage, stub, events
 ):
     source_id = await seed(pool, stub)
@@ -161,7 +171,7 @@ async def test_a_page_is_edited_reverted_removed_and_comes_back_and_the_api_deri
         assert await rescan(4) == {"source_id": source_id, "documents": 0, "status": "ok"}
         assert page_requests() - before == 2
         assert await document_count(pool, source_id) == 2
-        gone = await pool.fetch("SELECT url, detail FROM job_errors WHERE source_id = $1 AND reason = 'gone'", uuid.UUID(source_id))
+        gone = await pool.fetch("SELECT url, detail FROM job_errors WHERE source_id = $1 AND reason = 'http_error' AND detail ~ '^HTTP (404|410)$'", uuid.UUID(source_id))
         assert [(r["url"], r["detail"]) for r in gone] == [(stub.url(PAGE), "HTTP 410")]
         assert await derived(pool, source_id, first) == (True, True)
         assert (await pool.fetchrow("SELECT last_run_status FROM sources WHERE id = $1", uuid.UUID(source_id)))[0] == "ok"
@@ -169,7 +179,7 @@ async def test_a_page_is_edited_reverted_removed_and_comes_back_and_the_api_deri
         before = page_requests()  # still removed: one request, no second row
         assert await rescan(5) == {"source_id": source_id, "documents": 0, "status": "ok"}
         assert page_requests() - before == 1
-        assert await pool.fetchval("SELECT count(*) FROM job_errors WHERE reason = 'gone'") == 1
+        assert await pool.fetchval("SELECT count(*) FROM job_errors WHERE reason = 'http_error' AND detail ~ '^HTTP (404|410)$'") == 1
 
         stub.route(PAGE, body=original)  # back, unchanged text
         assert await rescan(6) == {"source_id": source_id, "documents": 0, "status": "ok"}
