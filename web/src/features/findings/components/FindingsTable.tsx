@@ -115,6 +115,7 @@ export function FindingsTable({ rows, total, sort, onSort, selectedId, onSelect,
                   <button type="button" className="link" dir="auto" onClick={() => onSelect(f.id)}>
                     {f.title}
                   </button>
+                  {f.host && <span className="row-host">{f.host}</span>}
                 </td>
                 <td role="cell" className="col-module">
                   <span className="module" title={MODULE_LABEL[f.module]}>

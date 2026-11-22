@@ -67,6 +67,6 @@ The first screenshot review (8.3) found the built look diverges from the mockups
 
 ## 9. Closing tasks
 
-- [x] 9.1 Apply the `iw-docs-update` skill (update `web/CLAUDE.md` if its rules changed, `.docs/status/dashboard.md` for the redesign, any ADR needed for the font dependencies), run `docs-check`, and add the `iw-ai-log` row (ADR 0213, `.docs/status/dashboard.md`, `design.md` figure corrected, AI log row; `docs-check: ok`)
+- [x] 9.1 Apply the `iw-docs-update` skill (update `web/CLAUDE.md` if its rules changed, `.docs/status/dashboard.md` for the redesign, any ADR needed for the font dependencies), run `docs-check`, and add the `iw-ai-log` row (ADR 0214, `.docs/status/dashboard.md`, `design.md` figure corrected, AI log row; `docs-check: ok`)
 - [x] 9.2 Run the `iw-pr-review` skill and fix real findings (whole-branch `iw-reviewer` on `3579890f..75ee06af`: one real finding, the unisolated search text in the filter chip, fixed test-first in `e362ff55`; the "could not check" item is the real-screen-reader behaviour of the explicit table roles on the phone card layout)
 - [x] 9.3 Raise the bulk actions, export and M2 coverage strip as an issue assigned to Damian, noting that contracts are frozen (issue #115)

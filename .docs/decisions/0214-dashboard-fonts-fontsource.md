@@ -1,4 +1,4 @@
-# 0213. Dashboard fonts: self-hosted static `@fontsource` packages
+# 0214. Dashboard fonts: self-hosted static `@fontsource` packages
 
 - Status: accepted
 - Date: 2026-11-22

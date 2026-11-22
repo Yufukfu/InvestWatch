@@ -173,3 +173,42 @@ def social_max_posts() -> int:
     if value < 1:
         raise ValueError("SOCIAL_MAX_POSTS must be a whole number of posts, at least 1")
     return value
+
+
+DEFAULT_YOUTUBE_MAX_VIDEOS = 10
+
+
+def youtube_max_videos() -> int:
+    """`YOUTUBE_MAX_VIDEOS`: how many of a channel's newest videos one run reads at most."""
+    try:
+        value = int(os.environ.get("YOUTUBE_MAX_VIDEOS", DEFAULT_YOUTUBE_MAX_VIDEOS))
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise ValueError("YOUTUBE_MAX_VIDEOS must be a whole number of videos, at least 1")
+    return value
+
+
+def yt_transcript_proxy() -> str | None:
+    """`YT_TRANSCRIPT_PROXY`: the HTTP proxy URL of the transcript request; None (unset or empty) turns transcripts off.
+
+    A bad value is refused without echoing it: it holds the proxy's credentials.
+    """
+    value = os.environ.get("YT_TRANSCRIPT_PROXY", "").strip()
+    if not value:
+        return None
+    try:
+        parts = urlsplit(value)
+        valid = parts.scheme in ("http", "https") and bool(parts.hostname)
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("YT_TRANSCRIPT_PROXY must be an http(s) proxy URL such as http://user:password@host:port") from None
+    return value
+
+
+def x_cookies() -> tuple[str, str] | None:
+    """`X_AUTH_TOKEN` and `X_CT0` of the dedicated X account; None when either is unset or empty."""
+    auth_token = os.environ.get("X_AUTH_TOKEN", "").strip()
+    ct0 = os.environ.get("X_CT0", "").strip()
+    return (auth_token, ct0) if auth_token and ct0 else None

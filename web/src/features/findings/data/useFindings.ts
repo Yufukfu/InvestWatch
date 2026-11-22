@@ -5,6 +5,16 @@ import { hasTriageFlag, parseFilters, parseSelected, serializeUrl, toQueryArg, t
 import { FINDINGS_SECTION, goToSection } from '../../../url/section';
 import { useUrlSearch } from '../../../url/useUrlSearch';
 
+// Only http(s) URLs give a host; scraped data may hold anything else.
+function httpHost(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.hostname : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // The generated DTO stops here. `module` and `status` are assigned from the generated unions, so a
 // contract change that adds a value fails to compile in this file instead of leaking into components.
 function toRow(f: Finding): FindingRow {
@@ -17,6 +27,9 @@ function toRow(f: Finding): FindingRow {
     riskLevel: f.risk_level,
     status: f.status,
     detectedAt: f.detected_at,
+    documentId: f.document_id,
+    url: f.url,
+    host: httpHost(f.url),
   };
 }
 

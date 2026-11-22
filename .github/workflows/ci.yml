@@ -1,11 +1,17 @@
 name: ci
 
-# Not a merge gate for now: manual only, to keep the 24h hackathon fast. Run it from the Actions tab
-# before milestones and hand-in to get a recorded dependency audit (jury criterion).
-# Later, as part of the full SDLC: add `pull_request` and `push: main` triggers and make the jobs
-# required checks in branch protection.
+# Runs on every PR to main and by hand (ADR 0213). Advisory, not a required check: required checks need a paid
+# plan or a public repo, so a red job is caught in review, and a PR is not merged with it red unless the PR body
+# says why the failure is unrelated.
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+# A new push to the same PR cancels the older run, so it does not spend Actions minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

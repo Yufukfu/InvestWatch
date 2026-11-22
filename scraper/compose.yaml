@@ -89,6 +89,12 @@ services:
       SCRAPER_ATTEMPT_TIMEOUT: ${SCRAPER_ATTEMPT_TIMEOUT:-180}
       RENDERER_URL: http://renderer:8080
       RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-90}
+      # Social collectors (ADR 0109): the dedicated X account's cookies, the transcript proxy and the video cap.
+      # Cookies and the proxy URL are credentials: root .env only. Scweet has no telemetry switch (checked in gate 1.1).
+      X_AUTH_TOKEN: ${X_AUTH_TOKEN:-}
+      X_CT0: ${X_CT0:-}
+      YT_TRANSCRIPT_PROXY: ${YT_TRANSCRIPT_PROXY:-}
+      YOUTUBE_MAX_VIDEOS: ${YOUTUBE_MAX_VIDEOS:-10}
     depends_on:
       api-migrate: { condition: service_completed_successfully }
       seed: { condition: service_completed_successfully }

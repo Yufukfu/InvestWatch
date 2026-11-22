@@ -12,6 +12,7 @@ import {
   SEVERITY_LABEL,
   STATUS_LABEL,
 } from './labels';
+import { RescanNotice } from './RescanNotice';
 import { RiskBadge } from './RiskBadge';
 
 type Props = {
@@ -21,6 +22,8 @@ type Props = {
   notFound: boolean;
   onClose: () => void;
   statusEditor?: ReactNode;
+  // Shown above the module-specific part when the material has findings of several modules.
+  moduleSwitcher?: ReactNode;
 };
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
@@ -98,7 +101,7 @@ function Screenshot({ src }: { src: string }) {
   return <img className="shot" src={src} alt="Zrzut ekranu materiału (desktop)" loading="lazy" onError={() => setFailed(true)} />;
 }
 
-function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode }) {
+function Body({ d, statusEditor, moduleSwitcher }: { d: FindingDetail; statusEditor?: ReactNode; moduleSwitcher?: ReactNode }) {
   const signal = d.module !== 'M2';
   const issues = d.rules
     .filter((r) => r.result === 'fail' || r.result === 'uncertain')
@@ -113,6 +116,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
 
   return (
     <>
+      {moduleSwitcher}
       <dl className="facts" aria-label="Dane zgłoszenia">
         <div className="fact-score">
           <dt>Wynik</dt>
@@ -143,6 +147,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
           </dd>
         </div>
       </dl>
+      <RescanNotice rescan={d.rescan} />
 
       {(d.firm || d.advertiser) && (
         <div className="parties">
@@ -253,7 +258,7 @@ function Body({ d, statusEditor }: { d: FindingDetail; statusEditor?: ReactNode 
 // Side panel with the finding detail. Scraped and model-written text is rendered as React text only,
 // each value alone in a dir="auto" element: an element with dir is a bidi isolate, so a U+202E in a
 // quote cannot reorder the UI text around it (issue #54).
-export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClose, statusEditor }: Props) {
+export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClose, statusEditor, moduleSwitcher }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   // The alert toasts move into the dialog while it is open, so they stay reachable and announced.
@@ -307,10 +312,10 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
   if (notFound) alert = <p role="alert">To zgłoszenie nie istnieje.</p>;
   else if (isError && detail) {
     alert = <p role="alert">Nie udało się odświeżyć szczegółów; pokazano ostatnio pobrane dane.</p>;
-    main = <Body d={detail} statusEditor={statusEditor} />;
+    main = <Body d={detail} statusEditor={statusEditor} moduleSwitcher={moduleSwitcher} />;
   } else if (isError) alert = <p role="alert">Nie udało się pobrać szczegółów zgłoszenia.</p>;
   else if (isLoading || !detail) main = <p className="muted" role="status">Ładowanie szczegółów…</p>;
-  else main = <Body d={detail} statusEditor={statusEditor} />;
+  else main = <Body d={detail} statusEditor={statusEditor} moduleSwitcher={moduleSwitcher} />;
   const content = (
     <>
       {alert}
@@ -353,9 +358,16 @@ export function FindingDetailPanel({ detail, isLoading, isError, notFound, onClo
           )}
           <h2 id="detail-title" dir="auto">{detail && !notFound ? detail.title : 'Szczegóły zgłoszenia'}</h2>
         </div>
-        <button ref={closeRef} type="button" className="btn" onClick={onClose}>
-          Zamknij
-        </button>
+        <div className="detail-actions">
+          {detail?.exportUrl && !notFound && (
+            <a className="btn" href={detail.exportUrl} target="_blank" rel="noopener noreferrer">
+              Eksportuj<span className="sr-label"> (pakiet dowodowy do druku, nowa karta)</span>
+            </a>
+          )}
+          <button ref={closeRef} type="button" className="btn" onClick={onClose}>
+            Zamknij
+          </button>
+        </div>
       </div>
       <div ref={setAlertSlot} className="detail-alerts" />
       {content}

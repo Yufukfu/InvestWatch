@@ -527,6 +527,9 @@ def main():
         by_platform={p: sum(1 for f in findings if f["platform"] == p) for p in sorted({f["platform"] for f in findings})},
         by_risk_level={r: sum(1 for f in findings if f["risk_level"] == r) for r in ("high", "medium", "low")},
         last_scan_at=iso(NOW - timedelta(minutes=25)),
+        m2_coverage=dict(total=sum(1 for f in findings if f["module"] == "M2"),
+                         registry_matched=sum(1 for f in findings if f["module"] == "M2"
+                                              and (f.get("firm") or {}).get("registry_id"))),
     )
     write("summary.json", summary)
     for m in ("M1", "M2", "M3"):

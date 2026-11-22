@@ -212,6 +212,114 @@ describe('FindingsPage', () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(within(dialog).getByRole('status')).toHaveTextContent('Zapisano.');
   });
+
+  describe('module switcher (one post, several modules)', () => {
+    // The contract mocks hold one post with an M1 and an M3 finding; their details are built here
+    // from the detail mock, each with its own rule, so the test can tell which module is shown.
+    const shared = (i: (typeof findings.items)[number]) => findings.items.filter((x) => x.document_id === i.document_id).length > 1;
+    const m1 = findings.items.find((i) => i.module === 'M1' && shared(i))!;
+    const m3 = findings.items.find((i) => i.module === 'M3' && i.document_id === m1.document_id)!;
+    const ruleOf = (id: string, name: string) => ({ ...detail.rules[0], rule_id: id, name, result: 'fail' as const });
+    const details: Record<string, object> = {
+      [m1.id]: { ...detail, ...m1, rules: [ruleOf('S1.1', 'Reklama firmy przez finfluencera')] },
+      [m3.id]: { ...detail, ...m3, rules: [ruleOf('S3.1', 'Płatne sygnały transakcyjne')] },
+    };
+
+    function documentApi(opts: { siblings?: 'ok' | 'error' } = {}) {
+      const seen: URLSearchParams[] = [];
+      server.use(
+        http.get('http://localhost/api/findings', ({ request }) => {
+          const p = new URL(request.url).searchParams;
+          seen.push(p);
+          const doc = p.get('document_id');
+          if (doc && opts.siblings === 'error') return HttpResponse.error();
+          let items = doc ? findings.items.filter((i) => i.document_id === doc) : findings.items;
+          if (p.get('module')) items = items.filter((i) => i.module === p.get('module'));
+          return HttpResponse.json({ ...findings, items, total: items.length });
+        }),
+        http.get('http://localhost/api/findings/:id', ({ params }) =>
+          details[params.id as string]
+            ? HttpResponse.json(details[params.id as string] as Record<string, unknown>)
+            : HttpResponse.json({ error: 'finding not found' }, { status: 404 }),
+        ),
+      );
+      return seen;
+    }
+
+    it('switches from M1 to M3: URL, rules and focus on the switcher', async () => {
+      documentApi();
+      window.history.replaceState(null, '', `/?finding=${m1.id}`);
+      render(<FindingsPage />, { wrapper: storeWrapper() });
+      const dialog = await screen.findByRole('dialog');
+      const nav = await within(dialog).findByRole('navigation', { name: 'Moduły tego materiału' });
+      expect(within(nav).getByRole('button', { name: /M1/ })).toHaveAttribute('aria-current', 'true');
+      expect(within(dialog).getByText('Reklama firmy przez finfluencera')).toBeInTheDocument();
+      fireEvent.click(within(nav).getByRole('button', { name: /M3/ }));
+      expect(window.location.search).toBe(`?finding=${m3.id}`);
+      const next = await screen.findByRole('dialog');
+      expect(await within(next).findByText('Płatne sygnały transakcyjne')).toBeInTheDocument();
+      expect(within(next).queryByText('Reklama firmy przez finfluencera')).toBeNull();
+      await waitFor(() => expect(within(next).getByRole('button', { name: /M3/ })).toHaveFocus());
+      expect(within(next).getByRole('button', { name: /M3/ })).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('opening a finding from the list keeps focus on Zamknij, not on the switcher', async () => {
+      documentApi();
+      render(<FindingsPage />, { wrapper: storeWrapper() });
+      fireEvent.click(await screen.findByRole('button', { name: m1.title }));
+      const dialog = await screen.findByRole('dialog');
+      await within(dialog).findByRole('navigation', { name: 'Moduły tego materiału' });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(within(dialog).getByRole('button', { name: 'Zamknij' })).toHaveFocus();
+    });
+
+    it('the back button returns to the M1 detail', async () => {
+      documentApi();
+      window.history.replaceState(null, '', `/?finding=${m1.id}`);
+      render(<FindingsPage />, { wrapper: storeWrapper() });
+      const nav = await screen.findByRole('navigation', { name: 'Moduły tego materiału' });
+      fireEvent.click(within(nav).getByRole('button', { name: /M3/ }));
+      expect(await screen.findByText('Płatne sygnały transakcyjne')).toBeInTheDocument();
+      await act(async () => {
+        window.history.back();
+        await new Promise<void>((r) => window.addEventListener('popstate', () => r(), { once: true }));
+      });
+      expect(window.location.search).toBe(`?finding=${m1.id}`);
+      expect(await screen.findByText('Reklama firmy przez finfluencera')).toBeInTheDocument();
+    });
+
+    it('shows no switcher when the document has only the open finding', async () => {
+      window.history.replaceState(null, '', `/?finding=${detail.id}`);
+      render(<FindingsPage />, { wrapper: storeWrapper() });
+      expect(await screen.findByRole('heading', { level: 2, name: detail.title })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(screen.queryByRole('navigation', { name: 'Moduły tego materiału' })).toBeNull();
+    });
+
+    it('a failed sibling request hides only the switcher', async () => {
+      const seen = documentApi({ siblings: 'error' });
+      window.history.replaceState(null, '', `/?finding=${m1.id}`);
+      render(<FindingsPage />, { wrapper: storeWrapper() });
+      const dialog = await screen.findByRole('dialog');
+      expect(await within(dialog).findByText('Reklama firmy przez finfluencera')).toBeInTheDocument();
+      await waitFor(() => expect(seen.some((p) => p.has('document_id'))).toBe(true));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(within(dialog).queryByRole('navigation', { name: 'Moduły tego materiału' })).toBeNull();
+      expect(dialog).not.toHaveTextContent('Nie udało się');
+      for (const radio of within(within(dialog).getByRole('radiogroup', { name: 'Status' })).getAllByRole('radio')) expect(radio).toBeEnabled();
+    });
+
+    it('a list filtered to M1 still offers M3 in the switcher', async () => {
+      const seen = documentApi();
+      window.history.replaceState(null, '', `/?module=M1&finding=${m1.id}`);
+      render(<FindingsPage />, { wrapper: storeWrapper() });
+      const nav = await screen.findByRole('navigation', { name: 'Moduły tego materiału' });
+      expect(within(nav).getByRole('button', { name: /M3/ })).toBeInTheDocument();
+      const sibling = seen.find((p) => p.has('document_id'))!;
+      expect(sibling.get('document_id')).toBe(m1.document_id);
+      expect(sibling.has('module')).toBe(false);
+    });
+  });
 });
 
 describe('FindingsPage keyboard shortcuts', () => {

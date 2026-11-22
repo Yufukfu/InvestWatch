@@ -50,6 +50,12 @@ class PgSourceStore:
             "UPDATE sources SET last_run_at = $2, last_run_status = $3 WHERE id = $1", uuid.UUID(source_id), at, status
         )
 
+    async def known_urls(self, urls: Sequence[str]) -> set[str]:
+        if not urls:
+            return set()
+        records = await self._pool.fetch("SELECT url FROM documents WHERE url = ANY($1::text[])", list(urls))
+        return {record["url"] for record in records}
+
     async def collectable(self) -> Sequence[Source]:
         """Every active source a collector reads (`Source.collectable`): the hosts a run may be redirected to are theirs."""
         records = await self._pool.fetch(f"SELECT {_COLUMNS} FROM sources WHERE active")

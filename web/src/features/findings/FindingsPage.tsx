@@ -1,20 +1,32 @@
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { FindingDetailPanel } from './components/FindingDetailPanel';
 import { FindingsFilters } from './components/FindingsFilters';
 import { FindingsPager } from './components/FindingsPager';
 import { FindingsTable } from './components/FindingsTable';
 import { safeHttpUrl } from './components/labels';
+import { ModuleSwitcher } from './components/ModuleSwitcher';
 import { ShortcutLegend } from './components/ShortcutLegend';
 import { StatusEditor } from './components/StatusEditor';
+import { useDocumentFindings } from './data/useDocumentFindings';
 import { useFindingDetail } from './data/useFindingDetail';
 import { useFindingShortcuts, type ShortcutTarget } from './data/useFindingShortcuts';
 import { useFindings } from './data/useFindings';
 import { useStatusChange } from './data/useStatusChange';
 
-function DetailContainer({ id, onClose, targetRef }: { id: string; onClose: () => void; targetRef: RefObject<ShortcutTarget | null> }) {
+type DetailProps = {
+  id: string;
+  onClose: () => void;
+  onSwitch: (id: string) => void;
+  focusSwitcher: boolean;
+  targetRef: RefObject<ShortcutTarget | null>;
+};
+
+function DetailContainer({ id, onClose, onSwitch, focusSwitcher, targetRef }: DetailProps) {
   const d = useFindingDetail(id);
   const change = useStatusChange(id);
+  const siblings = useDocumentFindings(d.detail?.documentId);
+  const switcher = <ModuleSwitcher options={siblings} currentId={id} onSelect={onSwitch} autoFocus={focusSwitcher} />;
   // The shortcuts act through this detail's own mutation, so an error shows here like a mouse change would.
   const { save, isSaving } = change;
   const status = d.detail?.status;
@@ -35,7 +47,7 @@ function DetailContainer({ id, onClose, targetRef }: { id: string; onClose: () =
       error={change.error}
     />
   );
-  return <FindingDetailPanel {...d} onClose={onClose} statusEditor={editor} />;
+  return <FindingDetailPanel {...d} onClose={onClose} statusEditor={editor} moduleSwitcher={switcher} />;
 }
 
 export function FindingsPage() {
@@ -46,6 +58,12 @@ export function FindingsPage() {
     [],
   );
   useFindingShortcuts({ rows: f.rows, selectedId: f.selectedId, select: f.select, targetRef, focusSearch });
+  // The finding opened from the module switcher; its panel puts focus back on the switcher.
+  const [switchedTo, setSwitchedTo] = useState<string>();
+  const switchTo = (id: string) => {
+    setSwitchedTo(id);
+    f.select(id);
+  };
   return (
     <section className="panel findings-panel" aria-labelledby="findings-heading">
       <div className="panel-header">
@@ -87,7 +105,14 @@ export function FindingsPage() {
           <div className="detail-layer">
             <div className="detail-backdrop" aria-hidden="true" onClick={() => f.select(undefined)} />
             {/* key: a new selection remounts the panel, so focus handling restarts per finding. */}
-            <DetailContainer key={f.selectedId} id={f.selectedId} onClose={() => f.select(undefined)} targetRef={targetRef} />
+            <DetailContainer
+              key={f.selectedId}
+              id={f.selectedId}
+              onClose={() => f.select(undefined)}
+              onSwitch={switchTo}
+              focusSwitcher={switchedTo === f.selectedId}
+              targetRef={targetRef}
+            />
           </div>,
           document.body,
         )}
