@@ -25,9 +25,11 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
 
 ## 3. First runs in GitHub Actions (~30 min, after the push)
 
-- [ ] 3.1 Push the branch and open the PR, which triggers the `pull_request` run. Every job must be green, or each red finding is fixed or documented as a residual risk in the PR body (ADR 0209 decision 2). Record each job's wall-clock time.
+- [x] 3.1 Push the branch and open the PR, which triggers the `pull_request` run. Every job must be green, or each red finding is fixed or documented as a residual risk in the PR body (ADR 0209 decision 2). Record each job's wall-clock time.
+  - Run [44969107368](https://github.com/Yufukfu/InvestWatch/actions/runs/44969107368) on PR #100, all green. Gitleaks: 736 commits, no leaks, 13 s. OSV-Scanner online: 12 manifests, no issues, 28 s. pip-audit 3.12 (contracts, analytics, scraper): none found, 39 s. pip-audit 3.13 (api, contracts/mock-server): none found, 21 s. npm audit: 0 vulnerabilities, 5 s. The first push did not trigger anything because the PR conflicted with `main` (no merge commit, so no `pull_request` run); merging `origin/main` fixed it.
 - [x] 3.0 The offline job also runs on a PR that changes `security.yml` (a `changes` job with an output), because GitHub starts a workflow by hand only once the file is on `main`, so 3.2 could not run on the branch (decided with Kacper). Spec, design and runbook updated. `mutations: n/a, workflow condition, not runnable locally; 3.1 and 3.2 are the check (it must run on this PR) and the next PR that leaves the file unchanged must skip it`
-- [ ] 3.2 The offline OSV-Scanner job runs on this PR (it changes `security.yml`). Record whether it finishes, its time and its result. This is the first verified OSV-Scanner run on this repository.
+- [x] 3.2 The offline OSV-Scanner job runs on this PR (it changes `security.yml`). Record whether it finishes, its time and its result. This is the first verified OSV-Scanner run on this repository.
+  - Same run: `changes` reported `security.yml changed: true`, the offline job ran. It loaded the npm and PyPI databases, scanned the same 12 manifests, no issues, 28 s including the image pull. The 8 GB laptop stall did not happen on the runner.
 
 ## 4. Closing
 
