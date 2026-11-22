@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { BulkStatusBar } from './components/BulkStatusBar';
 import { ExportReportLink } from './components/ExportReportLink';
 import { FindingDetailPanel } from './components/FindingDetailPanel';
 import { FindingsFilters } from './components/FindingsFilters';
 import { FindingsPager } from './components/FindingsPager';
-import { FindingsTable } from './components/FindingsTable';
+import { FindingsTable, type RowSelection } from './components/FindingsTable';
 import { safeHttpUrl } from './components/labels';
 import { ModuleSwitcher } from './components/ModuleSwitcher';
 import { ShortcutLegend } from './components/ShortcutLegend';
@@ -12,9 +13,11 @@ import { StatusEditor } from './components/StatusEditor';
 import { useDocumentFindings } from './data/useDocumentFindings';
 import { useFindingDetail } from './data/useFindingDetail';
 import { useFindingShortcuts, type ShortcutTarget } from './data/useFindingShortcuts';
-import { EXPORT_ROW_CAP, exportUrl } from './data/findingsUrl';
+import { useBulkStatus } from './data/useBulkStatus';
+import { EXPORT_ROW_CAP, exportUrl, serializeUrl } from './data/findingsUrl';
 import { useFindings } from './data/useFindings';
 import { useStatusChange } from './data/useStatusChange';
+import type { FindingRow } from './model';
 
 type DetailProps = {
   id: string;
@@ -54,6 +57,33 @@ function DetailContainer({ id, onClose, onSwitch, focusSwitcher, targetRef }: De
   return <FindingDetailPanel {...d} onClose={onClose} statusEditor={editor} moduleSwitcher={switcher} />;
 }
 
+// Bulk selection belongs to one loaded list: it is stored with the list's URL (filters, sort, page), and
+// any filter, sort or page change clears it. Only ids still in the
+// loaded rows count, in row order, so it never exceeds the page size (at most 100, the API takes 200).
+function useRowSelection(listKey: string, rows: FindingRow[] | undefined) {
+  const [state, setState] = useState<{ key: string; ids: ReadonlySet<string> }>({ key: listKey, ids: new Set() });
+  // Adjusting state while rendering (React's pattern for state derived from props): forget the old list's
+  // selection at once, so returning to that list later does not bring it back.
+  if (state.key !== listKey) setState({ key: listKey, ids: new Set() });
+  const stored = state.ids;
+  const selected = useMemo(() => (rows ?? []).filter((r) => stored.has(r.id)), [rows, stored]);
+  const ids = useMemo(() => new Set(selected.map((r) => r.id)), [selected]);
+  const clear = useCallback(() => setState({ key: listKey, ids: new Set() }), [listKey]);
+  const selection: RowSelection = {
+    ids,
+    toggle: (id) => {
+      const next = new Set(ids);
+      if (!next.delete(id)) next.add(id);
+      setState({ key: listKey, ids: next });
+    },
+    toggleAll: () => {
+      const all = rows !== undefined && rows.length > 0 && rows.every((r) => ids.has(r.id));
+      setState({ key: listKey, ids: all ? new Set() : new Set(rows?.map((r) => r.id)) });
+    },
+  };
+  return { selected, selection, clear };
+}
+
 export function FindingsPage() {
   const f = useFindings();
   const targetRef = useRef<ShortcutTarget | null>(null);
@@ -61,7 +91,10 @@ export function FindingsPage() {
     () => document.querySelector<HTMLInputElement>('.findings-panel input[type="search"]')?.focus(),
     [],
   );
-  useFindingShortcuts({ rows: f.rows, selectedId: f.selectedId, select: f.select, targetRef, focusSearch });
+  const { selected, selection, clear } = useRowSelection(serializeUrl(f.filters, undefined), f.rows);
+  const bulk = useBulkStatus();
+  const clearSelection = selected.length > 0 ? clear : undefined;
+  useFindingShortcuts({ rows: f.rows, selectedId: f.selectedId, select: f.select, targetRef, focusSearch, clearSelection });
   // The finding opened from the module switcher; its panel puts focus back on the switcher.
   const [switchedTo, setSwitchedTo] = useState<string>();
   const switchTo = (id: string) => {
@@ -82,6 +115,19 @@ export function FindingsPage() {
       </div>
       <ShortcutLegend />
       <FindingsFilters filters={f.filters} onChange={f.setFilters} onReset={f.resetFilters} />
+      <BulkStatusBar
+        count={selected.length}
+        onApply={(status) => {
+          void bulk.apply(selected, status).then((ok) => {
+            if (ok) clear();
+          });
+        }}
+        onClear={clear}
+        isSaving={bulk.isSaving}
+        error={bulk.error}
+        outcome={bulk.outcome}
+        onDismiss={bulk.dismiss}
+      />
       <FindingsTable
         rows={f.rows}
         total={f.total}
@@ -94,6 +140,7 @@ export function FindingsPage() {
         isLoading={f.isLoading}
         isFetching={f.isFetching}
         isError={f.isError}
+        selection={selection}
       />
       {f.total !== undefined && f.total > 0 && (
         <FindingsPager

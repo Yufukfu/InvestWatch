@@ -14,9 +14,9 @@
 
 ## 3. Bulk status change
 
-- [ ] 3.1 Write failing tests: row and select-all checkboxes (names, mixed state), the bar with the count and status buttons, the request body, per-item results, cache invalidation of findings and stats, error keeps the selection, a filter change clears it, `Esc` clears it with no detail open, `J` works from a checkbox, untrusted titles stay text.
-- [ ] 3.2 Implement `useBulkStatus`, `enhanced.ts` invalidation, selection in `FindingsPage`, checkboxes in `FindingsTable`, `BulkStatusBar`, `Esc` in `useFindingShortcuts`, styles.
-- [ ] 3.3 Mutation check.
+- [x] 3.1 Write failing tests: row and select-all checkboxes (names, mixed state), the bar with the count and status buttons, the request body, per-item results, cache invalidation of findings and stats, error keeps the selection, a filter change clears it, `Esc` clears it with no detail open, `J` works from a checkbox, untrusted titles stay text.
+- [x] 3.2 Implement `useBulkStatus`, `enhanced.ts` invalidation, selection in `FindingsPage`, checkboxes in `FindingsTable`, `BulkStatusBar`, `Esc` in `useFindingShortcuts`, styles.
+- [x] 3.3 Mutation check, against `FindingsPage.test.tsx` and `useBulkStatus.test.tsx`: selection reset on a list change dropped; success-only clear made unconditional; select-all `every` turned into `some`; `Esc` clear never offered; the no-detail guard on `Esc` dropped; `indeterminate` never set; header `checked` true for any selection; checkbox name without the title; the API title and the sent title each dropped from the result name; ids sent in reverse order; the old error kept on a new request; `dismiss` a no-op; bulk invalidation reduced to `findings`; the saving guard on the buttons dropped (survived at first; test for one request while saving added, then caught); the bar shown with 0 selected; `dir="auto"` dropped from result titles; `Wyczyść zaznaczenie` a no-op. A survivor showed the read-time list-key check was redundant after the reset, so it was removed. Equivalent, not counted: an `|| false` no-op, and the `return` after `Esc` (no later branch matches `Escape`). mutations: 18 tried, 18 caught
 
 ## 4. Closing
 
