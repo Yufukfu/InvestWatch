@@ -47,6 +47,9 @@ trap cleanup EXIT
 "$ROOT/scripts/init-env.sh" "$ENVF" >/dev/null
 sedi -e "s|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=$PROJECT|" "$ENVF"
 printf 'SCRAPER_HEALTH_PORT=%s\n' "$HEALTH_PORT" >>"$ENVF"
+# Off by default here: the run group's "idle worker" and "seed rerun" scenarios need a worker with no scans queued. The
+# bootstrap check switches it on for its own commands.
+printf 'BOOTSTRAP_SCAN=false\n' >>"$ENVF"
 envval() { grep -E "^$1=" "$ENVF" | cut -d= -f2-; }
 
 # ------------------------------------------------------------ config group (no containers)
@@ -90,9 +93,9 @@ restart_policies() {
 }
 image_built_once() { # three builds of one tag race on the containerd image store: only worker may build
   js '
-    const builders = ["seed", "worker", "scheduler"].filter((n) => c.services[n].build);
+    const builders = ["seed", "worker", "scheduler", "bootstrap"].filter((n) => c.services[n].build);
     if (builders.join() !== "worker") fail("services that build the image: " + builders.join(",") + " (want worker only)")
-    const tags = new Set(["seed", "worker", "scheduler"].map((n) => c.services[n].image));
+    const tags = new Set(["seed", "worker", "scheduler", "bootstrap"].map((n) => c.services[n].image));
     if (tags.size !== 1) fail("the roles use different images: " + [...tags].join(","))'
 }
 single_scheduler() {
@@ -172,6 +175,41 @@ seed_cron_argument() { # the default, then an override passed through to the com
   local rc=$?; cfg; return $rc
 }
 
+bootstrap_wired() { # a one-shot after seed and a healthy worker, never restarted, on the same image
+  js '
+    const b = c.services.bootstrap; if (!b) fail("missing service bootstrap");
+    const need = (dep, cond) => { const d = (b.depends_on || {})[dep]; if (!d || d.condition !== cond) fail("bootstrap must depend on " + dep + " with " + cond); };
+    need("seed", "service_completed_successfully"); need("worker", "service_healthy");
+    need("postgres", "service_healthy"); need("redis", "service_healthy");
+    const w = (c.services.scheduler.depends_on || {}).bootstrap;
+    if (!w || w.condition !== "service_completed_successfully" || w.required !== false) fail("scheduler must wait for bootstrap with required: false, or up --wait fails on the finished one-shot");
+    if (b.restart !== "no") fail("bootstrap restart " + b.restart);
+    if (b.build) fail("bootstrap must not build the image (worker does)");
+    if (b.image !== c.services.worker.image) fail("bootstrap image " + b.image);
+    if (!b.command.includes("iw_scraper.bootstrap")) fail("bootstrap command " + JSON.stringify(b.command))'
+}
+bootstrap_least_privilege() { # app role, Redis URL, no MinIO and no admin value, data only, hardened
+  js '
+    const b = c.services.bootstrap; if (!b) fail("missing service bootstrap");
+    const env = b.environment || {};
+    if (!String(env.DATABASE_URL || "").startsWith("postgresql://" + e.POSTGRES_APP_USER + ":")) fail("DATABASE_URL is not the app role");
+    if (!env.REDIS_URL) fail("no REDIS_URL");
+    const minio = Object.keys(env).filter((k) => k.startsWith("MINIO_")); if (minio.length) fail("bootstrap has " + minio);
+    const banned = [e.POSTGRES_ADMIN_PASSWORD, e.MINIO_ROOT_PASSWORD, e.POSTGRES_ADMIN_USER, e.MINIO_ROOT_USER];
+    if (banned.some((x) => !x)) fail("an admin value is unset, the check would be vacuous");
+    for (const [k, v] of Object.entries(env)) for (const x of banned) if (String(v).includes(x)) fail(k + " holds an admin credential");
+    if (Object.keys(b.networks || {}).join() !== "data") fail("bootstrap networks " + Object.keys(b.networks || {}));
+    if ((b.ports || []).length) fail("bootstrap publishes a port");
+    if (b.read_only !== true || !(b.cap_drop || []).includes("ALL") || !(b.security_opt || []).includes("no-new-privileges:true")) fail("bootstrap is not hardened");
+    const l = b.deploy && b.deploy.resources && b.deploy.resources.limits; if (!l || !Number(l.cpus) || !Number(l.memory)) fail("no limits")'
+}
+bootstrap_flag_passed() { # an empty value takes the default true; the env file's false (set above) reaches the container
+  BOOTSTRAP_SCAN= cfg
+  js 'if ((c.services.bootstrap.environment || {}).BOOTSTRAP_SCAN !== "true") fail("default BOOTSTRAP_SCAN " + c.services.bootstrap.environment.BOOTSTRAP_SCAN)' || { cfg; return 1; }
+  cfg
+  js 'if (c.services.bootstrap.environment.BOOTSTRAP_SCAN !== "false") fail("the env file value was not passed: " + c.services.bootstrap.environment.BOOTSTRAP_SCAN)'
+}
+
 group_config() {
   check "scraper/compose.yaml exists and the model builds" cfg
   [ -s "$TMP/cfg.json" ] || return 0  # nothing to inspect: the checks below would only repeat this failure
@@ -187,6 +225,9 @@ group_config() {
   check "hardening is declared with limits" hardening_declared
   check "stop grace covers the shutdown deadline" grace_covers_deadline
   check "seed passes the cron argument" seed_cron_argument
+  check "bootstrap runs after seed and a healthy worker, once" bootstrap_wired
+  check "bootstrap holds the app role and Redis only, on data alone" bootstrap_least_privilege
+  check "BOOTSTRAP_SCAN reaches bootstrap, default true" bootstrap_flag_passed
 }
 
 # ------------------------------------------------------------ run group (containers)
@@ -277,6 +318,31 @@ idle_stop_is_clean() {
   [ "$(inspect worker '{{.State.ExitCode}}')" = 0 ] && [ $((end - start)) -lt 20 ] || { echo "exit $(inspect worker '{{.State.ExitCode}}') after $((end - start))s"; return 1; }
 }
 
+redis_cli() { dc exec -T redis redis-cli -a "$(envval REDIS_PASSWORD)" --no-auth-warning "$@"; }
+scheduled_sources() { # sources a bootstrap queues: active, with a cron
+  dc exec -T postgres psql -U "$(envval POSTGRES_ADMIN_USER)" -d "$(envval POSTGRES_DB)" -tAc \
+    "select count(*) from sources where active and schedule_cron is not null"
+}
+bootstrap_queues_each_scheduled_source_once() { # also proves `up --wait` returns with a finished bootstrap
+  BOOTSTRAP_SCAN=true dc up -d --wait --wait-timeout 240 worker scheduler || return 1
+  [ "$(inspect bootstrap '{{.State.ExitCode}}')" = 0 ] || { echo "bootstrap exit $(inspect bootstrap '{{.State.ExitCode}}')"; return 1; }
+  local want len; want=$(scheduled_sources); len=$(redis_cli XLEN iw:scan-requests | tr -d '\r ')
+  [ "$want" -gt 0 ] && [ "$len" = "$want" ] || { echo "stream holds $len requests, $want scheduled sources"; return 1; }
+  BOOTSTRAP_SCAN=true dc run --rm --no-deps -T bootstrap >/dev/null || return 1  # a rerun, as a second `up` does
+  [ "$(redis_cli XLEN iw:scan-requests | tr -d '\r ')" = "$len" ] || { echo "a rerun queued more requests"; return 1; }
+}
+bootstrap_off_queues_nothing() { # BOOTSTRAP_SCAN=false: exit 0 and an unchanged stream
+  local before; before=$(redis_cli XLEN iw:scan-requests | tr -d '\r ')
+  BOOTSTRAP_SCAN=false dc run --rm --no-deps -T bootstrap >/dev/null || return 1
+  [ "$(redis_cli XLEN iw:scan-requests | tr -d '\r ')" = "$before" ] || { echo "the stream changed"; return 1; }
+}
+status_reads_the_migrated_schema() { # exit 0 or 1 is a report; 2 would mean a missing table or column
+  local out rc=0
+  out=$(dc run --rm --no-deps -T bootstrap python -m iw_scraper.bootstrap status 2>"$TMP/status.err") || rc=$?
+  [ "$rc" -le 1 ] || { echo "status exit $rc: $(cat "$TMP/status.err")"; return 1; }
+  printf '%s' "$out" | node -e 'const r = JSON.parse(require("fs").readFileSync(0, "utf8")); if (!Array.isArray(r.sources) || !r.sources.length) throw new Error("no sources"); for (const m of ["M1", "M2", "M3"]) if (!(m in r.findings && m in r.calibration_points)) throw new Error("no " + m)'
+}
+
 group_run() {
   check "an invalid seed cron exits non-zero and writes no row" invalid_cron_refused
   check "a failing seed keeps worker and scheduler from being created" seed_failure_blocks_services
@@ -288,6 +354,10 @@ group_run() {
   check "a write outside /tmp is refused" write_outside_tmp_refused
   check "a second start reruns seed and keeps one source row" seed_rerun_keeps_one_row
   check "stopping an idle worker exits 0 before the grace period" idle_stop_is_clean
+  # last: the queued scans keep the worker busy, which the idle-stop check must not see
+  check "bootstrap off queues nothing" bootstrap_off_queues_nothing
+  check "bootstrap queues each scheduled source once, up --wait returns, a rerun adds none" bootstrap_queues_each_scheduled_source_once
+  check "status reads the migrated schema and reports every module" status_reads_the_migrated_schema
 }
 
 # ------------------------------------------------------------ root group (root compose.yaml)
