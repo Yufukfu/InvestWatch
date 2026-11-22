@@ -32,7 +32,7 @@ When a gated (`third_party` or `unknown`) document has no dictionary hit, its no
 - **THEN** loading fails at start-up with an error naming the file and `centroids`
 
 #### Scenario: Margin from env
-- **WHEN** `GATE_EMBED_MIN_MARGIN` is not a number in [-1, 1], or `GATE_EMBED_MIN_CHARS` is not a positive integer
+- **WHEN** `GATE_EMBED_MIN_MARGIN` is not a number in [0, 1], or `GATE_EMBED_MIN_CHARS` is not a positive integer
 - **THEN** start-up fails with an error naming the variable
 
 ### Requirement: Embedding gate degrades to the dictionary

@@ -37,7 +37,7 @@ There is no "borderline" band above zero hits. One hit already passes, and the r
 ### 2. Centroids
 
 - **Seed classes.** `gate_terms.yaml` `centroids` holds named classes of seed lines. `off_topic` is a reserved name. When `centroids` is non-empty it must contain `off_topic` and at least one other class, or loading fails at start-up.
-- **Seed lines.** About 6-8 short synthetic Polish lines per class. The on-topic lines avoid the dictionary vocabulary on purpose, because those are the texts the rescue exists for. The off-topic lines cover news, sports, shopping, recipes, weather and hobbies.
+- **Seed lines.** Four short synthetic Polish lines per on-topic class and eight `off_topic` lines (news, sports, shopping, recipes, weather, hobbies). The dictionary is broad, so 8 of the 12 on-topic lines contain a term anyway; that is fine, since a centroid describes the topic, not the miss. `off_topic` lines must have no dictionary hit (a test checks it). `eval/gate_check.jsonl` never repeats a seed.
 - **`warm()`.**
   - Embeds every seed through the same `Embedder.embed(seed, content_hash(seed))`. The vectors are cached in `iw:emb:v1:{variant}:{hash}`, so a worker restart costs Redis reads only.
   - Builds one normalized mean per class and keeps it in memory.
@@ -54,6 +54,7 @@ There is no "borderline" band above zero hits. One hit already passes, and the r
 - The gate rescues iff `margin ≥ GATE_EMBED_MIN_MARGIN`.
 - The log line carries `similarity = on` and `margin`, rounded to 3 places.
 - The max over classes, rather than one pooled centroid, keeps a small class such as `advisory_service` from being averaged away.
+- **One env name.** `GATE_SIM_THRESHOLD` (default 0.45, forwarded by `analytics/compose.yaml`) was never read by any code path: it was reserved for the cut group 5. It is **replaced** by `GATE_EMBED_MIN_MARGIN`, not kept alongside it. The meaning changed (a margin between two cosines, in [0, 1], default 0.03, not an absolute cosine), so reusing the old name would mislead. An old `.env` that still sets it starts normally and the value is ignored. `GATE_EMBED_MIN_CHARS` (positive integer, default 40) is new. Both are forwarded in `analytics/compose.yaml`, documented in `analytics/.env.example` and the README, and a test checks that every `GATE_*` variable `config.py` reads is forwarded by compose.
 
 ### 4. Calibration
 

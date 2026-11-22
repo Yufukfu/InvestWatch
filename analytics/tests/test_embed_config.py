@@ -120,7 +120,7 @@ def test_budget_without_llm():
 
 def test_gate_defaults():
     g = GateSettings.from_env({})
-    assert g.enabled is True and g.sim_threshold == 0.45
+    assert g.enabled is True and g.embed_min_margin == 0.03 and g.embed_min_chars == 40
 
 
 @pytest.mark.parametrize("raw,expected", [("false", False), ("0", False), ("no", False), ("FALSE", False),
@@ -134,14 +134,9 @@ def test_gate_enabled_invalid():
         GateSettings.from_env({"GATE_ENABLED": "maybe"})
 
 
-@pytest.mark.parametrize("raw", ["0", "1.01", "-0.1", "abc", "nan"])
-def test_gate_threshold_range(raw):
-    with pytest.raises(ConfigError, match="GATE_SIM_THRESHOLD"):
-        GateSettings.from_env({"GATE_SIM_THRESHOLD": raw})
-
-
-def test_gate_threshold_upper_bound_inclusive():
-    assert GateSettings.from_env({"GATE_SIM_THRESHOLD": "1"}).sim_threshold == 1.0
+def test_removed_sim_threshold_is_ignored():
+    # GATE_SIM_THRESHOLD (never used) was replaced by GATE_EMBED_MIN_MARGIN; an old .env must still start.
+    assert GateSettings.from_env({"GATE_SIM_THRESHOLD": "0.45"}) == GateSettings()
 
 
 # ---- near-dup ---------------------------------------------------------------------------------

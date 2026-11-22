@@ -285,7 +285,7 @@ def test_compose_empty_values_mean_defaults():
 
     compose = (Path(__file__).resolve().parents[1] / "compose.yaml").read_text(encoding="utf-8")
     keys = re.findall(r"^\s+((?:EMBED|GATE|NEARDUP)_[A-Z_]+): \$\{\1:-([^}]*)\}", compose, re.M)
-    assert len(keys) == 16
+    assert len(keys) == 17
     env = {k: default for k, default in keys}
     env["EMBED_BASE_URL"] = "http://ollama:11434/v1"
     p = preprocessing_from_env(env, claim_min_idle_ms=60000, llm_settings=llm())

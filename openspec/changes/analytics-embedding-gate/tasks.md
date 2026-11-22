@@ -4,9 +4,9 @@ Requested by Damian on 2026-11-22. Feature freeze 08:00, so if time runs short, 
 
 ## 1. Seeds, settings and the rescue core (~45 min)
 
-- [ ] 1.1 Failing tests: `load_terms` rejects `centroids` without `off_topic` or with `off_topic` only; `GATE_EMBED_MIN_MARGIN` outside [-1, 1] and `GATE_EMBED_MIN_CHARS` ≤ 0 are rejected; `GateEmbedding.warm()` builds normalized class means from `FakeEmbedder`, stops on the first failed seed, and reuses cached seeds; `rescue()` returns `embedding` pass/drop by margin and `dictionary_only_fallback` with no centroids or a failed vector
-- [ ] 1.2 `off_topic` seeds and on-topic seeds without dictionary vocabulary in `gate_terms.yaml`; `GateSettings.embed_min_margin` / `embed_min_chars`; `gate_embedding.py`; `GateDecision.path`, `margin`
-- [ ] 1.3 Mutation check
+- [x] 1.1 Failing tests: `load_terms` rejects `centroids` without `off_topic` or with `off_topic` only; `GATE_EMBED_MIN_MARGIN` outside [0, 1] and `GATE_EMBED_MIN_CHARS` ≤ 0 are rejected; `GateEmbedding.warm()` builds normalized class means from `FakeEmbedder`, stops on the first failed seed, and reuses cached seeds; `rescue()` returns `embedding` pass/drop by margin and `dictionary_only_fallback` with no centroids or a failed vector
+- [x] 1.2 `off_topic` seeds (no dictionary hit) and on-topic seeds in `gate_terms.yaml`; `GateSettings.embed_min_margin` / `embed_min_chars` (replacing the unused `GATE_SIM_THRESHOLD`; compose and `.env.example` updated); `gate_embedding.py` (`GateEmbedding`, `decide`); `GateDecision.path`, `margin`
+- [x] 1.3 Mutation check; `mutations: 29 tried, 28 caught`, then the survivor (dropping the `off_topic` check when two on-topic classes exist) got its test case: `mutations: 3 tried, 3 caught` on the seed-class guard
 
 ## 2. Pipeline wiring (~40 min)
 
