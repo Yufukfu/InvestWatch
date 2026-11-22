@@ -71,7 +71,7 @@ The engine SHALL ask the LLM only about checks whose catalogue entry has an `llm
 - **THEN** the R17 verdict is merged and the R2 item is ignored
 
 ### Requirement: Validated response with verified quotes
-The response content SHALL be a JSON object `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}`, or a bare JSON array of those items, which SHALL be read as `{"results": <array>}` (hosted Gemma 4 `gemma-4-26b-a4b-it` answers so in JSON mode). It SHALL be validated per item with Pydantic; an invalid item SHALL be dropped and its check keeps the rules-only result. An `evidence_quote` SHALL be accepted only when it is at least 8 characters long and occurs in the chunk sent; otherwise the verdict SHALL become `uncertain` with `evidence: null`. Accepted evidence SHALL be a verbatim substring of the document `text`.
+The response content SHALL be a JSON object `{"results": [{"rule_id", "result", "evidence_quote", "explanation"}]}` or a bare JSON array of those items. It SHALL be validated per item with Pydantic; an invalid item SHALL be dropped and its check keeps the rules-only result. An `evidence_quote` SHALL be accepted only when it is at least 8 characters long and occurs in the chunk sent; otherwise the verdict SHALL become `uncertain` with `evidence: null`.
 
 #### Scenario: Hallucinated quote
 - **WHEN** the stub answers R17 `fail` with `evidence_quote` `Produkt zatwierdzony przez KNF`, which is not in the document
@@ -86,6 +86,7 @@ The response content SHALL be a JSON object `{"results": [{"rule_id", "result", 
 - **WHEN** the stub answers R17 `fail` with a quote that occurs in the document
 - **THEN** R17 is `fail`, `evidence` is that exact substring, and `method` is `hybrid`
 - **AND** a quote that differs only in whitespace SHALL be mapped back to the exact original span
+- **AND** accepted evidence SHALL be a verbatim substring of the document `text`
 
 #### Scenario: Result outside the allowed set
 - **WHEN** the stub answers `{"rule_id": "R17", "result": "maybe", …}`
@@ -101,6 +102,7 @@ The response content SHALL be a JSON object `{"results": [{"rule_id", "result", 
 - **WHEN** the stub answers HTTP 200 with content `[{"rule_id": "R17", "result": "fail", "evidence_quote": "<a sentence of the document>", "explanation": "x"}]`, optionally after a `<thought>` block or in a code fence
 - **THEN** it is read as `{"results": [...]}`: R17 is `fail` with that quote, the same per-item validation and quote verification apply, and the response is cached like an object answer
 - **AND** an empty array SHALL be a valid answer with no verdicts, and an item in the array that fails validation SHALL be dropped as in an object answer
+- **AND** a bare array SHALL be read as `{"results": <array>}`, because hosted Gemma 4 `gemma-4-26b-a4b-it` answers so in JSON mode
 
 ### Requirement: Degrade to rules-only on any LLM failure
 No LLM failure SHALL fail the document: the affected module's checks SHALL keep their rules-only results, the finding SHALL be produced and saved as usual, and a log line SHALL name the reason (`llm_unavailable`, `llm_timeout`, `llm_malformed`, `llm_budget_exhausted`) without document text. When any chunk of a module's call fails, all of that module's verdicts SHALL be dropped.
