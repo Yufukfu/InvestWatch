@@ -368,7 +368,7 @@ llm_no_host_port() {
 }
 pull_fail_isolated() { # a failed pull (an unknown model stands in for an unreachable registry) leaves the rest healthy
   local p=$1 code
-  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_MODELS=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
+  dcx "$p" "$PROBE_FILE" --profile llm run --rm -e OLLAMA_PULL_MODELS=iw-smoke-nonexistent/model:0 ollama-pull >/dev/null 2>&1
   code=$?; echo "ollama-pull exit: $code"; [ "$code" -ne 0 ] || return 1
   dcx "$p" "$PROBE_FILE" ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" {print; bad=1} END {exit bad}'
 }
