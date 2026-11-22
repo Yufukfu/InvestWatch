@@ -20,6 +20,7 @@ Who owns which folder: [`.github/CODEOWNERS`](.github/CODEOWNERS) (GitHub reques
 
 - [Integration plan](.docs/integration-plan.md) and [analytics plan](.docs/analytics-plan.md): drafts, contracts not yet confirmed
 - [AI-assisted development log](.docs/ai-workflow.md)
+- Scaling out `worker` and `analytics`, and what stays single-instance: [`infra/README.md`](infra/README.md#scale-out)
 
 ## Quick Start
 
