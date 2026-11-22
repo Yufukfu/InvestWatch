@@ -34,7 +34,7 @@ Every module is its own container image with its own `compose.yaml`; the root fi
                                  │ LLM_BASE_URL            │               │
   ─ [egress network: internet] ──┼─────────────────────────┴───────────────┴──────────────────────
      worker ─▶ target sites      ▼
-     analytics ─▶ hosted Gemma (default)   or, same code, env only:  ollama (profile llm, data network only)
+     analytics ─▶ hosted DeepSeek Flash (default)   or, same code, env only:  ollama (profile llm, data network only)
 ```
 
 - **Networks:** `edge` (gateway, `api`, `web`), `data` (internal, no internet: Postgres, Redis, MinIO, Ollama, `api`, `worker`, `scheduler`, `analytics` and the one-shots `api-migrate`, `minio-init`, `seed`, `analytics-eval`), `egress` (internet: `worker`, `analytics`, `renderer`, `ollama-pull`) and `render` (internal, `worker` to `renderer` only). Each service sits on only the networks it needs.
