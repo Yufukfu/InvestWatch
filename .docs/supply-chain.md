@@ -72,7 +72,7 @@ gitleaks --log-opts=origin/main    # full history of main
 |---|---|
 | Secrets (Gitleaks, full history) | every commit with `.gitleaks.toml`, values redacted. It fails when the log shows 0 commits scanned, because Gitleaks over an unreadable history says "no leaks found" and exits 0. |
 | Dependencies (OSV-Scanner) | `scan source -r` over the checkout in online mode: only package names and versions go to osv.dev |
-| Dependencies (OSV-Scanner, offline database) | manual only: start the workflow with `offline` ticked. It downloads the databases first, the on-premise mode of ADR 0209 |
+| Dependencies (OSV-Scanner, offline database) | by hand (start the workflow with `offline` ticked) and on every PR that changes `security.yml`, so a pin bump is proven before the merge. It downloads the databases first, the on-premise mode of ADR 0209 |
 | Python dependencies (pip-audit) | every `requirements*.txt`, on Python 3.12 or 3.13 like the images. It fails if a requirements file is in a directory the matrix does not list |
 | Node dependencies (npm audit) | every tracked `package-lock.json`, failing at high |
 
@@ -84,7 +84,7 @@ Every action is pinned by commit SHA, both images by digest and `pip-audit` by `
 |---|---|
 | `pip-audit`, `npm audit` in CI | in `.github/workflows/ci.yml`, but manual `workflow_dispatch` only: not a required check and not a merge gate yet (ADR 0209, Consequences) |
 | `.env` isolation (gitignore, hook, CI) | in place |
-| OSV-Scanner | on every PR in `security.yml` (online); offline database by hand (section 5) |
+| OSV-Scanner | on every PR in `security.yml` (online); offline database by hand and on PRs that change `security.yml` (section 5) |
 | Gitleaks + `.gitleaks.toml` | on every PR in `security.yml`, full history |
 | `pip-audit`, `npm audit` on every PR | in `security.yml` (`pip-audit==2.10.1`) |
 | Actions pinned by SHA, scanner images by digest | `security.yml`, enforced by `.github/tests/workflow-pins.test.mjs` |

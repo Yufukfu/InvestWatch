@@ -26,7 +26,8 @@ Owner Kacper. Nothing heavy runs on the laptop: OSV-Scanner and `pip-audit` are 
 ## 3. First runs in GitHub Actions (~30 min, after the push)
 
 - [ ] 3.1 Push the branch and open the PR, which triggers the `pull_request` run. Every job must be green, or each red finding is fixed or documented as a residual risk in the PR body (ADR 0209 decision 2). Record each job's wall-clock time.
-- [ ] 3.2 Start the workflow by hand on the branch with `offline: true`. Record whether the offline OSV-Scanner run finishes, its time and its result. This is the first verified OSV-Scanner run on this repository.
+- [x] 3.0 The offline job also runs on a PR that changes `security.yml` (a `changes` job with an output), because GitHub starts a workflow by hand only once the file is on `main`, so 3.2 could not run on the branch (decided with Kacper). Spec, design and runbook updated. `mutations: n/a, workflow condition, not runnable locally; 3.1 and 3.2 are the check (it must run on this PR) and the next PR that leaves the file unchanged must skip it`
+- [ ] 3.2 The offline OSV-Scanner job runs on this PR (it changes `security.yml`). Record whether it finishes, its time and its result. This is the first verified OSV-Scanner run on this repository.
 
 ## 4. Closing
 

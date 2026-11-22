@@ -64,9 +64,33 @@ jobs:
       - name: Scan the repository
         run: docker run --rm -v "$PWD:/src:ro" "$IMAGE_OSV" scan source -r /src
 
+  # Whether this PR changes the security workflow itself. The offline job runs then, so a change to it or to a
+  # pinned scanner is proven before the merge (a manual run needs the file on main first).
+  changes:
+    name: Does this PR change security.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      workflow: ${{ steps.diff.outputs.workflow }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 2  # the PR merge commit and its first parent, the tip of main
+          persist-credentials: false
+      - id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=false
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] && git diff --name-only HEAD^1 HEAD | grep -qx '.github/workflows/security.yml'; then changed=true; fi
+          echo "security.yml changed: $changed"
+          echo "workflow=$changed" >> "$GITHUB_OUTPUT"
+
   osv-scanner-offline:
     name: Dependencies (OSV-Scanner, offline database)
-    if: github.event_name == 'workflow_dispatch' && inputs.offline
+    needs: changes
+    # By hand with `offline` ticked, or on a PR that changes this file. Other PRs skip it (slow, large download).
+    if: (github.event_name == 'workflow_dispatch' && inputs.offline) || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

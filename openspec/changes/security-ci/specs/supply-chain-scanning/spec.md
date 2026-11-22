@@ -52,15 +52,19 @@ The dependency scans SHALL cover every `package-lock.json` and every `requiremen
 - **THEN** the npm audit step passes and still prints them
 
 ### Requirement: Offline on-premise scan on demand
-The workflow SHALL offer a manual-only dependency scan that first downloads the vulnerability database and then scans with no further network access for the scan itself. Pull requests SHALL NOT run it.
+The workflow SHALL offer a dependency scan that first downloads the vulnerability database and then scans with no further network access for the scan itself. It SHALL run when started by hand with the offline option, and on a pull request that changes the security workflow itself. Other pull requests SHALL NOT run it.
 
 #### Scenario: Offline run requested
 - **WHEN** a teammate starts the workflow by hand with the offline option
 - **THEN** the offline scan downloads the database, scans every manifest against it, and reports pass or fail
 
-#### Scenario: Pull request
-- **WHEN** a pull request triggers the workflow
+#### Scenario: Pull request that does not change the security workflow
+- **WHEN** a pull request that leaves the security workflow file unchanged triggers the workflow
 - **THEN** the offline scan is skipped
+
+#### Scenario: Pull request that changes the security workflow
+- **WHEN** a pull request changes the security workflow file, for example to bump a scanner pin
+- **THEN** the offline scan runs on that pull request, so the change is proven before the merge
 
 ### Requirement: Pinned scanning tools
 Every action the security workflow uses SHALL be pinned to a full commit SHA. Every container image it runs SHALL be pinned by digest, and every scanner installed from a package index SHALL be pinned to an exact version. A repository test SHALL fail when any of these is unpinned.

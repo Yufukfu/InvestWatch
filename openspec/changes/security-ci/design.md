@@ -30,9 +30,11 @@
    - `gitleaks/gitleaks-action` needs a license key for organization-owned repositories and pins its own binary version.
    - `google/osv-scanner-action` is a reusable workflow with nested pins.
    - A digest-pinned `docker run` is the same command as the runbook. It satisfies ADR 0209 decision 5 and the pin test checks it with one rule.
-2. **OSV-Scanner online on pull requests, offline as a manual option.**
+2. **OSV-Scanner online on pull requests, offline by hand and on PRs that change the workflow.**
    - Online sends only package names and versions to osv.dev and needs no database download.
-   - The offline job is the on-premise variant from ADR 0209. It runs only when the workflow is started by hand with the input `offline: true`.
+   - The offline job is the on-premise variant from ADR 0209. It runs when the workflow is started by hand with the input `offline: true`, and on a pull request that changes `security.yml`.
+   - The PR case exists because GitHub starts a workflow by hand only once the file is on the default branch, so a manual run could never prove the offline job before its own merge. A small `changes` job diffs the PR merge commit against its first parent (`fetch-depth: 2`) and sets an output the offline job reads in its `if:`. A `paths:` filter on the trigger would gate the whole workflow, not one job.
+   - Alternative rejected: a PR label that starts the offline job. It adds a second trigger to remember, and a pin bump could merge without anyone adding the label.
    - Both scan the manifests found by `scan source -r .`. A new manifest is picked up without a workflow edit, and the runner has the memory the laptop did not.
 3. **`pip-audit` mirrors `ci.yml`'s Python matrix.**
    - The interpreters are 3.12 for `contracts analytics scraper` and 3.13 for `api` and `contracts/mock-server`.
