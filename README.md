@@ -20,6 +20,7 @@ Who owns which folder: [`.github/CODEOWNERS`](.github/CODEOWNERS) (GitHub reques
 
 - [Integration plan](.docs/integration-plan.md) and [analytics plan](.docs/analytics-plan.md): drafts, contracts not yet confirmed
 - [AI-assisted development log](.docs/ai-workflow.md)
+- Scaling out `worker` and `analytics`, and what stays single-instance: [`infra/README.md`](infra/README.md#scale-out)
 
 ## Quick Start
 
@@ -27,13 +28,15 @@ Requires Docker with Compose v2.20+.
 
 ```bash
 ./scripts/init-env.sh          # creates .env with random secrets (never committed)
-docker compose up --build      # postgres, redis, minio (bucket iw-raw), gateway, web
+docker compose up --build      # the whole stack; the first run also scans every scheduled source
 docker compose --profile llm up -d   # optional: local Gemma (gemma3:4b via Ollama, several GB download)
 ```
 
 The LLM is a hosted OpenAI-compatible model by default (a mentor-approved exception to the on-premise rule, [ADR 0304](.docs/decisions/0304-llm-serving.md)); the `llm` profile is the local open-model fallback. Infrastructure, networks and the joining contract for new modules: [`infra/README.md`](infra/README.md).
 
-Open https://localhost:8443 (local certificate: see [`infra/README.md`](infra/README.md)). Until `api` exists the dashboard shows "Brak połączenia z API"; for UI work without it, run the contract mock server and point `API_UPSTREAM` at it, or use `npm run dev` in `web/` against it ([`contracts/README.md`](contracts/README.md), "Mock server"; [`web/README.md`](web/README.md)).
+On a clean clone the first `up` queues one scan per scheduled source (`bootstrap`, [`scraper/README.md`](scraper/README.md)); scans, analysis and findings take a few minutes. Check progress with `docker compose run --rm --no-deps -T bootstrap python -m iw_scraper.bootstrap status` (exit 0 = every module has findings). A later `up` on the same volumes scans nothing new, so use `docker compose down -v` for a clean demo. `BOOTSTRAP_SCAN=false` in `.env` turns the first scan off.
+
+Open https://localhost:8443 (local certificate: see [`infra/README.md`](infra/README.md)). For UI work without the backend, run the contract mock server and point `API_UPSTREAM` at it, or use `npm run dev` in `web/` against it ([`contracts/README.md`](contracts/README.md), "Mock server"; [`web/README.md`](web/README.md)).
 
 ## Hardware requirements
 
@@ -59,11 +62,11 @@ All settings are environment variables in the root `.env` (template: [`.env.exam
 | `redis` | `REDIS_PASSWORD` | [`infra/README.md`](infra/README.md) |
 | `minio`, `minio-init` | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` | [`infra/README.md`](infra/README.md) |
 | `gateway` | `IW_HOSTNAME`, `IW_HTTPS_PORT`, `IW_HTTP_PORT`, `IW_HSTS`, `API_UPSTREAM`, `WEB_UPSTREAM` | [`infra/README.md`](infra/README.md) |
-| `ollama`, `ollama-pull` (profile `llm`) | `OLLAMA_MODELS`, `OLLAMA_CONTEXT_LENGTH`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_KEEP_ALIVE` | [`infra/README.md`](infra/README.md) |
+| `ollama`, `ollama-pull` (profile `llm`) | `OLLAMA_PULL_MODELS`, `OLLAMA_CONTEXT_LENGTH`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_KEEP_ALIVE` | [`infra/README.md`](infra/README.md) |
 | dev ports overlay ([`infra/compose.dev-ports.yaml`](infra/compose.dev-ports.yaml)) | `IW_DEV_PG_PORT`, `IW_DEV_REDIS_PORT`, `IW_DEV_MINIO_PORT` | [`infra/README.md`](infra/README.md) |
 | `api-migrate`, `api` ([`api/`](api/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_SECURE`, `API_CORS_ORIGINS`; compose derives `DATABASE_URL`, `REDIS_URL` and `CORS_ORIGINS` from these, so never set them, and the image fixes `CONTRACTS_DIR` | [`api/README.md`](api/README.md) |
 | `analytics`, `analytics-eval` ([`analytics/`](analytics/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`; LLM: `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_S`, `LLM_DOC_BUDGET_S`, `LLM_CHUNK_CHARS`, `LLM_MAX_CHUNKS`, `LLM_CACHE_TTL_S`, `LLM_BREAKER_FAILURES`, `LLM_BREAKER_COOLDOWN_S`; embeddings: `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY`, `EMBED_DIM`, `EMBED_TIMEOUT_S`, `EMBED_MAX_CHARS`, `EMBED_CACHE_TTL_S`, `EMBED_BREAKER_FAILURES`, `EMBED_BREAKER_COOLDOWN_S`; gate and near-duplicates: `GATE_ENABLED`, `GATE_SIM_THRESHOLD`, `NEARDUP_NUM_PERM`, `NEARDUP_BANDS`, `NEARDUP_THRESHOLD`, `NEARDUP_MAX_CHARS`, `NEARDUP_TTL_S`; `CLAIM_MIN_IDLE_MS`, `REGISTRY_CSV` | [`analytics/README.md`](analytics/README.md), [`analytics/.env.example`](analytics/.env.example) |
-| `seed`, `worker`, `scheduler` ([`scraper/`](scraper/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`, `MINIO_*`, `SCRAPER_SEED_CRON`, `SCRAPER_SHUTDOWN_DEADLINE`, `SCRAPER_HEALTH_PORT`, `PROXY_LIST`, `PROXY_ROTATION`, `PROXY_COOLDOWN_SECONDS`, `DOMAIN_MIN_INTERVAL_SECONDS`, `FETCH_TIMEOUT_SECONDS`, `FETCH_MAX_BYTES`, `ALLOWED_PORTS`, `COMPOSE_INTERNAL_HOSTS`, `FETCH_EXTRA_HOSTS`, `SCRAPER_RENDER_ENABLED`, `SCRAPER_RENDER_MAX_PER_HOUR`, `SCRAPER_ATTEMPT_TIMEOUT`, `RENDER_TIMEOUT_SECONDS` | [`scraper/README.md`](scraper/README.md), [`scraper/.env.example`](scraper/.env.example) |
+| `seed`, `bootstrap`, `worker`, `scheduler` ([`scraper/`](scraper/compose.yaml)) | `POSTGRES_*`, `REDIS_PASSWORD`, `MINIO_*`, `SCRAPER_SEED_CRON`, `BOOTSTRAP_SCAN`, `SCRAPER_SHUTDOWN_DEADLINE`, `SCRAPER_HEALTH_PORT`, `PROXY_LIST`, `PROXY_ROTATION`, `PROXY_COOLDOWN_SECONDS`, `DOMAIN_MIN_INTERVAL_SECONDS`, `FETCH_TIMEOUT_SECONDS`, `FETCH_MAX_BYTES`, `ALLOWED_PORTS`, `COMPOSE_INTERNAL_HOSTS`, `FETCH_EXTRA_HOSTS`, `SCRAPER_RENDER_ENABLED`, `SCRAPER_RENDER_MAX_PER_HOUR`, `SCRAPER_ATTEMPT_TIMEOUT`, `RENDER_TIMEOUT_SECONDS` | [`scraper/README.md`](scraper/README.md), [`scraper/.env.example`](scraper/.env.example) |
 | `renderer` ([`scraper/compose.renderer.yaml`](scraper/compose.renderer.yaml)) | `RENDER_TIMEOUT_SECONDS`, `RENDER_MAX_PAGE_HEIGHT`, `RENDER_MAX_PNG_BYTES`, `RENDER_CONCURRENCY` | [`scraper/README.md`](scraper/README.md) |
 | `web` ([`web/`](web/compose.yaml)) | none at runtime. Build time, `npm run build`/`dev` only: `VITE_API_BASE_URL`, `VITE_EVENTS_URL`, `API_PROXY_TARGET` | [`web/README.md`](web/README.md), [`web/.env.example`](web/.env.example) |
 

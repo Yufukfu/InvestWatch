@@ -50,14 +50,73 @@ describe('CalibrationPanel', () => {
     expect(screen.getByText(/Liczba oznaczonych próbek: 70/)).toBeInTheDocument();
   });
 
+  it('draws the TP, FN, FP and TN counts of the selected point as a proportion bar with text labels', () => {
+    setup({ index: i70 });
+    const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
+    // Layout only: each segment grows by its returned count, so the browser sets the widths and nothing is recomputed.
+    const segments = Array.from(group.querySelectorAll<HTMLElement>('.proportion-bar > li'));
+    expect(segments.map((s) => s.style.flexGrow)).toEqual(['23', '7', '40']);
+    // The label sits inside its segment, so greyscale and screen readers get the same information as colour.
+    expect(segments.map((li) => li.textContent)).toEqual(['TP 23', 'FN 7', 'TN 40']);
+    // An outcome with a count of 0 draws no segment (the metric tiles still show every count).
+    expect(segments.map((li) => li.className)).toEqual(['seg seg-tp', 'seg seg-fn', 'seg seg-tn']);
+  });
+
+  it('opens with the eyebrow and the question as the heading', () => {
+    setup();
+    expect(screen.getByText('PANEL KALIBRACJI')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Ile alarmów, a ile przeoczeń?' })).toBeInTheDocument();
+  });
+
+  it('puts the warning, the reset and the save in one callout, reset before save', () => {
+    setup({ index: i70 });
+    const callout = screen.getByText(/zmienia poziom ryzyka wszystkich zgłoszeń modułu M2/).closest('.calibration-callout') as HTMLElement;
+    const buttons = within(callout).getAllByRole('button').map((b) => b.textContent);
+    expect(buttons).toEqual(['Wróć do obecnego', 'Zapisz próg']);
+  });
+
+  it('colours the FP and FN captions apart from the plain ones, in text that also names the outcome', () => {
+    setup();
+    expect(within(metric('Fałszywe alarmy (FP)')).getByText('Fałszywe alarmy (FP)')).toHaveClass('metric-fp');
+    expect(within(metric('Przeoczone (FN)')).getByText('Przeoczone (FN)')).toHaveClass('metric-fn');
+    expect(within(metric('Precyzja')).getByText('Precyzja').className).toBe('metric-label');
+  });
+
+  it('marks the selected point on both lines with a dot each', () => {
+    setup({ index: i70 });
+    expect(document.querySelectorAll('.recharts-reference-dot')).toHaveLength(2);
+  });
+
+  it('names the two series in the legend with what each one means', () => {
+    setup();
+    expect(screen.getByText('Precyzja — mało fałszywych alarmów')).toBeInTheDocument();
+    expect(screen.getByText('Czułość — mało przeoczonych naruszeń')).toBeInTheDocument();
+  });
+
+  it('draws a segment for a count of 1, and none for a count of 0', () => {
+    const points = calM2.points.map((pt, i) => (i === i70 ? { ...pt, tp: 1, fn: 0, fp: 1, tn: 0 } : pt));
+    setup({ view: { ...view, points }, index: i70 });
+    const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
+    expect(Array.from(group.querySelectorAll('.proportion-bar > li')).map((li) => li.textContent)).toEqual(['TP 1', 'FP 1']);
+  });
+
+  it('moves the proportion bar with the slider point', () => {
+    setup({ index: i50 });
+    const group = screen.getByRole('group', { name: 'Rozkład wyników dla wybranego progu' });
+    const point = calM2.points[i50];
+    expect(Array.from(group.querySelectorAll<HTMLElement>('.proportion-bar > li')).map((s) => s.style.flexGrow)).toEqual(
+      [point.tp, point.fn, point.fp, point.tn].filter((n) => n > 0).map(String),
+    );
+  });
+
   it('shows the selected point next to the current one, as returned', () => {
     setup({ index: i70 });
     expect(metric('Fałszywe alarmy (FP)')).toHaveTextContent('0');
     expect(metric('Fałszywe alarmy (FP)')).toHaveTextContent('obecnie 5');
     expect(metric('Przeoczone (FN)')).toHaveTextContent('7');
     expect(metric('Przeoczone (FN)')).toHaveTextContent('obecnie 0');
-    expect(metric('Wykryte naruszenia (TP)')).toHaveTextContent('23');
-    expect(metric('Poprawnie pominięte (TN)')).toHaveTextContent('40');
+    expect(metric('Wykryte (TP)')).toHaveTextContent('23');
+    expect(metric('Pominięte (TN)')).toHaveTextContent('40');
     expect(metric('Precyzja')).toHaveTextContent('100%');
     expect(metric('Precyzja')).toHaveTextContent('obecnie 85,7%');
     expect(metric('Czułość')).toHaveTextContent('76,7%');
@@ -173,8 +232,8 @@ describe('CalibrationPanel', () => {
     setup({ index: i70 });
     const plot = screen.getByRole('img', { name: /Precyzja i czułość/ });
     expect(plot).toHaveAttribute('aria-label', 'Precyzja i czułość w zależności od progu; obecny 0,50, wybrany 0,70');
-    expect(plot).toHaveTextContent('obecny');
-    expect(plot).toHaveTextContent('wybrany');
+    expect(plot).toHaveTextContent('obecny 0,50');
+    expect(plot).toHaveTextContent('wybrany 0,70');
     expect(document.querySelectorAll('path.recharts-line-curve')).toHaveLength(2);
     const table = within(screen.getByText('Pokaż dane w tabeli').closest('details')!).getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(calM2.points.length + 1);

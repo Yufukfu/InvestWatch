@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FILTERS, parseFilters, parseSelected, serializeUrl, toQueryArg, withFilter } from './findingsUrl';
+import {
+  DEFAULT_FILTERS,
+  hasTriageFlag,
+  parseFilters,
+  parseSelected,
+  serializeUrl,
+  toQueryArg,
+  triageUrl,
+  withFilter,
+} from './findingsUrl';
 
 describe('parseFilters', () => {
   it('returns the defaults for an empty search', () => {
@@ -131,6 +140,26 @@ describe('serialised parameter names (shared links)', () => {
       page: 1,
       pageSize: 50,
     });
+  });
+});
+
+describe('triage URL', () => {
+  it('asks for new high-risk findings on page 1 and carries a one-shot flag', () => {
+    expect(triageUrl()).toBe('?status=new&risk_level=high&triage=1');
+  });
+
+  it('reads the flag only when it is exactly 1', () => {
+    expect(hasTriageFlag('?status=new&risk_level=high&triage=1')).toBe(true);
+    expect(hasTriageFlag('?triage=0')).toBe(false);
+    expect(hasTriageFlag('?triage=')).toBe(false);
+    expect(hasTriageFlag('?status=new')).toBe(false);
+    expect(hasTriageFlag('')).toBe(false);
+  });
+
+  it('parses to the triage filters and drops the flag when the URL is serialized again', () => {
+    const f = parseFilters(triageUrl());
+    expect(f).toEqual({ ...DEFAULT_FILTERS, status: ['new'], riskLevel: 'high' });
+    expect(serializeUrl(f, undefined)).toBe('?status=new&risk_level=high');
   });
 });
 });

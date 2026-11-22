@@ -42,8 +42,13 @@ Gaps that matter for the demo:
 
 - `scraper-social-x-youtube` (X over Scweet from the home IP with a dedicated account's cookies; YouTube through our fetch layer with transcripts through a residential proxy, no Whisper; ADR 0109; seed rows in `scraper/seeds/x-youtube.toml`, no schedule so a scan request is the only trigger) is implemented and tested end to end on the test stack with saved real answers. First live run (2026-11-22, the production wiring on the test services, real network, the dedicated cookies and a residential proxy): X `@uknf` stored 24 posts from one Scweet call (cap 40) with the author's follower count, no job error; YouTube `@UKNFpolska` with `YOUTUBE_MAX_VIDEOS=3` stored 3 videos, each with its caption transcript (one transcript is about 80,000 characters, a long webinar), no job error. One run per platform: the restriction and block paths are tested against injected errors only. The PR is next.
 
+## First-run rehearsal (`first-run-bootstrap`)
+
+Clean project from this branch (2026-11-22, one `docker compose up -d --build --wait` on empty volumes, rules-only analytics because no LLM key was set, renderer off, real network): `up --wait` returned after 37 s with images already built (a cold image build was not timed); `bootstrap` exited 0; about three minutes later `status` reported 17 of 17 scheduled sources `scanned`, the 2 X and YouTube rows `manual`, 223 documents, findings M1 53, M2 5, M3 12 and 19 calibration points per module, and exited 0 (ready). A first read, about one minute after `up`, showed 15 scanned, 2 pending, 153 documents. Not checked: a cold build time, a run with the LLM on, a scheduled scan landing by cron, a rerun on the same volumes beyond the `stack.sh` check (no new requests).
+
 ## Active OpenSpec changes
 
+- `first-run-bootstrap` (this PR): a one-shot `bootstrap` queues one scan per active source with a cron that never ran, `python -m iw_scraper.bootstrap status` reports readiness, `.docs/brief-compliance.md` maps the brief to evidence; see "First-run rehearsal" below.
 - `scraper-v3-render` (merged, PR #67, 2026-11-22 00:24Z): isolated Playwright renderer service, per-viewport screenshots and `blocks` for `firm_own` + `M2` sources, off by default (`SCRAPER_RENDER_ENABLED`);
 - `scraper-source-discovery` (`python -m iw_scraper.discover`: inactive candidate sources from stored links, ADR 0108; implemented, in review);
 - `scraper-stack` (PR #52); `scraper-orchestration`, `scraper-author-provenance`, `scraper-v2-sources` and `content-hash-definition` are merged (PRs #38, #49, #41, #43, #44)

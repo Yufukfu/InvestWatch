@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import detail from '../../test/fixtures/finding-detail.json';
 import findings from '../../test/fixtures/findings.json';
 import { server } from '../../test/setup';
@@ -44,7 +44,7 @@ describe('FindingsPage', () => {
       ),
     );
     render(<FindingsPage />, { wrapper: storeWrapper() });
-    expect(await screen.findByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeInTheDocument();
+    expect(await screen.findByText('Brak zgłoszeń dla wybranych filtrów')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: /Wyczyść filtry/ })[0]);
     expect(await screen.findByText(findings.items[0].title)).toBeInTheDocument();
     expect(window.location.search).toBe('');
@@ -98,9 +98,8 @@ describe('FindingsPage', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    const select = await within(dialog).findByLabelText('Status');
-    fireEvent.change(select, { target: { value: 'confirmed' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Potwierdzone' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz decyzję' }));
     await waitFor(() => expect(within(dialog).getByText('Potwierdzone', { selector: 'dd' })).toBeInTheDocument());
     expect(saved.status).toBe('confirmed');
     const row = screen.getByRole('button', { name: findings.items.find((i) => i.id === detail.id)!.title }).closest('tr')!;
@@ -112,8 +111,8 @@ describe('FindingsPage', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz' }));
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Zamknięte' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zapisz decyzję' }));
     const alert = within(dialog).getByRole('alert');
     await waitFor(() => expect(alert).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.'));
     expect(within(dialog).getByText('transition not allowed')).toBeInTheDocument();
@@ -205,8 +204,8 @@ describe('FindingsPage', () => {
     window.history.replaceState(null, '', `/?finding=${detail.id}`);
     render(<FindingsPage />, { wrapper: storeWrapper() });
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(await within(dialog).findByLabelText('Status'), { target: { value: 'closed' } });
-    const save = within(dialog).getByRole('button', { name: 'Zapisz' });
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Zamknięte' }));
+    const save = within(dialog).getByRole('button', { name: 'Zapisz decyzję' });
     save.focus();
     fireEvent.click(save);
     await waitFor(() => expect(within(dialog).getByText('Zamknięte', { selector: 'dd' })).toBeInTheDocument());
@@ -307,7 +306,7 @@ describe('FindingsPage', () => {
       await new Promise((r) => setTimeout(r, 20));
       expect(within(dialog).queryByRole('navigation', { name: 'Moduły tego materiału' })).toBeNull();
       expect(dialog).not.toHaveTextContent('Nie udało się');
-      expect(within(dialog).getByLabelText('Status')).toBeEnabled();
+      for (const radio of within(within(dialog).getByRole('radiogroup', { name: 'Status' })).getAllByRole('radio')) expect(radio).toBeEnabled();
     });
 
     it('a list filtered to M1 still offers M3 in the switcher', async () => {
@@ -320,5 +319,193 @@ describe('FindingsPage', () => {
       expect(sibling.get('document_id')).toBe(m1.document_id);
       expect(sibling.has('module')).toBe(false);
     });
+  });
+});
+
+describe('FindingsPage keyboard shortcuts', () => {
+  const press = (key: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(document.body, { key, ...init });
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
+  const ids = findings.items.map((i) => i.id);
+
+  // Records every PATCH and answers like the API: the changed fields applied to the detail mock.
+  function recordPatches(over: Record<string, unknown> = {}) {
+    const patches: { id: string; body: Record<string, unknown> }[] = [];
+    server.use(
+      http.get('http://localhost/api/findings/:id', () => HttpResponse.json({ ...detail, ...over })),
+      http.patch('http://localhost/api/findings/:id', async ({ request, params }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patches.push({ id: String(params.id), body });
+        return HttpResponse.json({ ...detail, ...over, ...body });
+      }),
+    );
+    return patches;
+  }
+
+  async function openDetail(over?: Record<string, unknown>) {
+    const patches = recordPatches(over);
+    window.history.replaceState(null, '', `/?finding=${detail.id}`);
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('radiogroup', { name: 'Status' });
+    return { patches, dialog };
+  }
+
+  it('J with nothing selected opens the first row; J and K then move within the loaded page', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    press('j');
+    expect(window.location.search).toBe(`?finding=${ids[0]}`);
+    press('j');
+    expect(window.location.search).toBe(`?finding=${ids[1]}`);
+    press('k');
+    expect(window.location.search).toBe(`?finding=${ids[0]}`);
+  });
+
+  it('K on the first row and K with nothing selected change nothing', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    press('k');
+    expect(window.location.search).toBe('');
+    press('j');
+    press('k');
+    expect(window.location.search).toBe(`?finding=${ids[0]}`);
+  });
+
+  it('J on the last row stays and does not ask for another page', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('http://localhost/api/findings', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ ...findings, total: 60 });
+      }),
+    );
+    window.history.replaceState(null, '', `/?finding=${ids.at(-1)}`);
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    const requests = seen.length;
+    press('j');
+    await settle();
+    expect(window.location.search).toBe(`?finding=${ids.at(-1)}`);
+    expect(seen).toHaveLength(requests);
+  });
+
+  it('3 with an unsaved note sends nothing and keeps the note', async () => {
+    const { patches, dialog } = await openDetail();
+    const note = within(dialog).getByLabelText('Notatka');
+    fireEvent.change(note, { target: { value: 'do sprawdzenia w poniedziałek' } });
+    within(dialog).getByRole('button', { name: 'Zapisz decyzję' }).focus();
+    press('3');
+    await settle();
+    expect(patches).toEqual([]);
+    expect(note).toHaveValue('do sprawdzenia w poniedziałek');
+  });
+
+  it('3 with an unsaved status choice sends nothing', async () => {
+    const { patches, dialog } = await openDetail();
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Zamknięte' }));
+    press('3');
+    await settle();
+    expect(patches).toEqual([]);
+  });
+
+  it('3 sets the open finding to confirmed, and it stays selected', async () => {
+    const { patches } = await openDetail();
+    press('3');
+    await waitFor(() => expect(patches).toEqual([{ id: detail.id, body: { status: 'confirmed' } }]));
+    expect(window.location.search).toBe(`?finding=${detail.id}`);
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Potwierdzone'));
+  });
+
+  it.each([
+    ['1', 'in_review', 'new'],
+    ['2', 'new', 'in_review'],
+    ['4', 'new', 'false_positive'],
+    ['5', 'new', 'closed'],
+  ])('%s sets the status %s -> %s', async (key, from, to) => {
+    const { patches } = await openDetail({ status: from });
+    press(key);
+    await waitFor(() => expect(patches).toEqual([{ id: detail.id, body: { status: to } }]));
+  });
+
+  it('still works with focus on a status radio: choosing a status does not make the radio a typing field', async () => {
+    const { patches } = await openDetail();
+    const radio = within(screen.getByRole('dialog')).getByRole('radio', { name: 'Nowe' });
+    radio.focus();
+    fireEvent.keyDown(radio, { key: '3' });
+    await waitFor(() => expect(patches).toEqual([{ id: detail.id, body: { status: 'confirmed' } }]));
+  });
+
+  it('sends nothing when the finding already has that status', async () => {
+    const { patches } = await openDetail({ status: 'confirmed' });
+    press('3');
+    await settle();
+    expect(patches).toEqual([]);
+  });
+
+  it('sends nothing with no detail open', async () => {
+    const patches = recordPatches();
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    press('1');
+    press('3');
+    await settle();
+    expect(patches).toEqual([]);
+  });
+
+  it('ignores typing in a field and keys held with Ctrl, Meta or Alt', async () => {
+    const { patches } = await openDetail();
+    fireEvent.keyDown(screen.getByLabelText('Szukaj'), { key: '3' });
+    fireEvent.keyDown(within(screen.getByRole('dialog')).getByLabelText('Notatka'), { key: '3' });
+    press('3', { ctrlKey: true });
+    press('3', { metaKey: true });
+    press('3', { altKey: true });
+    press('j', { ctrlKey: true });
+    await settle();
+    expect(patches).toEqual([]);
+    expect(window.location.search).toBe(`?finding=${detail.id}`);
+  });
+
+  it('shows the same error as a mouse change when the PATCH fails, and the status stays the saved one', async () => {
+    const { dialog } = await openDetail();
+    // After openDetail, whose own PATCH handler would otherwise win.
+    server.use(http.patch('http://localhost/api/findings/:id', () => HttpResponse.json({ error: 'transition not allowed' }, { status: 422 })));
+    press('4');
+    await waitFor(() =>
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Nie udało się zapisać zmiany: serwer odrzucił tę wartość.'),
+    );
+    expect(within(dialog).getByText('Nowe', { selector: 'dd' })).toBeInTheDocument();
+  });
+
+  it('O opens the source of the selected finding in a new tab without opener access', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    await openDetail();
+    press('o');
+    expect(open).toHaveBeenCalledWith(detail.url, '_blank', 'noopener,noreferrer');
+    open.mockRestore();
+  });
+
+  it('O does nothing for a source that is not http or https', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    await openDetail({ url: 'javascript:alert(1)' });
+    press('o');
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('/ focuses the search field and does not type the slash', async () => {
+    render(<FindingsPage />, { wrapper: storeWrapper() });
+    await screen.findByText(findings.items[0].title);
+    const notPrevented = press('/');
+    expect(screen.getByLabelText('Szukaj')).toHaveFocus();
+    expect(notPrevented).toBe(false);
+  });
+
+  it('Escape is left to the detail: it closes once and the shortcuts do nothing more', async () => {
+    const { patches } = await openDetail();
+    press('Escape');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(window.location.search).toBe('');
+    await settle();
+    expect(patches).toEqual([]);
   });
 });

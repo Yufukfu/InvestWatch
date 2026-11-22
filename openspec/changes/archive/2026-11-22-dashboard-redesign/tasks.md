@@ -1,0 +1,72 @@
+# Tasks
+
+## 1. Tokens, fonts and base type
+
+- [x] 1.1 Write the failing tests first: a contrast test that parses the token colours and fails below 4.5:1 for every text-on-fill pair used (placeholder, secondary text, text on risk pills, white on the amber and red fills), a check that non-text controls (borders, focus ring, slider) are at least 3:1, a test that `index.html` has no `style` attribute, and a test that `main.tsx` imports only `latin` and `latin-ext` font files
+- [x] 1.2 Add `@fontsource/space-grotesk`, `@fontsource/inter` and `@fontsource/geist-mono` (the variable packages cannot be limited to two subsets), run `npm audit`, import the used weights and subsets in `main.tsx`
+- [x] 1.3 Replace the `:root` values in `styles.css` with the tokens from the Paper page (colour roles, spacing 4/8 steps, radii, type scale, 2px focus ring, reduced-motion rule) and set Inter as the body font
+- [x] 1.4 Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`; open the build and confirm all three families load from the same origin with a clean console (typecheck, lint, 470 tests and build pass; console clean under the production CSP header, see 8.4)
+- [x] 1.5 mutations: 12 tried, 12 caught
+
+## 2. Header, hero summary and navigation
+
+- [x] 2.1 Update the `SummaryCards`/`App` tests first: header shows `NARZĘDZIE NADZORCZE` and three anchor links, the hero shows `72` and `10` from the summary with the labels `zgłoszeń` and `wysokiego ryzyka`, the module counts are listed
+- [x] 2.2 Restyle the header, live and health badges (green live dot), hero and module counts; anchors scroll to the section ids
+- [x] 2.3 mutations: 12 tried, 12 caught
+
+## 3. Trend and findings table, filters and phone cards
+
+- [x] 3.1 Update tests first: high-risk rows carry the tint class and the text label `Wysoki`, scores and dates render in the mono class, M3 series colour is not the high-risk red and series still differ by dash pattern, the phone filter button has `aria-expanded`, controls the filter region and shows the active-filter count
+- [x] 3.2 Restyle the trend (colours, legend, bucket switch at 44px) and the filters (labels, chips, 44px controls, "Filtry" disclosure with count below 600px)
+- [x] 3.3 Restyle the findings table: tinted high-risk rows, mono scores and dates, tablet layout with platform, status and time under the title, phone layout as cards from the same markup with table roles kept
+- [x] 3.4 Run the web suite; confirm no horizontal overflow of the page at 320, 375, 768 and 1024px against the mock server
+- [x] 3.5 mutations: 14 tried, 14 caught
+
+## 4. Detail drawer, alert toast and status editor
+
+- [x] 4.1 Confirm the existing tests already cover what the detail shows (firm, advertiser, the "Dlaczego to zgłoszenie" text, each rule with legal basis and evidence, the status editor) and that focus stays in the dialog and `Esc` returns it to the row; no new unit test is red. The status editor keeps its native `<select>` (44px) instead of chips: it is keyboard-operable and a chip rewrite would change nine tests for no behavioural gain. Full-screen below 600px is CSS only (design decision 3: no `matchMedia`, so there is no class to assert); it is measured in the browser in task 8.2
+- [x] 4.2 Restyle the drawer (full-screen on phone, side panel from 600px), rule list with severity bars, status editor and the toast (44px actions, reduced-motion safe)
+- [x] 4.3 mutations: n/a, CSS-only restyle with no logic (layout is measured in the browser in 8.2)
+
+## 5. Calibration panel
+
+- [x] 5.1 Update tests first: a proportion bar with TP, FN, FP and TN segments whose widths follow the returned counts and whose labels carry the counts as text; metrics show their value beside the current one; slider spans the full width on phone
+- [x] 5.2 Restyle the calibration panel (module switch at 44px, large threshold figure, proportion bar, metric grid with two columns on phone, chart markers legible, warning and save bar)
+- [x] 5.3 mutations: 7 tried, 7 caught
+
+## 6. Triage entry
+
+- [x] 6.1 Write the failing tests first: with 10 high-risk findings the hero shows a button named exactly `Rozpocznij triage` (no count, because the summary count spans every status), activating it from page 3 with a module, text and date filter set clears those, sets `status=new` and `risk_level=high`, and opens the first returned finding; with 0 high-risk findings the button is absent; an empty or failed list opens no detail and clears the one-shot flag
+- [x] 6.2 Implement the button and the URL update through the existing `findingsUrl` helpers and the summary hook
+- [x] 6.3 mutations: 13 tried, 12 caught, 1 equivalent (an `isFetching` guard that `currentData` already covers; removed as dead code)
+
+## 7. Keyboard shortcuts
+
+- [x] 7.1 Write the failing tests first: `J`/`K` move the selection, `J` with nothing selected selects the first row, `K` on the first row stays, `3` sends a `PATCH` with `confirmed` and the finding stays selected, `3` on an already confirmed finding sends nothing, `1` with no detail open sends nothing, typing `1` in the search field sends nothing, a modifier key is ignored, `J` on the last row does nothing, a failed `PATCH` shows the normal error, `O` does nothing for a non-http URL, `/` focuses search, `Esc` closes the detail once (the shortcuts do not also handle it), and the legend disclosure lists every shortcut
+- [x] 7.2 Implement `useFindingShortcuts` and the shortcut legend disclosure
+- [x] 7.3 mutations: 25 tried, 25 caught (1 equivalent: dead selectedId guard removed)
+
+## 8a. Fidelity pass to the Paper mockups
+
+The first screenshot review (8.3) found the built look diverges from the mockups in `design/` (navy header and blue accent where the mockup is white and ink with red only for risk). Each item is checked against the exported JSX before it is changed.
+
+- [x] 8a.1 Tokens, header and hero: white header with the `NARZĘDZIE NADZORCZE` tagline and an underlined active tab, ink for selected controls, red only for high risk and the triage action, flat white sections with dividers, 24-28px section headings with a subtitle, the `PRZEGLĄD · date` eyebrow, 96px hero figures on one row and a four-up KPI strip (Nowe, M1, M2, M3) (mutations: 13 tried, 13 caught)
+- [x] 8a.2 Filters and findings table: plain label row and ink pills, uppercase table headers, plain title text, score bar coloured by risk, `dd.mm.rrrr · hh:mm` dates, `Strona n z m` pager (mutations: 8 tried, 8 caught)
+- [x] 8a.3 Trend chart: ink solid, blue dashed and teal dotted lines, mono ticks, two-line legend with counts, `Godzina | Dzień` segmented control (mutations: 8 tried, 8 caught)
+- [x] 8a.4 Phone and tablet: hamburger menu, `Filtry n` button with removable filter chips, bordered finding cards, tablet four-column list with the meta line under the title (mutations: 18 tried, 18 caught)
+- [x] 8a.5 Detail drawer, toast and calibration: tag row, 28px title, large score, `Naruszenie` / `Niepewne` / `Zgodne` tags, status radio pills, navy toast, labelled proportion bar and selection markers (mutations: 37 tried, 37 caught)
+- [x] 8a.6 Recapture the screenshots and have a subagent compare them with the mockup PNGs again; fix what is real (recaptured; three parallel Sonnet comparisons against the mockup exports; verified findings fixed: plain table titles and header case, 58px rows, triage button placement, zero-count bar segments, phone/tablet legend, page-size select and healthy badge hidden, 320px overflow)
+- [x] 8a.7 Components sheet states: shortcut chips, connection banner, empty state and skeleton rows (mutations: 28 tried, 28 caught)
+
+## 8. Responsive evidence
+
+- [x] 8.1 Build the production bundle and serve it with the contract mock server; capture every section, plus the open detail, a toast and the calibration panel, at 320, 375, 768, 1024, 1280 and 1440px with Chrome DevTools against the contract mock server (`web/README.md`) and save them under `.docs/screens/dashboard-redesign/`; export the Paper desktop, tablet and mobile artboards to `.docs/screens/dashboard-redesign/design/` (production build served by vite preview in front of the contract mock server; the alert toast comes from a local Socket.IO stand-in because the mock server has no real-time; 30 PNGs and the Paper exports are in `.docs/screens/dashboard-redesign/`)
+- [x] 8.2 Confirm programmatically at each width that `document.documentElement.scrollWidth` does not exceed the viewport width and that no interactive element is smaller than 44px by 44px at 375 and 768px (measured with a script at 320, 375, 768, 1024, 1280 and 1440: no horizontal overflow and no interactive element under 44px; it found an 8px overflow at 320 and a 41px disclosure, both fixed)
+- [x] 8.3 Have a subagent review the saved screenshots against the exported Paper artboards, including a greyscale pass for risk, rule result and status labels and a check that `ąćęłńóśźż` render in the chosen fonts, and list defects; verify each against the code, fix the real ones and recapture (subagent review with greyscale and Polish-glyph checks; details above in 8a)
+- [x] 8.4 Check the browser console is clean in the production build at every width (no CSP violation, no error) (no console message at any of the six widths with the exact `security-headers.conf` CSP added by a header proxy)
+
+## 9. Closing tasks
+
+- [x] 9.1 Apply the `iw-docs-update` skill (update `web/CLAUDE.md` if its rules changed, `.docs/status/dashboard.md` for the redesign, any ADR needed for the font dependencies), run `docs-check`, and add the `iw-ai-log` row (ADR 0214, `.docs/status/dashboard.md`, `design.md` figure corrected, AI log row; `docs-check: ok`)
+- [x] 9.2 Run the `iw-pr-review` skill and fix real findings (whole-branch `iw-reviewer` on `3579890f..75ee06af`: one real finding, the unisolated search text in the filter chip, fixed test-first in `e362ff55`; the "could not check" item is the real-screen-reader behaviour of the explicit table roles on the phone card layout)
+- [x] 9.3 Raise the bulk actions, export and M2 coverage strip as an issue assigned to Damian, noting that contracts are frozen (issue #115)

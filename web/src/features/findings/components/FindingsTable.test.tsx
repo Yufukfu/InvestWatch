@@ -31,6 +31,9 @@ const props = {
   isError: false,
 };
 
+// The year sits in its own element, so match the <time> by its whole text.
+const timeText = (text: string) => (_: string, el: Element | null) => el?.tagName === 'TIME' && el.textContent === text;
+
 describe('FindingsTable', () => {
   it('renders one row per finding with Polish status and a two-decimal score, without a store', () => {
     render(<FindingsTable {...props} rows={[row(), row({ id: '2', title: 'Inny', score: 0.123, status: 'false_positive' })]} />);
@@ -68,7 +71,7 @@ describe('FindingsTable', () => {
 
   it('shows the detection time in UTC and the module name', () => {
     render(<FindingsTable {...props} rows={[row()]} />);
-    expect(screen.getByText('21.11.2026, 15:00 UTC')).toBeInTheDocument();
+    expect(screen.getByText(timeText('21.11.2026 · 15:00'))).toBeInTheDocument();
     expect(screen.getByText('M2')).toHaveAttribute('title', 'Zgodność reklam');
   });
 
@@ -125,9 +128,24 @@ describe('FindingsTable', () => {
     render(<FindingsTable {...props} rows={[]} total={0} onReset={onReset} />);
     expect(screen.queryByRole('table')).toBeNull();
     const empty = screen.getByRole('status');
-    expect(empty).toHaveTextContent('Żadne zgłoszenie nie pasuje do filtrów.');
+    expect(empty).toHaveTextContent('Brak zgłoszeń dla wybranych filtrów');
     fireEvent.click(within(empty).getByRole('button', { name: 'Wyczyść filtry' }));
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains the empty state with a hint on what to change', () => {
+    render(<FindingsTable {...props} rows={[]} total={0} />);
+    expect(within(screen.getByRole('status')).getByText('Zmień zakres dat lub poziom ryzyka.')).toBeInTheDocument();
+  });
+
+  it('draws three decorative skeleton rows under the loading text, and marks the region busy', () => {
+    render(<FindingsTable {...props} rows={undefined} isLoading />);
+    const loading = screen.getByRole('status');
+    expect(loading).toHaveAttribute('aria-busy', 'true');
+    expect(loading).toHaveTextContent('Ładowanie…');
+    const skeleton = loading.querySelector('.skeleton');
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+    expect(skeleton?.children).toHaveLength(3);
   });
 
   it('shows loading and error states', () => {
@@ -152,7 +170,7 @@ describe('FindingsTable', () => {
   it('a page past the end is not "no matches": it offers the first page', () => {
     const onFirstPage = vi.fn();
     render(<FindingsTable {...props} rows={[]} total={9} onFirstPage={onFirstPage} />);
-    expect(screen.queryByText('Żadne zgłoszenie nie pasuje do filtrów.')).toBeNull();
+    expect(screen.queryByText('Brak zgłoszeń dla wybranych filtrów')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Na tej stronie nie ma już zgłoszeń.');
     fireEvent.click(screen.getByRole('button', { name: 'Wróć do pierwszej strony' }));
     expect(onFirstPage).toHaveBeenCalledTimes(1);
@@ -181,6 +199,85 @@ describe('FindingsTable', () => {
     render(<FindingsTable {...props} rows={[row()]} isFetching />);
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.queryByText('Ładowanie…')).toBeNull();
+  });
+
+  it('tints a high-risk row and still names the risk in text', () => {
+    render(
+      <FindingsTable
+        {...props}
+        rows={[row({ id: 'h', title: 'Wysokie', riskLevel: 'high' }), row({ id: 'm', title: 'Średnie', riskLevel: 'medium' })]}
+      />,
+    );
+    const high = screen.getByText('Wysokie').closest('tr')!;
+    const medium = screen.getByText('Średnie').closest('tr')!;
+    expect(high).toHaveClass('row-high');
+    expect(within(high).getByText('Wysoki')).toBeInTheDocument();
+    expect(medium).not.toHaveClass('row-high');
+  });
+
+  it('renders the score and the detection time in the monospace class', () => {
+    render(<FindingsTable {...props} rows={[row({ score: 0.93 })]} />);
+    expect(screen.getByText('0,93').closest('.score')).toHaveClass('mono');
+    expect(screen.getByText(timeText('21.11.2026 · 15:00')).closest('td')).toHaveClass('mono');
+  });
+
+  it('shows the detection time in UTC as day.month.year · hour:minute and says so on hover', () => {
+    render(<FindingsTable {...props} rows={[row({ detectedAt: '2026-01-05T08:07:00Z' })]} />);
+    const time = screen.getByText(timeText('05.01.2026 · 08:07'));
+    expect(time.tagName).toBe('TIME');
+    expect(time).toHaveAttribute('datetime', '2026-01-05T08:07:00Z');
+    expect(time).toHaveAttribute('title', 'Czas UTC');
+  });
+
+  it('reads the time as UTC whatever the browser zone is, and shows an unparsable value as it came', () => {
+    render(<FindingsTable {...props} rows={[row({ id: 'late', detectedAt: '2026-01-05T23:30:00Z' }), row({ id: 'bad', detectedAt: 'not-a-time' })]} />);
+    expect(screen.getByText(timeText('05.01.2026 · 23:30'))).toBeInTheDocument();
+    expect(screen.getByText('not-a-time')).toBeInTheDocument();
+  });
+
+  it('splits the year from the day and time, so a phone card can show dd.mm · hh:mm', () => {
+    render(<FindingsTable {...props} rows={[row({ detectedAt: '2026-01-05T08:07:00Z' })]} />);
+    const time = screen.getByText(timeText('05.01.2026 · 08:07'));
+    const year = time.querySelector('.date-year');
+    expect(year).toHaveTextContent('.2026');
+    expect(time.textContent?.replace(year?.textContent ?? '', '')).toBe('05.01 · 08:07');
+  });
+
+  it('keeps platform, status and time as consecutive cells after the title, for the card meta line', () => {
+    render(<FindingsTable {...props} rows={[row({ platform: 'instagram', status: 'new' })]} />);
+    const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
+    expect(cells.map((td) => td.className.split(' ')[0])).toEqual([
+      'col-risk', 'col-title', 'col-module', 'col-platform', 'col-score', 'col-status', 'col-date',
+    ]);
+    expect(cells[3]).toHaveTextContent('Instagram');
+    expect(cells[5]).toHaveTextContent('Nowe');
+  });
+
+  it('marks each row with its risk level, so the score bar can take the level colour', () => {
+    render(
+      <FindingsTable
+        {...props}
+        rows={[
+          row({ id: 'm', title: 'Średnie', riskLevel: 'medium' }),
+          row({ id: 'l', title: 'Niskie', riskLevel: 'low' }),
+        ]}
+      />,
+    );
+    expect(screen.getByText('Średnie').closest('tr')).toHaveClass('row-medium');
+    expect(screen.getByText('Niskie').closest('tr')).toHaveClass('row-low');
+  });
+
+  it('keeps table roles explicit, so the card layout on a phone is still a table for assistive technology', () => {
+    render(<FindingsTable {...props} rows={[row()]} />);
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('role', 'table');
+    for (const tr of Array.from(table.querySelectorAll('tr'))) expect(tr).toHaveAttribute('role', 'row');
+    expect(Array.from(table.querySelectorAll('thead th')).map((th) => th.getAttribute('role'))).toEqual(
+      Array(7).fill('columnheader'),
+    );
+    expect(Array.from(table.querySelectorAll('tbody td')).map((td) => td.getAttribute('role'))).toEqual(
+      Array(7).fill('cell'),
+    );
   });
 
   it.each([

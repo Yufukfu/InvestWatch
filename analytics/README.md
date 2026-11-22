@@ -60,28 +60,42 @@ CLAIM_MIN_IDLE_MS=90000
    LLM_BASE_URL=http://ollama:11434/v1   # internal host on the data network, plain http is allowed
    LLM_MODEL=gemma3:4b
    LLM_API_KEY=ollama                    # any non-empty value; Ollama does not check it
-   LLM_TIMEOUT_S=120                     # a small model on CPU is much slower than the hosted one
-   LLM_DOC_BUDGET_S=180
-   CLAIM_MIN_IDLE_MS=240000              # must stay above (LLM_DOC_BUDGET_S + 3) * 1000 or the worker exits
-   LLM_MAX_CHUNKS=2                      # fewer calls on long pages
+   LLM_TIMEOUT_S=240                     # measured: one 1500-character M1 call took 182 s on CPU
+   LLM_DOC_BUDGET_S=300
+   CLAIM_MIN_IDLE_MS=360000              # must stay above (LLM_DOC_BUDGET_S + 3 + EMBED_TIMEOUT_S) * 1000 or the worker exits
+   LLM_CHUNK_CHARS=1500                  # short chunks: the default 9000 characters take about 6 minutes per call on CPU
+   LLM_MAX_CHUNKS=1
+   EMBED_BASE_URL=http://ollama:11434/v1 # bge-m3 embeddings; without it bge-m3 is pulled but never used
    ```
 
-   `OLLAMA_MODELS="gemma3:4b bge-m3"`, `OLLAMA_CONTEXT_LENGTH=8192`, `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m` from `scripts/init-env.sh` stay as they are. The local timeouts are estimates: the speed of `gemma3:4b` on the team's laptops has not been measured.
+   `OLLAMA_PULL_MODELS="gemma3:4b bge-m3"`, `OLLAMA_CONTEXT_LENGTH=8192`, `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_KEEP_ALIVE=30m` come from `.env.example`. A `.env` from before 2026-11-22 may have `OLLAMA_MODEL` or `OLLAMA_MODELS` instead; both are ignored and the defaults apply. Never set `OLLAMA_MODELS`: Ollama reads it as its model directory.
 
-2. Pull the models once (`gemma3:4b` about 3.3 GB, `bge-m3` for embeddings about 1.2 GB), then start the stack with the profile:
+   **Speed on CPU** (measured 2026-11-22 on the demo machine: Docker Desktop with 16 GB and 16 CPUs, no GPU, `ollama` capped at 4 CPUs): `gemma3:4b` reads the prompt at about 10 tokens/s and writes about 1.7 tokens/s. With the values above an M1 check finished in 182 s. An M2 check, which has a longer prompt, still timed out at 240 s and that finding stayed rules-only. While the LLM runs, `bge-m3` calls time out at the default `EMBED_TIMEOUT_S=15` (`model.embedder = null`). With the earlier `LLM_TIMEOUT_S=120` and the default chunk size every call timed out. Locally, expect a few model verdicts per page and the rest rules-only. Hosted, the same call took 4.6 s.
+
+2. Pull the models once (`gemma3:4b` about 3.3 GB, about 7 minutes at 8.5 MB/s; `bge-m3` about 1.2 GB, under 3 minutes), then start the stack with the profile:
 
    ```bash
-   docker compose --profile llm up ollama-pull
+   docker compose --profile llm up --exit-code-from ollama-pull ollama-pull   # without --exit-code-from a failed pull still exits 0
    docker compose --profile llm up -d
-   # stack already running: recreate only what changed
+   # stack already running: recreate only what changed (about 40 s)
    docker compose --profile llm up -d ollama analytics
    ```
 
-3. Check: `docker compose logs analytics | grep llm_mode` shows `local`, and findings decided with the model carry `model.llm = "gemma3:4b"`.
+   If the pull fails (`unexpected EOF`, `digest mismatch`), run the same command again: finished models are only checked and a broken part is downloaded again. Run one stack only: `ollama` takes up to 6 GB on top of the rest of the stack, and on 2026-11-22 Docker Desktop crashed during a pull with several stacks running at once.
 
-**Back to hosted:** restore the hosted lines and limits, then `docker compose up -d analytics`.
+3. Check:
+   - `docker compose logs analytics | grep llm_mode` shows `local` and `gemma3:4b`. With `EMBED_BASE_URL` set, `embed_mode` is `local`.
+   - `docker compose exec ollama ollama ps` lists `gemma3:4b` and `bge-m3` with `CONTEXT 8192` once each has served a request.
+   - Findings decided with the model carry `model.llm = "gemma3:4b"`, and their summary names the model.
+   - Re-scanning an unchanged page creates no new document. To send a stored document through analytics again:
 
-Notes: the LLM cache key includes the model, so after a switch pages are analysed again. The default thresholds were measured rules-only (ADR 0316, 0317); quality on `gemma3:4b` is not measured.
+     ```bash
+     docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XADD iw:documents "*" document_id <document uuid> schema v1'
+     ```
+
+**Back to hosted:** restore the hosted lines and limits. Also remove `LLM_CHUNK_CHARS` and `LLM_MAX_CHUNKS`, which are local-only. Either remove `EMBED_BASE_URL` or keep `ollama` running for it (embeddings are local only, ADR 0313). Then run `docker compose up -d analytics` (about 60 s). `ollama` keeps running, so `docker compose stop ollama` frees its memory when embeddings are off.
+
+Notes: the LLM cache key includes the model, so after a switch pages are analysed again. The default thresholds were measured rules-only (ADR 0316, 0317); quality on `gemma3:4b` is not measured, and its verdicts differ from the hosted model's (the same Telegram post scored 0.622 with `gemma3:4b` and 0.182 with `gemma-4-26b-a4b-it`).
 
 ## Gold-set evaluation (calibration panel)
 

@@ -26,6 +26,10 @@ const fake = vi.hoisted(() => {
       socket.disconnected = true;
     },
     disconnected: false,
+    connect: () => {
+      socket.connects += 1;
+    },
+    connects: 0,
   };
   return {
     socket,
@@ -35,6 +39,7 @@ const fake = vi.hoisted(() => {
     reset: () => {
       handlers.clear();
       socket.disconnected = false;
+      socket.connects = 0;
     },
   };
 });
@@ -109,6 +114,26 @@ describe('useRealtime', () => {
     act(() => fake.fire('connect'));
     act(() => fake.fire('connect_error', new Error('x')));
     expect(result.current.connection).toBe('offline');
+  });
+
+  it('reconnect asks the socket to connect again and refetches findings and stats at once', async () => {
+    const n = countRequests();
+    const { result } = renderWithQueries();
+    await waitFor(() => expect(n.list).toBe(1));
+    await waitFor(() => expect(n.summary).toBe(1));
+    act(() => fake.fire('connect_error', new Error('x')));
+    act(() => result.current.rt.reconnect());
+    expect(fake.socket.connects).toBe(1);
+    await waitFor(() => expect(n.list).toBe(2), { timeout: 500 });
+    await waitFor(() => expect(n.summary).toBe(2), { timeout: 500 });
+  });
+
+  it('reconnect after unmount does not revive the closed socket', () => {
+    const { result, unmount } = renderHook(() => useRealtime(), { wrapper: storeWrapper() });
+    const { reconnect } = result.current;
+    unmount();
+    reconnect();
+    expect(fake.socket.connects).toBe(0);
   });
 
   it('refetches findings and stats on every connect, at once', async () => {

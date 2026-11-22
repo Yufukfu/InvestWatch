@@ -55,6 +55,35 @@ networks:
 - Local LLM: `LLM_BASE_URL=http://ollama:11434/v1`, `LLM_MODEL=gemma3:4b`, `LLM_API_KEY=ollama` (any non-empty value).
 - Running one module alone joins the same networks only with the stack's project name: `docker compose -p investwatch --env-file .env -f web/compose.yaml up`.
 
+## Scale-out
+
+On one host, `worker` (scraper) and `analytics` scale with `--scale`. Repeat the flags on every `up`: a plain `up` returns each service to one replica.
+
+```bash
+docker compose up -d --wait --scale worker=3 --scale analytics=2     # start
+docker compose ps worker analytics                                    # the replicas
+docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli XINFO CONSUMERS iw:documents analytics'
+for c in $(docker compose ps -q analytics); do echo "$(docker inspect -f '{{.Config.Hostname}}' $c): $(docker logs $c 2>&1 | grep -c 'message handled') documents"; done
+docker compose up -d --wait --scale worker=1 --scale analytics=1     # back to one each
+```
+
+The consumer list also keeps the names of replicas that were stopped or replaced; compare it with `docker compose ps`. A killed replica's unacknowledged entries are claimed by another one after `CLAIM_MIN_IDLE_MS` (60 s).
+
+| Service | Scale? | Why (evidence: `openspec/changes/archive/2026-11-22-architecture-scale-out/evidence.md`, 2026-11-22) |
+|---|---|---|
+| `worker` | **yes** | Run with 3. Jobs, run locks and per-domain limits live in Redis, so replicas share the queue and, by code reading, keep the politeness limits (a run with 3 workers on the 4 Telegram sources is consistent with the 5 s rule, 4.9 / 15.0 / 5.0 s between logged fetches, but those are response times, not request starts). Speed-up is bounded by those limits: one domain is still fetched at most every 5 s, wherever it runs. |
+| `analytics` | **yes** | Run with 2: each replica is its own consumer of `iw:documents` (name = container hostname), 223 documents split 111/112 with no overlap and no duplicate finding. 892 re-announced entries drained in 21-24 s with one replica and 9-10 s with two (rules-only, 12 CPU machine, same input). Two caveats: with the hosted LLM every replica adds its own concurrent calls and its own circuit breaker, and the local `ollama` is one instance, so replicas add no LLM throughput; two near-duplicate documents handled in the same moment by different replicas can each start a group (`neardup.py` reads, then writes), so one alert may appear twice instead of merged. |
+| `scheduler` | no | Exactly one is the design. Started twice by mistake it is harmless: the job id is source plus slot, so a slot is enqueued once (code, not run across a cron slot). |
+| `api` | no | Run with 2: the gateway sent all 30 requests to one replica (Caddy dials the name `api` and takes one of the two addresses), so the second replica idles. Balancing it would need dynamic upstreams and Socket.IO session stickiness; not done. |
+| `web` | no | Not run with replicas; it goes through the same gateway upstream rule as `api`, so extra replicas would idle. |
+| `gateway` | no | Publishes the host ports: a second replica fails with "port is already allocated". |
+| `renderer` | no | Optional, off by default, not run with replicas. |
+| `postgres`, `redis`, `minio` | no | Single-node data stores, no clustering configured. Never `--scale` them: a second replica mounts the same volume and can corrupt it. |
+| `ollama` | no | Profile `llm`, one model server (4 CPUs, 6 GB). |
+| `api-migrate`, `minio-init`, `seed`, `analytics-eval`, `ollama-pull` | n/a | One-shots that exit; not services to scale. |
+
+`infra/tests/smoke.sh scale` starts two `worker` and two `analytics` replicas on a throwaway project and checks that both run and that each analytics replica is a consumer. The compose limits add up to 5 CPUs and 3.3 GB for `worker=3 analytics=2`, on top of the single-instance stack.
+
 ## Database access
 
 - `iw_admin` (from `POSTGRES_ADMIN_*`): migrations and ops only.
@@ -72,14 +101,14 @@ networks:
 
 ```bash
 docker compose --profile llm up -d          # adds ollama and pulls gemma3:4b and bge-m3 (several GB, Docker Hub)
-docker compose --profile llm up ollama-pull # pre-pull before a demo
+docker compose --profile llm up --exit-code-from ollama-pull ollama-pull # pre-pull before a demo; plain `up` exits 0 even if the pull fails
 ```
 
 A plain `docker compose up` starts neither and downloads nothing.
 
 `ollama` runs with `OLLAMA_CONTEXT_LENGTH=8192` (override in `.env`). The OpenAI-compatible `/v1` endpoint cannot set the context length per request, and a stage-2 chunk (`analytics-llm-p0`, ADR 0304) is about 3k tokens plus the prompt. Ollama's own default context depends on the version and can be smaller, which truncates the input without an error to the client.
 
-`ollama-pull` pulls every model in `OLLAMA_MODELS` (space-separated, default `gemma3:4b bge-m3`; override in `.env`) and exits non-zero on the first failure. `bge-m3` (about 1.2 GB) serves `/v1/embeddings` for `analytics-embeddings` (ADR 0313); it is local only, with no hosted fallback. Without it analytics still runs with embeddings off. To add it to an existing volume, rerun `docker compose --profile llm up ollama-pull` (already pulled models are only checked). `docker compose exec ollama ollama pull bge-m3` does not work: the serving `ollama` is on `data` only, without internet. `ollama` keeps both models loaded side by side (`OLLAMA_MAX_LOADED_MODELS=2`) for 30 minutes after the last request (`OLLAMA_KEEP_ALIVE=30m`), so stage 2 and the embeddings do not evict each other on every document.
+`ollama-pull` pulls every model in `OLLAMA_PULL_MODELS` (space-separated, default `gemma3:4b bge-m3`; override in `.env`; not `OLLAMA_MODELS`, which Ollama reads as its model storage directory) and exits non-zero on the first failure. `bge-m3` (about 1.2 GB) serves `/v1/embeddings` for `analytics-embeddings` (ADR 0313); it is local only, with no hosted fallback. Without it analytics still runs with embeddings off. To add it to an existing volume, rerun `docker compose --profile llm up ollama-pull` (already pulled models are only checked). `docker compose exec ollama ollama pull bge-m3` does not work: the serving `ollama` is on `data` only, without internet. `ollama` keeps both models loaded side by side (`OLLAMA_MAX_LOADED_MODELS=2`) for 30 minutes after the last request (`OLLAMA_KEEP_ALIVE=30m`), so stage 2 and the embeddings do not evict each other on every document.
 
 ## Resource sizing
 
