@@ -12,6 +12,9 @@ import { MARKER } from './lib/rounds.mjs';
 
 const ID = ['-c', 'user.name=iw-test', '-c', 'user.email=iw-test@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const git = (cwd, ...args) => execFileSync('git', [...ID, ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+// The runner commits a merge with the user's own git identity. A CI runner has none, and on Linux git cannot guess
+// one ("Author identity unknown"), so the runner's own git calls get a fixed one here (node --test: one process per file).
+Object.assign(process.env, { GIT_AUTHOR_NAME: 'iw-test', GIT_AUTHOR_EMAIL: 'iw-test@example.invalid', GIT_COMMITTER_NAME: 'iw-test', GIT_COMMITTER_EMAIL: 'iw-test@example.invalid' });
 
 function repo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'iw-run-'));
