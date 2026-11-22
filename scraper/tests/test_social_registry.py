@@ -103,3 +103,13 @@ def test_home_ip_mode_needs_a_flow():
     reg = CollectorRegistry()
     with pytest.raises(ValueError, match="home_ip"):
         reg.register("x.com", collector, home_ip=True)
+
+
+def test_x_is_registered_as_a_home_ip_flow_for_its_own_platform():
+    from iw_scraper.social import x
+
+    found = registry.for_url("https://x.com/uknf")
+
+    assert (found.parse, found.flow, found.platform, found.home_ip) == (None, x.flow, "x", True)
+    assert found.valid_url is x.valid_url
+    assert registry.accepts("x", "https://x.com/uknf") and not registry.accepts("other", "https://x.com/uknf")

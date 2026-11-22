@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 from iw_scraper.ratelimit import host_key
-from iw_scraper.social import telegram
+from iw_scraper.social import telegram, x
 from iw_scraper.social.model import Channel, Flow
 
 # (body, final_url) -> Channel; a collector raises `ParseFailure` for a page it cannot read
@@ -55,3 +55,4 @@ class CollectorRegistry:
 
 registry = CollectorRegistry()
 registry.register("t.me", telegram.parse, valid_url=telegram.valid_url)
+registry.register("x.com", flow=x.flow, platform="x", valid_url=x.valid_url, home_ip=True)

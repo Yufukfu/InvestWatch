@@ -5,7 +5,7 @@ Nothing here knows a platform: the platform's name and profile URL travel in the
 """
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -25,6 +25,7 @@ class Post:
     views: int | None
     links: tuple[Link, ...]
     html: str
+    extra: dict = field(default_factory=dict)  # more `scrape_meta` keys a platform sets (`post_id`, `scraper`, ...)
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ def build_author(channel: Channel) -> dict:
     }
 
 
-def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
+def build_page(channel: Channel, post: Post, *, http_status: int | None) -> dict:
     """The page dict `Ingestor.ingest` takes for one post: the contract fields the page decides, plus `html`.
 
     `platform`, `source_kind`, `source_id`, the fetch time and the fetch facts of `scrape_meta` are added from the
@@ -85,7 +86,9 @@ def build_page(channel: Channel, post: Post, *, http_status: int) -> dict:
         "text": post.text,
         "published_at": _utc(post.published_at),
         "links": [{"href": link.href, "text": link.text or None} for link in post.links],
-        "scrape_meta": {"message_id": post.message_id, "views": post.views, "network": channel.network},
+        "scrape_meta": {
+            "message_id": post.message_id, "views": post.views, "network": channel.network, **post.extra,
+        },
         "html": post.html,
     }
 
@@ -100,6 +103,7 @@ class FlowContext:
     ingest: Callable[..., Awaitable[Any]]  # `Ingestor.ingest`
     clock: Callable[[], datetime]
     wait_turn: Callable[[], Awaitable[Any]]  # the per-domain limiter, for this source's domain
+    max_posts: int = 40  # `SOCIAL_MAX_POSTS`
     identity: Any = None
     session: Any = None
     proxy: Any = None

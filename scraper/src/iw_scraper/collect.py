@@ -145,7 +145,7 @@ class Collector:
         await self._limiter.wait_turn(domain)
         context = FlowContext(
             source=source, domain=domain, ingest=self._ingestor.ingest, clock=self._clock,
-            wait_turn=lambda: self._limiter.wait_turn(domain),
+            wait_turn=lambda: self._limiter.wait_turn(domain), max_posts=self._social_max_posts,
         )
         return await self._attempt(source.id, flow(context))
 
@@ -199,7 +199,8 @@ class Collector:
     def _flow_context(self, source: Source, domain: str, identity, session, proxy, guard) -> FlowContext:
         return FlowContext(
             source=source, domain=domain, ingest=self._ingestor.ingest, clock=self._clock,
-            wait_turn=lambda: self._limiter.wait_turn(domain), identity=identity, session=session, proxy=proxy,
+            wait_turn=lambda: self._limiter.wait_turn(domain), max_posts=self._social_max_posts,
+            identity=identity, session=session, proxy=proxy,
             check_robots=lambda: self._check_robots(source, identity, session, proxy, guard, domain),
             fetch=lambda url: self._fetch_page(url, identity, session, proxy, guard, domain),
         )
