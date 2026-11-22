@@ -2,7 +2,7 @@
 
 ## 1. Contract snapshot
 
-- [ ] 1.1 Regenerate `web/src/api/openapi.json` and `generated.ts` from `contracts/openapi.yaml` 1.2.0 (`npm run api:generate`); `npm run contracts:check` is clean. mutations: n/a, generated files only (no hand-written logic)
+- [x] 1.1 Regenerate `web/src/api/openapi.json` and `generated.ts` from `contracts/openapi.yaml` 1.2.0 (`npm run api:generate`); `npm run contracts:check` is clean. mutations: n/a, generated files only (no hand-written logic)
 
 ## 2. Export link in the detail
 
