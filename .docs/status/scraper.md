@@ -40,6 +40,8 @@ Gaps that matter for the demo:
 - The M3 false positive (Grant Thornton control) and the hosted-LLM outage are analytics findings, not scraper ones.
 - Re-running the same sources creates no new documents (dedup by `content_hash`), so a second rehearsal shows the scan events but no new findings; use a fresh database or a changed page for a live demo of a scan.
 
+- `scraper-social-x-youtube` (X over Scweet from the home IP with a dedicated account's cookies; YouTube through our fetch layer with transcripts through a residential proxy, no Whisper; ADR 0109; seed rows in `scraper/seeds/x-youtube.toml`, no schedule so a scan request is the only trigger) is implemented and tested end to end on the test stack with saved real answers. First live run (2026-11-22, the production wiring on the test services, real network, the dedicated cookies and a residential proxy): X `@uknf` stored 24 posts from one Scweet call (cap 40) with the author's follower count, no job error; YouTube `@UKNFpolska` with `YOUTUBE_MAX_VIDEOS=3` stored 3 videos, each with its caption transcript (one transcript is about 80,000 characters, a long webinar), no job error. One run per platform: the restriction and block paths are tested against injected errors only. The PR is next.
+
 ## Active OpenSpec changes
 
 - `scraper-v3-render` (merged, PR #67, 2026-11-22 00:24Z): isolated Playwright renderer service, per-viewport screenshots and `blocks` for `firm_own` + `M2` sources, off by default (`SCRAPER_RENDER_ENABLED`);

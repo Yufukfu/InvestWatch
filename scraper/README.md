@@ -3,7 +3,7 @@
 Data collection service: collectors for web pages and social media, job queue, scheduler.
 
 - **Owners:** [`.github/CODEOWNERS`](../.github/CODEOWNERS)
-- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; the queue, scheduler, scan requests, events and the run that joins all pieces (`scraper-orchestration`) are implemented. The first social platform, Telegram public channels (`scraper-v2-social`, ADR 0103), is implemented: a source URL is `https://t.me/s/<handle>`, one document per text post, seed rows in `seeds/telegram.toml`. Facebook, Instagram and TikTok (named in the brief) are not covered.
+- **Status:** web collection (`scraper-v1`: fetch, parse, politeness, guards) is implemented as a library; storage and announcement (`scraper-ingest`: validate, dedup, MinIO, `iw:documents`, republish sweep, `job_errors`) is implemented; the queue, scheduler, scan requests, events and the run that joins all pieces (`scraper-orchestration`) are implemented. The first social platform, Telegram public channels (`scraper-v2-social`, ADR 0103), is implemented: a source URL is `https://t.me/s/<handle>`, one document per text post, seed rows in `seeds/telegram.toml`. X and YouTube (`scraper-social-x-youtube`, ADR 0109) are implemented as dedicated flows, see "X and YouTube" below; their seed rows are in `seeds/x-youtube.toml` and carry no schedule. Facebook, Instagram and TikTok (named in the brief) are not covered.
 
 ## Run
 
@@ -51,6 +51,15 @@ Opt-in live smoke tests make real requests and are deselected by default (`-m sc
 
 It cannot give a success rate: the schema keeps only the last run of each source, so statuses are of the last run and nothing older, and the header says so.
 
+## X and YouTube
+
+Both are dedicated flows (`social/x.py`, `social/youtube.py`, `social/transcript.py`), not page parsers; evidence and the decision are in [ADR 0109](../.docs/decisions/0109-social-collectors-research.md). A source URL is `https://x.com/<handle>` or `https://www.youtube.com/@<handle>`; any other form is refused as `invalid_request` before a request.
+
+- **X** reads the account's newest posts through `Scweet` with the dedicated account's cookies, in one bounded call (one account lookup, at most two timeline requests, at most 40 posts), plus one lookup for the follower count. **This is the exception to the fetch rules:** it runs from the home IP (a changing IP for a cookie account raises the ban risk), draws no identity and session, rotates no proxy and reads no `robots.txt` (X disallows every path). It still passes the URL guard and the public-address check and takes one limiter turn. Reposts are skipped; one post is one document.
+- **YouTube** goes through the shared fetch layer (guards, limiter, `robots.txt`, identity, proxy): the channel's `/videos` page with the consent cookie `SOCS=CAI`, then one watch page per new video, one at a time. A video already stored is never requested again. With `YT_TRANSCRIPT_PROXY` set, each new video's caption transcript is requested once through that proxy (Polish track first) and appended to the document text; the outcome is `scrape_meta.transcript` = `caption`, `none` or `failed`, and it is final for the video. A block or a timeout on a transcript stops transcripts for the run; the documents stay. A `Retry-After` on a later watch page ends the run with what was stored and defers the domain for every worker.
+- **Stopping a lost account:** the seed rows have no `schedule_cron`, so only a scan request runs them. If a cron was added and X restricts the account (a run ends `blocked`; nothing retries inside a run), clear the source's `schedule_cron` or set `sources.active = false`, and unset `X_AUTH_TOKEN` and `X_CT0`. Replace the account's cookies only with a dedicated throwaway account's.
+- The cookies and the transcript proxy URL never reach a log, a job error or a stored document; library errors are mapped to the closed `Reason` set without the original text.
+
 ## Author provenance
 
 Analytics routes a post to M2 (published by the firm itself) from `author.handle`, `author.profile_url` and the host of `url` (`advertiser.publisher_firm`; `url` is the guarded fetch URL, so a collector must never take it from markup), so where they come from decides whether an impersonator can fake a firm post (issue 36). Read from the code on `main`:
@@ -61,6 +70,8 @@ Analytics routes a post to M2 (published by the firm itself) from `author.handle
 | sample import (`sample_import`, from `samples.toml`) | the manifest's `handle` | the manifest's `profile_url` | passed as the `author=` argument, never through the page dict; markup is ignored | no: operator-supplied |
 | any parsed page that carries an `author` | dropped | dropped | `ingest.document.build_document` ignores `author` on the page: markup (`<meta>`, `rel=author`, embedded JSON) is written by the post's author | no, so it is never stored |
 | Telegram (`social/telegram.py`) | channel handle | `https://t.me/<handle>` built from the handle | `social/telegram.py` takes the handle from the source URL `t.me/s/<handle>` (never from page text) and ignores posts of another channel; `social/model.build_author` builds the `author`, and `collect.py` passes it to `Ingestor.ingest` as the `author=` argument (the page dict from `build_page` never carries one) | the handle is the source row's own channel username; the page only supplies title and followers |
+| X (`social/x.py`) | `@<handle>` from the source URL | `https://x.com/<handle>` built from the handle | the handle comes from the source URL, never from a post; `name` is the display name the timeline rows carry and `followers` is the account lookup's count (None when unreadable) | the account's own fields, read with the dedicated cookies |
+| YouTube (`social/youtube.py`) | `@<handle>` from the source URL | `https://www.youtube.com/@<handle>` built from the handle | handle and profile URL come from the source URL; `name` is the channel name in the watch page's player data; a video whose channel id differs from the list page's is skipped; `followers` is null | the handle is the source row's own; the name is page data |
 
 Rule: `author` is set only by a platform collector from the platform's own account data, passed as the `author=` argument of `Ingestor.ingest` / `build_document`, never copied from the page dict. A document without `author` is a valid `ScrapedDocument`; consumers must treat it as "unknown", not "third party". `ingest.validate` only checks that `profile_url` is an http(s) URL, not who wrote it. A positive "verified" flag would need a `scrape_meta` field, which is a contract change (proposal: an optional `scrape_meta.author_source`, `platform_account | page_markup | unknown`, in the [issue 36 reply](https://github.com/Yufukfu/InvestWatch/issues/36#issuecomment-7068727126)). When that flag lands, `ingest.document._scrape_meta` must drop it from a page-supplied `scrape_meta` and set it only when `author=` is given, because today it keeps every page key and a parser could otherwise claim `platform_account`.
 
@@ -77,7 +88,10 @@ Environment only; defaults in `scraper/.env.example`. `config.py` reads and vali
 | `DOMAIN_MIN_INTERVAL_SECONDS` | `5` | minimum gap between request starts per domain, all workers |
 | `FETCH_TIMEOUT_SECONDS` | `20` | per-request timeout |
 | `FETCH_MAX_BYTES` | `5242880` | response size cap (5 MiB) |
-| `SOCIAL_MAX_POSTS` | `40` | posts of a social channel read per run, rounded up to whole pages of twenty (a Telegram source URL is `https://t.me/s/<handle>`) |
+| `SOCIAL_MAX_POSTS` | `40` | posts of a social channel read per run, rounded up to whole pages of twenty (a Telegram source URL is `https://t.me/s/<handle>`); an X run never reads more than 40 |
+| `X_AUTH_TOKEN`, `X_CT0` | empty | the `auth_token` and `ct0` cookies of the dedicated X account; without both an X run ends with `invalid_request` and makes no request. Secrets: only in the untracked `.env` |
+| `YT_TRANSCRIPT_PROXY` | empty (transcripts off) | an `http(s)://user:password@host:port` residential proxy for YouTube transcripts; a malformed value stops the run without echoing it. Secret |
+| `YOUTUBE_MAX_VIDEOS` | `10` | newest videos of a YouTube channel read per run |
 | `ALLOWED_PORTS` | `80,443` | ports the scraper may request |
 | `COMPOSE_INTERNAL_HOSTS` | empty | extra host names refused as internal (bare names are always refused) |
 | `FETCH_EXTRA_HOSTS` | empty | hosts allowed for redirects and scraped links besides the active sources |

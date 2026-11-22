@@ -54,6 +54,47 @@ async def test_identity_headers_are_sent_instead_of_client_defaults(stub):
     assert names[:3] == ["accept-language", "user-agent", "accept"]
 
 
+async def test_a_cookie_for_one_request_is_sent_on_the_runs_shared_session(stub):
+    stub.route("/ok", body=PAGE.encode())
+    session = fetch_module.open_session(IDENTITY)
+    try:
+        await fetch(stub.url("/ok"), IDENTITY, None, session=session, cookies={"SOCS": "CAI"})
+    finally:
+        await fetch_module.close_session(session)
+
+    sent = dict(stub.requests[0].headers)
+    assert sent["cookie"] == "SOCS=CAI" and sent["user-agent"] == "iw-test-agent/1.0"
+    assert [name for name, _ in stub.requests[0].headers][:3] == ["accept-language", "user-agent", "accept"]
+
+
+async def test_the_cookie_is_not_kept_for_the_next_request_of_the_session(stub):
+    stub.route("/ok", body=PAGE.encode())
+    session = fetch_module.open_session(IDENTITY)
+    try:
+        await fetch(stub.url("/ok"), IDENTITY, None, session=session, cookies={"SOCS": "CAI"})
+        await fetch(stub.url("/ok"), IDENTITY, None, session=session)
+    finally:
+        await fetch_module.close_session(session)
+
+    assert "cookie" in dict(stub.requests[0].headers) and "cookie" not in dict(stub.requests[1].headers)
+
+
+async def test_a_cookie_is_sent_when_fetch_opens_its_own_session_too(stub):
+    stub.route("/ok", body=PAGE.encode())
+
+    await fetch(stub.url("/ok"), IDENTITY, None, cookies={"SOCS": "CAI"})
+
+    assert dict(stub.requests[0].headers)["cookie"] == "SOCS=CAI"
+
+
+async def test_no_cookie_is_sent_when_none_was_given(stub):
+    stub.route("/ok", body=PAGE.encode())
+
+    await fetch(stub.url("/ok"), IDENTITY, None)
+
+    assert "cookie" not in dict(stub.requests[0].headers)
+
+
 @pytest.mark.parametrize(
     "content_type, markup",
     [

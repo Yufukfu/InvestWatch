@@ -291,6 +291,9 @@ class FakeSourceStore:
     async def schedulable(self):
         return list(self.sources.values())
 
+    async def known_urls(self, urls):
+        return set()
+
 
 @pytest.fixture
 def store() -> FakeSourceStore:

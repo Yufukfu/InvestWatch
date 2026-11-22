@@ -10,6 +10,16 @@ import { main } from './watch.mjs';
 import { fakeGh, fx, ME } from './testkit.mjs';
 import { MARKER } from './lib/rounds.mjs';
 
+// The runner commits merges itself (lib/worktree.mjs) with whatever git identity the machine has. macOS guesses one
+// from the host name, a Linux CI runner has none ("Author identity unknown"), so these tests passed on laptops and
+// failed in CI. Give this process (and every git it spawns) a fixed identity, ignore the developer's own git config
+// (a ~/.gitconfig identity hid the bug too) and turn guessing off, so a missing identity fails here, on any machine.
+Object.assign(process.env, {
+  GIT_AUTHOR_NAME: 'iw-test', GIT_AUTHOR_EMAIL: 'iw-test@example.invalid',
+  GIT_COMMITTER_NAME: 'iw-test', GIT_COMMITTER_EMAIL: 'iw-test@example.invalid',
+  GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.useConfigOnly', GIT_CONFIG_VALUE_0: 'true',
+});
 const ID = ['-c', 'user.name=iw-test', '-c', 'user.email=iw-test@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const git = (cwd, ...args) => execFileSync('git', [...ID, ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 

@@ -12,6 +12,9 @@ const row = (over: Partial<FindingRow> = {}): FindingRow => ({
   riskLevel: 'medium',
   status: 'in_review',
   detectedAt: '2026-11-21T15:00:00Z',
+  documentId: 'doc-1',
+  url: 'https://example.com/post/1',
+  host: 'example.com',
   ...over,
 });
 
@@ -190,5 +193,33 @@ describe('FindingsTable', () => {
   ])('uses the Polish plural for %i', (n, text) => {
     render(<FindingsTable {...props} rows={[row()]} total={n} />);
     expect(screen.getByText(text)).toBeInTheDocument();
+  });
+
+  it('shows the source host under the title as text', () => {
+    render(<FindingsTable {...props} rows={[row({ host: 'example.com' })]} />);
+    const title = screen.getByRole('button', { name: 'Obietnica zysku' }).closest('td') as HTMLElement;
+    expect(within(title).getByText('example.com')).toBeInTheDocument();
+    expect(within(title).queryByRole('link')).toBeNull();
+  });
+
+  it('shows no host when the URL is not http(s)', () => {
+    render(<FindingsTable {...props} rows={[row({ host: undefined })]} />);
+    const title = screen.getByRole('button', { name: 'Obietnica zysku' }).closest('td') as HTMLElement;
+    expect(title.textContent).toBe('Obietnica zysku');
+  });
+
+  it('keeps M1 and M3 of one document as two rows with their own status', () => {
+    render(
+      <FindingsTable
+        {...props}
+        rows={[
+          row({ id: 'a', module: 'M1', status: 'new' }),
+          row({ id: 'b', module: 'M3', status: 'confirmed' }),
+        ]}
+      />,
+    );
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByText('Nowe')).toBeInTheDocument();
+    expect(screen.getByText('Potwierdzone')).toBeInTheDocument();
   });
 });

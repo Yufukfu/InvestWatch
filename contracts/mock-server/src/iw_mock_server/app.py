@@ -27,6 +27,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .evidence import HTML_HEADERS, ExportFormat, NoObjects, evidence_pack, render_html
 from .png import placeholder_png
+from .report import MAX_EXPORT_ROWS, findings_csv
 from .settings import Settings
 from .store import MODULES, Store, load_mock_data
 
@@ -81,6 +82,14 @@ class FindingPatch(_Strict):
         if not self.model_fields_set:
             raise ValueError("at least one of status, note is required")
         return self
+
+
+class BulkStatus(_Strict):
+    ids: Annotated[list[UUID], Field(min_length=1, max_length=200), AfterValidator(_unique)]
+    status: Status
+
+
+Sort = Literal["detected_at", "-detected_at", "score", "-score"]
 
 
 class Thresholds(_Strict):
@@ -152,11 +161,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     settings = settings or Settings()
     store = store or Store(load_mock_data(settings.contracts_dir))
 
-    api = FastAPI(title="InvestWatch mock API", version="1.2.0")
+    api = FastAPI(title="InvestWatch mock API", version="1.3.0")
     api.state.store = store
     api.state.settings = settings
     api.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
-                       allow_headers=["*"])
+                       allow_headers=["*"], expose_headers=["Content-Disposition", "X-Total-Count", "X-Export-Truncated"])
 
     # --- error bodies in the contract shape { "error": ..., "details": ... } ----------------
 
@@ -177,22 +186,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     # --- findings -------------------------------------------------------------------------
 
-    @api.get("/api/findings")
-    async def list_findings(
-        module: Module | None = None,
-        status: str | None = None,
-        platform: str | None = None,
-        source_id: UUID | None = None,
-        document_id: UUID | None = None,
-        risk_level: RiskLevel | None = None,
-        score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
-        date_from: datetime | None = None,
-        date_to: datetime | None = None,
-        q: str | None = None,
-        sort: Literal["detected_at", "-detected_at", "score", "-score"] = "-detected_at",
-        page: Annotated[int, Query(ge=1)] = 1,
-        page_size: Annotated[int, Query(ge=1, le=200)] = 50,
-    ):
+    def filtered(module, status, platform, source_id, document_id, risk_level, score_min, date_from, date_to, q,
+                 sort) -> list[dict]:
+        """The findings GET /api/findings selects, sorted; GET /api/findings/export uses the same."""
         statuses = None
         if status is not None:
             statuses = {s.strip() for s in status.split(",") if s.strip()}
@@ -234,9 +230,72 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         result.sort(key=lambda f: f["id"])  # tie-breaker: the sorts are stable, so equal keys stay by id
         result.sort(key=(lambda f: parse_ts(f["detected_at"])) if key == "detected_at" else (lambda f: f["score"]),
                     reverse=sort.startswith("-"))
+        return result
+
+    @api.get("/api/findings")
+    async def list_findings(
+        module: Module | None = None,
+        status: str | None = None,
+        platform: str | None = None,
+        source_id: UUID | None = None,
+        document_id: UUID | None = None,
+        risk_level: RiskLevel | None = None,
+        score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        q: str | None = None,
+        sort: Sort = "-detected_at",
+        page: Annotated[int, Query(ge=1)] = 1,
+        page_size: Annotated[int, Query(ge=1, le=200)] = 50,
+    ):
+        result = filtered(module, status, platform, source_id, document_id, risk_level, score_min, date_from,
+                          date_to, q, sort)
         start = (page - 1) * page_size
         return {"items": [store.finding_view(f) for f in result[start:start + page_size]],
                 "total": len(result), "page": page, "page_size": page_size}
+
+    @api.get("/api/findings/export")
+    async def export_findings(
+        module: Module | None = None,
+        status: str | None = None,
+        platform: str | None = None,
+        source_id: UUID | None = None,
+        document_id: UUID | None = None,
+        risk_level: RiskLevel | None = None,
+        score_min: Annotated[float | None, Query(ge=0, le=1)] = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        q: str | None = None,
+        sort: Sort = "-detected_at",
+        format: Literal["csv"] = "csv",
+    ):
+        """Contract 1.3.0 (issue #115); declared before /api/findings/{finding_id}."""
+        result = filtered(module, status, platform, source_id, document_id, risk_level, score_min, date_from,
+                          date_to, q, sort)
+        rows = [store.finding_view(f) for f in result[:MAX_EXPORT_ROWS]]
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        headers = {"Content-Disposition": f'attachment; filename="investwatch-findings-{stamp}.csv"',
+                   "X-Total-Count": str(len(result)),
+                   "X-Export-Truncated": "true" if len(result) > len(rows) else "false"}
+        return Response(findings_csv(rows).encode("utf-8"), media_type="text/csv; charset=utf-8", headers=headers)
+
+    @api.post("/api/findings/bulk-status")
+    async def bulk_status(body: Annotated[BulkStatus, Body()]):
+        """Contract 1.3.0 (issue #115): the PATCH status change for every known id, one event each."""
+        results = []
+        for finding_id in body.ids:
+            finding = store.findings.get(str(finding_id))
+            if finding is None:
+                results.append({"id": str(finding_id), "result": "not_found", "finding": None})
+                continue
+            finding["status"] = body.status
+            finding["updated_at"] = bumped_timestamp(finding.get("updated_at"))
+            results.append({"id": finding["id"], "result": "updated", "finding": store.finding_view(finding)})
+        for item in results:
+            if item["finding"] is not None:
+                api.state.notify("finding.updated", {"id": item["id"], "status": body.status})
+        updated = sum(item["finding"] is not None for item in results)
+        return {"updated": updated, "not_found": len(results) - updated, "results": results}
 
     def finding_detail(finding_id: UUID) -> dict:
         finding = get_finding_or_404(finding_id)
@@ -283,6 +342,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                 counts[k] = counts.get(k, 0) + 1
             return counts
 
+        m2 = [f for f in findings if f["module"] == "M2"]
         last_runs = [s["last_run_at"] for s in store.sources.values() if s.get("last_run_at")]
         return {
             "total": len(findings),
@@ -291,6 +351,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             "by_platform": count(lambda f: f["platform"], sorted({f["platform"] for f in findings})),
             "by_risk_level": count(store.risk_level_of, ("high", "medium", "low")),
             "last_scan_at": max(last_runs) if last_runs else None,
+            "m2_coverage": {"total": len(m2), "registry_matched": sum(bool((f.get("firm") or {}).get("registry_id"))
+                                                                      for f in m2)},
         }
 
     @api.get("/api/stats/trend")
